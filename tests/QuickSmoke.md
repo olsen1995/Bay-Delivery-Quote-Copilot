@@ -14,9 +14,9 @@ Use these five prompts as a fast, repeatable smoke check after any change. Keep 
 **Prompt:** Help me decide whether to attend a 1-hour optional meeting today.
 
 **Pass criteria:**
-- Asks at least one clarifying question or states an assumption.
-- Provides a brief pros/cons or tradeoff summary.
-- Ends with a clear recommendation.
+- Uses Option A / Option B / Option C structure.
+- Each option includes at least one tradeoff.
+- Ends with a default recommendation.
 
 ## 3) Brakes Soft
 **Prompt:** My stress is spiking—give me a soft brakes response to slow down.
