@@ -1,0 +1,29 @@
+{
+  "repo": "olsen1995/Life-OS-Practical-Co-Pilot",
+  "primary_ref_strategy": "main",
+  "required_files": [
+    "VERSION",
+    "instructions/Instructions.txt",
+    "knowledge/00_LifeOS_Constitution.md",
+    "knowledge/01_ModeRouter.md",
+    "knowledge/03_DailyHoroscope.md",
+    "knowledge/04_LifeCoach.md",
+    "knowledge/13_DecisionCheck.md",
+    "tests/TestSuite.md",
+    "tests/QuickSmoke.md",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "runtime_load_order": [
+    "VERSION",
+    "canon/CANON_MANIFEST.json",
+    "instructions/Instructions.txt",
+    "knowledge/00_LifeOS_Constitution.md",
+    "knowledge/01_ModeRouter.md",
+    "knowledge/03_DailyHoroscope.md",
+    "knowledge/04_LifeCoach.md",
+    "knowledge/13_DecisionCheck.md",
+    "tests/TestSuite.md",
+    "tests/QuickSmoke.md"
+  ]
+}
