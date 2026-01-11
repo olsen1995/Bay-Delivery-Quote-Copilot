@@ -1,5 +1,11 @@
 # Changelog — Life OS — Practical Co-Pilot
 
+# Changelog
+
+## [0.1.3] - 2026-01-11
+### Added
+- System Health Check guardrails document to reduce behavioral drift and define degraded safe-mode rules.
+
 ## v0.1.2
 - Tier-2 safety polish added (Stop/Check + confidence + least-risk-first + escalation rules)
 
