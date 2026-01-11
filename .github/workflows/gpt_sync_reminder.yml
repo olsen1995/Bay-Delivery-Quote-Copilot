@@ -26,7 +26,7 @@ jobs:
           base="${{ github.base_ref }}"
           git fetch origin "$base" --depth=50
 
-          changed=$(git diff --name-only "origin/$base"...HEAD || true)
+          changed="$(git diff --name-only "origin/$base"...HEAD || true)"
 
           needs_sync=0
           hits=""
@@ -53,32 +53,34 @@ jobs:
             fi
           done <<< "$changed"
 
-          echo "needs_sync=$needs_sync" >> $GITHUB_OUTPUT
-          # Preserve newlines safely
-          echo "hits<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$hits" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "needs_sync=$needs_sync" >> "$GITHUB_OUTPUT"
+
+          # Build a safe multi-line comment body in bash (avoids YAML/JS template issues)
+          if [[ "$needs_sync" -eq 1 ]]; then
+            {
+              echo "comment_body<<'EOF'"
+              echo "Custom GPT sync reminder (non-blocking)"
+              echo ""
+              echo "This PR changes files that usually require re-uploading into the Custom GPT (to avoid repo updated, GPT stale drift):"
+              echo ""
+              echo "Changed:"
+              # Print hits with real newlines
+              echo -e "$hits"
+              echo ""
+              echo "After merge:"
+              echo "1) Download the latest Upload Pack artifact from GitHub Actions (LifeOS CI)"
+              echo "2) Update GPT Instructions using: instructions/Instructions.txt"
+              echo "3) Re-upload updated Knowledge files (knowledge/*) as needed"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Comment reminder on PR (only when needed)
         if: steps.detect.outputs.needs_sync == '1'
         uses: actions/github-script@v7
         with:
           script: |
-            const hits = `${{ steps.detect.outputs.hits }}`.trim();
-            const body =
-`Custom GPT sync reminder (non-blocking)
-
-This PR changes files that usually require re-uploading into the Custom GPT (to avoid “repo updated, GPT stale” drift):
-
-Changed:
-${hits}
-
-After merge:
-1) Download the latest Upload Pack artifact from GitHub Actions (LifeOS CI)
-2) Update GPT Instructions using: instructions/Instructions.txt
-3) Re-upload updated Knowledge files (knowledge/*) as needed
-`;
-
+            const body = `${{ steps.detect.outputs.comment_body }}`.trim();
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
