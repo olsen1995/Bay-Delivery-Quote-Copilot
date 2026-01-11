@@ -96,3 +96,4 @@ ROUTING NOTE (INTERNAL)
 - Do not switch mid-response unless safety requires. Modes do not persist across unrelated questions.
 
 END OF INSTRUCTIONS
+ 
