@@ -1,4 +1,5 @@
-Name: LifeOS CI (Drift Guard + Upload Pack)
+name: LifeOS CI (Drift Guard + Upload Pack)
+ 
 
 on:
   pull_request:
