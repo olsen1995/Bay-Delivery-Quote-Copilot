@@ -1,42 +1,78 @@
-# Skincare (Practical, Minimal)
+# 10 — Skincare (Austin) — Weekly Routine (Tretinoin-Safe)
 
-## Core rules
-- Introduce one active at a time (2+ weeks before adding another).
-- Start low frequency (1–2×/week) and build slowly.
-- If irritation shows up: go barrier-first (cleanser + moisturizer + sunscreen only) until calm.
+This is the current reference routine. Keep it simple, irritation-aware, and consistent.
 
-## Start: your profile
-- **Skin type:** dry / normal / combo / oily.
-- **Goals:** hydration, acne control, tone, texture, redness, etc.
-- **Sensitivity:** none / mild / high (stings easily, reactive).
+Source: Austin’s “Weekly Skincare Routine (Sensitive • Balanced • Tretinoin-Safe)” PDF. :contentReference[oaicite:1]{index=1}
 
-## Build a simple routine
-### AM (daily)
-1. **Cleanser** (gentle, non-stripping; rinse with water if very dry).
-2. **Moisturizer** (light or rich based on skin type).
-3. **Sunscreen** (broad-spectrum, SPF 30+).
+---
 
-### PM (daily)
-1. **Cleanser** (remove sunscreen/makeup).
-2. **Moisturizer** (same or richer for dry skin).
+## Morning Routine (Every Day)
 
-## Weekly extras (optional)
-- **One active only** (choose based on goal):
-  - **Acne/pores:** BHA (salicylic acid).
-  - **Texture/brightening:** AHA (lactic/glycolic).
-  - **Redness/uneven tone:** azelaic acid.
-- Start **1×/week**, then 2×/week if tolerated.
-- Always follow with moisturizer.
+1. **Cleanser:** CeraVe Foaming Cleanser  
+2. **Eye:** Thalgo Eye Gel  
+3. **Niacinamide:** **Monday & Friday mornings ONLY**  
+4. **Moisturizer:** (as needed / your preferred)  
+5. **SPF:** **SPF 50+ mandatory**
 
-## Escalation ladder (keep it slow)
-1. Baseline routine (AM/PM) for 2 weeks.
-2. Add **one** active weekly.
-3. Increase frequency only if skin is calm for 2+ weeks.
-4. Add a second active only after another 4+ weeks of stability.
+---
 
-## Pause conditions (reset to basics)
-- Burning, stinging, or persistent redness.
-- New flaking, tightness, or sensitivity.
-- Sudden breakout spike after changes.
+## Night Routine (By Day)
 
-When any of the above happens: stop actives and return to cleanser + moisturizer + sunscreen until calm.
+### Monday — BPO Night
+- Cleanser
+- Thalgo Eye Gel
+- **Clindamycin/BPO** (thin layer)
+- Moisturizer (if needed)
+
+### Tuesday — Reset Night
+- Cleanser
+- Thalgo Eye Gel
+- Calming mask **or** Vital Cream
+- Moisturizer
+
+### Wednesday — Tretinoin Night (Buffered)
+- Cleanser
+- Moisturizer (thin buffer)
+- **Tretinoin** (pea-sized amount)
+- Moisturizer (after)
+
+### Thursday — Reset Night
+- Cleanser
+- Thalgo Eye Gel
+- Hydrate only
+- Moisturizer
+
+### Friday — BPO Night
+- Cleanser
+- Thalgo Eye Gel
+- **Clindamycin/BPO**
+- Moisturizer (if needed)
+
+### Saturday — Reset Night
+- Cleanser
+- Thalgo Eye Gel
+- Calm/Hydrate
+- Moisturizer
+
+### Sunday — Reset + Weekly Scrub
+- Reset cleanser
+- **Thalgo Marine Scrub** (1× weekly)
+- Mask optional
+- Moisturizer
+
+---
+
+## Important Rules (Non-Negotiable)
+
+- **Tretinoin = once weekly only (Wednesday).**
+- **Never mix BPO and Tretinoin on the same night.**
+- **Do NOT use CeraVe Retinol Serum while on tretinoin.**
+- **Niacinamide = mornings only (Mon & Fri).**
+- Reset nights are there to prevent irritation and barrier damage.
+- Always moisturize after tretinoin.
+- **SPF every morning is mandatory.**
+
+---
+
+## Notes for Updates
+If product lineup changes (new SPF, new moisturizer, etc.), update this file and bump VERSION so the upload pack stays aligned.

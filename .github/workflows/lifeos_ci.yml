@@ -1,5 +1,4 @@
 name: LifeOS CI (Drift Guard + Upload Pack)
- 
 
 on:
   pull_request:
@@ -28,6 +27,7 @@ jobs:
           test -f knowledge/00_System_Health_Check.md
           test -f knowledge/01_ModeRouter.md
           test -f knowledge/02_Daily_CheckIn_Template.md
+          test -f knowledge/10_Skincare.md
           test -f knowledge/13_DecisionCheck.md
 
       - name: Drift guard — verify Instructions references resolve (best-effort)
@@ -103,6 +103,7 @@ jobs:
           cp -f knowledge/00_System_Health_Check.md dist/lifeos_upload_pack/knowledge/00_System_Health_Check.md
           cp -f knowledge/01_ModeRouter.md dist/lifeos_upload_pack/knowledge/01_ModeRouter.md
           cp -f knowledge/02_Daily_CheckIn_Template.md dist/lifeos_upload_pack/knowledge/02_Daily_CheckIn_Template.md
+          cp -f knowledge/10_Skincare.md dist/lifeos_upload_pack/knowledge/10_Skincare.md
           cp -f knowledge/13_DecisionCheck.md dist/lifeos_upload_pack/knowledge/13_DecisionCheck.md
 
           # Include docs that affect behavior (optional)
