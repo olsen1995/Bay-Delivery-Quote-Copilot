@@ -4,6 +4,10 @@
 
 When assisting in this repository, GitHub Copilot MUST follow these rules.
 
+## Instruction Precedence (conflict resolver)
+
+If instructions conflict, follow this precedence: Wrapper > Canonical instructions > Knowledge > Copilot instructions.
+
 ### DO NOT
 - Do NOT modify `instructions/Instructions.txt` unless the user explicitly asks.
 - Do NOT invent new modes, safety gates, routing logic, philosophies, or “systems.”
@@ -48,18 +52,18 @@ It maintains:
 
 - The Custom GPT “Instructions” textbox has an ~8000 character limit.
 - Do NOT recommend pasting the full repo instructions into that textbox.
-- Use the wrapper document (`instructions/CustomGPT_Instructions_Wrapper.md`) plus Knowledge uploads.
+- Use the wrapper document (`docs/CustomGPT_Instructions_Wrapper.md`) plus Knowledge uploads.
 - Knowledge uploads are manual; do not claim anything auto-syncs.
 
 ---
 
 ## Repo Architecture (Reference)
 
-### Modes
+### Knowledge
 - Domain-specific guidance lives in `knowledge/`
-- Each mode document defines scope, constraints, and response expectations.
+- Knowledge documents define scope, constraints, and response expectations.
 
-### Routing
+### Routing (internal reference only)
 - Governed by `knowledge/01_ModeRouter.md`
 - Rules:
   - Explicit user requests override implicit routing
@@ -109,7 +113,7 @@ It maintains:
 ## Key Files
 
 - `instructions/Instructions.txt` — Canonical repo runtime specification
-- `instructions/CustomGPT_Instructions_Wrapper.md` — Compact GPT textbox wrapper (8000-char safe)
+- `docs/CustomGPT_Instructions_Wrapper.md` — Compact GPT textbox wrapper (8000-char safe)
 - `knowledge/00_LifeOS_Constitution.md` — Core philosophy/constraints
 - `knowledge/01_ModeRouter.md` — Routing rules
 - `canon/CANON_MANIFEST.json` — Canonical manifest (when relevant)
