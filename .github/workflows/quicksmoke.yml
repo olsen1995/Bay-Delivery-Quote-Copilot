@@ -18,3 +18,15 @@ jobs:
         shell: pwsh
         run: |
           pwsh -File ./tools/quicksmoke.ps1
+
+      - name: Validate Horoscope Freshness (if file exists)
+        shell: pwsh
+        run: |
+          $today = Get-Date -Format "yyyy-MM-dd"
+          $path = "./daily-horoscope-log/$today.md"
+          if (Test-Path $path) {
+            Write-Host "🧪 Running horoscope freshness validator for $today..."
+            pwsh -File ./tools/validate_horoscope_freshness.ps1 -TodayPath $path
+          } else {
+            Write-Host "✅ No horoscope file for today ($today). Skipping freshness check."
+          }
