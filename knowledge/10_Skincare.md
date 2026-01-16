@@ -2,8 +2,6 @@
 
 This is the current reference routine. Keep it simple, irritation-aware, and consistent.
 
-Source: Austin’s “Weekly Skincare Routine (Sensitive • Balanced • Tretinoin-Safe)” PDF. :contentReference[oaicite:1]{index=1}
-
 ---
 
 ## Morning Routine (Every Day)
@@ -19,45 +17,52 @@ Source: Austin’s “Weekly Skincare Routine (Sensitive • Balanced • Tretin
 ## Night Routine (By Day)
 
 ### Monday — BPO Night
-- Cleanser
-- Thalgo Eye Gel
-- **Clindamycin/BPO** (thin layer)
+
+- Cleanser  
+- Thalgo Eye Gel  
+- **Clindamycin/BPO** (thin layer)  
 - Moisturizer (if needed)
 
 ### Tuesday — Reset Night
-- Cleanser
-- Thalgo Eye Gel
-- Calming mask **or** Vital Cream
+
+- Cleanser  
+- Thalgo Eye Gel  
+- Calming mask **or** Vital Cream  
 - Moisturizer
 
 ### Wednesday — Tretinoin Night (Buffered)
-- Cleanser
-- Moisturizer (thin buffer)
-- **Tretinoin** (pea-sized amount)
+
+- Cleanser  
+- Moisturizer (thin buffer)  
+- **Tretinoin** (pea-sized amount)  
 - Moisturizer (after)
 
 ### Thursday — Reset Night
-- Cleanser
-- Thalgo Eye Gel
-- Hydrate only
+
+- Cleanser  
+- Thalgo Eye Gel  
+- Hydrate only  
 - Moisturizer
 
 ### Friday — BPO Night
-- Cleanser
-- Thalgo Eye Gel
-- **Clindamycin/BPO**
+
+- Cleanser  
+- Thalgo Eye Gel  
+- **Clindamycin/BPO**  
 - Moisturizer (if needed)
 
 ### Saturday — Reset Night
-- Cleanser
-- Thalgo Eye Gel
-- Calm/Hydrate
+
+- Cleanser  
+- Thalgo Eye Gel  
+- Calm/Hydrate  
 - Moisturizer
 
 ### Sunday — Reset + Weekly Scrub
-- Reset cleanser
-- **Thalgo Marine Scrub** (1× weekly)
-- Mask optional
+
+- Reset cleanser  
+- **Thalgo Marine Scrub** (1× weekly)  
+- Mask optional  
 - Moisturizer
 
 ---
@@ -75,4 +80,5 @@ Source: Austin’s “Weekly Skincare Routine (Sensitive • Balanced • Tretin
 ---
 
 ## Notes for Updates
-If product lineup changes (new SPF, new moisturizer, etc.), update this file and bump VERSION so the upload pack stays aligned.
+
+If the product lineup changes (new SPF, new moisturizer, etc.), update this file and bump the VERSION so the upload pack stays aligned.
