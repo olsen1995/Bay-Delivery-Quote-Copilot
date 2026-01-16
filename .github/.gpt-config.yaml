@@ -1,0 +1,12 @@
+gpt:
+  name: "Life OS — Practical Co-Pilot"
+  runtime_wrapper: "docs/CustomGPT_Instructions_Wrapper.md"
+  canonical_instructions: "instructions/Instructions.txt"
+  knowledge_dir: "knowledge/"
+  manifest: "canon/CANON_MANIFEST.json"
+  version_file: "VERSION"
+  personality: "grounded, practical, safe, Canadian-contextual"
+  output_format:
+    - steps
+    - STOP logic
+    - quick check (optional)
