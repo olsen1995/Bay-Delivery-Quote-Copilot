@@ -26,7 +26,7 @@ $canonicalOrder = @(
 )
 
 function Get-ManifestFiles($basePath) {
-    if (Test-Path $basePath -PathType Leaf -and $basePath -like "*.manifest") {
+    if ((Test-Path $basePath -PathType Leaf) -and ($basePath -like "*.manifest")) {
         return @($basePath)
     }
 
@@ -91,12 +91,4 @@ if ($Check -and $filesWithIssues.Count -gt 0) {
 
 if ($Check) {
     Write-Output "`n✅ All files have correct key order."
-}
-if ($filesWithIssues.Count -gt 0) {
-    Write-Output "`n❌ $($filesWithIssues.Count) file(s) failed linting."
-    exit 1
-}
-else {
-    Write-Output "`n✅ All files passed linting."
-    exit 0
 }
