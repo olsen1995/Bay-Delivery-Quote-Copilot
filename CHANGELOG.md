@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 1.0.2 (2026-01-18)
+
+
+### Bug Fixes
+
+* **ci:** final release workflow with auth + identity ([d121e5f](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/commit/d121e5f93aa2dc241ff9d02205e85d75e8dd5467))
+
 ### [1.0.1](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/compare/v0.2.0...v1.0.1) (2026-01-18)
 
 # Changelog — Life OS Practical Co-Pilot
