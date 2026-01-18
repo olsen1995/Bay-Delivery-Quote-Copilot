@@ -14,7 +14,7 @@ jobs:
       - name: ⬇️ Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0   # REQUIRED for tags
+          fetch-depth: 0   # required for tags
 
       - name: ⚙️ Set up Node.js
         uses: actions/setup-node@v3
@@ -36,9 +36,12 @@ jobs:
 
       - name: 📤 Push changes and tags
         run: |
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git push --follow-tags origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🏷️ Create GitHub Release
+      - name: 🏷️ Create GitHub Release with changelog
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
@@ -57,7 +60,7 @@ jobs:
 
       - name: ▶ Run manifest_lint.ps1
         shell: pwsh
-        run: ./scripts/manifest_lint.ps1
+        run: ./scripts/lint/manifest_lint.ps1
 
       - name: ▶ Run manifest_order_fix.ps1
         shell: pwsh
