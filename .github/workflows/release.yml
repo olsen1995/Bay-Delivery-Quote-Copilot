@@ -19,6 +19,11 @@ jobs:
         with:
           node-version: '18'
 
+      - name: 🧾 Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: 📦 Install dependencies
         run: npm ci
 
@@ -26,9 +31,4 @@ jobs:
         run: npm run release
 
       - name: 📤 Push changes and tags
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore(release): version bump and changelog [skip ci]"
-          git push --follow-tags origin main
+        run: git push --follow-tags origin main
