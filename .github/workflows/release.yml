@@ -3,8 +3,10 @@ name: Release
 on:
   workflow_dispatch:     # ✅ Manual trigger from GitHub UI
   push:
+    branches:
+      - main             # ✅ Auto-trigger on main pushes
     tags:
-      - 'v*'             # ✅ Auto-run when a version tag like v1.0.2 is pushed
+      - 'v*'             # ✅ Auto-run when a tag like v1.0.2 is pushed
 
 jobs:
   release:
@@ -45,3 +47,15 @@ jobs:
           body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ps-scripts:
+    name: 🧪 Run PowerShell Scripts
+    runs-on: windows-latest
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🧪 Run manifest_lint.ps1
+        shell: pwsh
+        run: ./scripts/manifest_lint.ps1
