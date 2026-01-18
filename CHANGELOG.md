@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.6](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/compare/v1.0.5...v1.0.6) (2026-01-18)
+
 ### 1.0.5 (2026-01-18)
 
 ### 1.0.4 (2026-01-18)
