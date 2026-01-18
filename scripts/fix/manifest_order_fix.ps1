@@ -92,3 +92,11 @@ if ($Check -and $filesWithIssues.Count -gt 0) {
 if ($Check) {
     Write-Output "`n✅ All files have correct key order."
 }
+# Auto-stage any modified .manifest files
+$changed = git status --porcelain | Where-Object { $_ -match '\.manifest$' -and $_ -match '^ M ' }
+
+foreach ($line in $changed) {
+    $file = $line -replace '^ M ', ''
+    Write-Host "📌 Auto-staging fixed file: $file"
+    git add $file
+}
