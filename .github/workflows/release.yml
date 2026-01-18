@@ -37,7 +37,7 @@ jobs:
       - name: 📤 Push changes and tags
         run: |
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-          git push --follow-tags origin main
+          git push origin HEAD --follow-tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
