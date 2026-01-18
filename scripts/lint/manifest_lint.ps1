@@ -24,7 +24,7 @@ $canonicalOrder = @(
 )
 
 function Get-ManifestFiles($basePath) {
-    if (Test-Path $basePath -PathType Leaf -and $basePath -like "*.manifest") {
+    if ((Test-Path $basePath -PathType Leaf) -and ($basePath -like "*.manifest")) {
         return @($basePath)
     }
     return Get-ChildItem -Path $basePath -Recurse -Include "*.manifest" -File | Select-Object -ExpandProperty FullName
@@ -69,7 +69,7 @@ function Test-ManifestFile($filePath) {
 
     # Optional: Check for 2-space indentation
     foreach ($line in $lines) {
-        if ($line -match "^\s+" -and ($line -match "^\s{1,2}\S" -eq $false)) {
+        if ($line -match "^\s+" -and ($line -match "^\s{2}\S" -eq $false)) {
             Write-Output "⚠️  [INDENTATION] $filePath — Non-2-space indent detected"
             break
         }
@@ -97,4 +97,5 @@ else {
     Write-Output "`n❌ $failureCount file(s) failed linting."
     exit 1
 }
+
 Write-Host "🚦 Running QuickSmoke Checks..."
