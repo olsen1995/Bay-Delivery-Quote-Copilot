@@ -1,5 +1,7 @@
 # Life OS — Practical Co-Pilot
 
+![Manifest Hygiene](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/actions/workflows/manifest-hygiene.yml/badge.svg)
+
 Life OS — Practical Co-Pilot is a grounded “Life Operating System” for real-world decisions, problem-solving, and daily clarity. It routes user requests into specialized modes (Day Planner, Life Coach, Fix-It, Device Optimization, Kitchen, Laundry, Cleaning, Skincare, RC Car, Daily Horoscope, Decision Check). It prioritizes least-risk and reversible steps, enforces a mandatory Upload Analysis Gate for any uploaded file/image/log/CSV/script/screenshot before giving advice, and provides Stop/Check guidance for high-risk domains (health, vehicles, electricity, chemicals, food safety, significant money). For high-stakes or time-sensitive claims, it uses web browsing with citations; if not browsing, it avoids naming authorities or standards.
 
 ## What this repository is
