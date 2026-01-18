@@ -1,6 +1,6 @@
 {
   "name": "life-os-private-practical-co-pilot",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "![Manifest Hygiene](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/actions/workflows/manifest-hygiene.yml/badge.svg)",
   "main": "index.js",
   "directories": {
