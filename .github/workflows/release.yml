@@ -1,10 +1,10 @@
 name: Release
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:     # ✅ Manual trigger from GitHub UI
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'             # ✅ Auto-run when a version tag like v1.0.2 is pushed
 
 jobs:
   release:
@@ -37,8 +37,11 @@ jobs:
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git push --follow-tags origin main
 
-      - name: 🏷️ Create GitHub Release
+      - name: 🏷️ Create GitHub Release with changelog
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
+          name: Release ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
