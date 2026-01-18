@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  workflow_dispatch:     # ✅ Manual trigger from GitHub Actions UI
+  push:                  # ✅ Auto-run on push to main
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Run release script
+        run: npm run release
+
+      - name: 📤 Push changes and tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push --follow-tags origin main
