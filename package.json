@@ -1,0 +1,28 @@
+{
+  "name": "life-os-private-practical-co-pilot",
+  "version": "1.0.0",
+  "description": "![Manifest Hygiene](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/actions/workflows/manifest-hygiene.yml/badge.svg)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/issues"
+  },
+  "homepage": "https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot#readme",
+  "devDependencies": {
+    "standard-version": "^9.5.0"
+  }
+}
