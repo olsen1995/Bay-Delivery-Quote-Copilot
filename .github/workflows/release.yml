@@ -1,12 +1,10 @@
 name: Release
 
 on:
-  workflow_dispatch:     # ✅ Manual trigger from GitHub UI
+  workflow_dispatch:
   push:
     branches:
-      - main             # ✅ Auto-trigger on main pushes
-    tags:
-      - 'v*'             # ✅ Auto-run when a tag like v1.0.2 is pushed
+      - main
 
 jobs:
   release:
@@ -15,6 +13,8 @@ jobs:
     steps:
       - name: ⬇️ Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0   # REQUIRED for tags
 
       - name: ⚙️ Set up Node.js
         uses: actions/setup-node@v3
@@ -31,23 +31,21 @@ jobs:
 
       - name: 🚀 Run release script
         run: npm run release
-
-      - name: 📤 Push changes and tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📤 Push changes and tags
         run: |
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git push --follow-tags origin main
 
-      - name: 🏷️ Create GitHub Release with changelog
-        uses: /action-gh-release@v1
+      - name: 🏷️ Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
   ps-scripts:
     name: 🧪 Run PowerShell Scripts
@@ -58,7 +56,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: ▶ Run manifest_lint.ps1
-        shell: pwshsoftprops
+        shell: pwsh
         run: ./scripts/manifest_lint.ps1
 
       - name: ▶ Run manifest_order_fix.ps1
