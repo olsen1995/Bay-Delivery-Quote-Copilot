@@ -1,17 +1,122 @@
 {
-  "schema_version": "v1",
-  "name_for_human": "LifeOS Co-Pilot",
-  "name_for_model": "lifeos_copilot",
-  "description_for_human": "Routes your input to real-life task modes.",
-  "description_for_model": "Use this tool to determine the best mode for a user's request.",
-  "auth": {
-    "type": "none"
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LifeOS Co-Pilot",
+    "description": "Routes your input to real-life task modes.",
+    "version": "1.0.0"
   },
-  "api": {
-    "type": "openapi",
-    "url": "https://zeke-unattaining-wendy.ngrok-free.dev/openapi.json"
+  "paths": {
+    "/route": {
+      "post": {
+        "summary": "Route Input",
+        "operationId": "route_input_route_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "example": "Device Optimization"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   },
-  "logo_url": "https://via.placeholder.com/256",
-  "contact_email": "you@example.com",
-  "legal_info_url": "https://yourdomain.com/legal"
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "UserInput": {
+        "properties": {
+          "input": {
+            "type": "string",
+            "title": "Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input"
+        ],
+        "title": "UserInput"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://zeke-unattaining-wendy.ngrok-free.dev"
+    }
+  ]
 }
