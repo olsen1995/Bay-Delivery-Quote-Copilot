@@ -3,6 +3,10 @@ from modes.fridge_scanner import handle_fridge_scan
 from modes.kitchen import handle_kitchen_mode, KitchenInput
 from modes.home_organizer import handle_home_organizer_mode
 
+from PIL import Image
+import io
+
+
 def get_mode(input_text: str) -> str:
     input_text_lower = input_text.lower()
 
@@ -15,6 +19,7 @@ def get_mode(input_text: str) -> str:
     else:
         return "HomeOrganizer"
 
+
 class ModeRouter:
     def detect_mode(self, input_text: str) -> str:
         return get_mode(input_text)
@@ -25,12 +30,19 @@ class ModeRouter:
 
         elif mode == "Fridge":
             from fastapi import UploadFile
-            from io import BytesIO
 
+            # ✅ Create a valid blank image in memory
+            blank_image = Image.new("RGB", (100, 100), "white")
+            image_bytes = io.BytesIO()
+            blank_image.save(image_bytes, format="PNG")
+            image_bytes.seek(0)
+
+            # ✅ UploadFile does NOT take content_type
             dummy_file = UploadFile(
-                filename="dummy.jpg",
-                file=BytesIO()
+                filename="dummy.png",
+                file=image_bytes
             )
+
             return handle_fridge_scan(dummy_file)
 
         elif mode == "Kitchen":
