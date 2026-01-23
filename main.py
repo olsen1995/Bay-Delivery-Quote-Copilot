@@ -53,6 +53,11 @@ async def route_input(data: UserInput):
     result = router.handle_mode(mode, data.input)
     return {"mode": mode, "result": result}
 
+@app.post("/modes/fixit")
+async def call_fixit_mode(data: UserInput):
+    result = handle_fixit_mode(data.input)
+    return {"result": result}
+
 @app.post("/device-optimizer", response_model=List[OptimizationSuggestion])
 async def run_device_optimizer(state: DeviceState):
     return optimize_device(state)
