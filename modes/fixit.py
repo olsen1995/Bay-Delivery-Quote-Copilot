@@ -1,25 +1,33 @@
-from typing import Dict
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
 
-def handle_fixit_mode(code: str) -> Dict[str, str]:
-    """
-    Analyze code and return suggestions or fixes.
+# Load .env variables
+load_dotenv()
 
-    Args:
-        code (str): The code snippet provided by the user.
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    Returns:
-        Dict[str, str]: A dictionary with keys like "issue", "suggestion", and "patch".
-    """
-    # ⚠️ This is placeholder logic; eventually replace with GPT, LLM, or static analyzer
-    if "==" in code and "if" in code:
+def handle_fixit_mode(input_text: str):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You're an expert developer. Help debug or fix user-submitted code."},
+                {"role": "user", "content": input_text}
+            ]
+        )
+
+        reply = response.choices[0].message.content
+
         return {
-            "issue": "Potential use of '==' instead of 'is' for None comparison",
-            "suggestion": "Use 'is' or 'is not' when comparing with None",
-            "patch": code.replace("== None", "is None").replace("!= None", "is not None")
+            "issue": "See AI-generated suggestion below",
+            "suggestion": "This is generated based on the code you submitted.",
+            "patch": reply
         }
-    
-    return {
-        "issue": "No obvious issue detected",
-        "suggestion": "Looks good!",
-        "patch": code
-    }
+
+    except Exception as e:
+        return {
+            "issue": "Error during processing",
+            "suggestion": str(e),
+            "patch": ""
+        }
