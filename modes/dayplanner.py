@@ -7,8 +7,6 @@ def generate_weekly_schedule(tasks: List[str]) -> Dict[str, List[str]]:
     Distribute tasks across the week, one per day starting from Monday.
     Always returns Dict[str, List[str]].
     """
-
-    # ✅ FIX: error is returned as a list, not a string
     if not tasks:
         return {"Error": ["No tasks provided."]}
 
@@ -20,3 +18,15 @@ def generate_weekly_schedule(tasks: List[str]) -> Dict[str, List[str]]:
         schedule[day].append(f"{hour}:00 - {task}")
 
     return schedule
+
+
+def handle_dayplanner_mode(user_input: str) -> Dict[str, List[str]]:
+    """
+    Very basic example: extract tasks from user_input (comma-separated)
+    Later, you can use NLP/GPT to extract task lists intelligently.
+    """
+    # Temporary: split tasks by commas or 'and'
+    user_input = user_input.replace(" and ", ", ")
+    tasks = [task.strip() for task in user_input.split(",") if task.strip()]
+
+    return generate_weekly_schedule(tasks)
