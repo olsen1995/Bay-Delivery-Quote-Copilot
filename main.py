@@ -2,7 +2,11 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
-from mode_router import ModeRouter, run_mode_logic
+
+from mode_router import ModeRouter
+from modes.dayplanner import handle_dayplanner_mode
+from modes.lifecoach import handle_lifecoach_mode
+from modes.fixit import handle_fixit_mode
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -17,15 +21,31 @@ router = ModeRouter()
 class UserInput(BaseModel):
     input: str
 
-# Endpoint for routing user input to a mode
+# Route user input to the correct mode handler
 @app.post("/route")
 async def route_input(data: UserInput):
     mode = router.detect_mode(data.input)
-    result = run_mode_logic(mode, data.input)
-    return {
-        "mode": mode,
-        "result": result
-    }
+
+    if mode == "DayPlanner":
+        return {
+            "mode": mode,
+            "result": handle_dayplanner_mode(data.input)
+        }
+
+    elif mode == "LifeCoach":
+        return {
+            "mode": mode,
+            "result": handle_lifecoach_mode(data.input)
+        }
+
+    elif mode == "FixIt":
+        return {
+            "mode": mode,
+            "result": handle_fixit_mode(data.input)
+        }
+
+    return {"mode": mode, "result": "No logic implemented yet."}
+
 
 # Inject OpenAPI "servers" field so GPT plugin accepts the schema
 def custom_openapi():
@@ -38,7 +58,7 @@ def custom_openapi():
         routes=app.routes,
     )
     openapi_schema["servers"] = [
-        {"url": "https://zeke-unattaining-wendy.ngrok-free.dev"}  # Replace this URL when deployed
+        {"url": "https://zeke-unattaining-wendy.ngrok-free.dev"}  # Update this for deployment
     ]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
