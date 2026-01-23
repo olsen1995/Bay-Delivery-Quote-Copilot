@@ -1,10 +1,9 @@
-from typing import Dict
-from modes.fixit import handle_fixit_mode
+from typing import Dict, List, Tuple
 
 
 class ModeRouter:
     def __init__(self):
-        self.modes = {
+        self.modes: Dict[str, List[str]] = {
             "DayPlanner": [
                 "plan", "schedule", "calendar", "agenda", "itinerary",
                 "organize", "mapped out"
@@ -37,19 +36,13 @@ class ModeRouter:
                 if keyword in user_input:
                     matched_modes[mode] = matched_modes.get(mode, 0) + 1
 
-        if matched_modes:
-            return max(matched_modes.items(), key=lambda item: item[1])[0]
+        if not matched_modes:
+            return "Unknown"
 
-        return "Unknown"
+        # ✅ Pylance-safe max() usage
+        best_match: Tuple[str, int] = max(
+            matched_modes.items(),
+            key=lambda item: item[1]
+        )
 
-
-def run_mode_logic(mode: str, user_input: str):
-    """
-    Execute logic for a detected mode.
-    """
-    if mode == "FixIt":
-        return handle_fixit_mode(user_input)
-
-    return {
-        "message": f"Mode '{mode}' detected, but no logic is implemented yet."
-    }
+        return best_match[0]
