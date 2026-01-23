@@ -1,0 +1,8 @@
+{
+  "kitchen_plan": {
+    "goal": "make a healthy dinner",
+    "suggestions": [
+      "You might need to pick up a few fresh ingredients for dinner."
+    ]
+  }
+}
