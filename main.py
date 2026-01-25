@@ -1,85 +1,53 @@
-import os
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-from openai import OpenAI, OpenAIError
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from openai import OpenAI
+import os
 
-# ------------------------------------------------------------
-# Load environment variables from .env (LOCAL ONLY)
-# Render ignores .env — you must set env vars in Render dashboard
-# ------------------------------------------------------------
+# Load environment variables locally (.env) – Render already injects them
 load_dotenv()
 
-# ------------------------------------------------------------
-# Safely load API key (prevents strip() None errors)
-# ------------------------------------------------------------
-api_key = os.getenv("OPENAI_API_KEY") or ""
+# Get the OpenAI API key
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise RuntimeError("❌ OPENAI_API_KEY is missing. Set it in .env or Render.")
 
-if not api_key.strip():
-    raise RuntimeError(
-        "❌ OPENAI_API_KEY is missing.\n"
-        "➡️ Set it in Render → Environment tab.\n"
-        "➡️ Or add it to your local .env file."
-    )
+# Initialize OpenAI client (v2+ style)
+client = OpenAI(api_key=api_key)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=api_key.strip())
-
-# ------------------------------------------------------------
-# FastAPI App
-# ------------------------------------------------------------
+# Setup FastAPI app
 app = FastAPI()
 
+# Optional: allow frontend connections (adjust origin in production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ------------------------------------------------------------
-# Request/Response Models
-# ------------------------------------------------------------
-class ChatRequest(BaseModel):
-    message: str
-
-
-class ChatResponse(BaseModel):
-    response: str
-
-
-# ------------------------------------------------------------
-# Health Check (Render uses this)
-# ------------------------------------------------------------
+# Health check route
 @app.get("/healthz")
-def healthz():
+def health_check():
     return {"status": "ok"}
 
+# Request model
+class PromptRequest(BaseModel):
+    prompt: str
 
-# ------------------------------------------------------------
-# Root Route
-# ------------------------------------------------------------
-@app.get("/")
-def root():
-    return {"message": "LifeOS CoPilot is running!"}
-
-
-# ------------------------------------------------------------
-# Chat Endpoint
-# ------------------------------------------------------------
-@app.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
+# POST /ask endpoint — GPT chat
+@app.post("/ask")
+def ask_gpt(req: PromptRequest):
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        chat_response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are LifeOS, a helpful AI co-pilot."},
-                {"role": "user", "content": request.message},
-            ],
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": req.prompt}
+            ]
         )
-
-        # Safe: content might be None
-        content = response.choices[0].message.content
-        reply = content.strip() if content else "[No response returned]"
-
-        return ChatResponse(response=reply)
-
-    except OpenAIError as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI error: {str(e)}")
-
+        return {"response": chat_response.choices[0].message.content}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+        return {"error": str(e)}
