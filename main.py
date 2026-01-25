@@ -1,49 +1,61 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import os
 import openai
 
-# Load .env
+# Load environment variables
 load_dotenv()
 
-# Get API key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-if not OPENAI_API_KEY:
-    raise RuntimeError("❌ OPENAI_API_KEY is missing. Please set it in .env or Render.")
-
-# ✅ Create OpenAI client (new v2 syntax)
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
-
-app = FastAPI()
-
+# Define request model
 class PromptRequest(BaseModel):
     prompt: str
 
+# Create FastAPI app
+app = FastAPI()
+
+# Enable CORS for all origins (you can restrict this for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Root endpoint
+@app.get("/")
+def read_root():
+    return {"message": "LifeOS Co-Pilot API is running."}
+
+# Chat endpoint
 @app.post("/ask")
-async def ask_question(data: PromptRequest):
+async def ask_openai(request: PromptRequest):
+    prompt = request.prompt
+
+    if not prompt:
+        return JSONResponse(content={"error": "Prompt is required"}, status_code=400)
+
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        response = openai.chat.completions.create(
+            model="gpt-4",
             messages=[
-                {"role": "user", "content": data.prompt}
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
             ]
         )
-        return {"response": response.choices[0].message.content}
+
+        message = response.choices[0].message.content if response.choices else None
+
+        if not message:
+            return JSONResponse(content={"error": "No response from OpenAI"}, status_code=500)
+
+        return {"response": message.strip()}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/openapi.json")
-def get_openapi():
-    return FileResponse("openapi.json", media_type="application/json")
-
-
-@app.get("/")
-def root():
-    return {
-        "message": "✅ Life-OS API is live. Use POST /ask with { 'prompt': 'your question' }."
-    }
+        return JSONResponse(content={"error": str(e)}, status_code=500)
