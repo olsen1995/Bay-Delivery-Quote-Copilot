@@ -1,0 +1,32 @@
+name: 🔄 Sync OpenAI Key to Render
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-api-key:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: Create .env from GitHub Secrets
+        run: |
+          echo "RENDER_API_KEY=${{ secrets.RENDER_API_KEY }}" >> .env
+          echo "RENDER_SERVICE_ID=${{ secrets.RENDER_SERVICE_ID }}" >> .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+
+      - name: Run OpenAI Key Sync Script
+        run: python sync_openai_key.py
