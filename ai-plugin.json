@@ -1,0 +1,18 @@
+{
+    "schema_version": "v1",
+    "name_for_human": "Life OS Co-Pilot",
+    "name_for_model": "life_os_copilot",
+    "description_for_human": "Your private AI assistant for life organization, parenting, routines, and goals.",
+    "description_for_model": "Plugin that allows users to interact with their personal data like logs, goals, routines, parenting details, and more through a FastAPI backend.",
+    "auth": {
+        "type": "none"
+    },
+    "api": {
+        "type": "openapi",
+        "url": "https://life-os-private-practical-co-pilot.onrender.com/openapi.json",
+        "is_user_authenticated": false
+    },
+    "logo_url": "https://life-os-private-practical-co-pilot.onrender.com/logo.png",
+    "contact_email": "support@yourdomain.com",
+    "legal_info_url": "https://yourdomain.com/legal"
+}

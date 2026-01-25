@@ -1,9 +1,9 @@
 {
-    "openapi": "3.0.0",
+    "openapi": "3.0.1",
     "info": {
-        "title": "Life-OS API",
-        "version": "1.0.0",
-        "description": "An API for answering prompts via OpenAI."
+        "title": "Life OS API",
+        "description": "Plugin for interacting with your Life OS Private Assistant",
+        "version": "1.0.0"
     },
     "servers": [
         {
@@ -13,8 +13,8 @@
     "paths": {
         "/ask": {
             "post": {
-                "summary": "Send a prompt to the assistant",
-                "operationId": "sendPrompt",
+                "summary": "Ask a question",
+                "operationId": "ask",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -23,8 +23,7 @@
                                 "type": "object",
                                 "properties": {
                                     "prompt": {
-                                        "type": "string",
-                                        "description": "The user's prompt or question"
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -36,7 +35,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "The assistant's response",
+                        "description": "Successful response",
                         "content": {
                             "application/json": {
                                 "schema": {
