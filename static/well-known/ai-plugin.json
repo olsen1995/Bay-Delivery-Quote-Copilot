@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "LifeOS Co-Pilot",
+  "name_for_model": "lifeos_co_pilot",
+  "description_for_human": "A private assistant for reminders, memory, tasks, and household help.",
+  "description_for_model": "Use this plugin to help manage reminders, tasks, and memory.",
+  "auth": { "type": "none" },
+  "api": {
+    "type": "openapi",
+    "url": "https://life-os-private-practical-co-pilot.onrender.com/openapi.json"
+  },
+  "logo_url": "https://life-os-private-practical-co-pilot.onrender.com/logo.png",
+  "contact_email": "support@example.com",
+  "legal_info_url": "https://example.com/legal"
+}
