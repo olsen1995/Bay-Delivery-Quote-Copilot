@@ -8,13 +8,21 @@ Your private, voice-friendly, ADHD-aware ChatGPT plugin for managing real-life s
 ## ✨ Features
 
 - ✅ Add and retrieve notes, reminders, and tasks
+
 - 🕰️ Understands natural time: “in 30 minutes”, “next Friday”
+
 - 🔍 Search memory: “What do I have about groceries?”
+
 - ❌ Delete items or entire categories: “Forget all notes”
+
 - 🧠 Per-user persistent memory (JSON-based)
+
 - 🔁 Smart intent routing via `/ask` endpoint
+
 - 🎙️ Voice-friendly command parsing + fallback suggestions
+
 - 📜 Per-user usage logging (`/logs/user_id.jsonl`)
+
 - 🧩 Full ChatGPT Plugin integration via `ai-plugin.json`
 
 ---
@@ -24,6 +32,7 @@ Your private, voice-friendly, ADHD-aware ChatGPT plugin for managing real-life s
 ### 📦 Requirements
 
 - Python 3.9+
+
 - `uvicorn`, `fastapi`, `python-dotenv`, `openai`, `dateparser`
 
 ### 🚀 Running locally
@@ -32,7 +41,7 @@ Your private, voice-friendly, ADHD-aware ChatGPT plugin for managing real-life s
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 10000
 
-```
+```json
 
 ---
 
@@ -46,7 +55,7 @@ POST /ask
   "adhd_mode": true
 }
 
-```
+```json
 
 Returns structured JSON with summary, steps, actions, and priority.
 
@@ -57,7 +66,9 @@ Returns structured JSON with summary, steps, actions, and priority.
 Hosted at:
 
 - Plugin manifest: `/.well-known/ai-plugin.json`
+
 - OpenAPI spec: `/openapi.json`
+
 - Logo: `/logo.png`
 
 Follow ChatGPT > Settings > Actions > Develop Plugin
@@ -66,6 +77,7 @@ Follow ChatGPT > Settings > Actions > Develop Plugin
 
 ## 📁 Folder Structure
 
+```json
 ├── main.py                  # Entrypoint with /ask endpoint
 ├── mode_router.py           # Keyword routing to modes
 ├── modes/                   # Mode handlers (memory, fixit, etc)
@@ -77,11 +89,14 @@ Follow ChatGPT > Settings > Actions > Develop Plugin
 ├── ai-plugin.json           # Plugin manifest
 ├── openapi.json             # OpenAPI schema
 
+```json
+
 ---
 
 ## 📬 Contact & Support
 
 - `support@yourdomain.com` (update in `ai-plugin.json`)
+
 - Powered by FastAPI + OpenAI + Render
 
 ---
