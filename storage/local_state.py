@@ -30,3 +30,22 @@ def clear_user_data(user_id: str):
     file_path = _get_user_file_path(user_id)
     if os.path.exists(file_path):
         os.remove(file_path)
+
+def delete_item(user_id: str, category: str, keyword: str) -> bool:
+    data = get_user_data(user_id)
+    items = data.get(category, [])
+    updated_items = [item for item in items if keyword.lower() not in item.lower()]
+    data[category] = updated_items
+    with open(_get_user_file_path(user_id), "w") as f:
+        json.dump(data, f, indent=2)
+    return len(items) != len(updated_items)
+
+def clear_category(user_id: str, category: str):
+    data = get_user_data(user_id)
+    data[category] = []
+    with open(_get_user_file_path(user_id), "w") as f:
+        json.dump(data, f, indent=2)
+
+def clear_all(user_id: str):
+    with open(_get_user_file_path(user_id), "w") as f:
+        json.dump({"notes": [], "reminders": [], "tasks": []}, f, indent=2)

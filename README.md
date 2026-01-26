@@ -1,85 +1,91 @@
+
 # 🧠 LifeOS Co-Pilot
 
-An AI-augmented FastAPI application to help you manage daily life using modular "modes" — now powered by OpenAI and deployable on Render.
+Your private, voice-friendly, ADHD-aware ChatGPT plugin for managing real-life stuff like reminders, notes, tasks, and more.
 
 ---
 
-## 🚀 Features
+## ✨ Features
 
-- ⚡ Mode-based modular architecture (Fixit, Kitchen, Organizer, etc.)
-- 🤖 AI-powered chat using OpenAI (via `/chat`)
-- 🧠 Custom knowledge routing for personalized assistance
-- 🧪 Pytest-integrated test suite
-- 🐳 Docker-ready
-- 🔐 `.env.example` for safe secret storage
-- ☁️ Ready for Render deployment with `render.yaml`
-- ✅ CI/CD with GitHub Actions
-- 🧼 Pre-commit config with `black`, `flake8`, and `isort`
+- ✅ Add and retrieve notes, reminders, and tasks
+- 🕰️ Understands natural time: “in 30 minutes”, “next Friday”
+- 🔍 Search memory: “What do I have about groceries?”
+- ❌ Delete items or entire categories: “Forget all notes”
+- 🧠 Per-user persistent memory (JSON-based)
+- 🔁 Smart intent routing via `/ask` endpoint
+- 🎙️ Voice-friendly command parsing + fallback suggestions
+- 📜 Per-user usage logging (`/logs/user_id.jsonl`)
+- 🧩 Full ChatGPT Plugin integration via `ai-plugin.json`
 
 ---
 
-## 🧪 Local Development
+## 🛠️ Setup
+
+### 📦 Requirements
+
+- Python 3.9+
+- `uvicorn`, `fastapi`, `python-dotenv`, `openai`, `dateparser`
+
+### 🚀 Running locally
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 10000
 
-# Run tests
-pytest tests/
-
-# Start the app
-uvicorn main:app --reload
 ```
-
-Visit [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
-## 💬 AI Chat Mode
-
-POST to `/chat`:
+## 📡 API Endpoint
 
 ```json
+POST /ask
 {
-  "input": "What's in my fridge?"
+  "message": "Remind me to take my vitamins at 8am",
+  "user_id": "user_123",
+  "adhd_mode": true
 }
+
 ```
 
-Your `.env` must contain:
-
-```env
-OPENAI_API_KEY=your-key-here
-```
+Returns structured JSON with summary, steps, actions, and priority.
 
 ---
 
-## 🐳 Docker Support
+## 🤖 ChatGPT Plugin Integration
 
-```bash
-docker build -t lifeos-api .
-docker run -p 8000:8000 lifeos-api
-```
+Hosted at:
 
----
+- Plugin manifest: `/.well-known/ai-plugin.json`
+- OpenAPI spec: `/openapi.json`
+- Logo: `/logo.png`
 
-## ☁️ Deploy to Render
-
-Render auto-detects `render.yaml`:
-- Click “New Web Service” → connect your GitHub repo
-- Add `OPENAI_API_KEY` as an env var in the dashboard
-- Deploy
+Follow ChatGPT > Settings > Actions > Develop Plugin
 
 ---
 
-## ✅ Pre-Commit Hooks
+## 📁 Folder Structure
 
-```bash
-pip install pre-commit
-pre-commit install
-```
+├── main.py                  # Entrypoint with /ask endpoint
+├── mode_router.py           # Keyword routing to modes
+├── modes/                   # Mode handlers (memory, fixit, etc)
+├── storage/
+│   ├── local_state.py       # File-based user memory store
+│   └── user_data/           # Per-user memory files
+├── logs/                    # Per-user usage logs
+├── response_formatter.py    # Unified JSON formatter
+├── ai-plugin.json           # Plugin manifest
+├── openapi.json             # OpenAPI schema
+
+---
+
+## 📬 Contact & Support
+
+- `support@yourdomain.com` (update in `ai-plugin.json`)
+- Powered by FastAPI + OpenAI + Render
 
 ---
 
 ## 📄 License
 
-MIT License — free to use, modify, and share.
+MIT
