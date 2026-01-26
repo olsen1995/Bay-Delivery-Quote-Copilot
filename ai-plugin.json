@@ -1,16 +1,17 @@
 {
   "schema_version": "v1",
-  "name_for_human": "Life OS Co-Pilot",
-  "name_for_model": "life_os_copilot",
-  "description_for_human": "Your LifeOS Co-Pilot helps with daily life: save notes, set reminders, manage tasks, search your memory, and clean up old info. Optimized for voice and ADHD-friendly usage.",
-  "description_for_model": "Plugin that enables users to manage personal tasks, notes, and reminders with natural language. Supports saving, retrieving, deleting memory items. Recognizes voice prompts, extracts time expressions, and stores per-user memory in a lightweight JSON backend. Use the /ask endpoint to route user input. Supports: 'remember', 'remind me', 'show my notes', 'delete reminder', 'forget everything', and more.",
+  "name_for_human": "LifeOS Co-Pilot",
+  "name_for_model": "lifeos_copilot",
+  "description_for_human": "Manage your life with memory, reminders, and ADHD-friendly help. Ask anything.",
+  "description_for_model": "A plugin that enables users to manage memory, tasks, and reminders via natural language. Use the /ask endpoint for general AI tasks, and the /memory or /api-keys endpoints for memory or key management. Each request includes a 'user_id' (default: guest_123).",
   "auth": {
-    "type": "none"
+    "type": "api_key",
+    "api_key_name": "x-api-key"
   },
   "api": {
     "type": "openapi",
     "url": "https://life-os-private-practical-co-pilot.onrender.com/openapi.json",
-    "is_user_authenticated": false
+    "is_user_authenticated": true
   },
   "logo_url": "https://life-os-private-practical-co-pilot.onrender.com/logo.png",
   "contact_email": "support@yourdomain.com",
