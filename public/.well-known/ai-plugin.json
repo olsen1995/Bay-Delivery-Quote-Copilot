@@ -11,7 +11,7 @@
   },
   "api": {
     "type": "openapi",
-    "url": "https://life-os-private-practical-co-pilot.onrender.com/openapi.json"
+    "url": "https://life-os-private-practical-co-pilot.onrender.com/openapi.yaml"
   },
   "logo_url": "https://life-os-private-practical-co-pilot.onrender.com/logo.png",
   "contact_email": "support@example.com",

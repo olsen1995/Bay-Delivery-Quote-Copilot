@@ -2,17 +2,16 @@ openapi: 3.1.0
 info:
   title: LifeOS Co-Pilot API
   version: 1.0.0
-  description: API for managing memory, tasks, reminders, and general queries for LifeOS Co-Pilot.
+  description: API for managing memory, tasks, and general queries for LifeOS Co-Pilot.
+
 servers:
   - url: https://life-os-private-practical-co-pilot.onrender.com
+
 paths:
   /ask:
     post:
       operationId: askQuestion
       summary: Send a general question to the LifeOS Co-Pilot.
-      description: Handles general AI queries using natural language.
-      security:
-        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -22,14 +21,14 @@ paths:
               properties:
                 user_id:
                   type: string
-                  default: guest_123
+                  default: austin_master
                 prompt:
                   type: string
               required:
                 - prompt
       responses:
         '200':
-          description: The AI response from LifeOS Co-Pilot
+          description: The AI response
           content:
             application/json:
               schema:
@@ -41,103 +40,28 @@ paths:
   /memory:
     get:
       operationId: getMemory
-      summary: Get memory items for a user.
-      description: Retrieves saved memory data for the specified user.
-      security:
-        - ApiKeyAuth: []
+      summary: Retrieve stored memory
       parameters:
         - name: user_id
           in: query
-          required: false
+          required: true
           schema:
             type: string
-            default: guest_123
+            default: austin_master
       responses:
         '200':
-          description: Array of memory entries.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    content:
-                      type: string
-                    timestamp:
-                      type: string
-                      format: date-time
-    post:
-      operationId: addMemory
-      summary: Add a new memory item.
-      description: Adds or updates a memory entry for the specified user.
-      security:
-        - ApiKeyAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                user_id:
-                  type: string
-                  default: guest_123
-                content:
-                  type: string
-              required:
-                - content
-      responses:
-        '201':
-          description: Memory item created or updated.
+          description: Memory retrieved
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  id:
-                    type: string
-                  status:
+                  memory:
                     type: string
 
-  /api-keys:
-    get:
-      operationId: getApiKeys
-      summary: Get list of connected API keys.
-      description: Returns third-party service keys connected for the user.
-      security:
-        - ApiKeyAuth: []
-      parameters:
-        - name: user_id
-          in: query
-          required: false
-          schema:
-            type: string
-            default: guest_123
-      responses:
-        '200':
-          description: List of service keys.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    service:
-                      type: string
-                    key:
-                      type: string
-                    connected:
-                      type: boolean
     post:
-      operationId: addApiKey
-      summary: Add a third-party API key.
-      description: Stores an API key for services like Notion, Google Calendar, etc.
-      security:
-        - ApiKeyAuth: []
+      operationId: addMemory
+      summary: Store memory
       requestBody:
         required: true
         content:
@@ -147,38 +71,26 @@ paths:
               properties:
                 user_id:
                   type: string
-                  default: guest_123
-                service:
-                  type: string
-                key:
+                  default: austin_master
+                memory:
                   type: string
               required:
-                - service
-                - key
+                - memory
       responses:
         '201':
-          description: API key stored successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
+          description: Memory stored
 
   /tasks:
     get:
       operationId: getTasks
-      summary: Get user tasks
-      description: Returns all tasks for the user.
-      security:
-        - ApiKeyAuth: []
+      summary: List tasks
       parameters:
         - name: user_id
           in: query
+          required: true
           schema:
             type: string
-            default: guest_123
+            default: austin_master
       responses:
         '200':
           description: List of tasks
@@ -187,23 +99,11 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    title:
-                      type: string
-                    completed:
-                      type: boolean
-                    due:
-                      type: string
-                      format: date-time
+                  type: string
+
     post:
       operationId: createTask
       summary: Create a new task
-      description: Creates a new task for the user.
-      security:
-        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -213,34 +113,19 @@ paths:
               properties:
                 user_id:
                   type: string
-                  default: guest_123
-                title:
+                  default: austin_master
+                task:
                   type: string
-                due:
-                  type: string
-                  format: date-time
               required:
-                - title
+                - task
       responses:
         '201':
-          description: Task created successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  status:
-                    type: string
+          description: Task created
 
   /tasks/{id}:
     patch:
       operationId: updateTask
-      summary: Update a task
-      description: Updates task fields such as title, completion status, or due date.
-      security:
-        - ApiKeyAuth: []
+      summary: Update an existing task
       parameters:
         - name: id
           in: path
@@ -254,35 +139,36 @@ paths:
             schema:
               type: object
               properties:
-                title:
+                user_id:
                   type: string
-                completed:
-                  type: boolean
-                due:
+                  default: austin_master
+                task:
                   type: string
-                  format: date-time
+              required:
+                - task
       responses:
         '200':
-          description: Task updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
+          description: Task updated
+
     delete:
       operationId: deleteTask
       summary: Delete a task
-      description: Deletes a task permanently.
-      security:
-        - ApiKeyAuth: []
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  default: austin_master
       responses:
         '204':
           description: Task deleted successfully
@@ -293,3 +179,4 @@ components:
       type: apiKey
       in: header
       name: x-api-key
+  schemas: {}
