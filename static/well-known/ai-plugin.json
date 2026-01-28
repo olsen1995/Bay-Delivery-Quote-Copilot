@@ -12,8 +12,8 @@
   },
   "api": {
     "type": "openapi",
-    "url": "https://gist.githubusercontent.com/olsen1995/f42f916142453bebc363b4d7d455ae75/raw/35177ef94ccd3121cee1ba2d733afab5479d884f/lifeos-openapi.json",
-    "is_user_authenticated": false
+    "url": "https://gist.githubusercontent.com/olsen1995/f42f916142453bebc363b4d7d455ae75/raw/c222854a015372ad9b1016d0789c8929cf8d5119/lifeos-openapi.json",
+    "is_user_authenticated": true
   },
   "logo_url": "https://via.placeholder.com/128.png?text=LifeOS",
   "contact_email": "you@example.com",
