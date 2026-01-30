@@ -1,21 +1,32 @@
-# Byte-compiled / optimized / DLL files
+# ───────────── Python Cache & Bytecode ─────────────
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environments
+# ───────────── Virtual Environments ─────────────
 .venv/
-env/
 venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
-# dotenv
+# Also ignore nested or IDE-generated venvs
+**/venv/
+**/.venv/
+**/env/
+**/ENV/
+**/site-packages/
+
+# ───────────── Environment Variables ─────────────
 .env
 .env.*
+*.env
 
-# VSCode settings
+# ───────────── VS Code ─────────────
 .vscode/
 
-# Distribution / packaging
+# ───────────── Python Packaging ─────────────
 .Python
 build/
 develop-eggs/
@@ -32,23 +43,55 @@ var/
 .installed.cfg
 *.egg
 
-# Logs and temp files
+# ───────────── Logs & Temp Files ─────────────
 *.log
 *.pid
+*.pid.lock
+*.seed
 *.sqlite3
+*.db
+*.tmp
+*.bak
 
-# Pytest cache
+# ───────────── Pytest ─────────────
 .pytest_cache/
 
-# Docker
-*.pid
-*.seed
-*.pid.lock
-*.zip
-*.tar.gz
+# ───────────── Coverage Reports ─────────────
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
 
-# Node (if used)
+# ───────────── MyPy ─────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ───────────── Docker ─────────────
+*.tar
+*.tar.gz
+*.tgz
+.dockerignore
+
+# ───────────── Jupyter ─────────────
+.ipynb_checkpoints
+
+# ───────────── Mac/Linux/Windows ─────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ───────────── Node.js ─────────────
 node_modules/
-npm-debug.log
-yarn-debug.log
-yarn-error.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ───────────── Repo Audit Logs ─────────────
+repo_audit_report.txt
+audit_script_temp.py
+audit.ps1
