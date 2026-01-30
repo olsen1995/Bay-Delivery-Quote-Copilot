@@ -1,45 +1,47 @@
-from fastapi import FastAPI, Request, Form, Header, HTTPException
+from fastapi import FastAPI, Form, Request, HTTPException
 from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from lifeos.routes.mode_router import ModeRouter
-
-from lifeos.auth import verify_api_key
+from lifeos.storage.memory_manager import MemoryManager
 
 app = FastAPI()
-mode_router = ModeRouter()
 
-# Mount static folder for well-known
-app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
+# 🧠 Mount router instance
+router = ModeRouter()
 
+# 🌐 Enable CORS for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# ✅ /ask: Simple AI response route
 @app.post("/ask")
-async def ask(
-    request: Request,
-    message: str = Form(...),
-    user_id: str = Form(...),
-    x_api_key: str = Header(None)
-):
-    if not verify_api_key(x_api_key):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def ask(message: str = Form(...), user_id: str = Form(...)):
+    # Example response logic (you can improve this)
+    return {"summary": f"You said: {message}", "user_id": user_id}
 
-    state = {"user_id": user_id}
-    mode = mode_router.route(message, state)
-    response = mode.handle(message, state)
-    return {"summary": response}
-
-
+# ✅ /memory GET: Retrieve memory
 @app.get("/memory")
-async def get_memory(user_id: str):
-    from lifeos.storage.memory_manager import MemoryManager
+def get_memory(user_id: str):
     mm = MemoryManager(user_id)
-    memory = mm.get_memory()
-    return {"memory": memory}
+    return mm.get_all()
 
-
+# ✅ /memory POST: Clear memory
 @app.post("/memory")
-async def clear_memory(user_id: str = Form(...), confirm: str = Form(...)):
+def clear_memory(confirm: str = Form(...), user_id: str = Form(...)):
     if confirm.lower() == "yes":
-        from lifeos.storage.memory_manager import MemoryManager
         mm = MemoryManager(user_id)
-        mm.clear_memory()
-    return RedirectResponse(url="/", status_code=303)
+        mm.delete_all()
+        return RedirectResponse(url="/memory?user_id=" + user_id, status_code=303)
+    raise HTTPException(status_code=400, detail="Confirmation required to clear memory")
+
+# ✅ /route: Auto-route to best mode
+@app.post("/route")
+def handle_route(input: str = Form(...)):
+    state = {}
+    mode = router.route(input, state)
+    return mode.run(input, state)
