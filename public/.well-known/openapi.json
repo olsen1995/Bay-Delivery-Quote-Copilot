@@ -17,12 +17,8 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "message": {
-                    "type": "string"
-                  },
-                  "user_id": {
-                    "type": "string"
-                  }
+                  "message": { "type": "string" },
+                  "user_id": { "type": "string" }
                 },
                 "required": ["message", "user_id"]
               }
@@ -37,17 +33,74 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "summary": {
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "type": "string"
-                    },
-                    "memory": {
-                      "type": "object"
-                    }
+                    "summary": { "type": "string" },
+                    "user_id": { "type": "string" },
+                    "memory": { "type": "object" }
                   },
                   "required": ["summary", "user_id", "memory"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memory": {
+      "get": {
+        "summary": "Retrieve memory object",
+        "operationId": "getMemory",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Raw memory object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Unwrapped memory dictionary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Write memory object",
+        "operationId": "setMemory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": { "type": "string" },
+                  "memory": { "type": "object" }
+                },
+                "required": ["user_id", "memory"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory write result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "written": { "type": "integer" }
+                  },
+                  "required": ["ok", "written"]
                 }
               }
             }
