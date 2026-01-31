@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect files that require Custom GPT re-upload
+      - name: Detect changes to Custom GPT sources
         id: detect
         shell: bash
         run: |
@@ -59,7 +59,7 @@ jobs:
           if [[ "$needs_sync" -eq 1 ]]; then
             {
               echo "comment_body<<'EOF'"
-              echo "Custom GPT sync reminder (non-blocking)"
+              echo "💡 **Custom GPT Sync Reminder** _(non-blocking)_"
               echo ""
               echo "This PR changes files that usually require re-uploading into the Custom GPT (to avoid repo updated, GPT stale drift):"
               echo ""
