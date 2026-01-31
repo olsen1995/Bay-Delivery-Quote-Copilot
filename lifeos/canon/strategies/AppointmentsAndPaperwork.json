@@ -1,0 +1,6 @@
+{
+  "name": "AppointmentsAndPaperwork",
+  "type": "LifeOSStrategy",
+  "version": "5.0.0",
+  "description": "Canonical strategy for scheduling, attending, and managing paperwork."
+}

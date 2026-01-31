@@ -1,0 +1,6 @@
+{
+  "name": "Cleaning",
+  "type": "LifeOSStrategy",
+  "version": "5.0.0",
+  "description": "Canonical strategy for household cleaning routines and priorities."
+}

@@ -1,0 +1,6 @@
+{
+  "name": "TaskPlanning",
+  "type": "LifeOSStrategy",
+  "version": "5.0.0",
+  "description": "Canonical strategy for planning tasks and subtasks."
+}

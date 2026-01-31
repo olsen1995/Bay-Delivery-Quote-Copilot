@@ -1,0 +1,6 @@
+{
+  "name": "Budgeting",
+  "type": "LifeOSStrategy",
+  "version": "5.0.0",
+  "description": "Canonical strategy for personal and household budgeting."
+}
