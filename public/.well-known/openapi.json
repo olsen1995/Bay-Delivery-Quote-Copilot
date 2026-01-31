@@ -1,0 +1,59 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LifeOS Co-Pilot API",
+    "version": "1.0.0",
+    "description": "Minimal OpenAPI schema for GPT Actions"
+  },
+  "paths": {
+    "/ask": {
+      "post": {
+        "summary": "Ask a question",
+        "operationId": "askQuestion",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  },
+                  "user_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["message", "user_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assistant response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "user_id": {
+                      "type": "string"
+                    },
+                    "memory": {
+                      "type": "object"
+                    }
+                  },
+                  "required": ["summary", "user_id", "memory"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
