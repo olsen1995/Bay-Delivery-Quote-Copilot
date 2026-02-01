@@ -1,89 +1,120 @@
 import os
 import json
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict
 import logging
-
-CANON_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "canon"))
-CANON_MANIFEST_PATH = os.path.join(CANON_ROOT, "Canon_Manifest.json")
+import hashlib
+from fastapi import APIRouter, HTTPException
+from typing import List, Dict, Any
 
 logger = logging.getLogger("lifeos")
+
+CANON_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "canon")
+)
+CANON_MANIFEST_PATH = os.path.join(CANON_ROOT, "Canon_Manifest.json")
 
 
 class CanonRouter:
     def __init__(self):
         self.router = APIRouter()
-        self.router.get("/types")(self.get_types)
+
+        # Routes are relative to mount point (/canon)
+        self.router.get("/types")(self.get_canon_types)
         self.router.get("/file")(self.get_file)
         self.router.get("/snapshot")(self.get_snapshot)
+        self.router.get("/snapshot/digest")(self.get_snapshot_digest)
 
-    def get_manifest(self) -> Dict:
+    def get_manifest(self) -> Dict[str, Any]:
         with open(CANON_MANIFEST_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def get_file_by_path(self, path: str) -> Dict:
+    def get_file_by_path(self, path: str) -> Dict[str, Any]:
         full_path = os.path.abspath(os.path.join(CANON_ROOT, path))
+
+        # Enforce Canon root containment (no traversal)
         if not full_path.startswith(CANON_ROOT):
             raise HTTPException(status_code=403, detail="Access denied")
-        try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=str(e))
 
-    def get_entries_by_type(self, type: str) -> List[Dict]:
+        if not os.path.isfile(full_path):
+            raise FileNotFoundError(f"Canon file not found: {path}")
+
+        with open(full_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def get_entries_by_type(self, type: str) -> List[Dict[str, Any]]:
         return [
-            entry for entry in self.get_manifest().get("entries", [])
+            entry
+            for entry in self.get_manifest().get("entries", [])
             if entry.get("type") == type
         ]
 
-    def get_all_entries(self) -> List[Dict]:
+    def get_all_entries(self) -> List[Dict[str, Any]]:
         return self.get_manifest().get("entries", [])
 
-    async def get_types(self):
-        try:
-            return {
-                "status": "ok",
-                "types": list(set(e["type"] for e in self.get_manifest().get("entries", []))),
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    def _build_snapshot_entries(self) -> List[Dict[str, Any]]:
+        manifest = self.get_manifest()
+        entries: List[Dict[str, Any]] = []
+
+        for entry in manifest.get("entries", []):
+            content = self.get_file_by_path(entry["path"])
+            entries.append({**entry, "content": content})
+
+        return entries
+
+    async def get_canon_types(self):
+        manifest = self.get_manifest()
+        types = sorted({e["type"] for e in manifest.get("entries", [])})
+        return {"status": "ok", "types": types}
 
     async def get_file(self, type: str, name: str):
         entries = self.get_entries_by_type(type)
-        for entry in entries:
-            if entry.get("name") == name:
-                return {"status": "ok", "entity": self.get_file_by_path(entry["path"])}
-        raise HTTPException(status_code=404, detail="Entity not found")
+        match = next((e for e in entries if e.get("name") == name), None)
+
+        if match is None:
+            raise HTTPException(status_code=404, detail="Entity not found")
+
+        try:
+            entity = self.get_file_by_path(match["path"])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        return {"status": "ok", "entity": entity}
 
     async def get_snapshot(self):
-        manifest = self.get_manifest()
-        result = []
-
-        for entry in manifest.get("entries", []):
-            try:
-                content = self.get_file_by_path(entry["path"])
-                result.append(
-                    {
-                        "name": entry["name"],
-                        "type": entry["type"],
-                        "version": entry["version"],
-                        "description": entry["description"],
-                        "content": content,
-                    }
-                )
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to load {entry['name']}: {str(e)}"
-                )
+        try:
+            entries = self._build_snapshot_entries()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Snapshot error: {str(e)}")
 
         logger.info(
             json.dumps(
                 {
                     "event": "canon_snapshot_requested",
-                    "entry_count": len(result),
+                    "entry_count": len(entries),
                 }
             )
         )
 
-        return {"status": "ok", "entries": result}
+        return {"status": "ok", "entries": entries}
+
+    async def get_snapshot_digest(self):
+        try:
+            entries = self._build_snapshot_entries()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Snapshot error: {str(e)}")
+
+        canonical_json = json.dumps(
+            entries, sort_keys=True, separators=(",", ":")
+        )
+        digest = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+        logger.info(
+            json.dumps(
+                {
+                    "event": "canon_snapshot_digest_computed",
+                    "entry_count": len(entries),
+                    "digest_length": 64,
+                }
+            )
+        )
+
+        return {"status": "ok", "digest": digest}
