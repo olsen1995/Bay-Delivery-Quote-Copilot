@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifeos.dev/schemas/LifeOSStrategy.schema.json",
+  "title": "LifeOSStrategy",
+  "type": "object",
+  "required": ["name", "type", "version", "description"],
+  "properties": {
+    "name": { "type": "string" },
+    "type": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" }
+  },
+  "additionalProperties": false
+}
