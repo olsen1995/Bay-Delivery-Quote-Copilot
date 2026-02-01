@@ -1,0 +1,6 @@
+{
+  "name": "ShoppingAndProcurement",
+  "type": "LifeOSTree",
+  "version": "5.0.0",
+  "description": "Decision tree scaffold for ShoppingAndProcurement strategy."
+}

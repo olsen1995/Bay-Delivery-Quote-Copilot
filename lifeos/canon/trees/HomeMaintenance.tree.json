@@ -1,0 +1,6 @@
+{
+  "name": "HomeMaintenance",
+  "type": "LifeOSTree",
+  "version": "5.0.0",
+  "description": "Decision tree scaffold for HomeMaintenance strategy."
+}

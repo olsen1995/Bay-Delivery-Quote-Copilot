@@ -1,0 +1,6 @@
+{
+  "name": "HealthSupport",
+  "type": "LifeOSTree",
+  "version": "5.0.0",
+  "description": "Decision tree scaffold for HealthSupport strategy."
+}
