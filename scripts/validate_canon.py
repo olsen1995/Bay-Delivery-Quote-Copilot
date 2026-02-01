@@ -1,98 +1,97 @@
 import os
 import json
 import sys
+from jsonschema import validate as jsonschema_validate, ValidationError
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-CANON_DIR = os.path.join(REPO_ROOT, "lifeos", "canon")
-MANIFEST_PATH = os.path.join(CANON_DIR, "Canon_Manifest.json")
-TYPES_PATH = os.path.join(CANON_DIR, "CanonTypes.json")
-
-EXT_MAP = {
-    "LifeOSStrategy": "strategies",
-    "LifeOSSchema": "schemas",
-    "LifeOSTree": "trees"
+SCHEMA_MAP = {
+    "LifeOSStrategy": "schemas/LifeOSStrategy.schema.json",
+    "LifeOSSchema": "schemas/LifeOSSchema.schema.json",
+    "LifeOSTree": "schemas/LifeOSTree.schema.json",
 }
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CANON_ROOT = os.path.join(REPO_ROOT, "lifeos", "canon")
+MANIFEST_PATH = os.path.join(CANON_ROOT, "Canon_Manifest.json")
+
+class CanonValidationError(Exception):
+    pass
+
+class FileMissingError(CanonValidationError):
+    pass
+
+class SchemaValidationError(CanonValidationError):
+    pass
+
+class IdentityMismatchError(CanonValidationError):
+    pass
+
+class OrphanFileError(CanonValidationError):
+    pass
+
+class DuplicateEntryError(CanonValidationError):
+    pass
+
+def load_manifest():
+    with open(MANIFEST_PATH) as f:
+        return json.load(f)
+
 def load_json(path):
+    with open(path) as f:
+        return json.load(f)
+
+def load_schema(canon_type):
+    if canon_type not in SCHEMA_MAP:
+        raise CanonValidationError(f"No schema defined for canon type: {canon_type}")
+    schema_path = os.path.join(CANON_ROOT, SCHEMA_MAP[canon_type])
+    return load_json(schema_path)
+
+def validate_entry(entry, seen_keys):
+    path = os.path.join(CANON_ROOT, entry["path"])
+    if not os.path.isfile(path):
+        raise FileMissingError(f"Missing file: {entry['path']}")
+    data = load_json(path)
+    schema = load_schema(entry["type"])
     try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"[ERROR] Failed to load {path}: {e}")
-        sys.exit(1)
+        jsonschema_validate(instance=data, schema=schema)
+    except ValidationError as e:
+        raise SchemaValidationError(f"{entry['path']} failed schema validation: {e.message}")
+    for field in ("name", "type", "version"):
+        if field not in data or data[field] != entry[field]:
+            raise IdentityMismatchError(
+                f"{entry['path']} field '{field}' mismatch: manifest='{entry[field]}', file='{data.get(field)}'"
+            )
+    key = (entry["name"], entry["type"])
+    if key in seen_keys:
+        raise DuplicateEntryError(f"Duplicate canon entry detected: name={entry['name']} type={entry['type']}")
+    seen_keys.add(key)
+
+def detect_orphans(manifest_entries):
+    referenced_paths = {entry["path"] for entry in manifest_entries}
+    subdirs = ["strategies", "schemas", "trees"]
+    for subdir in subdirs:
+        dir_path = os.path.join(CANON_ROOT, subdir)
+        for filename in os.listdir(dir_path):
+            if filename.endswith(".json"):
+                rel_path = os.path.join(subdir, filename)
+                if rel_path not in referenced_paths:
+                    raise OrphanFileError(f"Orphan file not registered in manifest: {rel_path}")
 
 def main():
-    errors = []
-    warnings = []
-
-    # Load manifest
-    if not os.path.exists(MANIFEST_PATH):
-        print(f"[ERROR] Manifest not found at: {MANIFEST_PATH}")
-        sys.exit(1)
-
-    manifest = load_json(MANIFEST_PATH)
-    if "entries" not in manifest:
-        print("[ERROR] Manifest missing 'entries' array.")
-        sys.exit(1)
-
-    # Load types (optional)
-    valid_types = set()
-    if os.path.exists(TYPES_PATH):
-        types_json = load_json(TYPES_PATH)
-        for entry in types_json.get("types", []):
-            if "type" in entry:
-                valid_types.add(entry["type"])
-
-    for entry in manifest["entries"]:
-        path = entry.get("path")
-        typ = entry.get("type")
-        name = entry.get("name")
-        version = entry.get("version")
-
-        # Check required fields
-        if not all([path, typ, name, version]):
-            errors.append(f"[ERROR] Missing fields in manifest entry: {entry}")
-            continue
-
-        # File existence
-        full_path = os.path.join(CANON_DIR, path)
-        if not os.path.exists(full_path):
-            errors.append(f"[ERROR] Missing file: {path}")
-            continue
-
-        # Name must match filename
-        file_name = os.path.splitext(os.path.basename(path))[0]
-        if file_name != name:
-            warnings.append(f"[WARNING] Name mismatch: manifest name '{name}' != filename '{file_name}'")
-
-        # Folder must match declared type
-        expected_folder = EXT_MAP.get(typ)
-        if expected_folder and not path.startswith(f"{expected_folder}/"):
-            errors.append(f"[ERROR] Type-folder mismatch: {typ} should be in '{expected_folder}/' → {path}")
-
-        # Type must be known
-        if valid_types and typ not in valid_types:
-            warnings.append(f"[WARNING] Unknown type '{typ}' not found in CanonTypes.json")
-
-    # Output summary
-    print()
-    if errors:
-        print("X Canon integrity check failed:")
-        for e in errors:
-            print("-", e)
-    else:
-        print("OK No structural errors found in Canon manifest.")
-
-    if warnings:
-        print("\nWARNINGS:")
-        for w in warnings:
-            print("-", w)
-
-    if not errors:
-        print(f"\nPASS Canon integrity check passed ({len(manifest['entries'])} entries, {len(warnings)} warnings)")
+    try:
+        manifest = load_manifest()
+        entries = manifest.get("entries", [])
+        seen_keys = set()
+        for entry in entries:
+            validate_entry(entry, seen_keys)
+        detect_orphans(entries)
+        print("✅ Canon validation passed.")
         sys.exit(0)
-    else:
+    except CanonValidationError as e:
+        print(f"❌ Canon validation failed: {e}")
         sys.exit(1)
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        sys.exit(2)
 
 if __name__ == "__main__":
     main()
