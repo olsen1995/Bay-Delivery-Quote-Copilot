@@ -1,0 +1,49 @@
+name: Canon Metrics Invariants
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  metrics-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert no new audit writes or hooks
+        run: |
+          python - << 'EOF'
+          import pathlib
+
+          forbidden_tokens = [
+            "write_audit_record(",
+            "audit_read(",
+            "audit_read_with_provenance("
+          ]
+
+          for f in pathlib.Path("lifeos/metrics").rglob("*.py"):
+            text = f.read_text(encoding="utf-8")
+            for t in forbidden_tokens:
+              if t in text:
+                raise SystemExit(f"Forbidden new signal '{t}' in {f}")
+
+          print("No new signals detected.")
+          EOF
+
+      - name: Assert no Canon imports
+        run: |
+          python - << 'EOF'
+          import pathlib
+
+          for f in pathlib.Path("lifeos/metrics").rglob("*.py"):
+            if "lifeos.canon" in f.read_text(encoding="utf-8"):
+              raise SystemExit(f"Forbidden Canon import in {f}")
+
+          print("No Canon imports detected.")
+          EOF
+
+      - name: Assert deterministic schema present
+        run: |
+          test -f lifeos/metrics/metrics_schema.json || exit 1
+          echo "Metrics schema OK."
