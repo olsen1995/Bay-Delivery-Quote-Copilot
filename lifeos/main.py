@@ -29,11 +29,11 @@ app.add_middleware(
 )
 
 # ─────────────────────────────────────────────────────────────
-# Routers (runtime-relative imports ONLY)
+# Routers (runtime-relative imports only)
 # ─────────────────────────────────────────────────────────────
 
 from routes.mode_router import ModeRouter
-from routes.memory_read_router import memory_read_router
+from routes.memory_read_router import router as memory_read_router
 from routes.healthz import healthz_router
 from routes.openapi_alias import router as openapi_alias_router
 
