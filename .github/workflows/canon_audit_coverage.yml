@@ -1,0 +1,34 @@
+name: Canon Audit Hook Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  audit-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify audit hook imported on Canon read routes
+        run: |
+          python - << 'EOF'
+          import pathlib
+
+          routes = pathlib.Path("lifeos/routes").rglob("canon_*.py")
+          missing = []
+
+          for f in routes:
+              text = f.read_text(encoding="utf-8")
+              if "audit_read(" not in text:
+                  missing.append(str(f))
+
+          if missing:
+              print("Missing audit hook in:")
+              for m in missing:
+                  print("-", m)
+              raise SystemExit(1)
+
+          print("Audit hook coverage OK.")
+          EOF

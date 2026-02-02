@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "invariants": {
+    "logging": {
+      "append_only": true,
+      "best_effort": true,
+      "silent_failure": true
+    },
+    "subject": {
+      "source": "phase_34_pass_through_only"
+    },
+    "hashes": {
+      "snapshot_required_for_snapshot_reads": true,
+      "digest_required_for_digest_reads": true
+    },
+    "timestamps": {
+      "observational_only": true,
+      "ordering_authority": false
+    },
+    "determinism": {
+      "record_format_only": true,
+      "sequence_not_guaranteed": true
+    }
+  }
+}

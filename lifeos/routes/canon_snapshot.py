@@ -1,26 +1,21 @@
 from lifeos.canon.read_gate import assert_read_allowed
 from lifeos.canon.snapshot import build_snapshot
+from lifeos.audit.read_audit_hook import audit_read
 
-
-def get_snapshot_internal():
-    assert_read_allowed(
-        route="/canon/snapshot",
-        subject="internal"
-    )
-    return build_snapshot()
+_POLICY_VERSION = "1.0.0"
 
 
 def get_snapshot_gpt():
-    assert_read_allowed(
+    resource = assert_read_allowed(
         route="/canon/snapshot",
         subject="gpt"
     )
-    return build_snapshot()
-
-
-def get_snapshot_external():
-    assert_read_allowed(
+    result = build_snapshot()
+    audit_read(
+        subject="gpt",
+        resource=resource,
         route="/canon/snapshot",
-        subject="external"
+        policy_version=_POLICY_VERSION,
+        snapshot_hash=result["integrity"]["snapshot_hash"],
     )
-    return build_snapshot()
+    return result
