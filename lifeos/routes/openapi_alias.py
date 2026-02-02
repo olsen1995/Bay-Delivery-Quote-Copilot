@@ -1,13 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
-from main import app
 
 router = APIRouter()
 
-
 @router.get("/.well-known/openapi.json", include_in_schema=False)
-def openapi_alias():
+def openapi_alias(request: Request):
+    app = request.app
     return JSONResponse(
         get_openapi(
             title=app.title,

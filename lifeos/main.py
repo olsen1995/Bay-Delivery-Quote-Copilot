@@ -19,16 +19,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-
 @app.get("/meta/version")
 def meta_version():
     return get_version()
-
 
 canon_router = CanonRouter()
 app.include_router(canon_router.router)
