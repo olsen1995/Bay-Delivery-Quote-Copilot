@@ -2,10 +2,6 @@ services:
   - type: web
     name: lifeos-api
     env: python
-    plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port 10000"
-    envVars:
-      - key: OPENAI_API_KEY
-        sync: false
-    autoDeploy: true
+    pythonVersion: 3.11.9
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn lifeos.main:app --host 0.0.0.0 --port 10000
