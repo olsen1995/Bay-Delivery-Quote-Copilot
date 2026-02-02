@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from lifeos.storage.memory_manager import MemoryManager
+from storage.memory_manager import MemoryManager
 import logging
 import json
 
@@ -32,3 +32,4 @@ def get_memory(user_id: str = Query(..., min_length=1)):
         "user_id": user_id,
         "memory": memory,
     }
+

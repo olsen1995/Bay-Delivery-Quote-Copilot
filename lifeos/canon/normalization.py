@@ -17,7 +17,7 @@ Rules:
 from __future__ import annotations
 import json
 from typing import Any
-from lifeos.canon.ordering_rules import apply_ordering_rules
+from canon.ordering_rules import apply_ordering_rules
 
 
 NORMALIZATION_VERSION = "1.0.1"

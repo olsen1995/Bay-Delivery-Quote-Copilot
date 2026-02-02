@@ -1,5 +1,5 @@
 import os
-from lifeos.gpt.summary_validator import validate_summary
+from gpt.summary_validator import validate_summary
 
 def summarize_entity(entity: dict) -> str:
     """
@@ -60,3 +60,4 @@ def _call_llm(prompt: str) -> str:
         raise RuntimeError("LLM returned empty or invalid content")
 
     return content.strip()
+

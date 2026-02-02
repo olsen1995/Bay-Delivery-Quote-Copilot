@@ -1,7 +1,7 @@
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from openai import OpenAI
-from lifeos.storage.local_state import get_user_data, update_user_data
+from storage.local_state import get_user_data, update_user_data
 import logging
 
 client = OpenAI()

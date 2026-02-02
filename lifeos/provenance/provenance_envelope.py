@@ -5,7 +5,7 @@ Redundant by design.
 Sufficient to recompute lineage_id without external state.
 """
 
-from lifeos.provenance.lineage import derive_lineage_id
+from provenance.lineage import derive_lineage_id
 
 
 def build_provenance_envelope(
@@ -26,3 +26,4 @@ def build_provenance_envelope(
         "snapshot_hash": snapshot_hash,
         "normalization_version": normalization_version,
     }
+

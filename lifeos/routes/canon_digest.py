@@ -1,6 +1,6 @@
-from lifeos.canon.read_gate import assert_read_allowed
-from lifeos.canon.snapshot import build_digest
-from lifeos.audit.read_audit_hook import audit_read
+from canon.read_gate import assert_read_allowed
+from canon.snapshot import build_digest
+from audit.read_audit_hook import audit_read
 
 _POLICY_VERSION = "1.0.0"
 
@@ -19,3 +19,4 @@ def get_digest_internal():
         digest_hash=result["integrity"]["digest_hash"],
     )
     return result
+

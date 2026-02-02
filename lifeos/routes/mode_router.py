@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form, Query, HTTPException
 from pydantic import BaseModel
 from typing import Dict
-from lifeos.storage.memory_manager import MemoryManager
+from storage.memory_manager import MemoryManager
 import os
 
 
@@ -49,3 +49,4 @@ class ModeRouter:
             return {"ok": True, "deleted": True}
         except Exception as e:
             raise HTTPException(status_code=500, detail="Failed to delete memory") from e
+
