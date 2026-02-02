@@ -6,15 +6,14 @@ app = FastAPI(
     servers=[
         {
             "url": "https://life-os-private-practical-co-pilot.onrender.com",
-            "description": "Production (Render)"
+            "description": "Production (Render)",
         }
     ],
 )
 
-# ✅ ADD THIS IMPORT
+# 🔧 PHASE G FIX — register OpenAPI alias router
 from lifeos.routes.openapi_alias import router as openapi_alias_router
 
-# ✅ ADD THIS REGISTRATION (NO PREFIX)
 app.include_router(openapi_alias_router)
 
-# existing route includes remain unchanged
+# 🔒 all other existing includes remain unchanged
