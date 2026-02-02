@@ -1,7 +1,9 @@
 services:
   - type: web
-    name: lifeos-api
+    name: lifeos
     env: python
+    plan: free
+    rootDir: lifeos
     pythonVersion: 3.11.9
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn lifeos.main:app --host 0.0.0.0 --port 10000
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
