@@ -30,6 +30,7 @@ jobs:
         run: npm ci
 
       - name: 🔎 Validate version & run release
+        id: meta
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -43,6 +44,7 @@ jobs:
           fi
 
           TAG="v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
           # Never allow main (or anything else weird)
           if [[ "$TAG" == "main" ]]; then
@@ -70,8 +72,8 @@ jobs:
       - name: 🏷️ Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.ref_name }}
-          name: Release v${{ github.ref_name }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Release ${{ steps.meta.outputs.tag }}
           body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

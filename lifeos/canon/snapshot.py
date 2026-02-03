@@ -7,14 +7,10 @@ from canon.normalization import (
     normalize,
     normalize_to_bytes,
 )
+from meta.version import get_version
 
 _CANON_ROOT = Path(__file__).resolve().parent
-_MANIFEST_PATH = _CANON_ROOT / "CANON_MANIFEST.json"
 _POLICY_VERSION = "1.0.0"
-
-
-def _load_manifest() -> dict:
-    return json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def _load_json(path: Path) -> dict:
@@ -22,12 +18,11 @@ def _load_json(path: Path) -> dict:
 
 
 def _load_strategies() -> list[dict]:
-    manifest = _load_manifest()
-    entries = []
-    for entry in manifest.get("entries", []):
-        path = _CANON_ROOT / entry["path"]
-        entries.append(_load_json(path))
-    return entries
+    strategies_dir = _CANON_ROOT / "strategies"
+    return [
+        _load_json(path)
+        for path in sorted(strategies_dir.glob("*.json"))
+    ]
 
 
 def _load_schemas() -> list[dict]:
@@ -58,7 +53,7 @@ def build_snapshot():
     raw = _build_raw_snapshot()
     normalized = normalize(raw)
     snapshot_hash = sha256_bytes(normalize_to_bytes(raw))
-    canon_version = _load_manifest().get("version", "unknown")
+    canon_version = get_version().get("canon_version", "unknown")
 
     return {
         "data": normalized,
@@ -75,7 +70,7 @@ def build_digest():
     raw = _build_raw_snapshot()
     normalized = normalize(raw)
     digest_hash = sha256_bytes(normalize_to_bytes(raw))
-    canon_version = _load_manifest().get("version", "unknown")
+    canon_version = get_version().get("canon_version", "unknown")
 
     return {
         "data": normalized,
@@ -93,4 +88,3 @@ def get_snapshot():
 
 def get_digest():
     return build_digest()
-

@@ -27,6 +27,7 @@ jobs:
               "memory_read_router.py",
               "mode_router.py",
               "metrics.py",
+              "canon_router.py",
           }
 
           for f in routes_dir.rglob("*.py"):
