@@ -1,0 +1,83 @@
+name: OpenAPI Drift Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: 🧪 Validate OpenAPI Schema
+        run: |
+          set -euo pipefail
+
+          FILE="public/.well-known/openapi.json"
+
+          if [ ! -f "$FILE" ]; then
+            echo "❌ ERROR: $FILE not found"
+            exit 1
+          fi
+
+          echo "✅ Found OpenAPI file at $FILE"
+
+          python3 - <<'EOF'
+          import json
+
+          with open("public/.well-known/openapi.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          # 1. Basic structure
+          if data.get("openapi") != "3.1.0":
+              raise SystemExit("❌ ERROR: openapi version must be 3.1.0")
+
+          servers = data.get("servers", [])
+          if not any(
+              "https://life-os-private-practical-co-pilot.onrender.com" in s.get("url", "")
+              for s in servers
+          ):
+              raise SystemExit(
+                  "❌ ERROR: expected Render server URL not found in servers block"
+              )
+
+          paths = data.get("paths", {})
+
+          # 2. Check required paths and methods
+          required = {
+              "/ask": ["get", "post"],
+              "/memory": ["get", "post", "delete"],
+          }
+
+          missing = []
+
+          for path, methods in required.items():
+              if path not in paths:
+                  missing.append(f"Missing path: {path}")
+                  continue
+
+              for method in methods:
+                  if method not in paths[path]:
+                      missing.append(f"Missing method: {method.upper()} on {path}")
+                  else:
+                      op = paths[path][method]
+                      if op.get("x-openai-isConsequential") is not False:
+                          missing.append(
+                              f"{method.upper()} on {path} missing x-openai-isConsequential: false"
+                          )
+
+          if missing:
+              for m in missing:
+                  print("❌", m)
+              raise SystemExit("❌ ERROR: OpenAPI schema failed validation.")
+
+          print("✅ OpenAPI schema is valid.")
+          EOF
