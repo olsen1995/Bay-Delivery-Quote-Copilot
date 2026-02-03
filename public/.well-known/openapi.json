@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "LifeOS Co-Pilot API",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Minimal OpenAPI schema for GPT Actions"
   },
   "servers": [
@@ -32,7 +32,7 @@
         },
         "responses": {
           "200": {
-            "description": "Assistant response",
+            "description": "Response",
             "content": {
               "application/json": {
                 "schema": {
@@ -40,7 +40,10 @@
                   "properties": {
                     "summary": { "type": "string" },
                     "user_id": { "type": "string" },
-                    "memory": { "type": "object" }
+                    "memory": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
                   },
                   "required": ["summary", "user_id", "memory"]
                 }
@@ -52,7 +55,7 @@
     },
     "/memory": {
       "get": {
-        "summary": "Retrieve memory object",
+        "summary": "Retrieve memory",
         "operationId": "getMemory",
         "parameters": [
           {
@@ -64,48 +67,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Raw memory object",
+            "description": "Memory content",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "description": "Unwrapped memory dictionary"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Write memory object",
-        "operationId": "setMemory",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "user_id": { "type": "string" },
-                  "memory": { "type": "object" }
-                },
-                "required": ["user_id", "memory"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Memory write result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": { "type": "boolean" },
-                    "written": { "type": "integer" }
-                  },
-                  "required": ["ok", "written"]
+                  "description": "Unwrapped memory dictionary",
+                  "additionalProperties": true
                 }
               }
             }
