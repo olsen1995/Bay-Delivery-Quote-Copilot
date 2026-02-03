@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "LifeOS Co-Pilot API",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "Static OpenAPI schema for GPT Actions (ModeRouter runtime truth)."
   },
   "servers": [
@@ -51,6 +51,40 @@
                     }
                   },
                   "additionalProperties": true
+                },
+                "example": {
+                  "summary": "You said: hello",
+                  "user_id": "demo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -80,6 +114,10 @@
                   "user_id"
                 ],
                 "additionalProperties": false
+              },
+              "example": {
+                "message": "hello",
+                "user_id": "demo"
               }
             }
           }
@@ -100,6 +138,40 @@
                     }
                   },
                   "additionalProperties": true
+                },
+                "example": {
+                  "summary": "You said: hello",
+                  "user_id": "demo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -131,6 +203,39 @@
                   "type": "object",
                   "properties": {},
                   "additionalProperties": true
+                },
+                "example": {
+                  "some_key": "some_value"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -161,6 +266,12 @@
                   "memory"
                 ],
                 "additionalProperties": false
+              },
+              "example": {
+                "user_id": "demo",
+                "memory": {
+                  "some_key": "some_value"
+                }
               }
             }
           }
@@ -177,10 +288,44 @@
                       "type": "boolean"
                     },
                     "written": {
-                      "type": "number"
+                      "type": "integer"
                     }
                   },
                   "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "written": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -217,11 +362,77 @@
                     }
                   },
                   "additionalProperties": true
+                },
+                "examples": {
+                  "deletedTrue": {
+                    "summary": "Memory deleted",
+                    "value": {
+                      "ok": true,
+                      "deleted": true
+                    }
+                  },
+                  "deletedFalse": {
+                    "summary": "Memory not found",
+                    "value": {
+                      "ok": true,
+                      "deleted": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           }
         }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": true
       }
     }
   }
