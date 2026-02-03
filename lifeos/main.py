@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 # ─────────────────────────────────────────────────────────────
 # FastAPI App
@@ -14,6 +17,13 @@ app = FastAPI(
         }
     ]
 )
+
+
+@app.get("/.well-known/openapi.json", include_in_schema=False)
+def openapi_static():
+    root = Path(__file__).resolve().parents[1]
+    f = root / "public" / ".well-known" / "openapi.json"
+    return FileResponse(str(f), media_type="application/json")
 
 # ─────────────────────────────────────────────────────────────
 # Middleware
