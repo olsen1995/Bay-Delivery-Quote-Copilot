@@ -1,89 +1,29 @@
-name: Custom GPT Sync Reminder (Non-Blocking)
+name: GPT Sync Reminder
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [ "main" ]
+    paths:
+      # Canon and integrity
+      - "lifeos/canon/**"
+      - "canon_baselines/**"
 
-permissions:
-  pull-requests: write
-  contents: read
+      # Public contract for GPT Actions
+      - "public/.well-known/openapi.json"
+
+      # Core instruction sources (used by GPT + repo governance)
+      - "knowledge/**"
+      - "instructions/**"
+
+      # If you keep scripts that validate or gate canon/openapi, watch them too
+      - "scripts/ci/**"
 
 jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full history for reliable diff)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect changes to Custom GPT sources
-        id: detect
-        shell: bash
+      - name: Reminder
         run: |
-          set -e
-
-          base="${{ github.base_ref }}"
-          git fetch origin "$base" --depth=50
-
-          changed="$(git diff --name-only "origin/$base"...HEAD || true)"
-
-          needs_sync=0
-          hits=""
-
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-
-            if [[ "$f" == "instructions/Instructions.txt" ]]; then
-              needs_sync=1
-              hits="${hits}\n- ${f}"
-              continue
-            fi
-
-            if [[ "$f" == knowledge/* ]]; then
-              needs_sync=1
-              hits="${hits}\n- ${f}"
-              continue
-            fi
-
-            if [[ "$f" == "canon/CANON_MANIFEST.json" ]]; then
-              needs_sync=1
-              hits="${hits}\n- ${f}"
-              continue
-            fi
-          done <<< "$changed"
-
-          echo "needs_sync=$needs_sync" >> "$GITHUB_OUTPUT"
-
-          # Build a safe multi-line comment body in bash (avoids YAML/JS template issues)
-          if [[ "$needs_sync" -eq 1 ]]; then
-            {
-              echo "comment_body<<'EOF'"
-              echo "💡 **Custom GPT Sync Reminder** _(non-blocking)_"
-              echo ""
-              echo "This PR changes files that usually require re-uploading into the Custom GPT (to avoid repo updated, GPT stale drift):"
-              echo ""
-              echo "Changed:"
-              # Print hits with real newlines
-              echo -e "$hits"
-              echo ""
-              echo "After merge:"
-              echo "1) Download the latest Upload Pack artifact from GitHub Actions (LifeOS CI)"
-              echo "2) Update GPT Instructions using: instructions/Instructions.txt"
-              echo "3) Re-upload updated Knowledge files (knowledge/*) as needed"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Comment reminder on PR (only when needed)
-        if: steps.detect.outputs.needs_sync == '1'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const body = `${{ steps.detect.outputs.comment_body }}`.trim();
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body
-            });
+          echo "Changes detected in Canon/OpenAPI/Instructions."
+          echo "If you rely on a Custom GPT Project knowledge pack, re-sync/upload updated artifacts or referenced files."
+          echo "Watched paths: lifeos/canon/**, canon_baselines/**, public/.well-known/openapi.json, knowledge/**, instructions/**, scripts/ci/**"
