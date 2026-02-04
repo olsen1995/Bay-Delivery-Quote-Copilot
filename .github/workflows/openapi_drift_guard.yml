@@ -18,33 +18,4 @@ jobs:
           python-version: "3.x"
 
       - name: 🧪 Validate OpenAPI Schema
-        run: |
-          set -euo pipefail
-
-          FILE="public/.well-known/openapi.json"
-
-          if [ ! -f "$FILE" ]; then
-            echo "❌ ERROR: $FILE not found"
-            exit 1
-          fi
-
-          echo "✅ Found OpenAPI file at $FILE"
-
-          python3 -c 'import json,sys; data=json.load(open("public/.well-known/openapi.json","r",encoding="utf-8")); 
-          missing=[];
-          if data.get("openapi")!="3.1.0": missing.append("openapi version must be 3.1.0");
-          servers=data.get("servers",[]);
-          if not any("https://life-os-private-practical-co-pilot.onrender.com" in (s.get("url","")) for s in servers): missing.append("expected Render server URL not found in servers block");
-          paths=data.get("paths",{}) or {};
-          required={"/ask":["get","post"],"/memory":["get","post","delete"]};
-          for p,ms in required.items():
-              if p not in paths: missing.append(f"Missing path: {p}"); continue
-              for m in ms:
-                  if m not in paths[p]: missing.append(f"Missing method: {m.upper()} on {p}"); continue
-                  op=paths[p][m]
-                  if op.get("x-openai-isConsequential") is not False: missing.append(f"{m.upper()} on {p} missing x-openai-isConsequential: false");
-          if missing:
-              print("❌ OpenAPI schema failed validation:")
-              [print("❌",x) for x in missing]
-              sys.exit(1)
-          print("✅ OpenAPI schema is valid.")'
+        run: python3 scripts/ci/validate_openapi.py
