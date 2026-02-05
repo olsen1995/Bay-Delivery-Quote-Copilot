@@ -1,9 +1,10 @@
-fastapi
-uvicorn
-pydantic
+fastapi==0.110.0
+starlette==0.36.3
+uvicorn==0.29.0
+pydantic==2.6.4
 orjson
 python-dotenv
 python-multipart>=0.0.9
 apscheduler
 openai
-anyio>=3.4.0
+anyio==3.7.1
