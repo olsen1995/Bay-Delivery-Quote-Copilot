@@ -1,9 +1,8 @@
 services:
   - type: web
-    rootDir: lifeos
+    name: life-os-private-practical-co-pilot
     env: python
     plan: free
-    rootDir: lifeos
     pythonVersion: 3.11.9
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn lifeos.main:app --host 0.0.0.0 --port $PORT
