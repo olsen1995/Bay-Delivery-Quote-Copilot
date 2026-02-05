@@ -3,7 +3,7 @@ name: Canon Freeze Guard
 on:
   push:
     paths:
-      - "canon/Canon_Manifest_v5.0.json"
+      - "lifeos/canon/Canon_Manifest_v5.0.json"
       - ".github/workflows/canon_freeze_guard.yml"
   workflow_dispatch:
 
@@ -21,4 +21,4 @@ jobs:
 
       - name: Check for unintended changes
         run: |
-          git diff --exit-code canon/Canon_Manifest_v5.0.json
+          git diff --exit-code lifeos/canon/Canon_Manifest_v5.0.json
