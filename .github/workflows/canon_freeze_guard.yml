@@ -21,4 +21,4 @@ jobs:
 
       - name: Check for unintended changes
         run: |
-          git diff --exit-code lifeos/canon/Canon_Manifest_v5.0.json
+          git diff --exit-code lifeos/canon/integrity_contract.json
