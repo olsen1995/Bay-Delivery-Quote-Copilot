@@ -11,11 +11,13 @@ def test_runtime_canon_compatibility_is_explicit_when_declared():
     """
     Runtime ↔ Canon compatibility must be explicit once declared.
 
-    - Absence of a compatibility declaration is allowed (bootstrap phase)
-    - If declared, SUPPORTED_CANON_VERSIONS must be:
-        * a static literal
-        * a list or tuple
-        * non-empty
+    Rules:
+    - Absence of SUPPORTED_CANON_VERSIONS is allowed (bootstrap phase)
+    - If declared, it MUST:
+        * be a static literal
+        * be a list or tuple
+        * be non-empty
+        * contain only literal values
     """
 
     if not RUNTIME_ENTRY.exists():
@@ -36,7 +38,7 @@ def test_runtime_canon_compatibility_is_explicit_when_declared():
     ]
 
     if not assignments:
-        # No declaration yet — allowed for now
+        # No compatibility declaration yet — allowed
         return
 
     assignment = assignments[0]
