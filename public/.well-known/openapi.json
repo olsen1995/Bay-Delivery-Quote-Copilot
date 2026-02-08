@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "LifeOS Co-Pilot API",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "Static OpenAPI schema for GPT Actions (ModeRouter runtime truth)."
   },
   "servers": [
@@ -352,6 +352,45 @@
                       "deleted": false
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meta": {
+      "get": {
+        "summary": "Read-only governance and system status",
+        "operationId": "metaGet",
+        "x-openai-isConsequential": false,
+        "responses": {
+          "200": {
+            "description": "Governance and Canon visibility signals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operational_mode": {
+                      "type": "string"
+                    },
+                    "canon_version": {
+                      "type": ["string", "null"]
+                    },
+                    "canon_digest_loaded": {
+                      "type": "boolean"
+                    },
+                    "freeze_active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "operational_mode",
+                    "canon_digest_loaded",
+                    "freeze_active"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
