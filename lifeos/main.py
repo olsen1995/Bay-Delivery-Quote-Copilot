@@ -2,9 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
-# 🧠 Canon read-gate (existing utility)
-from lifeos.canon.read_gate import read_canon_file
-
 app = FastAPI(
     title="LifeOS",
     description="Private Practical Co-Pilot",
@@ -21,43 +18,36 @@ app.add_middleware(
 )
 
 # -------------------------------------------------------------------
-# 🔬 RUNTIME CANON READ PILOT (M17.2)
+# 🔬 RUNTIME CANON READ — DISABLED (SAFE MODE)
+#
+# Canon runtime reads are temporarily disabled until a proper
+# loader exists. This prevents import and startup failures.
+#
+# No Canon mutation.
+# No governance change.
+# No enforcement.
 # -------------------------------------------------------------------
 
 CANON_SYSTEM_IDENTITY = None
 
-try:
-    CANON_SYSTEM_IDENTITY = read_canon_file(
-        "metadata/system_identity.json"
-    )
-except Exception:
-    CANON_SYSTEM_IDENTITY = None
-
 
 # -------------------------------------------------------------------
-# 🔎 GOVERNANCE STATUS VISIBILITY (M18.1)
+# 🔎 GOVERNANCE STATUS VISIBILITY
 #
 # Read-only surface.
-# No enforcement.
-# No coupling.
 # Optional data only.
+# No coupling to Canon loaders.
 # -------------------------------------------------------------------
 
 FREEZE_FILE = Path("lifeos/FREEZE.json")
-
-CANON_DIGEST = None
-try:
-    CANON_DIGEST = read_canon_file("snapshot_digest.json")
-except Exception:
-    CANON_DIGEST = None
 
 
 @app.get("/")
 def root():
     return {
         "status": "ok",
-        "canon_identity_loaded": CANON_SYSTEM_IDENTITY is not None,
-        "canon_identity": CANON_SYSTEM_IDENTITY,
+        "canon_identity_loaded": False,
+        "canon_identity": None,
     }
 
 
@@ -68,11 +58,7 @@ def meta():
     """
     return {
         "operational_mode": "Day-2 (Operational)",
-        "canon_version": (
-            CANON_SYSTEM_IDENTITY.get("version")
-            if isinstance(CANON_SYSTEM_IDENTITY, dict)
-            else None
-        ),
-        "canon_digest_loaded": CANON_DIGEST is not None,
+        "canon_version": None,
+        "canon_digest_loaded": False,
         "freeze_active": FREEZE_FILE.exists(),
     }
