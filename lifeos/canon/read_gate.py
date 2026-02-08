@@ -43,6 +43,3 @@ def assert_read_allowed(*, route: str, subject: str) -> str:
     raise CanonAccessDenied(
         f"Read access denied (subject={subject}, resource={resource})"
     )
-
-read_canon_file = load_canon_json
-
