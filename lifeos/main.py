@@ -1,35 +1,16 @@
-from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 
-# ─────────────────────────────────────────────────────────────
-# FastAPI App
-# ─────────────────────────────────────────────────────────────
+# 🧠 Canon read-gate (existing utility)
+from lifeos.canon.read_gate import read_canon_file
 
 app = FastAPI(
-    title="LifeOS Co-Pilot API",
-    version="2.0.1",
-    servers=[
-        {
-            "url": "https://life-os-private-practical-co-pilot.onrender.com"
-        }
-    ]
+    title="LifeOS",
+    description="Private Practical Co-Pilot",
+    version="0.1.0",
 )
 
-
-@app.get("/.well-known/openapi.json", include_in_schema=False)
-def openapi_static():
-    root = Path(__file__).resolve().parents[1]
-    f = root / "public" / ".well-known" / "openapi.json"
-    return FileResponse(str(f), media_type="application/json")
-
-
-# ─────────────────────────────────────────────────────────────
-# Middleware
-# ─────────────────────────────────────────────────────────────
-
+# 🌐 Enable CORS for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,16 +19,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────────────────────────
-# Routers (absolute package imports for local uvicorn)
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------
+# 🔬 RUNTIME CANON READ PILOT (M17.2)
+#
+# Intentional constraints:
+# - ONE Canon artifact
+# - READ-ONLY
+# - Optional (safe fallback)
+# - No abstraction
+# - No enforcement
+#
+# ⚠️ Pilot only — do not generalize
+# -------------------------------------------------------------------
 
-from lifeos.routes.mode_router import ModeRouter
-from lifeos.routes.memory_read_router import router as memory_read_router
-from lifeos.routes.healthz import healthz_router
+CANON_SYSTEM_IDENTITY = None
 
-router = ModeRouter()
+try:
+    CANON_SYSTEM_IDENTITY = read_canon_file(
+        "metadata/system_identity.json"
+    )
+except Exception:
+    # Canon is optional at runtime for this pilot.
+    # Failure MUST NOT block startup.
+    CANON_SYSTEM_IDENTITY = None
 
-app.include_router(router.router)
-app.include_router(memory_read_router)
-app.include_router(healthz_router)
+
+@app.get("/")
+def root():
+    """
+    Minimal runtime surface.
+
+    If Canon metadata is available, expose it passively.
+    Otherwise, operate normally.
+    """
+    return {
+        "status": "ok",
+        "canon_identity_loaded": CANON_SYSTEM_IDENTITY is not None,
+        "canon_identity": CANON_SYSTEM_IDENTITY,
+    }
