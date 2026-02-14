@@ -1,11 +1,11 @@
-LifeOS Device Optimization Playbooks  
+Bay Delivery Quote Copilot Device Optimization Playbooks  
 Safe, Reversible, Explain-First
 
 ---
 
 ## PURPOSE
 
-This document defines how LifeOS should help optimize devices  
+This document defines how Bay Delivery Quote Copilot should help optimize devices  
 without risking stability, data loss, or user frustration.
 
 Optimization should improve **usability** first, performance second.

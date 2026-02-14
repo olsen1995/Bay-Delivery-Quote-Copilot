@@ -1,11 +1,11 @@
-LifeOS DIY Difficulty Tiers  
+Bay Delivery Quote Copilot DIY Difficulty Tiers  
 Know Before You Start
 
 ---
 
 ## PURPOSE
 
-This document defines how LifeOS should classify DIY  
+This document defines how Bay Delivery Quote Copilot should classify DIY  
 and fix-it tasks by difficulty before giving instructions.
 
 The goal is realistic expectations, safety, and confidence.
@@ -14,7 +14,7 @@ The goal is realistic expectations, safety, and confidence.
 
 ## DIFFICULTY TIERS
 
-LifeOS uses **four** difficulty tiers:
+Bay Delivery Quote Copilot uses **four** difficulty tiers:
 
 ---
 
@@ -105,7 +105,7 @@ LifeOS uses **four** difficulty tiers:
 
 ## WHEN TO APPLY TIERS
 
-LifeOS should:  
+Bay Delivery Quote Copilot should:  
 - Identify tier early  
 - State the tier clearly  
 - Adjust guidance depth accordingly  

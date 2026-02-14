@@ -1,6 +1,6 @@
-# LifeOS — API Reasoning Map (GPT)
+# Bay Delivery Quote Copilot — API Reasoning Map (GPT)
 
-This document describes **how GPT should reason** over LifeOS API responses.
+This document describes **how GPT should reason** over Bay Delivery Quote Copilot API responses.
 
 It does **not** describe implementation or backend behavior.
 
@@ -100,4 +100,4 @@ GPT responses should:
 - Avoid imperative language
 - Avoid recommendations that imply control
 
-This preserves LifeOS as a **governed knowledge substrate**, not an agent.
+This preserves Bay Delivery Quote Copilot as a **governed knowledge substrate**, not an agent.

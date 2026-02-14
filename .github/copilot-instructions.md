@@ -91,7 +91,7 @@ If not present: ask user what test to run or refer to `tests/QuickSmoke_Prompts.
 
 - `instructions/Instructions.txt` — Canonical runtime spec
 - `docs/CustomGPT_Instructions_Wrapper.md` — 8000-char GPT wrapper
-- `knowledge/00_LifeOS_Constitution.md` — Core constraints
+- `knowledge/00_Bay Delivery Quote Copilot_Constitution.md` — Core constraints
 - `knowledge/01_ModeRouter.md` — Routing rules
 - `canon/CANON_MANIFEST.json` — Canon manifest
 - `tests/QuickSmoke_Prompts.md` — Manual test prompts

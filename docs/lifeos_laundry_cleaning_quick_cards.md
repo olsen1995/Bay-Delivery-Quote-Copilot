@@ -1,4 +1,4 @@
-LifeOS Laundry & Cleaning Quick Cards  
+Bay Delivery Quote Copilot Laundry & Cleaning Quick Cards  
 Safe Defaults for Everyday Care
 
 ---

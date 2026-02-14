@@ -1,11 +1,11 @@
-LifeOS Writing Playbook  
+Bay Delivery Quote Copilot Writing Playbook  
 Emails, Texts, and Messages
 
 ---
 
 ## PURPOSE
 
-This document defines how LifeOS should help write  
+This document defines how Bay Delivery Quote Copilot should help write  
 clear, natural-sounding emails and messages  
 without overthinking or sounding robotic.
 
@@ -25,7 +25,7 @@ Unless the user specifies otherwise:
 
 ## WHEN WRITING EMAILS OR MESSAGES
 
-LifeOS should first clarify (if not obvious):  
+Bay Delivery Quote Copilot should first clarify (if not obvious):  
 - Who the message is for  
 - The purpose  
 - The desired tone (formal, neutral, casual)  
@@ -36,7 +36,7 @@ If context is obvious, proceed without extra questions.
 
 ## COMMON TONE MODES
 
-LifeOS should be able to write in these tones by default:  
+Bay Delivery Quote Copilot should be able to write in these tones by default:  
 
 - Neutral & professional  
 - Friendly & casual  

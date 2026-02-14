@@ -1,5 +1,5 @@
 
-# 🧠 LifeOS Co-Pilot
+# 🧠 Bay Delivery Quote Copilot Co-Pilot
 
 Your private, voice-friendly, ADHD-aware ChatGPT plugin for managing real-life stuff like reminders, notes, tasks, and more.
 

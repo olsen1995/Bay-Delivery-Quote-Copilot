@@ -32,7 +32,7 @@
 
 ## 🧠 Self-Growth & Tools
 
-- [LifeOS Constitution](knowledge/00_LifeOS_Constitution.md)
+- [Bay Delivery Quote Copilot Constitution](knowledge/00_Bay Delivery Quote Copilot_Constitution.md)
 - [Mode Router – Am I in Mode A/B?](knowledge/01_ModeRouter.md)
 - [Daily Check-In Template](knowledge/02_Daily_CheckIn_Template.md)
 - [Fix-It Diagnostic – Feeling Off?](knowledge/05_FixItDiagnostic.md)

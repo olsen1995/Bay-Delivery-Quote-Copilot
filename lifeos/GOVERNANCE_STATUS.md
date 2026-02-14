@@ -1,4 +1,4 @@
-# Governance Status — LifeOS
+# Governance Status — Bay Delivery Quote Copilot
 
 **Status:** Operational Mode  
 **Last Updated:** MANUAL  
@@ -13,7 +13,7 @@
 **Freeze Scope:** none  
 
 **Source of Truth:**  
-- `lifeos/FREEZE.json`
+- `Bay Delivery Quote Copilot/FREEZE.json`
 
 Notes:
 - When a freeze is active, this document MUST be updated manually.

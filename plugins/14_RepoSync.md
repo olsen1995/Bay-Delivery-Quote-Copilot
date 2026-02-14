@@ -15,7 +15,7 @@ The manifest on main now aligns with the following authoritative and supporting 
 
 ### Authoritative Core (“law” level)
 
-- 00_LifeOS_Constitution.md
+- 00_Bay Delivery Quote Copilot_Constitution.md
 - 01_ModeRouter.md
 - 13_DecisionCheck.md
 

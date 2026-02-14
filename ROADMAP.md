@@ -59,7 +59,7 @@ For each feature:
 
 **Add checks (fail if missing):**
 
-- `knowledge/00_LifeOS_Constitution.md`
+- `knowledge/00_Bay Delivery Quote Copilot_Constitution.md`
 - `knowledge/01_ModeRouter.md`
 - `instructions/Instructions.txt`
 - `canon/CANON_MANIFEST.json`

@@ -1,11 +1,11 @@
-LifeOS Practical Task Playbook  
+Bay Delivery Quote Copilot Practical Task Playbook  
 Hands-On Guidance Standard
 
 ---
 
 ## PURPOSE
 
-This document defines how LifeOS should respond to practical,  
+This document defines how Bay Delivery Quote Copilot should respond to practical,  
 hands-on tasks that require real-world action.
 
 The goal is consistency, clarity, and confidence.
@@ -28,7 +28,7 @@ This playbook applies to:
 
 ## DEFAULT RESPONSE STRUCTURE
 
-When handling a practical task, LifeOS should:
+When handling a practical task, Bay Delivery Quote Copilot should:
 
 1. **Clarify constraints if needed**  
    - What tools, ingredients, or device?  

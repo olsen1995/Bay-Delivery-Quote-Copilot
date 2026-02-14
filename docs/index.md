@@ -1,10 +1,10 @@
-# LifeOS Co-Pilot – Privacy Policy
+# Bay Delivery Quote Copilot Co-Pilot – Privacy Policy
 
 **Effective Date:** January 23, 2026
 
 ## 1. Overview
 
-LifeOS Co-Pilot is designed to assist users by intelligently routing tasks, thoughts, or requests to the correct LifeOS mode. This privacy policy explains how user data is handled.
+Bay Delivery Quote Copilot Co-Pilot is designed to assist users by intelligently routing tasks, thoughts, or requests to the correct Bay Delivery Quote Copilot mode. This privacy policy explains how user data is handled.
 
 ## 2. Data Handling
 
@@ -16,7 +16,7 @@ LifeOS Co-Pilot is designed to assist users by intelligently routing tasks, thou
 
 ## 3. Required Information
 
-No personal information is required to use LifeOS Co-Pilot.
+No personal information is required to use Bay Delivery Quote Copilot Co-Pilot.
 
 ## 4. Safety & Security
 

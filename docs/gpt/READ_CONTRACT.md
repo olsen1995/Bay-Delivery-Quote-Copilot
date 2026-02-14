@@ -1,7 +1,7 @@
-# LifeOS — GPT Read Contract (Read-Only)
+# Bay Delivery Quote Copilot — GPT Read Contract (Read-Only)
 
 This document defines the **binding read-only contract** under which GPT
-may reason over the LifeOS API.
+may reason over the Bay Delivery Quote Copilot API.
 
 This is **not** an implementation guide.
 This is a **behavioral contract** for GPT as a client.
@@ -13,7 +13,7 @@ This is a **behavioral contract** for GPT as a client.
 GPT is permitted to:
 
 - Perform **GET** requests only
-- Read from the **public LifeOS API surface**
+- Read from the **public Bay Delivery Quote Copilot API surface**
 - Reason deterministically over returned JSON
 
 GPT is explicitly **not permitted** to:
@@ -105,4 +105,4 @@ This contract is violated if GPT:
 - Uses undocumented endpoints
 - Assumes runtime authority
 
-This contract is **binding** for all GPT usage of LifeOS.
+This contract is **binding** for all GPT usage of Bay Delivery Quote Copilot.

@@ -1,4 +1,4 @@
-LifeOS Weekly Reset  
+Bay Delivery Quote Copilot Weekly Reset  
 A Calm Check-In, Not a Productivity Review
 
 ---

@@ -1,4 +1,4 @@
-LifeOS Memory Rules  
+Bay Delivery Quote Copilot Memory Rules  
 Personal-First, Shared-Link Safe
 
 ---
@@ -57,7 +57,7 @@ Memory must **NOT**:
 
 ## SHARED-LINK SAFETY RULE
 
-Because LifeOS may be used by others:  
+Because Bay Delivery Quote Copilot may be used by others:  
 - Never assume the speaker is Austin  
 - Never expose stored personal history  
 - Treat memories as defaults, not facts  

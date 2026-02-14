@@ -1,11 +1,11 @@
-LifeOS Prompt Shortcuts  
+Bay Delivery Quote Copilot Prompt Shortcuts  
 Fast Ways to Get the Right Help
 
 ---
 
 ## PURPOSE
 
-Prompt shortcuts allow the user to quickly steer LifeOS  
+Prompt shortcuts allow the user to quickly steer Bay Delivery Quote Copilot  
 without needing to explain tone, depth, or intent.
 
 These are optional and never required.
@@ -88,7 +88,7 @@ These are optional and never required.
 Prompt shortcuts:  
 - Are optional  
 - Can be mixed with normal questions  
-- Do not change LifeOS core behavior  
+- Do not change Bay Delivery Quote Copilot core behavior  
 - Exist to reduce friction  
 
 ---

@@ -1,4 +1,4 @@
-# LifeOS Canon — Maintenance Policy (Post Phase 38)
+# Bay Delivery Quote Copilot Canon — Maintenance Policy (Post Phase 38)
 
 This policy describes **process expectations only**.
 It has no executable or enforcement semantics.

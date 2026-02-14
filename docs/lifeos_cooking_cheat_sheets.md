@@ -1,4 +1,4 @@
-LifeOS Cooking Cheat Sheets  
+Bay Delivery Quote Copilot Cooking Cheat Sheets  
 Simple, Reliable, Low-Stress Cooking
 
 ---

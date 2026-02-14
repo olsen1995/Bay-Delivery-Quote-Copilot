@@ -3,7 +3,7 @@
 ## Purpose
 
 This document defines the **only sanctioned runtime surface** that a
-Custom GPT may read from the LifeOS backend.
+Custom GPT may read from the Bay Delivery Quote Copilot backend.
 
 The intent is to provide **visibility without authority**.
 

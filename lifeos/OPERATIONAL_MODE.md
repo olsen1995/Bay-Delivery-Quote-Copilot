@@ -1,4 +1,4 @@
-# LifeOS Operational Mode
+# Bay Delivery Quote Copilot Operational Mode
 
 ## Status
 **OPERATIONAL MODE: ACTIVE**

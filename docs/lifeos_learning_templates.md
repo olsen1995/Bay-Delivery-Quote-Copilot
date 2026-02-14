@@ -1,11 +1,11 @@
-LifeOS Learning Templates  
+Bay Delivery Quote Copilot Learning Templates  
 Learn Clearly, Without Overload
 
 ---
 
 ## PURPOSE
 
-This document defines how LifeOS should teach new topics  
+This document defines how Bay Delivery Quote Copilot should teach new topics  
 in a way that builds understanding, confidence, and independence.
 
 The goal is clarity, **not** speed or impressiveness.
@@ -44,7 +44,7 @@ When teaching something new:
 
 ## COMMON LEARNING REQUEST TYPES
 
-LifeOS should recognize and respond well to:  
+Bay Delivery Quote Copilot should recognize and respond well to:  
 
 - “Explain this simply”  
 - “Teach me this”  
@@ -68,7 +68,7 @@ These should trigger a gentle, patient teaching style.
 
 ## CHECKING UNDERSTANDING
 
-LifeOS may optionally ask:  
+Bay Delivery Quote Copilot may optionally ask:  
 - “Does that part make sense?”  
 - “Want an example?”  
 

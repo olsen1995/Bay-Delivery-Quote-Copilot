@@ -1,6 +1,6 @@
-# LifeOS — Runtime Architecture (Source of Truth)
+# Bay Delivery Quote Copilot — Runtime Architecture (Source of Truth)
 
-This document describes the **as-built** runtime architecture of the LifeOS backend as deployed (Render) and consumed by GPT Actions.
+This document describes the **as-built** runtime architecture of the Bay Delivery Quote Copilot backend as deployed (Render) and consumed by GPT Actions.
 
 It exists to prevent drift between:
 
@@ -12,11 +12,11 @@ It exists to prevent drift between:
 
 ### FastAPI app
 
-- `lifeos/main.py`
+- `Bay Delivery Quote Copilot/main.py`
 
 ### Runtime assumption
 
-- The service is executed with working directory / import base such that `lifeos/` is the effective root for imports.
+- The service is executed with working directory / import base such that `Bay Delivery Quote Copilot/` is the effective root for imports.
 
 This is why imports like:
 
@@ -64,26 +64,26 @@ Expected response shape (minimum stable fields):
 
 ### Wired (part of deployed request path)
 
-- `lifeos/main.py`
-- `lifeos/routes/mode_router.py` (contains `/ask` and `/memory` behavior as currently mounted)
-- `lifeos/storage/memory_manager.py` (JSON persistence)
+- `Bay Delivery Quote Copilot/main.py`
+- `Bay Delivery Quote Copilot/routes/mode_router.py` (contains `/ask` and `/memory` behavior as currently mounted)
+- `Bay Delivery Quote Copilot/storage/memory_manager.py` (JSON persistence)
 - `public/.well-known/openapi.json` (contract served to GPT Actions)
 
 ### Present but not necessarily mounted (verify before assuming)
 
 The repo contains additional modules intended for future integration:
 
-- `lifeos/modes/*`
-- other route modules under `lifeos/routes/*`
-- Canon subsystems under `lifeos/canon/*`
+- `Bay Delivery Quote Copilot/modes/*`
+- other route modules under `Bay Delivery Quote Copilot/routes/*`
+- Canon subsystems under `Bay Delivery Quote Copilot/canon/*`
 
-These may be used by CI or tooling, but should not be assumed part of the deployed request path unless explicitly mounted in `lifeos/main.py`.
+These may be used by CI or tooling, but should not be assumed part of the deployed request path unless explicitly mounted in `Bay Delivery Quote Copilot/main.py`.
 
 ## Canon subsystem
 
 Canon lives under:
 
-- `lifeos/canon/*`
+- `Bay Delivery Quote Copilot/canon/*`
 
 CI may validate Canon snapshot/digest integrity using:
 

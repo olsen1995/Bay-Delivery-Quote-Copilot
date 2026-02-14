@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the **authoritative handshake** between the LifeOS
+This document defines the **authoritative handshake** between the Bay Delivery Quote Copilot
 runtime backend and the Custom GPT interface.
 
 It establishes **capabilities, limits, and expectations** without
