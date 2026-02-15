@@ -1,6 +1,0 @@
-{
-  "name": "VehicleMaintenance",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for managing vehicle upkeep, inspections, and repairs."
-}

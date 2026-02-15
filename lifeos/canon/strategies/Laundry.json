@@ -1,6 +1,0 @@
-{
-  "name": "Laundry",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for sorting, washing, drying, and folding clothes."
-}

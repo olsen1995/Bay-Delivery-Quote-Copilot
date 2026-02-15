@@ -1,6 +1,0 @@
-{
-  "name": "EmailWriting",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for writing and responding to life administration emails."
-}

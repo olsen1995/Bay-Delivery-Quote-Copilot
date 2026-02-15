@@ -1,6 +1,0 @@
-{
-  "name": "HomeMaintenance",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for upkeep of appliances, utilities, and home systems."
-}

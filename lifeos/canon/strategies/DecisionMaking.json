@@ -1,6 +1,0 @@
-{
-  "name": "DecisionMaking",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for LifeOS decision support."
-}
