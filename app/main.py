@@ -1,49 +1,60 @@
 from fastapi import FastAPI, UploadFile, File
-from pydantic import BaseModel
 from typing import List
-from app.quote_engine import calculate_quote
 from app.image_analyzer import analyze_image
-from dotenv import load_dotenv
+from app.pricing_engine import calculate_quote
 
-# Load environment variables
-load_dotenv()
-
-app = FastAPI(title="Bay Delivery Quote Copilot")
+app = FastAPI()
 
 
-# ------------------------
-# Quote Engine Endpoint
-# ------------------------
+@app.get("/")
+def root():
+    return {"message": "Bay Delivery Quote Copilot API running"}
 
-class QuoteRequest(BaseModel):
-    service_type: str
-    estimated_hours: float
-    dump_fee_estimate: float = 0
-
-
-@app.post("/ask")
-def ask_quote(request: QuoteRequest):
-    result = calculate_quote(
-        service_type=request.service_type,
-        hours=request.estimated_hours,
-        dump_fee_estimate=request.dump_fee_estimate,
-    )
-    return result
-
-
-# ------------------------
-# Image Analysis Endpoint (Multi-Image Support)
-# ------------------------
 
 @app.post("/analyze-image")
 async def analyze_uploaded_images(files: List[UploadFile] = File(...)):
-    results = []
+    all_analyses = []
 
     for file in files:
         analysis = analyze_image(file)
-        results.append({
-            "filename": file.filename,
-            "analysis": analysis
-        })
+        all_analyses.append(analysis)
 
-    return {"analyses": results}
+    # Merge multiple image analyses (basic merge logic)
+    merged_analysis = {
+        "job_type": "junk_removal",
+        "estimated_volume_cubic_yards": 0,
+        "heavy_items": [],
+        "difficulty": "easy"
+    }
+
+    for analysis in all_analyses:
+        if "error" in analysis:
+            return {
+                "error": "Image analysis failed",
+                "details": analysis
+            }
+
+        merged_analysis["estimated_volume_cubic_yards"] += analysis.get(
+            "estimated_volume_cubic_yards", 0
+        )
+
+        merged_analysis["heavy_items"].extend(
+            analysis.get("heavy_items", [])
+        )
+
+        # Upgrade difficulty if any image is harder
+        if analysis.get("difficulty") == "hard":
+            merged_analysis["difficulty"] = "hard"
+        elif (
+            analysis.get("difficulty") == "moderate"
+            and merged_analysis["difficulty"] != "hard"
+        ):
+            merged_analysis["difficulty"] = "moderate"
+
+    # Calculate final quote
+    quote = calculate_quote(merged_analysis)
+
+    return {
+        "analysis": merged_analysis,
+        "quote": quote
+    }
