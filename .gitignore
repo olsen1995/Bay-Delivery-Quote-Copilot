@@ -24,7 +24,11 @@ venv.bak/
 *.env
 
 # ───────────── VS Code ─────────────
-.vscode/
+# VS Code (ignore most, but keep useful team tasks)
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+
 
 # ───────────── Python Packaging ─────────────
 .Python
