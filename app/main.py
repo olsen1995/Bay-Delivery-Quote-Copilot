@@ -10,12 +10,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.storage import init_db, save_quote, get_quote, list_quotes, search_quotes
+from app.storage import (
+    init_db,
+    save_quote,
+    get_quote,
+    list_quotes,
+    search_quotes,
+    save_job,
+    get_job,
+    list_jobs,
+    update_job_fields,
+)
 
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.3.1",
+    version="0.4.0",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + customer messaging helpers.",
 )
 
@@ -118,6 +128,61 @@ class CustomerMessageRequest(BaseModel):
 class CustomerMessageResponse(BaseModel):
     message: str
 
+
+# =========================
+# Jobs Models
+# =========================
+
+class JobStatus(str, Enum):
+    new = "new"
+    booked = "booked"
+    in_progress = "in_progress"
+    completed = "completed"
+    paid = "paid"
+    cancelled = "cancelled"
+
+
+class JobCreateFromQuoteRequest(BaseModel):
+    customer_name: Optional[str] = None
+    job_address: Optional[str] = None
+    scheduled_start: Optional[str] = Field(None, description="ISO string preferred, e.g. 2026-02-16T14:00:00-05:00")
+    scheduled_end: Optional[str] = Field(None, description="ISO string preferred")
+    deposit_paid_cad: NonNegFloat = 0.0
+    notes: Optional[str] = None
+
+
+class JobUpdateRequest(BaseModel):
+    status: Optional[JobStatus] = None
+    customer_name: Optional[str] = None
+    job_address: Optional[str] = None
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
+    paid_cad: Optional[NonNegFloat] = None
+    notes: Optional[str] = None
+
+
+class JobResponse(BaseModel):
+    job_id: str
+    created_at: str
+    quote_id: str
+    status: JobStatus
+
+    customer_name: Optional[str] = None
+    job_address: Optional[str] = None
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
+
+    total_cad: NonNegFloat
+    paid_cad: NonNegFloat
+    owing_cad: NonNegFloat
+
+    notes: Optional[str] = None
+    quote_snapshot: Dict[str, Any]
+
+
+# =========================
+# Quote Engine
+# =========================
 
 @dataclass
 class CalcResult:
@@ -316,6 +381,10 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
     )
 
 
+# =========================
+# Routes
+# =========================
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return {"ok": True, "time": datetime.utcnow().isoformat() + "Z", "version": app.version}
@@ -378,4 +447,146 @@ def quote_search(
         max_total=max_total,
         after=after,
         before=before,
+    )
+
+
+# =========================
+# Jobs Routes
+# =========================
+
+@app.post("/job/from-quote/{quote_id}", response_model=JobResponse)
+def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse:
+    quote = get_quote(quote_id)
+    if not quote:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Quote not found")
+
+    job_id = str(uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
+
+    total = float(quote["total_cad"])
+    paid = float(req.deposit_paid_cad)
+    owing = max(0.0, total - paid)
+
+    job = {
+        "job_id": job_id,
+        "created_at": created_at,
+        "quote_id": quote_id,
+        "status": JobStatus.booked.value,
+        "customer_name": req.customer_name,
+        "job_address": req.job_address,
+        "scheduled_start": req.scheduled_start,
+        "scheduled_end": req.scheduled_end,
+        "total_cad": total,
+        "paid_cad": paid,
+        "owing_cad": owing,
+        "notes": req.notes,
+        "quote_snapshot": quote,
+    }
+
+    # Persist
+    save_job(
+        {
+            "job_id": job_id,
+            "created_at": created_at,
+            "quote_id": quote_id,
+            "status": job["status"],
+            "customer_name": req.customer_name,
+            "job_address": req.job_address,
+            "scheduled_start": req.scheduled_start,
+            "scheduled_end": req.scheduled_end,
+            "total_cad": total,
+            "paid_cad": paid,
+            "owing_cad": owing,
+            "notes": req.notes,
+            "job_json": job,
+        }
+    )
+
+    return JobResponse(
+        job_id=job_id,
+        created_at=created_at,
+        quote_id=quote_id,
+        status=JobStatus(job["status"]),
+        customer_name=req.customer_name,
+        job_address=req.job_address,
+        scheduled_start=req.scheduled_start,
+        scheduled_end=req.scheduled_end,
+        total_cad=total,
+        paid_cad=paid,
+        owing_cad=owing,
+        notes=req.notes,
+        quote_snapshot=quote,
+    )
+
+
+@app.get("/job/{job_id}", response_model=JobResponse)
+def job_get(job_id: str) -> JobResponse:
+    data = get_job(job_id)
+    if not data:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(
+        job_id=data["job_id"],
+        created_at=data["created_at"],
+        quote_id=data["quote_id"],
+        status=JobStatus(data["status"]),
+        customer_name=data.get("customer_name"),
+        job_address=data.get("job_address"),
+        scheduled_start=data.get("scheduled_start"),
+        scheduled_end=data.get("scheduled_end"),
+        total_cad=float(data["total_cad"]),
+        paid_cad=float(data["paid_cad"]),
+        owing_cad=float(data["owing_cad"]),
+        notes=data.get("notes"),
+        quote_snapshot=data["quote_snapshot"],
+    )
+
+
+@app.get("/job", response_model=List[Dict[str, Any]])
+def job_list(
+    limit: int = 50,
+    status: Optional[JobStatus] = None,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    return list_jobs(
+        limit=limit,
+        status=status.value if status else None,
+        after=after,
+        before=before,
+    )
+
+
+@app.patch("/job/{job_id}", response_model=JobResponse)
+def job_update(job_id: str, req: JobUpdateRequest) -> JobResponse:
+    updated = update_job_fields(
+        job_id,
+        status=req.status.value if req.status else None,
+        customer_name=req.customer_name,
+        job_address=req.job_address,
+        scheduled_start=req.scheduled_start,
+        scheduled_end=req.scheduled_end,
+        paid_cad=float(req.paid_cad) if req.paid_cad is not None else None,
+        notes=req.notes,
+    )
+
+    if not updated:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return JobResponse(
+        job_id=updated["job_id"],
+        created_at=updated["created_at"],
+        quote_id=updated["quote_id"],
+        status=JobStatus(updated["status"]),
+        customer_name=updated.get("customer_name"),
+        job_address=updated.get("job_address"),
+        scheduled_start=updated.get("scheduled_start"),
+        scheduled_end=updated.get("scheduled_end"),
+        total_cad=float(updated["total_cad"]),
+        paid_cad=float(updated["paid_cad"]),
+        owing_cad=float(updated["owing_cad"]),
+        notes=updated.get("notes"),
+        quote_snapshot=updated["quote_snapshot"],
     )
