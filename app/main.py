@@ -22,10 +22,9 @@ from app.storage import (
     update_job_fields,
 )
 
-
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.4.0",
+    version="0.5.0",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + customer messaging helpers.",
 )
 
@@ -38,7 +37,6 @@ app.add_middleware(
 )
 
 init_db()
-
 
 CAD = "CAD"
 
@@ -53,15 +51,21 @@ CURBSIDE_SCRAP_EASY_NOT_FREE_CAD = 30.00
 DEFAULT_HOURLY_RATE_CAD = 80.00
 DEFAULT_COMPLEXITY_MULTIPLIER = 1.0
 
+HST_RATE_EMT = 0.13
+
 
 class TruckType(str, Enum):
     ram_2015 = "2015_ram_1500_5_7"
     ram_2019 = "2019_ram_1500_warlock_5_7"
 
 
+class PaymentMethod(str, Enum):
+    cash = "cash"
+    emt = "emt"  # e-transfer / EMT
+
+
 DEFAULT_TRAVEL_PER_KM_CAD = 0.35
 DEFAULT_TRAVEL_FREE_KM = 10.0
-
 
 NonNegFloat = Annotated[float, Field(ge=0)]
 NonNegInt = Annotated[int, Field(ge=0)]
@@ -103,6 +107,8 @@ class QuoteRequest(BaseModel):
     travel_free_km: NonNegFloat = DEFAULT_TRAVEL_FREE_KM
 
     truck_type: TruckType = TruckType.ram_2015
+
+    payment_method: PaymentMethod = PaymentMethod.cash
     notes: Optional[str] = None
 
 
@@ -111,8 +117,17 @@ class QuoteResponse(BaseModel):
     created_at: str
     currency: str = CAD
 
+    # BEFORE TAX
     subtotal_cad: float
     minimum_applied: bool
+
+    # TAX
+    payment_method: PaymentMethod
+    tax_rate: float
+    tax_cad: float
+
+    # FINAL
+    total_before_tax_cad: float
     total_cad: float
 
     line_items: List[QuoteLineItem]
@@ -190,11 +205,20 @@ class CalcResult:
     assumptions: List[str]
     subtotal: float
     minimum_applied: bool
+    total_before_tax: float
+    tax_rate: float
+    tax: float
     total: float
 
 
 def _round_money(x: float) -> float:
     return float(f"{x:.2f}")
+
+
+def _tax_rate_for_method(method: PaymentMethod) -> float:
+    if method == PaymentMethod.emt:
+        return HST_RATE_EMT
+    return 0.0
 
 
 def _calc_travel(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], float]:
@@ -360,23 +384,43 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
     subtotal = pre_multiplier + multiplier_delta
 
     minimum_applied = False
-    total = subtotal
-    if total < MINIMUM_CHARGE_CAD:
+    total_before_tax = subtotal
+    if total_before_tax < MINIMUM_CHARGE_CAD:
         minimum_applied = True
         items.append(
             QuoteLineItem(
                 code="minimum",
                 label=f"Minimum charge adjustment (to ${MINIMUM_CHARGE_CAD:.0f})",
-                amount_cad=_round_money(MINIMUM_CHARGE_CAD - total),
+                amount_cad=_round_money(MINIMUM_CHARGE_CAD - total_before_tax),
             )
         )
-        total = MINIMUM_CHARGE_CAD
+        total_before_tax = MINIMUM_CHARGE_CAD
+
+    tax_rate = _tax_rate_for_method(req.payment_method)
+    tax = _round_money(total_before_tax * tax_rate)
+    total = _round_money(total_before_tax + tax)
+
+    if tax_rate > 0:
+        items.append(
+            QuoteLineItem(
+                code="tax_hst",
+                label=f"HST ({int(tax_rate * 100)}%) for EMT payment",
+                amount_cad=_round_money(tax),
+                notes="Tax applied only when payment method is EMT/e-transfer.",
+            )
+        )
+        assumptions.append("Tax applied because payment method is EMT/e-transfer. Cash payments are tax-free in this system.")
+    else:
+        assumptions.append("No tax applied because payment method is cash.")
 
     return CalcResult(
         line_items=items,
         assumptions=assumptions,
         subtotal=_round_money(subtotal),
         minimum_applied=minimum_applied,
+        total_before_tax=_round_money(total_before_tax),
+        tax_rate=float(f"{tax_rate:.2f}"),
+        tax=_round_money(tax),
         total=_round_money(total),
     )
 
@@ -401,6 +445,10 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
         created_at=created_at,
         subtotal_cad=result.subtotal,
         minimum_applied=result.minimum_applied,
+        payment_method=req.payment_method,
+        tax_rate=result.tax_rate,
+        tax_cad=result.tax,
+        total_before_tax_cad=result.total_before_tax,
         total_cad=result.total,
         line_items=result.line_items,
         assumptions=result.assumptions,
@@ -450,10 +498,6 @@ def quote_search(
     )
 
 
-# =========================
-# Jobs Routes
-# =========================
-
 @app.post("/job/from-quote/{quote_id}", response_model=JobResponse)
 def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse:
     quote = get_quote(quote_id)
@@ -484,7 +528,6 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
         "quote_snapshot": quote,
     }
 
-    # Persist
     save_job(
         {
             "job_id": job_id,
