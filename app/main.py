@@ -24,7 +24,7 @@ from app.storage import (
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.5.0",
+    version="0.5.1",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + customer messaging helpers.",
 )
 
@@ -57,11 +57,6 @@ HST_RATE_EMT = 0.13
 class TruckType(str, Enum):
     ram_2015 = "2015_ram_1500_5_7"
     ram_2019 = "2019_ram_1500_warlock_5_7"
-
-
-class PaymentMethod(str, Enum):
-    cash = "cash"
-    emt = "emt"  # e-transfer / EMT
 
 
 DEFAULT_TRAVEL_PER_KM_CAD = 0.35
@@ -107,8 +102,6 @@ class QuoteRequest(BaseModel):
     travel_free_km: NonNegFloat = DEFAULT_TRAVEL_FREE_KM
 
     truck_type: TruckType = TruckType.ram_2015
-
-    payment_method: PaymentMethod = PaymentMethod.cash
     notes: Optional[str] = None
 
 
@@ -117,18 +110,13 @@ class QuoteResponse(BaseModel):
     created_at: str
     currency: str = CAD
 
-    # BEFORE TAX
     subtotal_cad: float
     minimum_applied: bool
 
-    # TAX
-    payment_method: PaymentMethod
-    tax_rate: float
-    tax_cad: float
-
-    # FINAL
-    total_before_tax_cad: float
-    total_cad: float
+    total_cash_cad: float
+    hst_rate: float
+    hst_cad: float
+    total_emt_cad: float
 
     line_items: List[QuoteLineItem]
     assumptions: List[str]
@@ -205,20 +193,14 @@ class CalcResult:
     assumptions: List[str]
     subtotal: float
     minimum_applied: bool
-    total_before_tax: float
-    tax_rate: float
-    tax: float
-    total: float
+    total_cash: float
+    hst_rate: float
+    hst: float
+    total_emt: float
 
 
 def _round_money(x: float) -> float:
     return float(f"{x:.2f}")
-
-
-def _tax_rate_for_method(method: PaymentMethod) -> float:
-    if method == PaymentMethod.emt:
-        return HST_RATE_EMT
-    return 0.0
 
 
 def _calc_travel(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], float]:
@@ -384,44 +366,34 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
     subtotal = pre_multiplier + multiplier_delta
 
     minimum_applied = False
-    total_before_tax = subtotal
-    if total_before_tax < MINIMUM_CHARGE_CAD:
+    total_cash = subtotal
+    if total_cash < MINIMUM_CHARGE_CAD:
         minimum_applied = True
         items.append(
             QuoteLineItem(
                 code="minimum",
                 label=f"Minimum charge adjustment (to ${MINIMUM_CHARGE_CAD:.0f})",
-                amount_cad=_round_money(MINIMUM_CHARGE_CAD - total_before_tax),
+                amount_cad=_round_money(MINIMUM_CHARGE_CAD - total_cash),
             )
         )
-        total_before_tax = MINIMUM_CHARGE_CAD
+        total_cash = MINIMUM_CHARGE_CAD
 
-    tax_rate = _tax_rate_for_method(req.payment_method)
-    tax = _round_money(total_before_tax * tax_rate)
-    total = _round_money(total_before_tax + tax)
+    hst_rate = HST_RATE_EMT
+    hst = _round_money(total_cash * hst_rate)
+    total_emt = _round_money(total_cash + hst)
 
-    if tax_rate > 0:
-        items.append(
-            QuoteLineItem(
-                code="tax_hst",
-                label=f"HST ({int(tax_rate * 100)}%) for EMT payment",
-                amount_cad=_round_money(tax),
-                notes="Tax applied only when payment method is EMT/e-transfer.",
-            )
-        )
-        assumptions.append("Tax applied because payment method is EMT/e-transfer. Cash payments are tax-free in this system.")
-    else:
-        assumptions.append("No tax applied because payment method is cash.")
+    assumptions.append("Cash payments are tax-free in this system.")
+    assumptions.append("EMT/e-transfer adds 13% HST to the cash total.")
 
     return CalcResult(
         line_items=items,
         assumptions=assumptions,
         subtotal=_round_money(subtotal),
         minimum_applied=minimum_applied,
-        total_before_tax=_round_money(total_before_tax),
-        tax_rate=float(f"{tax_rate:.2f}"),
-        tax=_round_money(tax),
-        total=_round_money(total),
+        total_cash=_round_money(total_cash),
+        hst_rate=float(f"{hst_rate:.2f}"),
+        hst=hst,
+        total_emt=total_emt,
     )
 
 
@@ -445,11 +417,10 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
         created_at=created_at,
         subtotal_cad=result.subtotal,
         minimum_applied=result.minimum_applied,
-        payment_method=req.payment_method,
-        tax_rate=result.tax_rate,
-        tax_cad=result.tax,
-        total_before_tax_cad=result.total_before_tax,
-        total_cad=result.total,
+        total_cash_cad=result.total_cash,
+        hst_rate=result.hst_rate,
+        hst_cad=result.hst,
+        total_emt_cad=result.total_emt,
         line_items=result.line_items,
         assumptions=result.assumptions,
     )
@@ -458,7 +429,7 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
         quote_id=quote_id,
         created_at=created_at,
         job_type=req.job_type,
-        total_cad=resp.total_cad,
+        total_cad=resp.total_cash_cad,  # store cash base for sorting/search (stable baseline)
         request_obj=req.model_dump(),
         response_obj=resp.model_dump(),
     )
@@ -508,7 +479,8 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
     job_id = str(uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
 
-    total = float(quote["total_cad"])
+    # Default job total should be CASH base unless you decide otherwise later.
+    total = float(quote["total_cash_cad"])
     paid = float(req.deposit_paid_cad)
     owing = max(0.0, total - paid)
 
