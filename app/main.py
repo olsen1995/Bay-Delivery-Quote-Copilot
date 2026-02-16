@@ -24,7 +24,7 @@ from app.storage import (
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.6.2",
+    version="0.6.3",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + job tracking.",
 )
 
@@ -257,6 +257,7 @@ class JobUpdateRequest(BaseModel):
     job_description_internal: Optional[str] = None
     scheduled_start: Optional[str] = None
     scheduled_end: Optional[str] = None
+    payment_method: Optional[PaymentMethod] = None
     paid_cad: Optional[NonNegFloat] = None
     notes: Optional[str] = None
 
@@ -456,6 +457,7 @@ def _calc_scrap(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], floa
         total += CURBSIDE_SCRAP_EASY_CAD
     elif req.curbside_easy_but_charge_30:
         items.append(QuoteLineItem(code="scrap_curbside", label="Curbside scrap pickup (easy)", amount_cad=_round_money(CURBSIDE_SCRAP_EASY_NOT_FREE_CAD)))
+        assumptions.append("Curbside scrap marked as easy (charged $30).")
         assumptions.append("Curbside scrap marked as easy (charged $30).")
         total += CURBSIDE_SCRAP_EASY_NOT_FREE_CAD
 
@@ -753,6 +755,7 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
         "quote_snapshot": quote,
     }
 
+    # Persist full job_json + mirrored columns (indexable)
     save_job(
         {
             "job_id": job_id,
@@ -760,9 +763,13 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
             "quote_id": quote_id,
             "status": job["status"],
             "customer_name": customer_name,
+            "customer_phone": customer_phone,
             "job_address": job_address,
+            "job_description_customer": job_desc_customer,
+            "job_description_internal": job_desc_internal,
             "scheduled_start": req.scheduled_start,
             "scheduled_end": req.scheduled_end,
+            "payment_method": req.payment_method.value,
             "total_cad": float(job["total_cad"]),
             "paid_cad": float(job["paid_cad"]),
             "owing_cad": float(job["owing_cad"]),
@@ -844,9 +851,13 @@ def job_update(job_id: str, req: JobUpdateRequest) -> JobResponse:
         job_id,
         status=req.status.value if req.status else None,
         customer_name=req.customer_name,
+        customer_phone=req.customer_phone,
         job_address=req.job_address,
+        job_description_customer=req.job_description_customer,
+        job_description_internal=req.job_description_internal,
         scheduled_start=req.scheduled_start,
         scheduled_end=req.scheduled_end,
+        payment_method=req.payment_method.value if req.payment_method else None,
         paid_cad=float(req.paid_cad) if req.paid_cad is not None else None,
         notes=req.notes,
     )
