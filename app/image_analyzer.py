@@ -1,11 +1,17 @@
 import base64
+import os
 from openai import OpenAI
 from fastapi import UploadFile
 
-client = OpenAI()
-
 
 def analyze_image(file: UploadFile):
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not found in environment variables.")
+
+    client = OpenAI(api_key=api_key)
+
     contents = file.file.read()
     encoded_image = base64.b64encode(contents).decode("utf-8")
 
