@@ -24,7 +24,6 @@ def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
     except sqlite3.OperationalError as e:
         msg = str(e).lower()
-        # "duplicate column name" is the normal 'already exists' case
         if "duplicate column name" in msg:
             return
         raise
@@ -71,7 +70,6 @@ def init_db() -> None:
         )
 
         # --- lightweight migrations for new mirrored fields ---
-        # These are "indexable" columns that mirror what we also store inside job_json.
         _try_add_column(conn, "jobs", "customer_phone TEXT")
         _try_add_column(conn, "jobs", "job_description_customer TEXT")
         _try_add_column(conn, "jobs", "job_description_internal TEXT")
@@ -328,6 +326,7 @@ def update_job_fields(
     scheduled_start: Optional[str] = None,
     scheduled_end: Optional[str] = None,
     payment_method: Optional[str] = None,
+    total_cad: Optional[float] = None,
     paid_cad: Optional[float] = None,
     notes: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
@@ -357,12 +356,19 @@ def update_job_fields(
     if notes is not None:
         job["notes"] = notes
 
+    # If total changes (Option B), recompute owing against current paid
+    if total_cad is not None:
+        new_total = max(0.0, float(total_cad))
+        job["total_cad"] = new_total
+        paid_now = float(job.get("paid_cad", 0.0))
+        job["owing_cad"] = max(0.0, new_total - paid_now)
+
+    # Paid update (if both total & paid provided, this runs after total for correct owing)
     if paid_cad is not None:
         paid = max(0.0, float(paid_cad))
-        total = float(job["total_cad"])
-        owing = max(0.0, total - paid)
+        total_now = float(job.get("total_cad", 0.0))
         job["paid_cad"] = paid
-        job["owing_cad"] = owing
+        job["owing_cad"] = max(0.0, total_now - paid)
 
     # Persist job + mirrored columns for indexing/listing
     save_job(
@@ -379,9 +385,9 @@ def update_job_fields(
             "scheduled_start": job.get("scheduled_start"),
             "scheduled_end": job.get("scheduled_end"),
             "payment_method": job.get("payment_method"),
-            "total_cad": float(job["total_cad"]),
-            "paid_cad": float(job["paid_cad"]),
-            "owing_cad": float(job["owing_cad"]),
+            "total_cad": float(job.get("total_cad", 0.0)),
+            "paid_cad": float(job.get("paid_cad", 0.0)),
+            "owing_cad": float(job.get("owing_cad", 0.0)),
             "notes": job.get("notes"),
             "job_json": job,
         }
