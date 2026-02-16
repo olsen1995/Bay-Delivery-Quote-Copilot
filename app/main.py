@@ -20,11 +20,15 @@ from app.storage import (
     get_job,
     list_jobs,
     update_job_fields,
+    save_quote_request,
+    get_quote_request,
+    list_quote_requests,
+    update_quote_request,
 )
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.6.4",
+    version="0.7.0",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + job tracking.",
 )
 
@@ -217,6 +221,97 @@ class QuoteResponse(BaseModel):
     customer_summary: List[CustomerSummaryItem]
 
     assumptions: List[str]
+
+
+# =========================
+# Quote Requests (Lead Capture / Confirm Workflow)
+# =========================
+
+class QuoteRequestStatus(str, Enum):
+    new = "new"
+    reviewed = "reviewed"
+    confirmed = "confirmed"
+    booked = "booked"
+    closed = "closed"
+    cancelled = "cancelled"
+
+
+class CustomerQuoteView(BaseModel):
+    """Customer-facing view (minimal, shareable).
+
+    Goal: give instant estimate (cash + EMT) without exposing internal line pricing.
+    """
+
+    quote_id: str
+    created_at: str
+    currency: str = CAD
+
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    job_address: Optional[str] = None
+
+    service_type: ServiceType
+
+    estimate_cash_cad: NonNegFloat
+    estimate_emt_cad: NonNegFloat
+
+    # Minimal summary (amounts only for mattress/box spring disposal)
+    summary: List[CustomerSummaryItem]
+
+    disclaimer: str
+
+
+class QuoteRequestCreateResponse(BaseModel):
+    request_id: str
+    created_at: str
+    status: QuoteRequestStatus
+    quote_id: str
+    customer_view: CustomerQuoteView
+
+
+class QuoteRequestListItem(BaseModel):
+    request_id: str
+    created_at: str
+    status: QuoteRequestStatus
+    quote_id: str
+
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    job_address: Optional[str] = None
+
+    service_type: ServiceType
+    cash_total_cad: NonNegFloat
+    emt_total_cad: NonNegFloat
+
+
+class QuoteRequestDetail(BaseModel):
+    request_id: str
+    created_at: str
+    status: QuoteRequestStatus
+    quote_id: str
+
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    job_address: Optional[str] = None
+    job_description_customer: Optional[str] = None
+    job_description_internal: Optional[str] = None
+
+    service_type: ServiceType
+    cash_total_cad: NonNegFloat
+    emt_total_cad: NonNegFloat
+
+    # Canonical inputs used for estimate
+    request_inputs: Dict[str, Any]
+
+    notes: Optional[str] = None
+
+
+class QuoteRequestUpdate(BaseModel):
+    status: Optional[QuoteRequestStatus] = None
+    notes: Optional[str] = None
+
+    # If provided, we merge these into the stored request_inputs and re-price.
+    pricing_overrides: Optional[Dict[str, Any]] = None
 
 
 # =========================
@@ -617,6 +712,278 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
 # =========================
 # Routes
 # =========================
+
+def _quote_to_customer_view(quote: Dict[str, Any]) -> CustomerQuoteView:
+    # Prefer the already-computed customer_summary from stored quote snapshot.
+    summary_raw = quote.get("customer_summary") or []
+    summary = [CustomerSummaryItem(**s) for s in summary_raw]
+
+    disclaimer = (
+        "Instant estimate only — final price is confirmed after we verify details like stairs, heavy items, access, "
+        "and actual dump/landfill fees. Cash is tax-free; EMT/e-transfer adds 13% HST."
+    )
+
+    return CustomerQuoteView(
+        quote_id=str(quote.get("quote_id")),
+        created_at=str(quote.get("created_at")),
+        customer_name=quote.get("customer_name"),
+        customer_phone=quote.get("customer_phone"),
+        job_address=quote.get("job_address"),
+        service_type=ServiceType(str(quote.get("service_type"))),
+        estimate_cash_cad=float(quote.get("total_cash_cad", 0.0)),
+        estimate_emt_cad=float(quote.get("total_emt_cad", 0.0)),
+        summary=summary,
+        disclaimer=disclaimer,
+    )
+
+
+@app.get("/quote/{quote_id}/customer", response_model=CustomerQuoteView)
+def quote_get_customer_view(quote_id: str) -> CustomerQuoteView:
+    quote = get_quote(quote_id)
+    if not quote:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Quote not found")
+    return _quote_to_customer_view(quote)
+
+
+@app.post("/request", response_model=QuoteRequestCreateResponse)
+def quote_request_create(req: QuoteRequest) -> QuoteRequestCreateResponse:
+    # 1) Calculate and persist quote snapshot
+    result = calculate_quote(req)
+    quote_id = str(uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
+
+    has_labor = any(li.code in {"labor"} for li in result.line_items)
+    has_travel_or_towing = any(li.code in {"travel_gas_min", "travel_wear_min", "travel_variable", "towing"} for li in result.line_items)
+
+    customer_summary = _build_customer_summary(
+        has_labor=has_labor,
+        has_travel_or_towing=has_travel_or_towing,
+        has_dump=result.has_dump,
+        has_stairs_or_heavy=result.has_stairs_or_heavy,
+        has_complexity=result.has_complexity,
+        mattresses_count=result.mattresses_count,
+        box_springs_count=result.box_springs_count,
+    )
+
+    quote_resp = QuoteResponse(
+        quote_id=quote_id,
+        created_at=created_at,
+        customer_name=req.customer_name,
+        customer_phone=req.customer_phone,
+        job_address=req.job_address,
+        job_description_customer=req.job_description_customer,
+        job_description_internal=req.job_description_internal,
+        subtotal_cad=result.subtotal,
+        minimum_applied=result.minimum_applied,
+        total_cash_cad=result.total_cash,
+        hst_rate=result.hst_rate,
+        hst_cad=result.hst,
+        total_emt_cad=result.total_emt,
+        service_type=req.service_type,
+        crew_size=result.crew_size,
+        towing_mode=result.towing_mode,
+        line_items_internal=result.line_items,
+        customer_summary=customer_summary,
+        assumptions=result.assumptions,
+    )
+
+    save_quote(
+        quote_id=quote_id,
+        created_at=created_at,
+        job_type=req.service_type.value,
+        total_cad=quote_resp.total_cash_cad,
+        request_obj=req.model_dump(),
+        response_obj=quote_resp.model_dump(),
+    )
+
+    # 2) Create a request record pointing at this quote
+    request_id = str(uuid4())
+    save_quote_request(
+        {
+            "request_id": request_id,
+            "created_at": created_at,
+            "status": QuoteRequestStatus.new.value,
+            "quote_id": quote_id,
+            "customer_name": req.customer_name,
+            "customer_phone": req.customer_phone,
+            "job_address": req.job_address,
+            "job_description_customer": req.job_description_customer,
+            "job_description_internal": req.job_description_internal,
+            "service_type": req.service_type.value,
+            "cash_total_cad": float(quote_resp.total_cash_cad),
+            "emt_total_cad": float(quote_resp.total_emt_cad),
+            "request_json": req.model_dump(),
+            "notes": None,
+        }
+    )
+
+    return QuoteRequestCreateResponse(
+        request_id=request_id,
+        created_at=created_at,
+        status=QuoteRequestStatus.new,
+        quote_id=quote_id,
+        customer_view=_quote_to_customer_view(quote_resp.model_dump()),
+    )
+
+
+@app.get("/request", response_model=List[QuoteRequestListItem])
+def quote_request_list(limit: int = 50, status: Optional[QuoteRequestStatus] = None) -> List[QuoteRequestListItem]:
+    rows = list_quote_requests(limit=limit, status=status.value if status else None)
+    out: List[QuoteRequestListItem] = []
+    for r in rows:
+        out.append(
+            QuoteRequestListItem(
+                request_id=r["request_id"],
+                created_at=r["created_at"],
+                status=QuoteRequestStatus(r["status"]),
+                quote_id=r["quote_id"],
+                customer_name=r.get("customer_name"),
+                customer_phone=r.get("customer_phone"),
+                job_address=r.get("job_address"),
+                service_type=ServiceType(r["service_type"]),
+                cash_total_cad=float(r["cash_total_cad"]),
+                emt_total_cad=float(r["emt_total_cad"]),
+            )
+        )
+    return out
+
+
+@app.get("/request/{request_id}", response_model=QuoteRequestDetail)
+def quote_request_get(request_id: str) -> QuoteRequestDetail:
+    r = get_quote_request(request_id)
+    if not r:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Quote request not found")
+
+    return QuoteRequestDetail(
+        request_id=r["request_id"],
+        created_at=r["created_at"],
+        status=QuoteRequestStatus(r["status"]),
+        quote_id=r["quote_id"],
+        customer_name=r.get("customer_name"),
+        customer_phone=r.get("customer_phone"),
+        job_address=r.get("job_address"),
+        job_description_customer=r.get("job_description_customer"),
+        job_description_internal=r.get("job_description_internal"),
+        service_type=ServiceType(r["service_type"]),
+        cash_total_cad=float(r["cash_total_cad"]),
+        emt_total_cad=float(r["emt_total_cad"]),
+        request_inputs=r["request_json"],
+        notes=r.get("notes"),
+    )
+
+
+@app.patch("/request/{request_id}", response_model=QuoteRequestDetail)
+def quote_request_update(request_id: str, patch: QuoteRequestUpdate) -> QuoteRequestDetail:
+    existing = get_quote_request(request_id)
+    if not existing:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Quote request not found")
+
+    # Merge + reprice if overrides supplied
+    new_quote_id: Optional[str] = None
+    cash_total = float(existing["cash_total_cad"])
+    emt_total = float(existing["emt_total_cad"])
+    new_request_inputs: Optional[Dict[str, Any]] = None
+
+    if patch.pricing_overrides:
+        base_inputs = dict(existing["request_json"])
+        base_inputs.update(patch.pricing_overrides)
+
+        # Validate by re-parsing as QuoteRequest
+        req_model = QuoteRequest(**base_inputs)
+        result = calculate_quote(req_model)
+
+        new_quote_id = str(uuid4())
+        created_at = datetime.utcnow().isoformat() + "Z"
+
+        has_labor = any(li.code in {"labor"} for li in result.line_items)
+        has_travel_or_towing = any(li.code in {"travel_gas_min", "travel_wear_min", "travel_variable", "towing"} for li in result.line_items)
+
+        customer_summary = _build_customer_summary(
+            has_labor=has_labor,
+            has_travel_or_towing=has_travel_or_towing,
+            has_dump=result.has_dump,
+            has_stairs_or_heavy=result.has_stairs_or_heavy,
+            has_complexity=result.has_complexity,
+            mattresses_count=result.mattresses_count,
+            box_springs_count=result.box_springs_count,
+        )
+
+        quote_resp = QuoteResponse(
+            quote_id=new_quote_id,
+            created_at=created_at,
+            customer_name=req_model.customer_name,
+            customer_phone=req_model.customer_phone,
+            job_address=req_model.job_address,
+            job_description_customer=req_model.job_description_customer,
+            job_description_internal=req_model.job_description_internal,
+            subtotal_cad=result.subtotal,
+            minimum_applied=result.minimum_applied,
+            total_cash_cad=result.total_cash,
+            hst_rate=result.hst_rate,
+            hst_cad=result.hst,
+            total_emt_cad=result.total_emt,
+            service_type=req_model.service_type,
+            crew_size=result.crew_size,
+            towing_mode=result.towing_mode,
+            line_items_internal=result.line_items,
+            customer_summary=customer_summary,
+            assumptions=result.assumptions,
+        )
+
+        save_quote(
+            quote_id=new_quote_id,
+            created_at=created_at,
+            job_type=req_model.service_type.value,
+            total_cad=quote_resp.total_cash_cad,
+            request_obj=req_model.model_dump(),
+            response_obj=quote_resp.model_dump(),
+        )
+
+        cash_total = float(quote_resp.total_cash_cad)
+        emt_total = float(quote_resp.total_emt_cad)
+        new_request_inputs = req_model.model_dump()
+
+    updated = update_quote_request(
+        request_id,
+        status=patch.status.value if patch.status else None,
+        notes=patch.notes,
+        quote_id=new_quote_id,
+        cash_total_cad=cash_total if new_quote_id else None,
+        emt_total_cad=emt_total if new_quote_id else None,
+        request_json=new_request_inputs,
+        # Keep customer fields mirrored up-to-date if we repriced
+        customer_name=(new_request_inputs.get("customer_name") if new_request_inputs else None),
+        customer_phone=(new_request_inputs.get("customer_phone") if new_request_inputs else None),
+        job_address=(new_request_inputs.get("job_address") if new_request_inputs else None),
+        job_description_customer=(new_request_inputs.get("job_description_customer") if new_request_inputs else None),
+        job_description_internal=(new_request_inputs.get("job_description_internal") if new_request_inputs else None),
+        service_type=(new_request_inputs.get("service_type") if new_request_inputs else None),
+    )
+
+    if not updated:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Quote request not found")
+
+    return QuoteRequestDetail(
+        request_id=updated["request_id"],
+        created_at=updated["created_at"],
+        status=QuoteRequestStatus(updated["status"]),
+        quote_id=updated["quote_id"],
+        customer_name=updated.get("customer_name"),
+        customer_phone=updated.get("customer_phone"),
+        job_address=updated.get("job_address"),
+        job_description_customer=updated.get("job_description_customer"),
+        job_description_internal=updated.get("job_description_internal"),
+        service_type=ServiceType(updated["service_type"]),
+        cash_total_cad=float(updated["cash_total_cad"]),
+        emt_total_cad=float(updated["emt_total_cad"]),
+        request_inputs=updated["request_json"],
+        notes=updated.get("notes"),
+    )
+
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
