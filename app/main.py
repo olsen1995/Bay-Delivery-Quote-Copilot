@@ -24,7 +24,7 @@ from app.storage import (
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.6.3",
+    version="0.6.4",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + job tracking.",
 )
 
@@ -458,7 +458,6 @@ def _calc_scrap(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], floa
     elif req.curbside_easy_but_charge_30:
         items.append(QuoteLineItem(code="scrap_curbside", label="Curbside scrap pickup (easy)", amount_cad=_round_money(CURBSIDE_SCRAP_EASY_NOT_FREE_CAD)))
         assumptions.append("Curbside scrap marked as easy (charged $30).")
-        assumptions.append("Curbside scrap marked as easy (charged $30).")
         total += CURBSIDE_SCRAP_EASY_NOT_FREE_CAD
 
     if float(req.scrap_difficult_surcharge_cad) > 0:
@@ -720,10 +719,7 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
     created_at = datetime.utcnow().isoformat() + "Z"
 
     # Choose job total based on payment method (cash vs EMT)
-    if req.payment_method == PaymentMethod.emt:
-        total = float(quote["total_emt_cad"])
-    else:
-        total = float(quote["total_cash_cad"])
+    total = float(quote["total_emt_cad"]) if req.payment_method == PaymentMethod.emt else float(quote["total_cash_cad"])
 
     paid = float(req.deposit_paid_cad)
     owing = max(0.0, total - paid)
@@ -755,7 +751,7 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
         "quote_snapshot": quote,
     }
 
-    # Persist full job_json + mirrored columns (indexable)
+    # ✅ Persist mirrored columns too (not just job_json)
     save_job(
         {
             "job_id": job_id,
@@ -847,6 +843,19 @@ def job_list(
 
 @app.patch("/job/{job_id}", response_model=JobResponse)
 def job_update(job_id: str, req: JobUpdateRequest) -> JobResponse:
+    # ✅ Option B: if payment method changes, recalc total from quote snapshot
+    new_total: Optional[float] = None
+    if req.payment_method is not None:
+        existing = get_job(job_id)
+        if not existing:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Job not found")
+        quote = existing.get("quote_snapshot", {})
+        if req.payment_method == PaymentMethod.emt:
+            new_total = float(quote.get("total_emt_cad", existing.get("total_cad", 0.0)))
+        else:
+            new_total = float(quote.get("total_cash_cad", existing.get("total_cad", 0.0)))
+
     updated = update_job_fields(
         job_id,
         status=req.status.value if req.status else None,
@@ -858,6 +867,7 @@ def job_update(job_id: str, req: JobUpdateRequest) -> JobResponse:
         scheduled_start=req.scheduled_start,
         scheduled_end=req.scheduled_end,
         payment_method=req.payment_method.value if req.payment_method else None,
+        total_cad=new_total,
         paid_cad=float(req.paid_cad) if req.paid_cad is not None else None,
         notes=req.notes,
     )
