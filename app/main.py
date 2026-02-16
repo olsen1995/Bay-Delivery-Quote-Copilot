@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List
 from app.image_analyzer import analyze_image
 from app.pricing_engine import calculate_quote
-from app.job_logger import log_job
+from app.job_logger import log_job, get_jobs, update_job_status
 
 app = FastAPI()
 
@@ -56,15 +56,15 @@ async def analyze_uploaded_images(files: List[UploadFile] = File(...)):
 
     quote = calculate_quote(merged_analysis)
 
-    # Log the job
-    log_job({
+    logged = log_job({
         "analysis": merged_analysis,
         "quote": quote
     })
 
     return {
         "analysis": merged_analysis,
-        "quote": quote
+        "quote": quote,
+        "job_id": logged["id"]
     }
 
 
@@ -91,16 +91,36 @@ def manual_quote(data: ManualQuoteRequest):
 
     quote = calculate_quote(analysis)
 
-    # Log the job
-    log_job({
+    logged = log_job({
         "analysis": analysis,
         "quote": quote
     })
 
     return {
         "analysis": analysis,
-        "quote": quote
+        "quote": quote,
+        "job_id": logged["id"]
     }
+
+
+# -----------------------------
+# View All Jobs
+# -----------------------------
+@app.get("/jobs")
+def view_jobs():
+    return get_jobs()
+
+
+# -----------------------------
+# Update Job Status
+# -----------------------------
+class StatusUpdateRequest(BaseModel):
+    status: str  # quoted, booked, completed, declined
+
+
+@app.patch("/jobs/{job_id}")
+def update_status(job_id: int, data: StatusUpdateRequest):
+    return update_job_status(job_id, data.status)
 
 
 # -----------------------------
