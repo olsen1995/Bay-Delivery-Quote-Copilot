@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 DB_PATH = Path("app/data/bay_delivery.sqlite3")
 
@@ -31,6 +31,7 @@ def init_db() -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON quotes(created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_job_type ON quotes(job_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_total_cad ON quotes(total_cad)")
 
 
 def save_quote(
@@ -81,6 +82,58 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
             """,
             (int(limit),),
         ).fetchall()
+
+    return [
+        {
+            "quote_id": r["quote_id"],
+            "created_at": r["created_at"],
+            "job_type": r["job_type"],
+            "total_cad": float(r["total_cad"]),
+        }
+        for r in rows
+    ]
+
+
+def search_quotes(
+    limit: int = 50,
+    job_type: Optional[str] = None,
+    min_total: Optional[float] = None,
+    max_total: Optional[float] = None,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    where: List[str] = []
+    params: List[Any] = []
+
+    if job_type:
+        where.append("job_type = ?")
+        params.append(job_type)
+    if min_total is not None:
+        where.append("total_cad >= ?")
+        params.append(float(min_total))
+    if max_total is not None:
+        where.append("total_cad <= ?")
+        params.append(float(max_total))
+    if after:
+        where.append("created_at >= ?")
+        params.append(after)
+    if before:
+        where.append("created_at <= ?")
+        params.append(before)
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    sql = f"""
+        SELECT quote_id, created_at, job_type, total_cad
+        FROM quotes
+        {where_sql}
+        ORDER BY created_at DESC
+        LIMIT ?
+    """
+
+    params.append(int(limit))
+
+    with _connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
 
     return [
         {

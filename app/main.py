@@ -10,16 +10,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.storage import init_db, save_quote, get_quote, list_quotes
+from app.storage import init_db, save_quote, get_quote, list_quotes, search_quotes
 
-
-# =========================
-# App
-# =========================
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.3.0",
+    version="0.3.1",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + customer messaging helpers.",
 )
 
@@ -31,13 +27,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize DB on startup
 init_db()
 
-
-# =========================
-# Business Rules (Known)
-# =========================
 
 CAD = "CAD"
 
@@ -62,18 +53,10 @@ DEFAULT_TRAVEL_PER_KM_CAD = 0.35
 DEFAULT_TRAVEL_FREE_KM = 10.0
 
 
-# =========================
-# Type aliases (Pydantic v2 friendly)
-# =========================
-
 NonNegFloat = Annotated[float, Field(ge=0)]
 NonNegInt = Annotated[int, Field(ge=0)]
 ComplexityMult = Annotated[float, Field(ge=0.5, le=3.0)]
 
-
-# =========================
-# Data Models
-# =========================
 
 class QuoteLineItem(BaseModel):
     code: str
@@ -129,16 +112,12 @@ class QuoteResponse(BaseModel):
 class CustomerMessageRequest(BaseModel):
     customer_name: Optional[str] = None
     quote: QuoteResponse
-    tone: str = "friendly"  # friendly / firm / short
+    tone: str = "friendly"
 
 
 class CustomerMessageResponse(BaseModel):
     message: str
 
-
-# =========================
-# Quote Engine
-# =========================
 
 @dataclass
 class CalcResult:
@@ -250,7 +229,6 @@ def _calc_scrap(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], floa
         items.append(QuoteLineItem(code="scrap_curbside", label="Curbside scrap pickup (easy)", amount_cad=_round_money(CURBSIDE_SCRAP_EASY_CAD)))
         assumptions.append("Curbside scrap marked as easy (no pickup fee).")
         total += CURBSIDE_SCRAP_EASY_CAD
-
     elif req.curbside_easy_but_charge_30:
         items.append(QuoteLineItem(code="scrap_curbside", label="Curbside scrap pickup (easy)", amount_cad=_round_money(CURBSIDE_SCRAP_EASY_NOT_FREE_CAD)))
         assumptions.append("Curbside scrap marked as easy (charged $30).")
@@ -267,8 +245,8 @@ def _calc_scrap(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], floa
 def _calc_surcharges(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], float]:
     items: List[QuoteLineItem] = []
     assumptions: List[str] = []
-
     s = 0.0
+
     if float(req.stairs_surcharge_cad) > 0:
         items.append(QuoteLineItem(code="stairs", label="Stairs surcharge", amount_cad=_round_money(float(req.stairs_surcharge_cad))))
         s += float(req.stairs_surcharge_cad)
@@ -338,18 +316,9 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
     )
 
 
-# =========================
-# Routes
-# =========================
-
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {
-        "ok": True,
-        "service": "bay-delivery-quote-copilot",
-        "time": datetime.utcnow().isoformat() + "Z",
-        "version": app.version,
-    }
+    return {"ok": True, "time": datetime.utcnow().isoformat() + "Z", "version": app.version}
 
 
 @app.post("/quote/calculate", response_model=QuoteResponse)
@@ -376,7 +345,6 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
         request_obj=req.model_dump(),
         response_obj=resp.model_dump(),
     )
-
     return resp
 
 
@@ -394,34 +362,20 @@ def quote_list(limit: int = 50) -> List[Dict[str, Any]]:
     return list_quotes(limit=limit)
 
 
-# =========================
-# Messaging helpers
-# =========================
-
-@app.post("/quote/customer-message", response_model=CustomerMessageResponse)
-def quote_customer_message(req: CustomerMessageRequest) -> CustomerMessageResponse:
-    q = req.quote
-    name = req.customer_name or "there"
-
-    if req.tone == "short":
-        msg = (
-            f"Hey {name}! Your estimate is **${q.total_cad:.2f} CAD**.\n"
-            f"If you want, send the address + what items/how many and I’ll lock it in."
-        )
-    elif req.tone == "firm":
-        msg = (
-            f"Hi {name}, based on the details provided your estimate comes to **${q.total_cad:.2f} CAD**.\n"
-            f"This includes travel, labour/handling, and any disposal fees in the breakdown.\n"
-            f"If stairs/heavy items/dump fees change on-site, the total may adjust."
-        )
-    else:
-        msg = (
-            f"Hey {name}! 😊 Based on what you told me, your estimate is **${q.total_cad:.2f} CAD**.\n\n"
-            f"**What’s included:**\n"
-            f"- Travel (gas + wear)\n"
-            f"- Labour/handling\n"
-            f"- Disposal fees (if applicable)\n\n"
-            f"If you send a quick photo of the load (or list of items + address), I can confirm the quote and give you a time window."
-        )
-
-    return CustomerMessageResponse(message=msg)
+@app.get("/quote/search", response_model=List[Dict[str, Any]])
+def quote_search(
+    limit: int = 50,
+    job_type: Optional[str] = None,
+    min_total: Optional[float] = None,
+    max_total: Optional[float] = None,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    return search_quotes(
+        limit=limit,
+        job_type=job_type,
+        min_total=min_total,
+        max_total=max_total,
+        after=after,
+        before=before,
+    )
