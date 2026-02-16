@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.storage import init_db, save_quote, get_quote, list_quotes
+
 
 # =========================
 # App
@@ -17,11 +19,10 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.2.1",
+    version="0.3.0",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + customer messaging helpers.",
 )
 
-# CORS: permissive for local dev; tighten in prod
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize DB on startup
+init_db()
 
 
 # =========================
@@ -41,11 +45,11 @@ MINIMUM_CHARGE_CAD = 50.00
 MIN_GAS_CAD = 20.00
 MIN_WEAR_CAD = 20.00
 
-MATTRESS_FEE_EACH_CAD = 50.00  # mattress or box spring
+MATTRESS_FEE_EACH_CAD = 50.00
 CURBSIDE_SCRAP_EASY_CAD = 0.00
 CURBSIDE_SCRAP_EASY_NOT_FREE_CAD = 30.00
 
-DEFAULT_HOURLY_RATE_CAD = 80.00  # placeholder; override per request
+DEFAULT_HOURLY_RATE_CAD = 80.00
 DEFAULT_COMPLEXITY_MULTIPLIER = 1.0
 
 
@@ -54,7 +58,6 @@ class TruckType(str, Enum):
     ram_2019 = "2019_ram_1500_warlock_5_7"
 
 
-# Travel tuning knobs
 DEFAULT_TRAVEL_PER_KM_CAD = 0.35
 DEFAULT_TRAVEL_FREE_KM = 10.0
 
@@ -80,39 +83,32 @@ class QuoteLineItem(BaseModel):
 
 
 class QuoteRequest(BaseModel):
-    # Core job info
     job_type: str = Field(..., description="e.g., dump_run, scrap_pickup, small_move, demolition, delivery")
     distance_km: NonNegFloat = 0.0
     estimated_hours: NonNegFloat = 0.0
 
-    # Labor / staffing
     hourly_rate_cad: NonNegFloat = DEFAULT_HOURLY_RATE_CAD
     helpers_count: NonNegInt = 0
-    helper_hourly_rate_cad: NonNegFloat = 0.0  # if you pay helpers and bill it through
+    helper_hourly_rate_cad: NonNegFloat = 0.0
 
-    # Disposal / dump details
-    dump_fees_cad: NonNegFloat = 0.0  # pass-through (landfill / dump)
+    dump_fees_cad: NonNegFloat = 0.0
     mattresses_count: NonNegInt = 0
     box_springs_count: NonNegInt = 0
 
-    # Scrap pickup specifics
     is_scrap_pickup: bool = False
     curbside_easy: bool = False
     curbside_easy_but_charge_30: bool = False
     scrap_difficult_surcharge_cad: NonNegFloat = 0.0
 
-    # Complexity + stairs/heavy items (user supplies dollar surcharges for now)
     complexity_multiplier: ComplexityMult = DEFAULT_COMPLEXITY_MULTIPLIER
     stairs_surcharge_cad: NonNegFloat = 0.0
     heavy_items_surcharge_cad: NonNegFloat = 0.0
 
-    # Travel cost tuning knobs
     min_gas_cad: NonNegFloat = MIN_GAS_CAD
     min_wear_cad: NonNegFloat = MIN_WEAR_CAD
     travel_per_km_cad: NonNegFloat = DEFAULT_TRAVEL_PER_KM_CAD
     travel_free_km: NonNegFloat = DEFAULT_TRAVEL_FREE_KM
 
-    # Misc
     truck_type: TruckType = TruckType.ram_2015
     notes: Optional[str] = None
 
@@ -138,38 +134,6 @@ class CustomerMessageRequest(BaseModel):
 
 class CustomerMessageResponse(BaseModel):
     message: str
-
-
-class AdRequest(BaseModel):
-    service: str
-    city: str = "North Bay"
-    hook: str = "Fast, reliable, no nonsense."
-    include_price_hint: bool = True
-    price_hint: str = "Quotes start at $50+ (depends on load & distance)."
-
-
-class AdResponse(BaseModel):
-    headline: str
-    body: str
-    bullets: List[str]
-
-
-class InvoiceRequest(BaseModel):
-    customer_name: str
-    job_address: Optional[str] = None
-    quote: QuoteResponse
-    paid_cad: NonNegFloat = 0.0
-
-
-class InvoiceResponse(BaseModel):
-    invoice_text: str
-
-
-# =========================
-# In-memory storage (swap to DB later)
-# =========================
-
-_QUOTES: Dict[str, QuoteResponse] = {}
 
 
 # =========================
@@ -392,28 +356,47 @@ def health() -> Dict[str, Any]:
 def quote_calculate(req: QuoteRequest) -> QuoteResponse:
     result = calculate_quote(req)
     quote_id = str(uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
 
     resp = QuoteResponse(
         quote_id=quote_id,
-        created_at=datetime.utcnow().isoformat() + "Z",
+        created_at=created_at,
         subtotal_cad=result.subtotal,
         minimum_applied=result.minimum_applied,
         total_cad=result.total,
         line_items=result.line_items,
         assumptions=result.assumptions,
     )
-    _QUOTES[quote_id] = resp
+
+    save_quote(
+        quote_id=quote_id,
+        created_at=created_at,
+        job_type=req.job_type,
+        total_cad=resp.total_cad,
+        request_obj=req.model_dump(),
+        response_obj=resp.model_dump(),
+    )
+
     return resp
 
 
 @app.get("/quote/{quote_id}", response_model=QuoteResponse)
 def quote_get(quote_id: str) -> QuoteResponse:
-    q = _QUOTES.get(quote_id)
-    if not q:
+    data = get_quote(quote_id)
+    if not data:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Quote not found")
-    return q
+    return QuoteResponse(**data)
 
+
+@app.get("/quote", response_model=List[Dict[str, Any]])
+def quote_list(limit: int = 50) -> List[Dict[str, Any]]:
+    return list_quotes(limit=limit)
+
+
+# =========================
+# Messaging helpers
+# =========================
 
 @app.post("/quote/customer-message", response_model=CustomerMessageResponse)
 def quote_customer_message(req: CustomerMessageRequest) -> CustomerMessageResponse:
@@ -442,46 +425,3 @@ def quote_customer_message(req: CustomerMessageRequest) -> CustomerMessageRespon
         )
 
     return CustomerMessageResponse(message=msg)
-
-
-@app.post("/ads/generate", response_model=AdResponse)
-def ads_generate(req: AdRequest) -> AdResponse:
-    headline = f"{req.city} {req.service} — Fast & Fair"
-    bullets = [
-        "Same-day or next-day when possible",
-        "Dump runs, scrap pickup, small moves",
-        "Careful handling (no drama)",
-        "Clear pricing — no surprise nonsense",
-    ]
-    body = f"{req.hook} Serving {req.city} and nearby. "
-    if req.include_price_hint:
-        body += req.price_hint
-
-    return AdResponse(headline=headline, body=body, bullets=bullets)
-
-
-@app.post("/invoice/render", response_model=InvoiceResponse)
-def invoice_render(req: InvoiceRequest) -> InvoiceResponse:
-    q = req.quote
-    owing = max(0.0, float(q.total_cad) - float(req.paid_cad))
-
-    lines = [
-        "BAY DELIVERY — INVOICE",
-        f"Date: {datetime.now().strftime('%Y-%m-%d')}",
-        f"Customer: {req.customer_name}",
-    ]
-    if req.job_address:
-        lines.append(f"Address: {req.job_address}")
-
-    lines += ["", "Breakdown:"]
-    for li in q.line_items:
-        lines.append(f"- {li.label}: ${float(li.amount_cad):.2f} CAD")
-
-    lines += [
-        "",
-        f"Total: ${float(q.total_cad):.2f} CAD",
-        f"Paid:  ${float(req.paid_cad):.2f} CAD",
-        f"Owing: ${owing:.2f} CAD",
-    ]
-
-    return InvoiceResponse(invoice_text="\n".join(lines))
