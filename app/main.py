@@ -24,7 +24,7 @@ from app.storage import (
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
-    version="0.6.1",
+    version="0.6.2",
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + job tracking.",
 )
 
@@ -130,6 +130,17 @@ class CustomerSummaryItem(BaseModel):
 
 
 class QuoteRequest(BaseModel):
+    # --- Customer + job details (captured at quote time) ---
+    customer_name: Optional[str] = Field(None, description="Customer full name")
+    customer_phone: Optional[str] = Field(None, description="Customer phone number (string to allow formats)")
+    job_address: Optional[str] = Field(None, description="Job address / pickup location / dropoff location")
+    job_description_customer: Optional[str] = Field(
+        None, description="Customer-facing description (what they want done)"
+    )
+    job_description_internal: Optional[str] = Field(
+        None, description="Internal notes (access issues, gate code, weird stairs, parking, risks, etc.)"
+    )
+
     # Customer-facing choice
     service_type: ServiceType = ServiceType.dump_run
 
@@ -181,6 +192,13 @@ class QuoteResponse(BaseModel):
     created_at: str
     currency: str = CAD
 
+    # --- Customer + job details (echoed back / saved in quote snapshot) ---
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    job_address: Optional[str] = None
+    job_description_customer: Optional[str] = None
+    job_description_internal: Optional[str] = None
+
     subtotal_cad: float
     minimum_applied: bool
 
@@ -215,10 +233,16 @@ class JobStatus(str, Enum):
 
 
 class JobCreateFromQuoteRequest(BaseModel):
+    # Optional overrides; if omitted, we take values from the quote snapshot
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     job_address: Optional[str] = None
+    job_description_customer: Optional[str] = None
+    job_description_internal: Optional[str] = None
+
     scheduled_start: Optional[str] = Field(None, description="ISO preferred, e.g. 2026-02-16T14:00:00-05:00")
     scheduled_end: Optional[str] = Field(None, description="ISO preferred")
+
     deposit_paid_cad: NonNegFloat = 0.0
     payment_method: PaymentMethod = PaymentMethod.cash
     notes: Optional[str] = None
@@ -227,7 +251,10 @@ class JobCreateFromQuoteRequest(BaseModel):
 class JobUpdateRequest(BaseModel):
     status: Optional[JobStatus] = None
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     job_address: Optional[str] = None
+    job_description_customer: Optional[str] = None
+    job_description_internal: Optional[str] = None
     scheduled_start: Optional[str] = None
     scheduled_end: Optional[str] = None
     paid_cad: Optional[NonNegFloat] = None
@@ -241,7 +268,11 @@ class JobResponse(BaseModel):
     status: JobStatus
 
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     job_address: Optional[str] = None
+    job_description_customer: Optional[str] = None
+    job_description_internal: Optional[str] = None
+
     scheduled_start: Optional[str] = None
     scheduled_end: Optional[str] = None
 
@@ -284,9 +315,6 @@ def _round_money(x: float) -> float:
 
 
 def _calc_travel(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], float, float]:
-    """
-    Returns: (items, assumptions, travel_total, variable_km)
-    """
     items: List[QuoteLineItem] = []
     assumptions: List[str] = []
 
@@ -316,10 +344,6 @@ def _calc_travel(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], flo
 
 
 def _calc_towing(req: QuoteRequest, variable_km: float) -> Tuple[List[QuoteLineItem], List[str], float]:
-    """
-    Applies towing surcharge on variable km (after free km buffer).
-    Default towing is ON (open). Frontend can omit and you still get towing cost reflected.
-    """
     items: List[QuoteLineItem] = []
     assumptions: List[str] = []
 
@@ -347,12 +371,6 @@ def _calc_towing(req: QuoteRequest, variable_km: float) -> Tuple[List[QuoteLineI
 
 
 def _calc_labor(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], float, int]:
-    """
-    Labour pricing:
-      - Small items: 1 worker
-      - Big/heavy item: requires 2 workers
-      - 2-worker labour has a CHARGED floor (above cost), so quick heavy jobs don't undercharge.
-    """
     items: List[QuoteLineItem] = []
     assumptions: List[str] = []
 
@@ -374,10 +392,8 @@ def _calc_labor(req: QuoteRequest) -> Tuple[List[QuoteLineItem], List[str], floa
         )
         return items, assumptions, _round_money(labor), crew_size
 
-    # crew_size == 2
     labor_calc = hours * (float(req.primary_worker_rate_cad) + float(req.additional_worker_rate_cad))
 
-    # Apply charged floor (NOT at-cost)
     charged_floor = float(req.two_worker_charge_floor_cad)
     if labor_calc < charged_floor:
         items.append(
@@ -533,7 +549,6 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
 
     pre_multiplier = travel_total + towing_total + labor_total + disposal_total + scrap_total + surcharge_total
 
-    # Complexity multiplier applies to handling/labour-ish stuff (not dump fees)
     complexity = float(req.complexity_multiplier)
     multiplier_base = travel_total + towing_total + labor_total + scrap_total + surcharge_total
     multiplier_delta = 0.0
@@ -555,7 +570,6 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
 
     subtotal = pre_multiplier + multiplier_delta
 
-    # Apply overall minimum charge
     minimum_applied = False
     total_cash = subtotal
     if total_cash < MINIMUM_CHARGE_CAD:
@@ -569,7 +583,6 @@ def calculate_quote(req: QuoteRequest) -> CalcResult:
         )
         total_cash = MINIMUM_CHARGE_CAD
 
-    # Dual totals: cash (no tax) and EMT (HST included)
     hst_rate = HST_RATE_EMT
     hst = _round_money(total_cash * hst_rate)
     total_emt = _round_money(total_cash + hst)
@@ -615,7 +628,6 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
     quote_id = str(uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
 
-    # Customer summary (minimal words, minimal $; exception: mattress/box spring show amounts)
     has_labor = any(li.code in {"labor"} for li in result.line_items)
     has_travel_or_towing = any(li.code in {"travel_gas_min", "travel_wear_min", "travel_variable", "towing"} for li in result.line_items)
 
@@ -632,6 +644,11 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
     resp = QuoteResponse(
         quote_id=quote_id,
         created_at=created_at,
+        customer_name=req.customer_name,
+        customer_phone=req.customer_phone,
+        job_address=req.job_address,
+        job_description_customer=req.job_description_customer,
+        job_description_internal=req.job_description_internal,
         subtotal_cad=result.subtotal,
         minimum_applied=result.minimum_applied,
         total_cash_cad=result.total_cash,
@@ -646,7 +663,6 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
         assumptions=result.assumptions,
     )
 
-    # Store cash base as "total_cad" for sorting/search (stable baseline)
     save_quote(
         quote_id=quote_id,
         created_at=created_at,
@@ -710,13 +726,23 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
     paid = float(req.deposit_paid_cad)
     owing = max(0.0, total - paid)
 
+    # Defaults come from quote snapshot if not supplied on job creation
+    customer_name = req.customer_name if req.customer_name is not None else quote.get("customer_name")
+    customer_phone = req.customer_phone if req.customer_phone is not None else quote.get("customer_phone")
+    job_address = req.job_address if req.job_address is not None else quote.get("job_address")
+    job_desc_customer = req.job_description_customer if req.job_description_customer is not None else quote.get("job_description_customer")
+    job_desc_internal = req.job_description_internal if req.job_description_internal is not None else quote.get("job_description_internal")
+
     job = {
         "job_id": job_id,
         "created_at": created_at,
         "quote_id": quote_id,
         "status": JobStatus.booked.value,
-        "customer_name": req.customer_name,
-        "job_address": req.job_address,
+        "customer_name": customer_name,
+        "customer_phone": customer_phone,
+        "job_address": job_address,
+        "job_description_customer": job_desc_customer,
+        "job_description_internal": job_desc_internal,
         "scheduled_start": req.scheduled_start,
         "scheduled_end": req.scheduled_end,
         "payment_method": req.payment_method.value,
@@ -733,8 +759,8 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
             "created_at": created_at,
             "quote_id": quote_id,
             "status": job["status"],
-            "customer_name": req.customer_name,
-            "job_address": req.job_address,
+            "customer_name": customer_name,
+            "job_address": job_address,
             "scheduled_start": req.scheduled_start,
             "scheduled_end": req.scheduled_end,
             "total_cad": float(job["total_cad"]),
@@ -750,8 +776,11 @@ def job_from_quote(quote_id: str, req: JobCreateFromQuoteRequest) -> JobResponse
         created_at=created_at,
         quote_id=quote_id,
         status=JobStatus(job["status"]),
-        customer_name=req.customer_name,
-        job_address=req.job_address,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        job_address=job_address,
+        job_description_customer=job_desc_customer,
+        job_description_internal=job_desc_internal,
         scheduled_start=req.scheduled_start,
         scheduled_end=req.scheduled_end,
         payment_method=req.payment_method,
@@ -779,7 +808,10 @@ def job_get(job_id: str) -> JobResponse:
         quote_id=data["quote_id"],
         status=JobStatus(data["status"]),
         customer_name=data.get("customer_name"),
+        customer_phone=data.get("customer_phone"),
         job_address=data.get("job_address"),
+        job_description_customer=data.get("job_description_customer"),
+        job_description_internal=data.get("job_description_internal"),
         scheduled_start=data.get("scheduled_start"),
         scheduled_end=data.get("scheduled_end"),
         payment_method=pm,
@@ -832,7 +864,10 @@ def job_update(job_id: str, req: JobUpdateRequest) -> JobResponse:
         quote_id=updated["quote_id"],
         status=JobStatus(updated["status"]),
         customer_name=updated.get("customer_name"),
+        customer_phone=updated.get("customer_phone"),
         job_address=updated.get("job_address"),
+        job_description_customer=updated.get("job_description_customer"),
+        job_description_internal=updated.get("job_description_internal"),
         scheduled_start=updated.get("scheduled_start"),
         scheduled_end=updated.get("scheduled_end"),
         payment_method=pm,
