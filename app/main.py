@@ -88,3 +88,26 @@ def manual_quote(data: ManualQuoteRequest):
         "analysis": analysis,
         "quote": quote
     }
+
+
+# -----------------------------
+# Customer Message Generator
+# -----------------------------
+class CustomerMessageRequest(BaseModel):
+    estimated_price: float
+    job_type: str
+
+
+@app.post("/generate-customer-message")
+def generate_customer_message(data: CustomerMessageRequest):
+    message = (
+        f"Hi there! Based on the details provided, your estimated total for this "
+        f"{data.job_type.replace('_', ' ')} job is ${data.estimated_price:.2f}.\n\n"
+        "This includes disposal, fuel, and labor.\n\n"
+        "Final price may vary slightly depending on actual volume at pickup.\n\n"
+        "Let me know if you'd like to schedule!"
+    )
+
+    return {
+        "message": message
+    }
