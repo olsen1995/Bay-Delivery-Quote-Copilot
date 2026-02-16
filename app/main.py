@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List
 from app.image_analyzer import analyze_image
 from app.pricing_engine import calculate_quote
+from app.job_logger import log_job
 
 app = FastAPI()
 
@@ -55,6 +56,12 @@ async def analyze_uploaded_images(files: List[UploadFile] = File(...)):
 
     quote = calculate_quote(merged_analysis)
 
+    # Log the job
+    log_job({
+        "analysis": merged_analysis,
+        "quote": quote
+    })
+
     return {
         "analysis": merged_analysis,
         "quote": quote
@@ -83,6 +90,12 @@ def manual_quote(data: ManualQuoteRequest):
     }
 
     quote = calculate_quote(analysis)
+
+    # Log the job
+    log_job({
+        "analysis": analysis,
+        "quote": quote
+    })
 
     return {
         "analysis": analysis,
