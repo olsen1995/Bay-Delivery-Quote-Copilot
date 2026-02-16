@@ -15,6 +15,21 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
+    """
+    SQLite doesn't support ADD COLUMN IF NOT EXISTS in all versions.
+    We try and ignore if it already exists.
+    """
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
+    except sqlite3.OperationalError as e:
+        msg = str(e).lower()
+        # "duplicate column name" is the normal 'already exists' case
+        if "duplicate column name" in msg:
+            return
+        raise
+
+
 def init_db() -> None:
     with _connect() as conn:
         # Quotes
@@ -34,7 +49,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_job_type ON quotes(job_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_total_cad ON quotes(total_cad)")
 
-        # Jobs
+        # Jobs (base schema)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS jobs (
@@ -54,9 +69,18 @@ def init_db() -> None:
             )
             """
         )
+
+        # --- lightweight migrations for new mirrored fields ---
+        # These are "indexable" columns that mirror what we also store inside job_json.
+        _try_add_column(conn, "jobs", "customer_phone TEXT")
+        _try_add_column(conn, "jobs", "job_description_customer TEXT")
+        _try_add_column(conn, "jobs", "job_description_internal TEXT")
+        _try_add_column(conn, "jobs", "payment_method TEXT")
+
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_quote_id ON jobs(quote_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_customer_name ON jobs(customer_name)")
 
 
 # =========================
@@ -183,16 +207,24 @@ def save_job(job_obj: Dict[str, Any]) -> None:
     """
     job_obj must include:
       job_id, created_at, quote_id, status, total_cad, paid_cad, owing_cad, job_json
-    Optional:
-      customer_name, job_address, scheduled_start, scheduled_end, notes
+
+    Optional mirrored columns:
+      customer_name, customer_phone, job_address,
+      job_description_customer, job_description_internal,
+      scheduled_start, scheduled_end, payment_method, notes
     """
     with _connect() as conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO jobs
-            (job_id, created_at, quote_id, status, customer_name, job_address, scheduled_start, scheduled_end,
-             total_cad, paid_cad, owing_cad, notes, job_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (job_id, created_at, quote_id, status,
+             customer_name, customer_phone, job_address,
+             job_description_customer, job_description_internal,
+             scheduled_start, scheduled_end,
+             payment_method,
+             total_cad, paid_cad, owing_cad,
+             notes, job_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_obj["job_id"],
@@ -200,9 +232,13 @@ def save_job(job_obj: Dict[str, Any]) -> None:
                 job_obj["quote_id"],
                 job_obj["status"],
                 job_obj.get("customer_name"),
+                job_obj.get("customer_phone"),
                 job_obj.get("job_address"),
+                job_obj.get("job_description_customer"),
+                job_obj.get("job_description_internal"),
                 job_obj.get("scheduled_start"),
                 job_obj.get("scheduled_end"),
+                job_obj.get("payment_method"),
                 float(job_obj["total_cad"]),
                 float(job_obj["paid_cad"]),
                 float(job_obj["owing_cad"]),
@@ -244,7 +280,12 @@ def list_jobs(
 
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     sql = f"""
-        SELECT job_id, created_at, quote_id, status, customer_name, scheduled_start, scheduled_end, total_cad, paid_cad, owing_cad
+        SELECT
+            job_id, created_at, quote_id, status,
+            customer_name, customer_phone, job_address,
+            scheduled_start, scheduled_end,
+            payment_method,
+            total_cad, paid_cad, owing_cad
         FROM jobs
         {where_sql}
         ORDER BY created_at DESC
@@ -262,8 +303,11 @@ def list_jobs(
             "quote_id": r["quote_id"],
             "status": r["status"],
             "customer_name": r["customer_name"],
+            "customer_phone": r["customer_phone"],
+            "job_address": r["job_address"],
             "scheduled_start": r["scheduled_start"],
             "scheduled_end": r["scheduled_end"],
+            "payment_method": r["payment_method"],
             "total_cad": float(r["total_cad"]),
             "paid_cad": float(r["paid_cad"]),
             "owing_cad": float(r["owing_cad"]),
@@ -277,9 +321,13 @@ def update_job_fields(
     *,
     status: Optional[str] = None,
     customer_name: Optional[str] = None,
+    customer_phone: Optional[str] = None,
     job_address: Optional[str] = None,
+    job_description_customer: Optional[str] = None,
+    job_description_internal: Optional[str] = None,
     scheduled_start: Optional[str] = None,
     scheduled_end: Optional[str] = None,
+    payment_method: Optional[str] = None,
     paid_cad: Optional[float] = None,
     notes: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
@@ -287,17 +335,25 @@ def update_job_fields(
     if not job:
         return None
 
-    # Apply updates
+    # Apply updates to canonical job_json
     if status is not None:
         job["status"] = status
     if customer_name is not None:
         job["customer_name"] = customer_name
+    if customer_phone is not None:
+        job["customer_phone"] = customer_phone
     if job_address is not None:
         job["job_address"] = job_address
+    if job_description_customer is not None:
+        job["job_description_customer"] = job_description_customer
+    if job_description_internal is not None:
+        job["job_description_internal"] = job_description_internal
     if scheduled_start is not None:
         job["scheduled_start"] = scheduled_start
     if scheduled_end is not None:
         job["scheduled_end"] = scheduled_end
+    if payment_method is not None:
+        job["payment_method"] = payment_method
     if notes is not None:
         job["notes"] = notes
 
@@ -308,7 +364,7 @@ def update_job_fields(
         job["paid_cad"] = paid
         job["owing_cad"] = owing
 
-    # Persist job + mirrored columns for indexing
+    # Persist job + mirrored columns for indexing/listing
     save_job(
         {
             "job_id": job["job_id"],
@@ -316,9 +372,13 @@ def update_job_fields(
             "quote_id": job["quote_id"],
             "status": job["status"],
             "customer_name": job.get("customer_name"),
+            "customer_phone": job.get("customer_phone"),
             "job_address": job.get("job_address"),
+            "job_description_customer": job.get("job_description_customer"),
+            "job_description_internal": job.get("job_description_internal"),
             "scheduled_start": job.get("scheduled_start"),
             "scheduled_end": job.get("scheduled_end"),
+            "payment_method": job.get("payment_method"),
             "total_cad": float(job["total_cad"]),
             "paid_cad": float(job["paid_cad"]),
             "owing_cad": float(job["owing_cad"]),
