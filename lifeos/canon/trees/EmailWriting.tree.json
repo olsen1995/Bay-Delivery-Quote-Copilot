@@ -1,7 +1,0 @@
-{
-  "name": "EmailWriting",
-  "type": "LifeOSTree",
-  "version": "5.0.0",
-  "description": "Declarative decision tree for EmailWriting.",
-  "nodes": {}
-}

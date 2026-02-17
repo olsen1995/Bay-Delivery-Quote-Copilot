@@ -1,6 +1,0 @@
-{
-  "name": "DeviceOptimization",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for managing and optimizing personal devices and settings."
-}

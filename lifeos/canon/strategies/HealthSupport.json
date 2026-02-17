@@ -1,6 +1,0 @@
-{
-  "name": "HealthSupport",
-  "type": "LifeOSStrategy",
-  "version": "5.0.0",
-  "description": "Canonical strategy for illness tracking, symptom care, and routines."
-}

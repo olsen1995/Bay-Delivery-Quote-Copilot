@@ -1,15 +1,25 @@
-﻿{
+{
   "business_name": "Bay Delivery",
   "service_area": "North Bay, Ontario",
   "currency": "CAD",
-  "services": [
-    "Dump runs",
-    "Scrap metal pickup",
-    "Small moving jobs",
-    "Demolition and cleanouts",
-    "Building material delivery",
-    "Marketplace deliveries"
-  ],
+  "services": {
+    "dump_run": {
+      "hourly_rate": 95,
+      "minimum_hours": 1
+    },
+    "moving": {
+      "hourly_rate": 110,
+      "minimum_hours": 2
+    },
+    "scrap_pickup": {
+      "hourly_rate": 85,
+      "minimum_hours": 1
+    },
+    "demolition": {
+      "hourly_rate": 120,
+      "minimum_hours": 2
+    }
+  },
   "minimum_charges": {
     "gas": 20,
     "wear_and_tear": 20
