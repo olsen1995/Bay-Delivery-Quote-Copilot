@@ -101,10 +101,18 @@ def init_db() -> None:
             )
             """
         )
+
+        # ✅ Workflow / booking-request columns (migrations)
+        _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
+        _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
+        _try_add_column(conn, "quote_requests", "customer_accepted_at TEXT")
+        _try_add_column(conn, "quote_requests", "admin_approved_at TEXT")
+
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_created_at ON quote_requests(created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_service_type ON quote_requests(service_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_quote_id ON quote_requests(quote_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_requested_job_date ON quote_requests(requested_job_date)")
 
 
 # =========================
@@ -421,8 +429,10 @@ def save_quote_request(req_obj: Dict[str, Any]) -> None:
              customer_name, customer_phone, job_address,
              job_description_customer, job_description_internal,
              service_type, cash_total_cad, emt_total_cad,
-             request_json, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             request_json, notes,
+             requested_job_date, requested_time_window,
+             customer_accepted_at, admin_approved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 req_obj["request_id"],
@@ -439,6 +449,10 @@ def save_quote_request(req_obj: Dict[str, Any]) -> None:
                 float(req_obj["emt_total_cad"]),
                 json.dumps(req_obj["request_json"], ensure_ascii=False),
                 req_obj.get("notes"),
+                req_obj.get("requested_job_date"),
+                req_obj.get("requested_time_window"),
+                req_obj.get("customer_accepted_at"),
+                req_obj.get("admin_approved_at"),
             ),
         )
 
@@ -452,7 +466,9 @@ def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
                 customer_name, customer_phone, job_address,
                 job_description_customer, job_description_internal,
                 service_type, cash_total_cad, emt_total_cad,
-                request_json, notes
+                request_json, notes,
+                requested_job_date, requested_time_window,
+                customer_accepted_at, admin_approved_at
             FROM quote_requests
             WHERE request_id = ?
             """,
@@ -476,6 +492,10 @@ def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
             "emt_total_cad": float(row["emt_total_cad"]),
             "request_json": json.loads(row["request_json"]),
             "notes": row["notes"],
+            "requested_job_date": row["requested_job_date"],
+            "requested_time_window": row["requested_time_window"],
+            "customer_accepted_at": row["customer_accepted_at"],
+            "admin_approved_at": row["admin_approved_at"],
         }
 
 
@@ -492,7 +512,8 @@ def list_quote_requests(limit: int = 50, status: Optional[str] = None) -> List[D
         SELECT
             request_id, created_at, status, quote_id,
             customer_name, customer_phone, job_address,
-            service_type, cash_total_cad, emt_total_cad
+            service_type, cash_total_cad, emt_total_cad,
+            requested_job_date, requested_time_window
         FROM quote_requests
         {where_sql}
         ORDER BY created_at DESC
@@ -515,6 +536,8 @@ def list_quote_requests(limit: int = 50, status: Optional[str] = None) -> List[D
             "service_type": r["service_type"],
             "cash_total_cad": float(r["cash_total_cad"]),
             "emt_total_cad": float(r["emt_total_cad"]),
+            "requested_job_date": r["requested_job_date"],
+            "requested_time_window": r["requested_time_window"],
         }
         for r in rows
     ]
@@ -535,6 +558,10 @@ def update_quote_request(
     service_type: Optional[str] = None,
     request_json: Optional[Dict[str, Any]] = None,
     notes: Optional[str] = None,
+    requested_job_date: Optional[str] = None,
+    requested_time_window: Optional[str] = None,
+    customer_accepted_at: Optional[str] = None,
+    admin_approved_at: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     existing = get_quote_request(request_id)
     if not existing:
@@ -567,6 +594,15 @@ def update_quote_request(
     if notes is not None:
         updated["notes"] = notes
 
+    if requested_job_date is not None:
+        updated["requested_job_date"] = requested_job_date
+    if requested_time_window is not None:
+        updated["requested_time_window"] = requested_time_window
+    if customer_accepted_at is not None:
+        updated["customer_accepted_at"] = customer_accepted_at
+    if admin_approved_at is not None:
+        updated["admin_approved_at"] = admin_approved_at
+
     save_quote_request(
         {
             "request_id": updated["request_id"],
@@ -583,6 +619,10 @@ def update_quote_request(
             "emt_total_cad": float(updated["emt_total_cad"]),
             "request_json": updated["request_json"],
             "notes": updated.get("notes"),
+            "requested_job_date": updated.get("requested_job_date"),
+            "requested_time_window": updated.get("requested_time_window"),
+            "customer_accepted_at": updated.get("customer_accepted_at"),
+            "admin_approved_at": updated.get("admin_approved_at"),
         }
     )
 
