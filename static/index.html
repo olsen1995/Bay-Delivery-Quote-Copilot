@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Bay Delivery – Internal Quote Tool</title>
+  <style>
+    body { font-family: Arial; max-width: 700px; margin: 40px auto; }
+    label { display:block; margin-top:12px; }
+    input, select { width:100%; padding:6px; margin-top:4px; }
+    button { margin-top:20px; padding:10px; width:100%; }
+    .result { margin-top:30px; padding:15px; border:1px solid #ccc; }
+  </style>
+</head>
+<body>
+
+<h2>Bay Delivery – Internal Quote Tool</h2>
+
+<form id="quoteForm">
+
+<label>Customer Name</label>
+<input type="text" id="customer_name" />
+
+<label>Phone</label>
+<input type="text" id="customer_phone" />
+
+<label>Job Address</label>
+<input type="text" id="job_address" />
+
+<label>Service Type</label>
+<select id="service_type">
+  <option value="dump_run">Dump Run</option>
+  <option value="scrap_pickup">Scrap Pickup</option>
+  <option value="small_move">Small Move</option>
+  <option value="item_delivery">Item Delivery</option>
+  <option value="demolition">Demolition</option>
+</select>
+
+<label>Distance (km)</label>
+<input type="number" id="distance_km" value="10" />
+
+<label>Estimated Hours</label>
+<input type="number" id="estimated_hours" value="1" />
+
+<label>Requires 2 Workers?</label>
+<select id="requires_two_workers">
+  <option value="false">No</option>
+  <option value="true">Yes</option>
+</select>
+
+<label>Mattress Count</label>
+<input type="number" id="mattresses_count" value="0" />
+
+<label>Box Spring Count</label>
+<input type="number" id="box_springs_count" value="0" />
+
+<button type="submit">Generate Estimate</button>
+
+</form>
+
+<div id="result" class="result" style="display:none;"></div>
+
+<script>
+document.getElementById("quoteForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const payload = {
+    customer_name: document.getElementById("customer_name").value,
+    customer_phone: document.getElementById("customer_phone").value,
+    job_address: document.getElementById("job_address").value,
+    service_type: document.getElementById("service_type").value,
+    distance_km: parseFloat(document.getElementById("distance_km").value),
+    estimated_hours: parseFloat(document.getElementById("estimated_hours").value),
+    requires_two_workers: document.getElementById("requires_two_workers").value === "true",
+    mattresses_count: parseInt(document.getElementById("mattresses_count").value),
+    box_springs_count: parseInt(document.getElementById("box_springs_count").value)
+  };
+
+  const res = await fetch("/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  const div = document.getElementById("result");
+  div.style.display = "block";
+  div.innerHTML = `
+    <h3>Estimate Generated</h3>
+    <p><strong>Quote ID:</strong> ${data.quote_id}</p>
+    <p><strong>Cash:</strong> $${data.customer_view.estimate_cash_cad}</p>
+    <p><strong>EMT:</strong> $${data.customer_view.estimate_emt_cad}</p>
+  `;
+});
+</script>
+
+</body>
+</html>
