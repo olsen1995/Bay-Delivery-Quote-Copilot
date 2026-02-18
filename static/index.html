@@ -2,96 +2,160 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Bay Delivery – Internal Quote Tool</title>
+  <title>Bay Delivery – Quote Tool</title>
   <style>
-    body { font-family: Arial; max-width: 700px; margin: 40px auto; }
-    label { display:block; margin-top:12px; }
-    input, select { width:100%; padding:6px; margin-top:4px; }
-    button { margin-top:20px; padding:10px; width:100%; }
-    .result { margin-top:30px; padding:15px; border:1px solid #ccc; }
+    body { font-family: Arial; max-width: 760px; margin: 40px auto; }
+    label { display:block; margin-top:12px; font-weight: 600; }
+    input, select { width:100%; padding:10px; margin-top:6px; box-sizing: border-box; }
+    button { margin-top:18px; padding:12px; width:100%; font-weight: 700; cursor: pointer; }
+    .result { margin-top:24px; padding:16px; border:1px solid #ccc; border-radius: 8px; }
+    .muted { color:#666; font-size: 0.95em; margin-top: 10px; line-height: 1.35; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#f2f2f2; margin:6px 6px 0 0; font-size: 0.9em; }
+    .error { color: #b00020; font-weight: 700; }
   </style>
 </head>
 <body>
 
-<h2>Bay Delivery – Internal Quote Tool</h2>
+<h2>Bay Delivery – Quote Tool</h2>
 
 <form id="quoteForm">
 
-<label>Customer Name</label>
-<input type="text" id="customer_name" />
+  <div class="row">
+    <div>
+      <label>Customer Name</label>
+      <input type="text" id="customer_name" placeholder="Optional" />
+    </div>
+    <div>
+      <label>Phone</label>
+      <input type="text" id="customer_phone" placeholder="Optional" />
+    </div>
+  </div>
 
-<label>Phone</label>
-<input type="text" id="customer_phone" />
+  <label>Job Address</label>
+  <input type="text" id="job_address" placeholder="Optional (used later for distance auto-calc)" />
 
-<label>Job Address</label>
-<input type="text" id="job_address" />
+  <label>Service Type</label>
+  <select id="service_type">
+    <option value="dump_run">Dump Run</option>
+    <option value="scrap_pickup">Scrap Pickup</option>
+    <option value="small_move">Small Move</option>
+    <option value="item_delivery">Item Delivery</option>
+    <option value="demolition">Demolition</option>
+  </select>
 
-<label>Service Type</label>
-<select id="service_type">
-  <option value="dump_run">Dump Run</option>
-  <option value="scrap_pickup">Scrap Pickup</option>
-  <option value="small_move">Small Move</option>
-  <option value="item_delivery">Item Delivery</option>
-  <option value="demolition">Demolition</option>
-</select>
+  <div class="row">
+    <div>
+      <label>Estimated Hours</label>
+      <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
+    </div>
+    <div>
+      <label>Requires 2 Workers?</label>
+      <select id="requires_two_workers">
+        <option value="false">No</option>
+        <option value="true">Yes</option>
+      </select>
+    </div>
+  </div>
 
-<label>Distance (km)</label>
-<input type="number" id="distance_km" value="10" />
+  <div class="row">
+    <div>
+      <label>Mattress Count</label>
+      <input type="number" id="mattresses_count" value="0" min="0" step="1" />
+    </div>
+    <div>
+      <label>Box Spring Count</label>
+      <input type="number" id="box_springs_count" value="0" min="0" step="1" />
+    </div>
+  </div>
 
-<label>Estimated Hours</label>
-<input type="number" id="estimated_hours" value="1" />
-
-<label>Requires 2 Workers?</label>
-<select id="requires_two_workers">
-  <option value="false">No</option>
-  <option value="true">Yes</option>
-</select>
-
-<label>Mattress Count</label>
-<input type="number" id="mattresses_count" value="0" />
-
-<label>Box Spring Count</label>
-<input type="number" id="box_springs_count" value="0" />
-
-<button type="submit">Generate Estimate</button>
-
+  <button type="submit">Generate Estimate</button>
 </form>
 
 <div id="result" class="result" style="display:none;"></div>
 
 <script>
-document.getElementById("quoteForm").addEventListener("submit", async function(e) {
-  e.preventDefault();
-
-  const payload = {
-    customer_name: document.getElementById("customer_name").value,
-    customer_phone: document.getElementById("customer_phone").value,
-    job_address: document.getElementById("job_address").value,
-    service_type: document.getElementById("service_type").value,
-    distance_km: parseFloat(document.getElementById("distance_km").value),
-    estimated_hours: parseFloat(document.getElementById("estimated_hours").value),
-    requires_two_workers: document.getElementById("requires_two_workers").value === "true",
-    mattresses_count: parseInt(document.getElementById("mattresses_count").value),
-    box_springs_count: parseInt(document.getElementById("box_springs_count").value)
+  const fmt = (n) => {
+    const x = Number(n || 0);
+    return x.toFixed(2);
   };
 
-  const res = await fetch("/request", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+  document.getElementById("quoteForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const payload = {
+      customer_name: document.getElementById("customer_name").value || null,
+      customer_phone: document.getElementById("customer_phone").value || null,
+      job_address: document.getElementById("job_address").value || null,
+      service_type: document.getElementById("service_type").value,
+      estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
+      requires_two_workers: document.getElementById("requires_two_workers").value === "true",
+      mattresses_count: parseInt(document.getElementById("mattresses_count").value || "0", 10),
+      box_springs_count: parseInt(document.getElementById("box_springs_count").value || "0", 10)
+    };
+
+    const div = document.getElementById("result");
+    div.style.display = "block";
+    div.innerHTML = `<div class="muted">Calculating…</div>`;
+
+    try {
+      const res = await fetch("/quote/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        div.innerHTML = `<div class="error">Error:</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        return;
+      }
+
+      // Summary pills (no $ amounts for labour/travel/etc — just a pro summary)
+      const summary = [];
+      summary.push("Labour included");
+      summary.push("Local base pricing (North Bay)");
+
+      // Only show mattress/boxspring amounts if counts > 0
+      const m = payload.mattresses_count || 0;
+      const b = payload.box_springs_count || 0;
+
+      let disposalHtml = "";
+      if (m > 0 || b > 0) {
+        const mattressCost = m * 50;
+        const boxCost = b * 50;
+        disposalHtml = `
+          <div style="margin-top: 10px;">
+            <div><strong>Disposal (shown only because you entered items):</strong></div>
+            ${m > 0 ? `<div class="pill">Mattress: ${m} × $50 = $${fmt(mattressCost)}</div>` : ""}
+            ${b > 0 ? `<div class="pill">Box Spring: ${b} × $50 = $${fmt(boxCost)}</div>` : ""}
+          </div>
+        `;
+      }
+
+      div.innerHTML = `
+        <h3>Estimate Generated</h3>
+        <p><strong>Quote ID:</strong> ${data.quote_id}</p>
+        <p><strong>Cash:</strong> $${fmt(data.total_cash_cad)}</p>
+        <p><strong>EMT:</strong> $${fmt(data.total_emt_cad)}</p>
+
+        <div style="margin-top: 10px;">
+          ${summary.map(s => `<span class="pill">${s}</span>`).join("")}
+        </div>
+
+        ${disposalHtml}
+
+        <div class="muted">
+          <strong>Important:</strong> This estimate is solely based on the information provided.
+          Quote may be subject to change after an in-person view (stairs, heavy items, access, actual dump/landfill fees, multiple trips, etc.).
+        </div>
+      `;
+    } catch (err) {
+      div.innerHTML = `<div class="error">Network error:</div><pre>${String(err)}</pre>`;
+    }
   });
-
-  const data = await res.json();
-
-  const div = document.getElementById("result");
-  div.style.display = "block";
-  div.innerHTML = `
-    <h3>Estimate Generated</h3>
-    <p><strong>Quote ID:</strong> ${data.quote_id}</p>
-    <p><strong>Cash:</strong> $${data.customer_view.estimate_cash_cad}</p>
-    <p><strong>EMT:</strong> $${data.customer_view.estimate_emt_cad}</p>
-  `;
-});
 </script>
 
 </body>
