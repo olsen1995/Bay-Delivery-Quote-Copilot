@@ -4,42 +4,29 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Annotated
+from typing import Any, Dict, Optional, Annotated
 from uuid import uuid4
 
-import os
-import secrets
-
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field, field_validator
+
 
 from app.storage import (
     init_db,
     save_quote,
-    get_quote,
-    list_quotes,
-    search_quotes,
-    save_job,
-    get_job,
-    list_jobs,
-    update_job_fields,
-    save_quote_request,
-    get_quote_request,
-    list_quote_requests,
-    update_quote_request,
 )
 
 # =========================
 # VERSION
 # =========================
 
-APP_VERSION = "0.8.2"
+APP_VERSION = "0.9.0"
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
@@ -70,7 +57,7 @@ INDEX_HTML_PATH = BASE_DIR / "static" / "index.html"
 @app.get("/")
 def root():
     """
-    Serve the customer/internal quote page.
+    Serve the quote page.
     Keeps API routes like /health working normally.
     """
     if not INDEX_HTML_PATH.exists():
@@ -82,40 +69,44 @@ def root():
 
 
 # =========================
-# Admin Auth (HTTP Basic)
+# Business Rules
 # =========================
 
-security = HTTPBasic()
+HST_RATE_EMT = 0.13
 
+# Minimums per service (your call)
+MINIMUM_DUMP_RUN_CAD = 50.0
+MINIMUM_MOVING_CAD = 60.0
+MINIMUM_DEMOLITION_CAD = 75.0
+MINIMUM_OTHER_CAD = 50.0
 
-def _require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> str:
-    """
-    HTTP Basic auth for admin routes.
-    Uses env vars:
-      - ADMIN_USERNAME
-      - ADMIN_PASSWORD
-    """
-    expected_user = (os.getenv("ADMIN_USERNAME") or "").strip()
-    expected_pass = (os.getenv("ADMIN_PASSWORD") or "").strip()
+# Travel minimum always (gas + wear)
+MIN_GAS_CAD = 20.0
+MIN_WEAR_CAD = 20.0
 
-    if not expected_user or not expected_pass:
-        # Misconfiguration should be loud during setup.
-        raise HTTPException(
-            status_code=500,
-            detail="Admin auth not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD.",
-        )
+# Labour rates (internal defaults — you can tune later)
+DEFAULT_PRIMARY_RATE_CAD = 20.0
+DEFAULT_HELPER_RATE_CAD = 16.0
 
-    user_ok = secrets.compare_digest(credentials.username, expected_user)
-    pass_ok = secrets.compare_digest(credentials.password, expected_pass)
+# Disposal
+MATTRESS_FEE_EACH_CAD = 50.0
+BOXSPRING_FEE_EACH_CAD = 50.0
 
-    if not (user_ok and pass_ok):
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": 'Basic realm="Bay Delivery Admin"'},
-        )
+# Dump run: bag tiers (includes dump travel + margin)
+BAG_TIER_SMALL_MAX = 5
+BAG_TIER_MEDIUM_MAX = 15
+BAG_TIER_SMALL_PRICE = 50.0
+BAG_TIER_MEDIUM_PRICE = 80.0
+BAG_TIER_LARGE_PRICE = 120.0
 
-    return credentials.username
+# Scrap pickup
+SCRAP_CURBSIDE_PRICE = 0.0
+SCRAP_INSIDE_PRICE = 30.0
+
+# Cash rounding (you don’t like $22.50 etc)
+def round_cash_to_nearest_5(x: float) -> float:
+    # nearest $5
+    return float(int((x + 2.5) // 5) * 5)
 
 
 # =========================
@@ -131,18 +122,11 @@ class ServiceType(str, Enum):
 
     @classmethod
     def normalize(cls, value: str) -> "ServiceType":
-        """
-        Allow both 'small_move' and 'small_moving' externally.
-        Everything normalizes to 'small_move' internally.
-        """
+        # Allow both 'small_move' and 'small_moving' externally.
         if value == "small_moving":
             return cls.small_move
         return cls(value)
 
-
-# =========================
-# Validation helpers
-# =========================
 
 def normalize_service_type(value: Any) -> Any:
     if isinstance(value, str):
@@ -150,13 +134,19 @@ def normalize_service_type(value: Any) -> Any:
     return value
 
 
-# =========================
-# Schemas
-# =========================
+class ScrapPickupLocation(str, Enum):
+    curbside = "curbside"
+    inside = "inside"
+
 
 NonNegFloat = Annotated[float, Field(ge=0)]
 NonNegInt = Annotated[int, Field(ge=0)]
+PosInt = Annotated[int, Field(ge=1)]
 
+
+# =========================
+# Schemas
+# =========================
 
 class QuoteRequest(BaseModel):
     service_type: ServiceType = ServiceType.dump_run
@@ -166,19 +156,40 @@ class QuoteRequest(BaseModel):
     def validate_service_type(cls, v):
         return normalize_service_type(v)
 
+    # Customer/job info
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     job_address: Optional[str] = None
-    job_description_customer: Optional[str] = None
-    job_description_internal: Optional[str] = None
 
-    distance_km: Optional[NonNegFloat] = None
+    # Description (this is what we will eventually "scan" / refine with)
+    description: Optional[str] = Field(
+        None,
+        description="Customer description of items / job details. Stored for admin review.",
+    )
+
+    # Core pricing inputs
     estimated_hours: NonNegFloat = 0.0
-    requires_two_workers: bool = False
 
-    dump_fees_cad: NonNegFloat = 0.0
+    # Crew: customer can set, but we enforce minimums by service
+    crew_size: Optional[PosInt] = Field(
+        None,
+        description="Optional crew size. We clamp to service minimums.",
+    )
+
+    # Dump run specific
+    garbage_bag_count: NonNegInt = 0
+
+    # Mattresses / boxsprings (shown explicitly to customer only if >0)
     mattresses_count: NonNegInt = 0
     box_springs_count: NonNegInt = 0
+
+    # Scrap pickup specific
+    scrap_pickup_location: ScrapPickupLocation = ScrapPickupLocation.curbside
+
+    # Access flags (stored now, used later for smarter bumping)
+    stairs: bool = False
+    elevator: bool = False
+    difficult_corner: bool = False
 
 
 class QuoteResponse(BaseModel):
@@ -186,26 +197,141 @@ class QuoteResponse(BaseModel):
     created_at: str
     currency: str = CAD
     service_type: ServiceType
+
+    # Minimal customer-facing totals
     total_cash_cad: NonNegFloat
     total_emt_cad: NonNegFloat
 
+    # helpful metadata for admin + debugging
+    crew_size: int
+    travel_min_cad: NonNegFloat
+    labor_cad: NonNegFloat
+    disposal_cad: NonNegFloat
+    mattress_boxspring_cad: NonNegFloat
+    scrap_cad: NonNegFloat
+
+    disclaimer: str
+
 
 # =========================
-# Minimal Quote Logic (unchanged)
+# Quote Logic
 # =========================
+
+def _service_minimum(service_type: ServiceType) -> float:
+    if service_type == ServiceType.dump_run:
+        return MINIMUM_DUMP_RUN_CAD
+    if service_type == ServiceType.small_move:
+        return MINIMUM_MOVING_CAD
+    if service_type == ServiceType.demolition:
+        return MINIMUM_DEMOLITION_CAD
+    return MINIMUM_OTHER_CAD
+
+
+def _service_min_crew(service_type: ServiceType) -> int:
+    # Your guidance:
+    # - dump_run: can be 1 (sometimes 2)
+    # - moving: never below 2; default 3
+    # - demolition: usually 2+; common 4 on big jobs (we set minimum 2, default 4)
+    if service_type == ServiceType.small_move:
+        return 2
+    if service_type == ServiceType.demolition:
+        return 2
+    return 1
+
+
+def _service_default_crew(service_type: ServiceType) -> int:
+    if service_type == ServiceType.small_move:
+        return 3
+    if service_type == ServiceType.demolition:
+        return 4
+    return 1
+
+
+def _calc_travel_min() -> float:
+    return float(MIN_GAS_CAD + MIN_WEAR_CAD)
+
+
+def _calc_labor(estimated_hours: float, crew_size: int) -> float:
+    # Simple but realistic:
+    # primary + (crew-1)*helper
+    if estimated_hours <= 0:
+        return 0.0
+    hourly_total = DEFAULT_PRIMARY_RATE_CAD + max(0, crew_size - 1) * DEFAULT_HELPER_RATE_CAD
+    return float(estimated_hours * hourly_total)
+
+
+def _calc_dump_run_disposal(garbage_bag_count: int) -> float:
+    if garbage_bag_count <= 0:
+        # if it's a dump run, even 0 bags could be "junk items" — but we only apply this bag-tier
+        # when they give us bags. Minimums + labour/travel cover the rest.
+        return 0.0
+
+    if garbage_bag_count <= BAG_TIER_SMALL_MAX:
+        return float(BAG_TIER_SMALL_PRICE)
+    if garbage_bag_count <= BAG_TIER_MEDIUM_MAX:
+        return float(BAG_TIER_MEDIUM_PRICE)
+    return float(BAG_TIER_LARGE_PRICE)
+
+
+def _calc_mattress_boxspring(m: int, b: int) -> float:
+    return float(m * MATTRESS_FEE_EACH_CAD + b * BOXSPRING_FEE_EACH_CAD)
+
+
+def _calc_scrap(req: QuoteRequest) -> float:
+    if req.service_type != ServiceType.scrap_pickup:
+        return 0.0
+    if req.scrap_pickup_location == ScrapPickupLocation.curbside:
+        return float(SCRAP_CURBSIDE_PRICE)
+    return float(SCRAP_INSIDE_PRICE)
+
 
 def calculate_quote(req: QuoteRequest) -> Dict[str, Any]:
-    # NOTE: This is the simple estimator you’re currently running.
-    # We’ll upgrade per-service rules next (bags, scrap curbside, moving crew, demo minimums, etc.)
-    base = 50.0
-    hours_cost = req.estimated_hours * 60.0
-    total_cash = max(base, hours_cost)
+    service_min = _service_minimum(req.service_type)
 
-    total_emt = round(total_cash * 1.13, 2)
+    min_crew = _service_min_crew(req.service_type)
+    default_crew = _service_default_crew(req.service_type)
+
+    crew = int(req.crew_size) if req.crew_size is not None else default_crew
+    if crew < min_crew:
+        crew = min_crew
+
+    travel = _calc_travel_min()
+    labor = _calc_labor(float(req.estimated_hours), crew)
+
+    disposal = 0.0
+    if req.service_type == ServiceType.dump_run:
+        disposal = _calc_dump_run_disposal(int(req.garbage_bag_count))
+
+    mattress_boxspring = _calc_mattress_boxspring(int(req.mattresses_count), int(req.box_springs_count))
+    scrap = _calc_scrap(req)
+
+    raw_cash = travel + labor + disposal + mattress_boxspring + scrap
+
+    # enforce minimum per service
+    cash_before_round = max(service_min, raw_cash)
+
+    # cash: round to nearest $5
+    cash_total = round_cash_to_nearest_5(cash_before_round)
+
+    # EMT: cents are fine (don’t “round to 5”)
+    emt_total = round(cash_total * (1.0 + HST_RATE_EMT), 2)
+
+    disclaimer = (
+        "This estimate is solely based on the information provided and may change after an in-person view "
+        "(stairs, heavy items, access, actual load size, multiple trips, etc.). "
+        "Cash is tax-free; EMT/e-transfer adds 13% HST."
+    )
 
     return {
-        "total_cash_cad": round(total_cash, 2),
-        "total_emt_cad": total_emt,
+        "total_cash_cad": round(cash_total, 2),
+        "total_emt_cad": round(emt_total, 2),
+        "crew_size": crew,
+        "travel_min_cad": round(travel, 2),
+        "labor_cad": round(labor, 2),
+        "disposal_cad": round(disposal, 2),
+        "mattress_boxspring_cad": round(mattress_boxspring, 2),
+        "scrap_cad": round(scrap, 2),
+        "disclaimer": disclaimer,
     }
 
 
@@ -214,7 +340,7 @@ def calculate_quote(req: QuoteRequest) -> Dict[str, Any]:
 # =========================
 
 @app.get("/health")
-def health() -> Dict[str, Any]:
+def health():
     return {
         "ok": True,
         "version": APP_VERSION,
@@ -224,35 +350,25 @@ def health() -> Dict[str, Any]:
 
 
 @app.post("/quote/calculate", response_model=QuoteResponse)
-def quote_calculate(req: QuoteRequest) -> QuoteResponse:
+def quote_calculate(req: QuoteRequest):
     result = calculate_quote(req)
 
     quote_id = str(uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
 
+    # Store full request + response for admin review later
     save_quote(
         quote_id=quote_id,
         created_at=created_at,
         job_type=req.service_type.value,
-        total_cad=result["total_cash_cad"],
+        total_cad=float(result["total_cash_cad"]),
         request_obj=req.model_dump(),
         response_obj={
             "quote_id": quote_id,
             "created_at": created_at,
             "currency": CAD,
             "service_type": req.service_type.value,
-            "total_cash_cad": result["total_cash_cad"],
-            "total_emt_cad": result["total_emt_cad"],
-            # Echo back useful fields so the stored quote is self-contained
-            "customer_name": req.customer_name,
-            "customer_phone": req.customer_phone,
-            "job_address": req.job_address,
-            "job_description_customer": req.job_description_customer,
-            "job_description_internal": req.job_description_internal,
-            "estimated_hours": float(req.estimated_hours),
-            "requires_two_workers": bool(req.requires_two_workers),
-            "mattresses_count": int(req.mattresses_count),
-            "box_springs_count": int(req.box_springs_count),
+            **result,
         },
     )
 
@@ -260,61 +376,13 @@ def quote_calculate(req: QuoteRequest) -> QuoteResponse:
         quote_id=quote_id,
         created_at=created_at,
         service_type=req.service_type,
-        total_cash_cad=result["total_cash_cad"],
-        total_emt_cad=result["total_emt_cad"],
+        total_cash_cad=float(result["total_cash_cad"]),
+        total_emt_cad=float(result["total_emt_cad"]),
+        crew_size=int(result["crew_size"]),
+        travel_min_cad=float(result["travel_min_cad"]),
+        labor_cad=float(result["labor_cad"]),
+        disposal_cad=float(result["disposal_cad"]),
+        mattress_boxspring_cad=float(result["mattress_boxspring_cad"]),
+        scrap_cad=float(result["scrap_cad"]),
+        disclaimer=str(result["disclaimer"]),
     )
-
-
-# =========================
-# Admin JSON Dashboard (Phase 1)
-# =========================
-
-@app.get("/admin/health")
-def admin_health(admin_user: str = Depends(_require_admin)) -> Dict[str, Any]:
-    return {
-        "ok": True,
-        "admin_user": admin_user,
-        "time": datetime.utcnow().isoformat() + "Z",
-        "version": APP_VERSION,
-    }
-
-
-@app.get("/admin/quotes")
-def admin_list_quotes(
-    limit: int = 50,
-    admin_user: str = Depends(_require_admin),
-) -> Dict[str, Any]:
-    rows = list_quotes(limit=limit)
-    return {"count": len(rows), "items": rows}
-
-
-@app.get("/admin/quotes/{quote_id}")
-def admin_get_quote(
-    quote_id: str,
-    admin_user: str = Depends(_require_admin),
-) -> Dict[str, Any]:
-    data = get_quote(quote_id)
-    if not data:
-        raise HTTPException(status_code=404, detail="Quote not found")
-    return data
-
-
-@app.get("/admin/quote-requests")
-def admin_list_quote_requests(
-    limit: int = 50,
-    status: Optional[str] = None,
-    admin_user: str = Depends(_require_admin),
-) -> Dict[str, Any]:
-    rows = list_quote_requests(limit=limit, status=status)
-    return {"count": len(rows), "items": rows}
-
-
-@app.get("/admin/quote-requests/{request_id}")
-def admin_get_quote_request(
-    request_id: str,
-    admin_user: str = Depends(_require_admin),
-) -> Dict[str, Any]:
-    r = get_quote_request(request_id)
-    if not r:
-        raise HTTPException(status_code=404, detail="Quote request not found")
-    return r
