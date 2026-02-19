@@ -4,19 +4,20 @@
   <meta charset="UTF-8" />
   <title>Bay Delivery – Quote Tool</title>
   <style>
-    body { font-family: Arial; max-width: 760px; margin: 40px auto; }
-    label { display:block; margin-top:12px; font-weight: 600; }
+    body { font-family: Arial; max-width: 820px; margin: 40px auto; padding: 0 12px; }
+    label { display:block; margin-top:12px; font-weight: 700; }
     input, select, textarea { width:100%; padding:10px; margin-top:6px; box-sizing: border-box; }
     textarea { min-height: 90px; resize: vertical; }
-    button { margin-top:18px; padding:12px; width:100%; font-weight: 700; cursor: pointer; }
+    button { margin-top:18px; padding:12px; width:100%; font-weight: 800; cursor: pointer; }
     .result { margin-top:24px; padding:16px; border:1px solid #ccc; border-radius: 8px; }
     .muted { color:#666; font-size: 0.95em; margin-top: 10px; line-height: 1.35; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
     .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#f2f2f2; margin:6px 6px 0 0; font-size: 0.9em; }
-    .error { color: #b00020; font-weight: 700; }
-    .section { margin-top: 18px; padding-top: 12px; border-top: 1px solid #eee; }
-    .hint { font-size: 0.9em; color: #666; margin-top: 6px; }
+    .error { color: #b00020; font-weight: 800; }
+    .section { margin-top: 18px; padding-top: 12px; border-top: 1px dashed #ddd; }
+    .hidden { display: none; }
+    small { color:#666; }
   </style>
 </head>
 <body>
@@ -27,125 +28,149 @@
 
   <div class="row">
     <div>
-      <label>Customer Name</label>
+      <label>Customer Name <small>(optional)</small></label>
       <input type="text" id="customer_name" placeholder="Optional" />
     </div>
     <div>
-      <label>Phone</label>
+      <label>Phone <small>(optional)</small></label>
       <input type="text" id="customer_phone" placeholder="Optional" />
     </div>
   </div>
 
-  <label>Job Address</label>
-  <input type="text" id="job_address" placeholder="Optional (local pricing assumes North Bay unless noted)" />
+  <label>Job Address <small>(optional)</small></label>
+  <input type="text" id="job_address" placeholder="Optional (distance auto-calc later)" />
 
   <label>Service Type</label>
   <select id="service_type">
     <option value="dump_run">Dump Run</option>
     <option value="scrap_pickup">Scrap Pickup</option>
-    <option value="small_move">Small Move</option>
+    <option value="small_move">Moving</option>
     <option value="item_delivery">Item Delivery</option>
     <option value="demolition">Demolition</option>
   </select>
 
-  <div id="dumpRunSection" class="section">
-    <h3 style="margin: 0 0 8px 0;">Dump Run Details</h3>
+  <div class="section">
+    <label>Description of items / job <small>(recommended — helps estimate)</small></label>
+    <textarea id="job_description_customer" placeholder="Example: 1 couch, 20 bags, basement stairs, tight corner..."></textarea>
+
+    <label>Upload photos <small>(optional)</small></label>
+    <input type="file" id="photos" multiple />
+    <small>Tip: Photos improve accuracy. (Starter feature — files may not be permanent on free hosting yet.)</small>
+  </div>
+
+  <div class="section">
     <div class="row">
       <div>
-        <label>Garbage Bags (count)</label>
+        <label>Estimated Hours <small>(you can enter any amount)</small></label>
+        <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
+      </div>
+      <div>
+        <label>Workers <small>(optional — we may enforce minimums)</small></label>
+        <input type="number" id="workers" value="" min="1" step="1" placeholder="Leave blank for default" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label><input type="checkbox" id="stairs" /> Stairs</label>
+      </div>
+      <div>
+        <label><input type="checkbox" id="elevator" /> Elevator</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label><input type="checkbox" id="difficult_corner" /> Difficult corner / tight access</label>
+      </div>
+      <div>
+        <label><input type="checkbox" id="long_carry" /> Long carry (far from truck)</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dump Run -->
+  <div id="section_dump" class="section">
+    <h3>Dump Run Details</h3>
+    <div class="row">
+      <div>
+        <label>Garbage Bags Count</label>
         <input type="number" id="garbage_bags_count" value="0" min="0" step="1" />
-        <div class="hint">Used only for Dump Runs. Pricing is handled automatically.</div>
+        <small>We charge $7.50 per bag (cash totals rounded clean).</small>
       </div>
       <div>
-        <label>Requires 2 Workers?</label>
-        <select id="requires_two_workers">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="row section">
-    <div>
-      <label>Estimated Hours</label>
-      <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
-    </div>
-    <div>
-      <label>Requires 2 Workers?</label>
-      <select id="requires_two_workers_global">
-        <option value="false">No</option>
-        <option value="true">Yes</option>
-      </select>
-      <div class="hint">If you set this to Yes, we assume 2-person labour.</div>
-    </div>
-  </div>
-
-  <div class="row section">
-    <div>
-      <label>Mattress Count</label>
-      <input type="number" id="mattresses_count" value="0" min="0" step="1" />
-    </div>
-    <div>
-      <label>Box Spring Count</label>
-      <input type="number" id="box_springs_count" value="0" min="0" step="1" />
-    </div>
-  </div>
-
-  <div class="section">
-    <h3 style="margin: 0 0 8px 0;">Access & Difficulty</h3>
-
-    <div class="row">
-      <div>
-        <label>Stairs involved?</label>
-        <select id="has_stairs">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
-      </div>
-      <div>
-        <label>Tight corners / difficult access?</label>
-        <select id="has_tight_corners">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
+        <label>Dump / Landfill Fees <small>(optional)</small></label>
+        <input type="number" id="dump_fees_cad" value="0" min="0" step="1" />
       </div>
     </div>
 
     <div class="row">
       <div>
-        <label>Long carry distance (far walk to truck)?</label>
-        <select id="has_long_carry">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
+        <label>Mattress Count</label>
+        <input type="number" id="mattresses_count" value="0" min="0" step="1" />
       </div>
       <div>
-        <label>Apartment / Condo?</label>
-        <select id="is_apartment_condo">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
+        <label>Box Spring Count</label>
+        <input type="number" id="box_springs_count" value="0" min="0" step="1" />
       </div>
     </div>
-
-    <div class="row">
-      <div>
-        <label>Elevator available?</label>
-        <select id="has_elevator">
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
-        <div class="hint">If Apartment/Condo + Elevator = helps reduce access difficulty.</div>
-      </div>
-      <div></div>
-    </div>
+    <small>Mattress/Box spring disposal is $50 each (shown on estimate only if entered).</small>
   </div>
 
-  <div class="section">
-    <label>Description of items / job</label>
-    <textarea id="job_description_customer" placeholder="Example: 1 couch, 1 dresser, 10 garbage bags, basement stairs, tight hallway..."></textarea>
-    <div class="hint">This is logged with the quote so you can review it on your end.</div>
+  <!-- Scrap -->
+  <div id="section_scrap" class="section hidden">
+    <h3>Scrap Pickup Details</h3>
+    <label>Is it curbside? (free curbside only)</label>
+    <select id="scrap_curbside">
+      <option value="true">Yes — curbside (FREE)</option>
+      <option value="false">No — inside (we charge $30)</option>
+    </select>
+    <small>Scrap pickup estimate excludes mattress/bags fields.</small>
+  </div>
+
+  <!-- Moving / Delivery -->
+  <div id="section_move" class="section hidden">
+    <h3>Moving / Delivery Details</h3>
+    <div class="row">
+      <div>
+        <label>Pickup Type</label>
+        <select id="pickup_property_type">
+          <option value="">Select…</option>
+          <option value="house">House</option>
+          <option value="apartment">Apartment</option>
+          <option value="apartment_building">Apartment Building</option>
+          <option value="storage_locker">Storage Locker</option>
+          <option value="commercial">Commercial Building</option>
+        </select>
+      </div>
+      <div>
+        <label>Dropoff Type</label>
+        <select id="dropoff_property_type">
+          <option value="">Select…</option>
+          <option value="house">House</option>
+          <option value="apartment">Apartment</option>
+          <option value="apartment_building">Apartment Building</option>
+          <option value="storage_locker">Storage Locker</option>
+          <option value="commercial">Commercial Building</option>
+        </select>
+      </div>
+    </div>
+    <small>Moving defaults to 3 workers and minimum 4 hours. System will enforce at least 2 workers.</small>
+  </div>
+
+  <!-- Demolition -->
+  <div id="section_demo" class="section hidden">
+    <h3>Demolition Details</h3>
+    <label>Demo Type</label>
+    <select id="demo_type">
+      <option value="">Select…</option>
+      <option value="small">Small interior demo</option>
+      <option value="shed_deck">Shed / Deck / Backyard demo</option>
+      <option value="brick_masonry">Brick / Masonry / Heavy wall removal</option>
+    </select>
+
+    <label><input type="checkbox" id="remove_materials" /> Remove materials (haul away)</label>
+    <small>Demolition returns a range because job scope can change after viewing.</small>
   </div>
 
   <button type="submit">Generate Estimate</button>
@@ -159,57 +184,85 @@
     return x.toFixed(2);
   };
 
-  const serviceTypeEl = document.getElementById("service_type");
-  const dumpRunSection = document.getElementById("dumpRunSection");
+  const show = (el, yes) => {
+    el.classList.toggle("hidden", !yes);
+  };
 
-  function syncServiceUI() {
-    const st = serviceTypeEl.value;
-    dumpRunSection.style.display = (st === "dump_run") ? "block" : "none";
+  const serviceEl = document.getElementById("service_type");
+  const sectionDump = document.getElementById("section_dump");
+  const sectionScrap = document.getElementById("section_scrap");
+  const sectionMove = document.getElementById("section_move");
+  const sectionDemo = document.getElementById("section_demo");
+
+  function refreshSections() {
+    const s = serviceEl.value;
+    show(sectionDump, s === "dump_run");
+    show(sectionScrap, s === "scrap_pickup");
+    show(sectionMove, s === "small_move" || s === "item_delivery");
+    show(sectionDemo, s === "demolition");
   }
-  serviceTypeEl.addEventListener("change", syncServiceUI);
-  syncServiceUI();
+
+  serviceEl.addEventListener("change", refreshSections);
+  refreshSections();
+
+  async function uploadIfAny() {
+    const input = document.getElementById("photos");
+    if (!input.files || input.files.length === 0) return [];
+
+    const form = new FormData();
+    for (const f of input.files) form.append("files", f);
+
+    const res = await fetch("/upload", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.detail || "Upload failed");
+    return data.photo_refs || [];
+  }
 
   document.getElementById("quoteForm").addEventListener("submit", async function(e) {
     e.preventDefault();
 
-    const serviceType = document.getElementById("service_type").value;
-
-    // If dump_run, use the dump-run "requires_two_workers" selector; otherwise use global.
-    const req2Workers = (serviceType === "dump_run")
-      ? (document.getElementById("requires_two_workers").value === "true")
-      : (document.getElementById("requires_two_workers_global").value === "true");
-
-    const payload = {
-      customer_name: document.getElementById("customer_name").value || null,
-      customer_phone: document.getElementById("customer_phone").value || null,
-      job_address: document.getElementById("job_address").value || null,
-      service_type: serviceType,
-
-      estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
-      requires_two_workers: req2Workers,
-
-      mattresses_count: parseInt(document.getElementById("mattresses_count").value || "0", 10),
-      box_springs_count: parseInt(document.getElementById("box_springs_count").value || "0", 10),
-
-      // dump_run bags (used only when service_type=dump_run)
-      garbage_bags_count: parseInt(document.getElementById("garbage_bags_count").value || "0", 10),
-
-      // access/difficulty
-      has_stairs: document.getElementById("has_stairs").value === "true",
-      has_tight_corners: document.getElementById("has_tight_corners").value === "true",
-      has_long_carry: document.getElementById("has_long_carry").value === "true",
-      is_apartment_condo: document.getElementById("is_apartment_condo").value === "true",
-      has_elevator: document.getElementById("has_elevator").value === "true",
-
-      // description
-      job_description_customer: document.getElementById("job_description_customer").value || null
-    };
-
     const div = document.getElementById("result");
     div.style.display = "block";
-    div.innerHTML = `<div class="muted">Calculating…</div>`;
+    div.innerHTML = `<div class="muted">Uploading photos (if any) & calculating…</div>`;
 
     try {
+      const photo_refs = await uploadIfAny();
+
+      const payload = {
+        customer_name: document.getElementById("customer_name").value || null,
+        customer_phone: document.getElementById("customer_phone").value || null,
+        job_address: document.getElementById("job_address").value || null,
+        service_type: document.getElementById("service_type").value,
+
+        job_description_customer: document.getElementById("job_description_customer").value || null,
+        photo_refs,
+
+        estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
+        workers: document.getElementById("workers").value ? parseInt(document.getElementById("workers").value, 10) : null,
+
+        stairs: document.getElementById("stairs").checked,
+        elevator: document.getElementById("elevator").checked,
+        difficult_corner: document.getElementById("difficult_corner").checked,
+        long_carry: document.getElementById("long_carry").checked,
+
+        // dump
+        garbage_bags_count: parseInt(document.getElementById("garbage_bags_count").value || "0", 10),
+        dump_fees_cad: parseFloat(document.getElementById("dump_fees_cad").value || "0"),
+        mattresses_count: parseInt(document.getElementById("mattresses_count").value || "0", 10),
+        box_springs_count: parseInt(document.getElementById("box_springs_count").value || "0", 10),
+
+        // scrap
+        scrap_curbside: document.getElementById("scrap_curbside").value === "true",
+
+        // move
+        pickup_property_type: document.getElementById("pickup_property_type").value || null,
+        dropoff_property_type: document.getElementById("dropoff_property_type").value || null,
+
+        // demo
+        demo_type: document.getElementById("demo_type").value || null,
+        remove_materials: document.getElementById("remove_materials").checked
+      };
+
       const res = await fetch("/quote/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -223,57 +276,51 @@
         return;
       }
 
-      // Summary pills (no $ amounts for labour/access/etc — only disposal amounts when entered)
-      const summary = [];
-      summary.push("Labour included");
-      summary.push("Local base pricing (North Bay)");
+      const pills = (data.summary_labels || []).map(s => `<span class="pill">${s}</span>`).join("");
 
-      if (payload.has_stairs) summary.push("Stairs");
-      if (payload.has_tight_corners) summary.push("Tight corners");
-      if (payload.has_long_carry) summary.push("Long carry");
-      if (payload.is_apartment_condo) summary.push("Apartment/condo");
-      if (payload.is_apartment_condo && payload.has_elevator) summary.push("Elevator");
-
-      if (payload.service_type === "dump_run" && payload.garbage_bags_count > 0) {
-        summary.push(`${payload.garbage_bags_count} garbage bags`);
-      }
-
-      // Only show mattress/boxspring amounts if counts > 0
-      const m = payload.mattresses_count || 0;
-      const b = payload.box_springs_count || 0;
-
+      // Disposal line items only when present
       let disposalHtml = "";
-      if (m > 0 || b > 0) {
-        const mattressCost = m * 50;
-        const boxCost = b * 50;
+      if (data.disposal_line_items && data.disposal_line_items.length > 0) {
         disposalHtml = `
           <div style="margin-top: 10px;">
-            <div><strong>Disposal (shown only because you entered items):</strong></div>
-            ${m > 0 ? `<div class="pill">Mattress: ${m} × $50 = $${fmt(mattressCost)}</div>` : ""}
-            ${b > 0 ? `<div class="pill">Box Spring: ${b} × $50 = $${fmt(boxCost)}</div>` : ""}
+            <div><strong>Disposal (shown because you entered these items):</strong></div>
+            ${data.disposal_line_items.map(li => `
+              <div class="pill">${li.label}: ${li.count} × $${fmt(li.each_cad)} = $${fmt(li.total_cad)}</div>
+            `).join("")}
           </div>
+        `;
+      }
+
+      let rangeHtml = "";
+      if (data.cash_range_low_cad != null && data.cash_range_high_cad != null) {
+        rangeHtml = `
+          <p><strong>Cash Range:</strong> $${fmt(data.cash_range_low_cad)} – $${fmt(data.cash_range_high_cad)}</p>
         `;
       }
 
       div.innerHTML = `
         <h3>Estimate Generated</h3>
         <p><strong>Quote ID:</strong> ${data.quote_id}</p>
+
         <p><strong>Cash:</strong> $${fmt(data.total_cash_cad)}</p>
+        ${rangeHtml}
         <p><strong>EMT:</strong> $${fmt(data.total_emt_cad)}</p>
 
-        <div style="margin-top: 10px;">
-          ${summary.map(s => `<span class="pill">${s}</span>`).join("")}
+        <div style="margin-top: 10px;">${pills}</div>
+
+        <div class="muted" style="margin-top: 10px;">
+          <div><strong>Workers used:</strong> ${data.workers_used}</div>
+          <div><strong>Hours used:</strong> ${fmt(data.hours_used)} (you entered ${fmt(data.hours_entered)}, suggested ${fmt(data.hours_suggested)})</div>
         </div>
 
         ${disposalHtml}
 
         <div class="muted">
-          <strong>Important:</strong> This estimate is solely based on the information provided.
-          Quote may be subject to change after an in-person view (stairs, heavy items, access, actual dump/landfill fees, multiple trips, etc.).
+          <strong>Important:</strong> ${data.disclaimer}
         </div>
       `;
     } catch (err) {
-      div.innerHTML = `<div class="error">Network error:</div><pre>${String(err)}</pre>`;
+      div.innerHTML = `<div class="error">Network/Upload error:</div><pre>${String(err)}</pre>`;
     }
   });
 </script>
