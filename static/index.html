@@ -6,7 +6,8 @@
   <style>
     body { font-family: Arial; max-width: 760px; margin: 40px auto; }
     label { display:block; margin-top:12px; font-weight: 600; }
-    input, select { width:100%; padding:10px; margin-top:6px; box-sizing: border-box; }
+    input, select, textarea { width:100%; padding:10px; margin-top:6px; box-sizing: border-box; }
+    textarea { min-height: 90px; resize: vertical; }
     button { margin-top:18px; padding:12px; width:100%; font-weight: 700; cursor: pointer; }
     .result { margin-top:24px; padding:16px; border:1px solid #ccc; border-radius: 8px; }
     .muted { color:#666; font-size: 0.95em; margin-top: 10px; line-height: 1.35; }
@@ -14,6 +15,8 @@
     @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
     .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#f2f2f2; margin:6px 6px 0 0; font-size: 0.9em; }
     .error { color: #b00020; font-weight: 700; }
+    .section { margin-top: 18px; padding-top: 12px; border-top: 1px solid #eee; }
+    .hint { font-size: 0.9em; color: #666; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -34,7 +37,7 @@
   </div>
 
   <label>Job Address</label>
-  <input type="text" id="job_address" placeholder="Optional (used later for distance auto-calc)" />
+  <input type="text" id="job_address" placeholder="Optional (local pricing assumes North Bay unless noted)" />
 
   <label>Service Type</label>
   <select id="service_type">
@@ -45,21 +48,40 @@
     <option value="demolition">Demolition</option>
   </select>
 
-  <div class="row">
+  <div id="dumpRunSection" class="section">
+    <h3 style="margin: 0 0 8px 0;">Dump Run Details</h3>
+    <div class="row">
+      <div>
+        <label>Garbage Bags (count)</label>
+        <input type="number" id="garbage_bags_count" value="0" min="0" step="1" />
+        <div class="hint">Used only for Dump Runs. Pricing is handled automatically.</div>
+      </div>
+      <div>
+        <label>Requires 2 Workers?</label>
+        <select id="requires_two_workers">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="row section">
     <div>
       <label>Estimated Hours</label>
       <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
     </div>
     <div>
       <label>Requires 2 Workers?</label>
-      <select id="requires_two_workers">
+      <select id="requires_two_workers_global">
         <option value="false">No</option>
         <option value="true">Yes</option>
       </select>
+      <div class="hint">If you set this to Yes, we assume 2-person labour.</div>
     </div>
   </div>
 
-  <div class="row">
+  <div class="row section">
     <div>
       <label>Mattress Count</label>
       <input type="number" id="mattresses_count" value="0" min="0" step="1" />
@@ -68,6 +90,62 @@
       <label>Box Spring Count</label>
       <input type="number" id="box_springs_count" value="0" min="0" step="1" />
     </div>
+  </div>
+
+  <div class="section">
+    <h3 style="margin: 0 0 8px 0;">Access & Difficulty</h3>
+
+    <div class="row">
+      <div>
+        <label>Stairs involved?</label>
+        <select id="has_stairs">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+      <div>
+        <label>Tight corners / difficult access?</label>
+        <select id="has_tight_corners">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Long carry distance (far walk to truck)?</label>
+        <select id="has_long_carry">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+      <div>
+        <label>Apartment / Condo?</label>
+        <select id="is_apartment_condo">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Elevator available?</label>
+        <select id="has_elevator">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+        <div class="hint">If Apartment/Condo + Elevator = helps reduce access difficulty.</div>
+      </div>
+      <div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <label>Description of items / job</label>
+    <textarea id="job_description_customer" placeholder="Example: 1 couch, 1 dresser, 10 garbage bags, basement stairs, tight hallway..."></textarea>
+    <div class="hint">This is logged with the quote so you can review it on your end.</div>
   </div>
 
   <button type="submit">Generate Estimate</button>
@@ -81,18 +159,50 @@
     return x.toFixed(2);
   };
 
+  const serviceTypeEl = document.getElementById("service_type");
+  const dumpRunSection = document.getElementById("dumpRunSection");
+
+  function syncServiceUI() {
+    const st = serviceTypeEl.value;
+    dumpRunSection.style.display = (st === "dump_run") ? "block" : "none";
+  }
+  serviceTypeEl.addEventListener("change", syncServiceUI);
+  syncServiceUI();
+
   document.getElementById("quoteForm").addEventListener("submit", async function(e) {
     e.preventDefault();
+
+    const serviceType = document.getElementById("service_type").value;
+
+    // If dump_run, use the dump-run "requires_two_workers" selector; otherwise use global.
+    const req2Workers = (serviceType === "dump_run")
+      ? (document.getElementById("requires_two_workers").value === "true")
+      : (document.getElementById("requires_two_workers_global").value === "true");
 
     const payload = {
       customer_name: document.getElementById("customer_name").value || null,
       customer_phone: document.getElementById("customer_phone").value || null,
       job_address: document.getElementById("job_address").value || null,
-      service_type: document.getElementById("service_type").value,
+      service_type: serviceType,
+
       estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
-      requires_two_workers: document.getElementById("requires_two_workers").value === "true",
+      requires_two_workers: req2Workers,
+
       mattresses_count: parseInt(document.getElementById("mattresses_count").value || "0", 10),
-      box_springs_count: parseInt(document.getElementById("box_springs_count").value || "0", 10)
+      box_springs_count: parseInt(document.getElementById("box_springs_count").value || "0", 10),
+
+      // dump_run bags (used only when service_type=dump_run)
+      garbage_bags_count: parseInt(document.getElementById("garbage_bags_count").value || "0", 10),
+
+      // access/difficulty
+      has_stairs: document.getElementById("has_stairs").value === "true",
+      has_tight_corners: document.getElementById("has_tight_corners").value === "true",
+      has_long_carry: document.getElementById("has_long_carry").value === "true",
+      is_apartment_condo: document.getElementById("is_apartment_condo").value === "true",
+      has_elevator: document.getElementById("has_elevator").value === "true",
+
+      // description
+      job_description_customer: document.getElementById("job_description_customer").value || null
     };
 
     const div = document.getElementById("result");
@@ -113,10 +223,20 @@
         return;
       }
 
-      // Summary pills (no $ amounts for labour/travel/etc — just a pro summary)
+      // Summary pills (no $ amounts for labour/access/etc — only disposal amounts when entered)
       const summary = [];
       summary.push("Labour included");
       summary.push("Local base pricing (North Bay)");
+
+      if (payload.has_stairs) summary.push("Stairs");
+      if (payload.has_tight_corners) summary.push("Tight corners");
+      if (payload.has_long_carry) summary.push("Long carry");
+      if (payload.is_apartment_condo) summary.push("Apartment/condo");
+      if (payload.is_apartment_condo && payload.has_elevator) summary.push("Elevator");
+
+      if (payload.service_type === "dump_run" && payload.garbage_bags_count > 0) {
+        summary.push(`${payload.garbage_bags_count} garbage bags`);
+      }
 
       // Only show mattress/boxspring amounts if counts > 0
       const m = payload.mattresses_count || 0;
