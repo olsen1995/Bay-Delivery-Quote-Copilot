@@ -4,20 +4,19 @@
   <meta charset="UTF-8" />
   <title>Bay Delivery – Quote Tool</title>
   <style>
-    body { font-family: Arial; max-width: 820px; margin: 40px auto; padding: 0 12px; }
-    label { display:block; margin-top:12px; font-weight: 700; }
+    body { font-family: Arial; max-width: 760px; margin: 40px auto; }
+    label { display:block; margin-top:12px; font-weight: 600; }
     input, select, textarea { width:100%; padding:10px; margin-top:6px; box-sizing: border-box; }
-    textarea { min-height: 90px; resize: vertical; }
-    button { margin-top:18px; padding:12px; width:100%; font-weight: 800; cursor: pointer; }
+    textarea { min-height: 110px; resize: vertical; }
+    button { margin-top:18px; padding:12px; width:100%; font-weight: 700; cursor: pointer; }
     .result { margin-top:24px; padding:16px; border:1px solid #ccc; border-radius: 8px; }
     .muted { color:#666; font-size: 0.95em; margin-top: 10px; line-height: 1.35; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
     .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#f2f2f2; margin:6px 6px 0 0; font-size: 0.9em; }
-    .error { color: #b00020; font-weight: 800; }
-    .section { margin-top: 18px; padding-top: 12px; border-top: 1px dashed #ddd; }
-    .hidden { display: none; }
-    small { color:#666; }
+    .error { color: #b00020; font-weight: 700; }
+    .section { margin-top: 18px; padding-top: 6px; border-top: 1px dashed #ddd; }
+    .hide { display: none; }
   </style>
 </head>
 <body>
@@ -28,80 +27,44 @@
 
   <div class="row">
     <div>
-      <label>Customer Name <small>(optional)</small></label>
+      <label>Customer Name</label>
       <input type="text" id="customer_name" placeholder="Optional" />
     </div>
     <div>
-      <label>Phone <small>(optional)</small></label>
+      <label>Phone</label>
       <input type="text" id="customer_phone" placeholder="Optional" />
     </div>
   </div>
 
-  <label>Job Address <small>(optional)</small></label>
-  <input type="text" id="job_address" placeholder="Optional (distance auto-calc later)" />
+  <label>Job Address</label>
+  <input type="text" id="job_address" placeholder="Optional" />
 
   <label>Service Type</label>
   <select id="service_type">
     <option value="dump_run">Dump Run</option>
     <option value="scrap_pickup">Scrap Pickup</option>
-    <option value="small_move">Moving</option>
+    <option value="small_move">Small Move</option>
     <option value="item_delivery">Item Delivery</option>
     <option value="demolition">Demolition</option>
   </select>
 
-  <div class="section">
-    <label>Description of items / job <small>(recommended — helps estimate)</small></label>
-    <textarea id="job_description_customer" placeholder="Example: 1 couch, 20 bags, basement stairs, tight corner..."></textarea>
-
-    <label>Upload photos <small>(optional)</small></label>
-    <input type="file" id="photos" multiple />
-    <small>Tip: Photos improve accuracy. (Starter feature — files may not be permanent on free hosting yet.)</small>
-  </div>
-
-  <div class="section">
-    <div class="row">
-      <div>
-        <label>Estimated Hours <small>(you can enter any amount)</small></label>
-        <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
-      </div>
-      <div>
-        <label>Workers <small>(optional — we may enforce minimums)</small></label>
-        <input type="number" id="workers" value="" min="1" step="1" placeholder="Leave blank for default" />
-      </div>
+  <div class="row">
+    <div>
+      <label>Estimated Hours</label>
+      <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
     </div>
-
-    <div class="row">
-      <div>
-        <label><input type="checkbox" id="stairs" /> Stairs</label>
-      </div>
-      <div>
-        <label><input type="checkbox" id="elevator" /> Elevator</label>
-      </div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label><input type="checkbox" id="difficult_corner" /> Difficult corner / tight access</label>
-      </div>
-      <div>
-        <label><input type="checkbox" id="long_carry" /> Long carry (far from truck)</label>
-      </div>
+    <div>
+      <label>Crew Size</label>
+      <input type="number" id="crew_size" value="1" min="1" step="1" />
+      <div class="muted" id="crew_hint"></div>
     </div>
   </div>
 
-  <!-- Dump Run -->
-  <div id="section_dump" class="section">
-    <h3>Dump Run Details</h3>
-    <div class="row">
-      <div>
-        <label>Garbage Bags Count</label>
-        <input type="number" id="garbage_bags_count" value="0" min="0" step="1" />
-        <small>We charge $7.50 per bag (cash totals rounded clean).</small>
-      </div>
-      <div>
-        <label>Dump / Landfill Fees <small>(optional)</small></label>
-        <input type="number" id="dump_fees_cad" value="0" min="0" step="1" />
-      </div>
+  <div class="section" id="dump_run_section">
+    <label>Garbage Bags (Dump Run)</label>
+    <input type="number" id="garbage_bag_count" value="0" min="0" step="1" />
+    <div class="muted">
+      Tip: Bags help us estimate disposal tier. Pricing is rounded for cash quotes (nearest $5).
     </div>
 
     <div class="row">
@@ -114,63 +77,45 @@
         <input type="number" id="box_springs_count" value="0" min="0" step="1" />
       </div>
     </div>
-    <small>Mattress/Box spring disposal is $50 each (shown on estimate only if entered).</small>
   </div>
 
-  <!-- Scrap -->
-  <div id="section_scrap" class="section hidden">
-    <h3>Scrap Pickup Details</h3>
-    <label>Is it curbside? (free curbside only)</label>
-    <select id="scrap_curbside">
-      <option value="true">Yes — curbside (FREE)</option>
-      <option value="false">No — inside (we charge $30)</option>
+  <div class="section hide" id="scrap_section">
+    <label>Scrap Pickup</label>
+    <select id="scrap_pickup_location">
+      <option value="curbside">Curbside (Free)</option>
+      <option value="inside">Inside (Add $30)</option>
     </select>
-    <small>Scrap pickup estimate excludes mattress/bags fields.</small>
+    <div class="muted">
+      Note: Scrap pickup does not use bags/mattresses/box springs.
+    </div>
   </div>
 
-  <!-- Moving / Delivery -->
-  <div id="section_move" class="section hidden">
-    <h3>Moving / Delivery Details</h3>
+  <div class="section">
+    <label>Description (What are we moving/removing? Any heavy items?)</label>
+    <textarea id="description" placeholder="Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner."></textarea>
+
     <div class="row">
       <div>
-        <label>Pickup Type</label>
-        <select id="pickup_property_type">
-          <option value="">Select…</option>
-          <option value="house">House</option>
-          <option value="apartment">Apartment</option>
-          <option value="apartment_building">Apartment Building</option>
-          <option value="storage_locker">Storage Locker</option>
-          <option value="commercial">Commercial Building</option>
+        <label>Stairs?</label>
+        <select id="stairs">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
         </select>
       </div>
       <div>
-        <label>Dropoff Type</label>
-        <select id="dropoff_property_type">
-          <option value="">Select…</option>
-          <option value="house">House</option>
-          <option value="apartment">Apartment</option>
-          <option value="apartment_building">Apartment Building</option>
-          <option value="storage_locker">Storage Locker</option>
-          <option value="commercial">Commercial Building</option>
+        <label>Elevator?</label>
+        <select id="elevator">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
         </select>
       </div>
     </div>
-    <small>Moving defaults to 3 workers and minimum 4 hours. System will enforce at least 2 workers.</small>
-  </div>
 
-  <!-- Demolition -->
-  <div id="section_demo" class="section hidden">
-    <h3>Demolition Details</h3>
-    <label>Demo Type</label>
-    <select id="demo_type">
-      <option value="">Select…</option>
-      <option value="small">Small interior demo</option>
-      <option value="shed_deck">Shed / Deck / Backyard demo</option>
-      <option value="brick_masonry">Brick / Masonry / Heavy wall removal</option>
+    <label>Difficult Corner / Tight Access?</label>
+    <select id="difficult_corner">
+      <option value="false">No</option>
+      <option value="true">Yes</option>
     </select>
-
-    <label><input type="checkbox" id="remove_materials" /> Remove materials (haul away)</label>
-    <small>Demolition returns a range because job scope can change after viewing.</small>
   </div>
 
   <button type="submit">Generate Estimate</button>
@@ -179,90 +124,118 @@
 <div id="result" class="result" style="display:none;"></div>
 
 <script>
-  const fmt = (n) => {
-    const x = Number(n || 0);
-    return x.toFixed(2);
-  };
-
-  const show = (el, yes) => {
-    el.classList.toggle("hidden", !yes);
-  };
+  const fmt = (n) => (Number(n || 0)).toFixed(2);
 
   const serviceEl = document.getElementById("service_type");
-  const sectionDump = document.getElementById("section_dump");
-  const sectionScrap = document.getElementById("section_scrap");
-  const sectionMove = document.getElementById("section_move");
-  const sectionDemo = document.getElementById("section_demo");
+  const dumpSection = document.getElementById("dump_run_section");
+  const scrapSection = document.getElementById("scrap_section");
+  const crewEl = document.getElementById("crew_size");
+  const crewHint = document.getElementById("crew_hint");
 
-  function refreshSections() {
-    const s = serviceEl.value;
-    show(sectionDump, s === "dump_run");
-    show(sectionScrap, s === "scrap_pickup");
-    show(sectionMove, s === "small_move" || s === "item_delivery");
-    show(sectionDemo, s === "demolition");
+  function applyServiceDefaults() {
+    const service = serviceEl.value;
+
+    // show/hide sections
+    if (service === "dump_run") {
+      dumpSection.classList.remove("hide");
+    } else {
+      dumpSection.classList.add("hide");
+    }
+
+    if (service === "scrap_pickup") {
+      scrapSection.classList.remove("hide");
+    } else {
+      scrapSection.classList.add("hide");
+    }
+
+    // crew defaults & minimums
+    let defaultCrew = 1;
+    let minCrew = 1;
+    let hint = "";
+
+    if (service === "small_move") {
+      defaultCrew = 3;
+      minCrew = 2;
+      hint = "Moving: default 3 workers (minimum 2).";
+    } else if (service === "demolition") {
+      defaultCrew = 4;
+      minCrew = 2;
+      hint = "Demolition: default 4 workers (minimum 2).";
+    } else if (service === "dump_run") {
+      defaultCrew = 1;
+      minCrew = 1;
+      hint = "Dump run: crew can be 1+ depending on items.";
+    } else if (service === "scrap_pickup") {
+      defaultCrew = 1;
+      minCrew = 1;
+      hint = "Scrap pickup: curbside is free; inside adds $30.";
+    } else {
+      defaultCrew = 1;
+      minCrew = 1;
+      hint = "Crew size depends on job details.";
+    }
+
+    // if user hasn't changed crew yet, we set default (simple approach)
+    if (!crewEl.dataset.touched) {
+      crewEl.value = String(defaultCrew);
+    }
+
+    // clamp min
+    const current = parseInt(crewEl.value || "1", 10);
+    if (current < minCrew) crewEl.value = String(minCrew);
+
+    crewHint.textContent = hint;
   }
 
-  serviceEl.addEventListener("change", refreshSections);
-  refreshSections();
+  crewEl.addEventListener("input", () => {
+    crewEl.dataset.touched = "true";
+    applyServiceDefaults();
+  });
 
-  async function uploadIfAny() {
-    const input = document.getElementById("photos");
-    if (!input.files || input.files.length === 0) return [];
+  serviceEl.addEventListener("change", () => {
+    // reset touched so changing service applies new default cleanly
+    crewEl.dataset.touched = "";
+    applyServiceDefaults();
+  });
 
-    const form = new FormData();
-    for (const f of input.files) form.append("files", f);
-
-    const res = await fetch("/upload", { method: "POST", body: form });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.detail || "Upload failed");
-    return data.photo_refs || [];
-  }
+  applyServiceDefaults();
 
   document.getElementById("quoteForm").addEventListener("submit", async function(e) {
     e.preventDefault();
 
+    const service = serviceEl.value;
+
+    const payload = {
+      customer_name: document.getElementById("customer_name").value || null,
+      customer_phone: document.getElementById("customer_phone").value || null,
+      job_address: document.getElementById("job_address").value || null,
+      service_type: service,
+
+      estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
+      crew_size: parseInt(document.getElementById("crew_size").value || "1", 10),
+
+      // dump run
+      garbage_bag_count: service === "dump_run" ? parseInt(document.getElementById("garbage_bag_count").value || "0", 10) : 0,
+      mattresses_count: service === "dump_run" ? parseInt(document.getElementById("mattresses_count").value || "0", 10) : 0,
+      box_springs_count: service === "dump_run" ? parseInt(document.getElementById("box_springs_count").value || "0", 10) : 0,
+
+      // scrap
+      scrap_pickup_location: service === "scrap_pickup"
+        ? document.getElementById("scrap_pickup_location").value
+        : "curbside",
+
+      // info flags + description
+      description: document.getElementById("description").value || null,
+      stairs: document.getElementById("stairs").value === "true",
+      elevator: document.getElementById("elevator").value === "true",
+      difficult_corner: document.getElementById("difficult_corner").value === "true",
+    };
+
     const div = document.getElementById("result");
     div.style.display = "block";
-    div.innerHTML = `<div class="muted">Uploading photos (if any) & calculating…</div>`;
+    div.innerHTML = `<div class="muted">Calculating…</div>`;
 
     try {
-      const photo_refs = await uploadIfAny();
-
-      const payload = {
-        customer_name: document.getElementById("customer_name").value || null,
-        customer_phone: document.getElementById("customer_phone").value || null,
-        job_address: document.getElementById("job_address").value || null,
-        service_type: document.getElementById("service_type").value,
-
-        job_description_customer: document.getElementById("job_description_customer").value || null,
-        photo_refs,
-
-        estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
-        workers: document.getElementById("workers").value ? parseInt(document.getElementById("workers").value, 10) : null,
-
-        stairs: document.getElementById("stairs").checked,
-        elevator: document.getElementById("elevator").checked,
-        difficult_corner: document.getElementById("difficult_corner").checked,
-        long_carry: document.getElementById("long_carry").checked,
-
-        // dump
-        garbage_bags_count: parseInt(document.getElementById("garbage_bags_count").value || "0", 10),
-        dump_fees_cad: parseFloat(document.getElementById("dump_fees_cad").value || "0"),
-        mattresses_count: parseInt(document.getElementById("mattresses_count").value || "0", 10),
-        box_springs_count: parseInt(document.getElementById("box_springs_count").value || "0", 10),
-
-        // scrap
-        scrap_curbside: document.getElementById("scrap_curbside").value === "true",
-
-        // move
-        pickup_property_type: document.getElementById("pickup_property_type").value || null,
-        dropoff_property_type: document.getElementById("dropoff_property_type").value || null,
-
-        // demo
-        demo_type: document.getElementById("demo_type").value || null,
-        remove_materials: document.getElementById("remove_materials").checked
-      };
-
       const res = await fetch("/quote/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -276,51 +249,56 @@
         return;
       }
 
-      const pills = (data.summary_labels || []).map(s => `<span class="pill">${s}</span>`).join("");
+      // Customer-facing summary pills (no $ amounts for labour/travel/etc)
+      const summary = [];
+      summary.push("Labour included");
+      summary.push("Travel included");
+      if (payload.stairs) summary.push("Stairs noted");
+      if (payload.elevator) summary.push("Elevator noted");
+      if (payload.difficult_corner) summary.push("Tight access noted");
 
-      // Disposal line items only when present
+      // Only show mattress/boxspring amounts if counts > 0 (your exception)
+      const m = payload.mattresses_count || 0;
+      const b = payload.box_springs_count || 0;
+
       let disposalHtml = "";
-      if (data.disposal_line_items && data.disposal_line_items.length > 0) {
+      if (m > 0 || b > 0) {
+        const mattressCost = m * 50;
+        const boxCost = b * 50;
         disposalHtml = `
           <div style="margin-top: 10px;">
-            <div><strong>Disposal (shown because you entered these items):</strong></div>
-            ${data.disposal_line_items.map(li => `
-              <div class="pill">${li.label}: ${li.count} × $${fmt(li.each_cad)} = $${fmt(li.total_cad)}</div>
-            `).join("")}
+            <div><strong>Disposal (shown only because you entered items):</strong></div>
+            ${m > 0 ? `<div class="pill">Mattress: ${m} × $50 = $${fmt(mattressCost)}</div>` : ""}
+            ${b > 0 ? `<div class="pill">Box Spring: ${b} × $50 = $${fmt(boxCost)}</div>` : ""}
           </div>
         `;
       }
 
-      let rangeHtml = "";
-      if (data.cash_range_low_cad != null && data.cash_range_high_cad != null) {
-        rangeHtml = `
-          <p><strong>Cash Range:</strong> $${fmt(data.cash_range_low_cad)} – $${fmt(data.cash_range_high_cad)}</p>
-        `;
+      // Scrap note
+      let scrapNote = "";
+      if (service === "scrap_pickup") {
+        scrapNote = `<div class="muted">Scrap pickup: curbside is free; inside removal adds $30.</div>`;
       }
 
       div.innerHTML = `
         <h3>Estimate Generated</h3>
         <p><strong>Quote ID:</strong> ${data.quote_id}</p>
-
         <p><strong>Cash:</strong> $${fmt(data.total_cash_cad)}</p>
-        ${rangeHtml}
         <p><strong>EMT:</strong> $${fmt(data.total_emt_cad)}</p>
 
-        <div style="margin-top: 10px;">${pills}</div>
-
-        <div class="muted" style="margin-top: 10px;">
-          <div><strong>Workers used:</strong> ${data.workers_used}</div>
-          <div><strong>Hours used:</strong> ${fmt(data.hours_used)} (you entered ${fmt(data.hours_entered)}, suggested ${fmt(data.hours_suggested)})</div>
+        <div style="margin-top: 10px;">
+          ${summary.map(s => `<span class="pill">${s}</span>`).join("")}
         </div>
 
         ${disposalHtml}
+        ${scrapNote}
 
         <div class="muted">
           <strong>Important:</strong> ${data.disclaimer}
         </div>
       `;
     } catch (err) {
-      div.innerHTML = `<div class="error">Network/Upload error:</div><pre>${String(err)}</pre>`;
+      div.innerHTML = `<div class="error">Network error:</div><pre>${String(err)}</pre>`;
     }
   });
 </script>
