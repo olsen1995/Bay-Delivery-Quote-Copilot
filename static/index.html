@@ -52,6 +52,7 @@
     <div>
       <label>Estimated Hours</label>
       <input type="number" id="estimated_hours" value="1" min="0" step="0.25" />
+      <div class="muted" id="hours_hint"></div>
     </div>
     <div>
       <label>Crew Size</label>
@@ -60,11 +61,12 @@
     </div>
   </div>
 
+  <!-- DUMP RUN -->
   <div class="section" id="dump_run_section">
     <label>Garbage Bags (Dump Run)</label>
     <input type="number" id="garbage_bag_count" value="0" min="0" step="1" />
     <div class="muted">
-      Tip: Bags help us estimate disposal tier. Pricing is rounded for cash quotes (nearest $5).
+      Bags help estimate disposal tier. Cash quotes are rounded to nearest $5.
     </div>
 
     <div class="row">
@@ -79,6 +81,7 @@
     </div>
   </div>
 
+  <!-- SCRAP -->
   <div class="section hide" id="scrap_section">
     <label>Scrap Pickup</label>
     <select id="scrap_pickup_location">
@@ -86,10 +89,54 @@
       <option value="inside">Inside (Add $30)</option>
     </select>
     <div class="muted">
-      Note: Scrap pickup does not use bags/mattresses/box springs.
+      Curbside scrap is free. If we have to go inside / carry it out, it’s +$30.
     </div>
   </div>
 
+  <!-- MOVING -->
+  <div class="section hide" id="moving_section">
+    <div class="row">
+      <div>
+        <label>Moving From</label>
+        <select id="move_from_type">
+          <option value="house">House</option>
+          <option value="apartment">Apartment (single unit)</option>
+          <option value="apartment_building">Apartment Building</option>
+          <option value="storage_locker">Storage Locker</option>
+          <option value="commercial">Commercial Building</option>
+        </select>
+      </div>
+      <div>
+        <label>Moving To</label>
+        <select id="move_to_type">
+          <option value="house">House</option>
+          <option value="apartment">Apartment (single unit)</option>
+          <option value="apartment_building">Apartment Building</option>
+          <option value="storage_locker">Storage Locker</option>
+          <option value="commercial">Commercial Building</option>
+        </select>
+      </div>
+    </div>
+    <div class="muted">
+      Moving usually needs 3 workers. Minimum 2. We normally charge a minimum 4 hours for moving.
+    </div>
+  </div>
+
+  <!-- DEMOLITION -->
+  <div class="section hide" id="demo_section">
+    <label>Debris / Material Removal</label>
+    <select id="demo_debris_tier">
+      <option value="none">No (demo only)</option>
+      <option value="small">Yes — Small load</option>
+      <option value="medium">Yes — Medium load</option>
+      <option value="large">Yes — Large load</option>
+    </select>
+    <div class="muted">
+      If you want us to remove materials/debris, select a tier. Final price may change after in-person view.
+    </div>
+  </div>
+
+  <!-- COMMON -->
   <div class="section">
     <label>Description (What are we moving/removing? Any heavy items?)</label>
     <textarea id="description" placeholder="Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner."></textarea>
@@ -129,62 +176,67 @@
   const serviceEl = document.getElementById("service_type");
   const dumpSection = document.getElementById("dump_run_section");
   const scrapSection = document.getElementById("scrap_section");
+  const movingSection = document.getElementById("moving_section");
+  const demoSection = document.getElementById("demo_section");
+
   const crewEl = document.getElementById("crew_size");
   const crewHint = document.getElementById("crew_hint");
+  const hoursHint = document.getElementById("hours_hint");
+  const hoursEl = document.getElementById("estimated_hours");
 
   function applyServiceDefaults() {
     const service = serviceEl.value;
 
     // show/hide sections
-    if (service === "dump_run") {
-      dumpSection.classList.remove("hide");
-    } else {
-      dumpSection.classList.add("hide");
-    }
-
-    if (service === "scrap_pickup") {
-      scrapSection.classList.remove("hide");
-    } else {
-      scrapSection.classList.add("hide");
-    }
+    dumpSection.classList.toggle("hide", service !== "dump_run");
+    scrapSection.classList.toggle("hide", service !== "scrap_pickup");
+    movingSection.classList.toggle("hide", service !== "small_move");
+    demoSection.classList.toggle("hide", service !== "demolition");
 
     // crew defaults & minimums
     let defaultCrew = 1;
     let minCrew = 1;
-    let hint = "";
+    let crewText = "";
+    let hoursText = "";
 
     if (service === "small_move") {
       defaultCrew = 3;
       minCrew = 2;
-      hint = "Moving: default 3 workers (minimum 2).";
+      crewText = "Moving: default 3 workers (minimum 2).";
+      hoursText = "Moving: you can enter any hours, but pricing uses a minimum 4 hours.";
     } else if (service === "demolition") {
       defaultCrew = 4;
       minCrew = 2;
-      hint = "Demolition: default 4 workers (minimum 2).";
+      crewText = "Demolition: default 4 workers (minimum 2).";
+      hoursText = "Demolition: enter your best estimate — final confirmed after review.";
     } else if (service === "dump_run") {
       defaultCrew = 1;
       minCrew = 1;
-      hint = "Dump run: crew can be 1+ depending on items.";
+      crewText = "Dump run: crew can be 1+ depending on items.";
+      hoursText = "Dump run: enter a rough time estimate (loading + hauling).";
     } else if (service === "scrap_pickup") {
       defaultCrew = 1;
       minCrew = 1;
-      hint = "Scrap pickup: curbside is free; inside adds $30.";
+      crewText = "Scrap pickup: curbside is free; inside adds $30.";
+      hoursText = "Scrap pickup: enter a rough time estimate (loading).";
     } else {
       defaultCrew = 1;
       minCrew = 1;
-      hint = "Crew size depends on job details.";
+      crewText = "Crew size depends on job details.";
+      hoursText = "Enter a rough time estimate.";
     }
 
-    // if user hasn't changed crew yet, we set default (simple approach)
+    // set default crew if user hasn't touched
     if (!crewEl.dataset.touched) {
       crewEl.value = String(defaultCrew);
     }
 
-    // clamp min
+    // clamp to min
     const current = parseInt(crewEl.value || "1", 10);
     if (current < minCrew) crewEl.value = String(minCrew);
 
-    crewHint.textContent = hint;
+    crewHint.textContent = crewText;
+    hoursHint.textContent = hoursText;
   }
 
   crewEl.addEventListener("input", () => {
@@ -192,8 +244,11 @@
     applyServiceDefaults();
   });
 
+  hoursEl.addEventListener("input", () => {
+    hoursEl.dataset.touched = "true";
+  });
+
   serviceEl.addEventListener("change", () => {
-    // reset touched so changing service applies new default cleanly
     crewEl.dataset.touched = "";
     applyServiceDefaults();
   });
@@ -223,6 +278,13 @@
       scrap_pickup_location: service === "scrap_pickup"
         ? document.getElementById("scrap_pickup_location").value
         : "curbside",
+
+      // moving
+      move_from_type: service === "small_move" ? document.getElementById("move_from_type").value : null,
+      move_to_type: service === "small_move" ? document.getElementById("move_to_type").value : null,
+
+      // demo
+      demo_debris_tier: service === "demolition" ? document.getElementById("demo_debris_tier").value : "none",
 
       // info flags + description
       description: document.getElementById("description").value || null,
@@ -280,6 +342,18 @@
         scrapNote = `<div class="muted">Scrap pickup: curbside is free; inside removal adds $30.</div>`;
       }
 
+      // Moving note
+      let movingNote = "";
+      if (service === "small_move") {
+        movingNote = `<div class="muted">Moving note: pricing uses a minimum 4 hours (even if you enter less).</div>`;
+      }
+
+      // Demo note
+      let demoNote = "";
+      if (service === "demolition") {
+        demoNote = `<div class="muted">Demolition note: debris removal tier affects estimate; final confirmed after review.</div>`;
+      }
+
       div.innerHTML = `
         <h3>Estimate Generated</h3>
         <p><strong>Quote ID:</strong> ${data.quote_id}</p>
@@ -292,6 +366,8 @@
 
         ${disposalHtml}
         ${scrapNote}
+        ${movingNote}
+        ${demoNote}
 
         <div class="muted">
           <strong>Important:</strong> ${data.disclaimer}
