@@ -10,16 +10,21 @@
 
 <h2>Bay Delivery – Admin Dashboard</h2>
 <div class="muted">
-  View recent estimates and booking requests. Approvals are required before a request becomes confirmed.
+  View recent estimates, booking requests, and jobs. Approvals create a job record automatically.
 </div>
 
 <div class="card mt14">
   <div class="small">
-    Optional security: if you set <code>BAYDELIVERY_ADMIN_TOKEN</code> on your server, include it below to access admin APIs.
+    Admin access uses your Render environment variables: <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
   </div>
 
-  <div class="rowToken">
-    <input id="adminToken" type="password" placeholder="Admin token (optional)" />
+  <div class="rowCreds">
+    <input id="adminUsername" type="text" placeholder="Admin username" />
+    <input id="adminPassword" type="password" placeholder="Admin password" />
+  </div>
+
+  <div class="rowToken mt10">
+    <div></div>
     <button id="refreshBtn">Refresh</button>
   </div>
 
@@ -35,19 +40,29 @@
 
   <div class="card">
     <h3>Booking Requests</h3>
-    <div class="muted">Customer accepted quote and requested a booking. You must approve or reject.</div>
+    <div class="muted">Approve → creates a job entry. Reject → closes the request.</div>
     <div id="requestsBox"></div>
   </div>
+</div>
+
+<div class="card mt14">
+  <h3>Jobs</h3>
+  <div class="muted">Jobs created after admin approval (baseline total uses cash quote; payment method set later).</div>
+  <div id="jobsBox"></div>
 </div>
 
 <script>
   const statusLine = document.getElementById("statusLine");
 
-  async function fetchJSON(path) {
-    const t = (document.getElementById("adminToken").value || "").trim();
-    const headers = {};
-    if (t) headers["X-Admin-Token"] = t;
+  function authHeaders() {
+    const u = (document.getElementById("adminUsername").value || "").trim();
+    const p = (document.getElementById("adminPassword").value || "").trim();
+    if (!u || !p) return {};
+    return { "Authorization": "Basic " + btoa(u + ":" + p) };
+  }
 
+  async function fetchJSON(path) {
+    const headers = authHeaders();
     const res = await fetch(path, { headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(JSON.stringify(data));
@@ -55,112 +70,133 @@
   }
 
   function renderQuotes(items) {
+    const box = document.getElementById("quotesBox");
     if (!items || items.length === 0) {
-      document.getElementById("quotesBox").innerHTML = "<div class='muted'>No quotes yet.</div>";
+      box.innerHTML = "<div class='muted'>No quotes yet.</div>";
       return;
     }
 
-    const rows = items.map(q => `
-      <tr>
-        <td><code>${q.quote_id}</code></td>
-        <td>${q.created_at}</td>
-        <td><span class="pill">${q.job_type}</span></td>
-        <td>$${Number(q.total_cad).toFixed(2)}</td>
-      </tr>
-    `).join("");
+    let rows = "";
+    for (const q of items) {
+      rows += "<tr>"
+        + "<td><code>" + (q.quote_id || "") + "</code></td>"
+        + "<td>" + (q.created_at || "") + "</td>"
+        + "<td><span class='pill'>" + (q.job_type || "") + "</span></td>"
+        + "<td>$" + Number(q.total_cad || 0).toFixed(2) + "</td>"
+        + "</tr>";
+    }
 
-    document.getElementById("quotesBox").innerHTML = `
-      <table>
-        <thead>
-          <tr><th>Quote ID</th><th>Created</th><th>Type</th><th>Total (cash)</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+    box.innerHTML =
+      "<table>"
+      + "<thead><tr><th>Quote ID</th><th>Created</th><th>Type</th><th>Total (cash)</th></tr></thead>"
+      + "<tbody>" + rows + "</tbody>"
+      + "</table>";
   }
 
   async function decide(requestId, action) {
-    const notes = prompt(`Admin notes (${action}) – optional:`) || "";
-    statusLine.textContent = "Saving decision…";
+    const notes = prompt("Admin notes (" + action + ") - optional:") || "";
+    statusLine.textContent = "Saving decision...";
 
-    const t = (document.getElementById("adminToken").value || "").trim();
-    const headers = { "Content-Type": "application/json" };
-    if (t) headers["X-Admin-Token"] = t;
+    const headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
 
-    const res = await fetch(`/admin/api/quote-requests/${encodeURIComponent(requestId)}/decision`, {
+    const res = await fetch("/admin/api/quote-requests/" + encodeURIComponent(requestId) + "/decision", {
       method: "POST",
       headers,
-      body: JSON.stringify({ action, notes: notes.trim() || null })
+      body: JSON.stringify({ action: action, notes: (notes.trim() || null) })
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      statusLine.innerHTML = `<span class="bad">Error:</span> ${JSON.stringify(data)}`;
+      statusLine.innerHTML = "<span class='bad'>Error:</span> " + JSON.stringify(data);
       return;
     }
 
-    statusLine.innerHTML = `<span class="ok">Saved:</span> ${action.toUpperCase()} for ${requestId}`;
+    const jobId = data && data.job && data.job.job_id ? data.job.job_id : null;
+    if (jobId) {
+      statusLine.innerHTML = "<span class='ok'>Approved.</span> Job created: <code>" + jobId + "</code>";
+    } else {
+      statusLine.innerHTML = "<span class='ok'>Saved:</span> " + action.toUpperCase() + " for " + requestId;
+    }
+
     await refreshAll();
   }
 
   function renderRequests(items) {
+    const box = document.getElementById("requestsBox");
     if (!items || items.length === 0) {
-      document.getElementById("requestsBox").innerHTML = "<div class='muted'>No booking requests yet.</div>";
+      box.innerHTML = "<div class='muted'>No booking requests yet.</div>";
       return;
     }
 
-    const rows = items.map(r => `
-      <tr>
-        <td><code>${r.request_id}</code><div class="small">${r.created_at}</div></td>
-        <td>
-          <div><strong>${r.customer_name || ""}</strong></div>
-          <div class="small">${r.customer_phone || ""}</div>
-        </td>
-        <td class="small">
-          <div>${r.job_address || ""}</div>
-          <div><span class="pill">${r.service_type}</span></div>
-        </td>
-        <td class="small">
-          <div><strong>Date:</strong> ${r.requested_job_date || "-"}</div>
-          <div><strong>Window:</strong> ${r.requested_time_window || "-"}</div>
-        </td>
-        <td>
-          <div class="small"><strong>Status:</strong> <span class="pill">${r.status}</span></div>
-          <div class="small"><strong>Cash:</strong> $${Number(r.cash_total_cad).toFixed(2)}</div>
-          <div class="small"><strong>EMT:</strong> $${Number(r.emt_total_cad).toFixed(2)}</div>
-        </td>
-        <td>
-          <button onclick="window.__approve('${r.request_id}')">Approve</button>
-          <button onclick="window.__reject('${r.request_id}')" class="btnSpacer">Reject</button>
-        </td>
-      </tr>
-    `).join("");
+    let rows = "";
+    for (const r of items) {
+      rows += "<tr>"
+        + "<td><code>" + (r.request_id || "") + "</code><div class='small'>" + (r.created_at || "") + "</div></td>"
+        + "<td><div><strong>" + (r.customer_name || "") + "</strong></div><div class='small'>" + (r.customer_phone || "") + "</div></td>"
+        + "<td class='small'><div>" + (r.job_address || "") + "</div><div><span class='pill'>" + (r.service_type || "") + "</span></div></td>"
+        + "<td class='small'><div><strong>Date:</strong> " + (r.requested_job_date || "-") + "</div><div><strong>Window:</strong> " + (r.requested_time_window || "-") + "</div></td>"
+        + "<td>"
+        + "<div class='small'><strong>Status:</strong> <span class='pill'>" + (r.status || "") + "</span></div>"
+        + "<div class='small'><strong>Cash:</strong> $" + Number(r.cash_total_cad || 0).toFixed(2) + "</div>"
+        + "<div class='small'><strong>EMT:</strong> $" + Number(r.emt_total_cad || 0).toFixed(2) + "</div>"
+        + "</td>"
+        + "<td>"
+        + "<button onclick=\"window.__approve('" + (r.request_id || "") + "')\">Approve</button>"
+        + "<button onclick=\"window.__reject('" + (r.request_id || "") + "')\" class=\"btnSpacer\">Reject</button>"
+        + "</td>"
+        + "</tr>";
+    }
 
-    document.getElementById("requestsBox").innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>Request</th><th>Customer</th><th>Job</th><th>Requested</th><th>Totals</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+    box.innerHTML =
+      "<table>"
+      + "<thead><tr><th>Request</th><th>Customer</th><th>Job</th><th>Requested</th><th>Totals</th><th>Actions</th></tr></thead>"
+      + "<tbody>" + rows + "</tbody>"
+      + "</table>";
+  }
+
+  function renderJobs(items) {
+    const box = document.getElementById("jobsBox");
+    if (!items || items.length === 0) {
+      box.innerHTML = "<div class='muted'>No jobs yet.</div>";
+      return;
+    }
+
+    let rows = "";
+    for (const j of items) {
+      rows += "<tr>"
+        + "<td><code>" + (j.job_id || "") + "</code><div class='small'>" + (j.created_at || "") + "</div></td>"
+        + "<td><code>" + (j.quote_id || "") + "</code></td>"
+        + "<td><span class='pill'>" + (j.status || "") + "</span></td>"
+        + "<td><div><strong>" + (j.customer_name || "") + "</strong></div><div class='small'>" + (j.customer_phone || "") + "</div></td>"
+        + "<td class='small'>" + (j.job_address || "") + "</td>"
+        + "<td>$" + Number(j.total_cad || 0).toFixed(2) + "</td>"
+        + "<td class='small'>" + (j.notes || "") + "</td>"
+        + "</tr>";
+    }
+
+    box.innerHTML =
+      "<table>"
+      + "<thead><tr><th>Job</th><th>Quote</th><th>Status</th><th>Customer</th><th>Address</th><th>Total</th><th>Notes</th></tr></thead>"
+      + "<tbody>" + rows + "</tbody>"
+      + "</table>";
   }
 
   async function refreshAll() {
     try {
-      statusLine.textContent = "Loading…";
+      statusLine.textContent = "Loading...";
 
-      const quotes = await fetchJSON(`/admin/api/quotes`);
+      const quotes = await fetchJSON("/admin/api/quotes");
       renderQuotes(quotes.items || []);
 
-      const reqs = await fetchJSON(`/admin/api/quote-requests`);
+      const reqs = await fetchJSON("/admin/api/quote-requests");
       renderRequests(reqs.items || []);
 
-      statusLine.innerHTML = `<span class="ok">Loaded.</span>`;
+      const jobs = await fetchJSON("/admin/api/jobs");
+      renderJobs(jobs.items || []);
+
+      statusLine.innerHTML = "<span class='ok'>Loaded.</span>";
     } catch (err) {
-      statusLine.innerHTML = `<span class="bad">Admin API error:</span> ${String(err)}`;
+      statusLine.innerHTML = "<span class='bad'>Admin API error:</span> " + String(err);
     }
   }
 
@@ -168,7 +204,6 @@
   window.__reject = (id) => decide(id, "reject");
 
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
-  refreshAll();
 </script>
 
 </body>

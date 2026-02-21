@@ -10,9 +10,13 @@ h2 { margin-bottom: 6px; }
 .rowToken { display: grid; grid-template-columns: 1fr 220px; gap: 16px; margin-top: 10px; }
 @media (max-width: 720px) { .rowToken { grid-template-columns: 1fr; } }
 
+.rowCreds { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+@media (max-width: 720px) { .rowCreds { grid-template-columns: 1fr; } }
+
 .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; }
 
 .mt14 { margin-top: 14px; }
+.mt10 { margin-top: 10px; }
 
 table { width:100%; border-collapse: collapse; margin-top: 10px; }
 th, td { text-align:left; border-bottom:1px solid #eee; padding:8px; vertical-align: top; }
