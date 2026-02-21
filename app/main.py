@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import os
+import secrets
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -23,6 +25,9 @@ from app.storage import (
     list_quote_requests,
     get_quote_request,
     update_quote_request,
+    save_job,
+    list_jobs,
+    get_job_by_quote_id,
 )
 
 try:
@@ -35,9 +40,12 @@ APP_VERSION = "0.9.0"
 CAD = "CAD"
 LOCAL_TZ_NAME = "America/Toronto"
 
-# Optional admin token (recommended for public Render deploy)
-# If set, admin endpoints require header: X-Admin-Token: <token>  (or ?token=<token>)
+# Admin auth options (either works):
+# 1) Token auth (simple)
 ADMIN_TOKEN_ENV = "BAYDELIVERY_ADMIN_TOKEN"
+# 2) Basic auth (username/password) - matches what you already set on Render
+ADMIN_USERNAME_ENV = "ADMIN_USERNAME"
+ADMIN_PASSWORD_ENV = "ADMIN_PASSWORD"
 
 
 app = FastAPI(
@@ -58,10 +66,11 @@ init_db()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
-INDEX_HTML_PATH = STATIC_DIR / "index.html"
+
+HOME_HTML_PATH = STATIC_DIR / "home.html"
+QUOTE_HTML_PATH = STATIC_DIR / "index.html"
 ADMIN_HTML_PATH = STATIC_DIR / "admin.html"
 
-# Serve /static/* (admin.css, future assets, etc.)
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -74,23 +83,73 @@ def _now_local_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat()
 
 
+def _unauthorized_basic() -> HTTPException:
+    # Browser will show a login prompt if you hit /admin directly.
+    return HTTPException(
+        status_code=401,
+        detail="Admin authentication required",
+        headers={"WWW-Authenticate": 'Basic realm="Bay Delivery Admin"'},
+    )
+
+
 def _require_admin(request: Request) -> None:
+    """
+    Admin protection logic:
+    - If BAYDELIVERY_ADMIN_TOKEN is set -> require token (header X-Admin-Token or ?token=)
+    - Else if ADMIN_USERNAME + ADMIN_PASSWORD are set -> require HTTP Basic Auth
+    - Else -> admin endpoints are open (NOT recommended for public Render deploy)
+    """
     token_required = os.getenv(ADMIN_TOKEN_ENV)
-    if not token_required:
-        # No token configured -> admin endpoints are open.
-        # Recommended: set BAYDELIVERY_ADMIN_TOKEN on Render.
+    if token_required:
+        token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
+        if token != token_required:
+            raise HTTPException(status_code=401, detail="Admin token required")
         return
 
-    token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
-    if token != token_required:
-        raise HTTPException(status_code=401, detail="Admin token required")
+    user_required = os.getenv(ADMIN_USERNAME_ENV)
+    pass_required = os.getenv(ADMIN_PASSWORD_ENV)
+    if user_required and pass_required:
+        auth = request.headers.get("Authorization") or ""
+        if not auth.startswith("Basic "):
+            raise _unauthorized_basic()
 
+        b64 = auth.split(" ", 1)[1].strip()
+        try:
+            decoded = base64.b64decode(b64).decode("utf-8")
+        except Exception:
+            raise _unauthorized_basic()
+
+        if ":" not in decoded:
+            raise _unauthorized_basic()
+
+        username, password = decoded.split(":", 1)
+        if not (secrets.compare_digest(username, user_required) and secrets.compare_digest(password, pass_required)):
+            raise _unauthorized_basic()
+        return
+
+    # If you deploy publicly, DO NOT leave this empty.
+    return
+
+
+# =========================
+# Pages (All-in-one site)
+# =========================
 
 @app.get("/")
-def root():
-    if not INDEX_HTML_PATH.exists():
-        raise HTTPException(status_code=500, detail=f"Missing frontend file: {INDEX_HTML_PATH.as_posix()}")
-    return FileResponse(INDEX_HTML_PATH)
+def home():
+    if HOME_HTML_PATH.exists():
+        return FileResponse(HOME_HTML_PATH)
+    # fallback if home.html isn't present yet
+    if QUOTE_HTML_PATH.exists():
+        return FileResponse(QUOTE_HTML_PATH)
+    raise HTTPException(status_code=500, detail=f"Missing frontend files under: {STATIC_DIR.as_posix()}")
+
+
+@app.get("/quote")
+def quote_page():
+    if not QUOTE_HTML_PATH.exists():
+        raise HTTPException(status_code=500, detail=f"Missing quote page: {QUOTE_HTML_PATH.as_posix()}")
+    return FileResponse(QUOTE_HTML_PATH)
 
 
 @app.get("/admin")
@@ -100,6 +159,10 @@ def admin_page(request: Request):
         raise HTTPException(status_code=500, detail=f"Missing admin file: {ADMIN_HTML_PATH.as_posix()}")
     return FileResponse(ADMIN_HTML_PATH)
 
+
+# =========================
+# Models
+# =========================
 
 class ServiceType(str, Enum):
     haul_away = "haul_away"
@@ -209,8 +272,13 @@ def health():
         "version": APP_VERSION,
         "local_timezone": LOCAL_TZ_NAME,
         "admin_token_configured": bool(os.getenv(ADMIN_TOKEN_ENV)),
+        "admin_basic_configured": bool(os.getenv(ADMIN_USERNAME_ENV) and os.getenv(ADMIN_PASSWORD_ENV)),
     }
 
+
+# =========================
+# Quote API
+# =========================
 
 @app.post("/quote/calculate", response_model=QuoteResponse)
 def quote_calculate(req: QuoteRequest):
@@ -264,7 +332,7 @@ def quote_calculate(req: QuoteRequest):
 
 
 # =========================
-# Customer: accept estimate + request booking (admin must approve)
+# Customer: request booking
 # =========================
 
 class BookingRequest(BaseModel):
@@ -349,13 +417,10 @@ def admin_list_quote_requests(request: Request, limit: int = 50, status: Optiona
     return {"items": list_quote_requests(limit=int(limit), status=status)}
 
 
-@app.get("/admin/api/quote-requests/{request_id}")
-def admin_get_quote_request(request: Request, request_id: str):
+@app.get("/admin/api/jobs")
+def admin_list_jobs(request: Request, limit: int = 50, status: Optional[str] = None):
     _require_admin(request)
-    data = get_quote_request(request_id)
-    if not data:
-        raise HTTPException(status_code=404, detail="Request not found")
-    return data
+    return {"items": list_jobs(limit=int(limit), status=status)}
 
 
 class AdminDecision(BaseModel):
@@ -370,6 +435,69 @@ class AdminDecision(BaseModel):
         if isinstance(v, str):
             return v.strip()
         return v
+
+
+def _create_job_from_request(request_row: dict, admin_notes: Optional[str]) -> dict:
+    existing = get_job_by_quote_id(request_row["quote_id"])
+    if existing:
+        return existing
+
+    now = _now_local_iso()
+    job_id = str(uuid4())
+
+    requested_date = request_row.get("requested_job_date") or ""
+    requested_window = request_row.get("requested_time_window") or ""
+
+    notes_parts = []
+    if requested_date or requested_window:
+        notes_parts.append(f"Requested: {requested_date} {requested_window}".strip())
+    if admin_notes:
+        notes_parts.append(f"Admin notes: {admin_notes}".strip())
+    notes = " | ".join([p for p in notes_parts if p])
+
+    total = float(request_row.get("cash_total_cad", 0.0))
+
+    job_obj = {
+        "job_id": job_id,
+        "created_at": now,
+        "quote_id": request_row["quote_id"],
+        "status": "approved_pending_schedule",
+        "customer_name": request_row.get("customer_name"),
+        "customer_phone": request_row.get("customer_phone"),
+        "job_address": request_row.get("job_address"),
+        "job_description_customer": request_row.get("job_description_customer"),
+        "job_description_internal": request_row.get("job_description_internal"),
+        "scheduled_start": None,
+        "scheduled_end": None,
+        "payment_method": None,
+        "total_cad": total,
+        "paid_cad": 0.0,
+        "owing_cad": total,
+        "notes": notes or None,
+        "job_json": {
+            "source": "quote_request_approved",
+            "quote_request": request_row,
+            "admin_notes": admin_notes,
+        },
+    }
+
+    save_job(job_obj)
+    return {
+        "job_id": job_id,
+        "created_at": now,
+        "quote_id": request_row["quote_id"],
+        "status": "approved_pending_schedule",
+        "customer_name": request_row.get("customer_name"),
+        "customer_phone": request_row.get("customer_phone"),
+        "job_address": request_row.get("job_address"),
+        "scheduled_start": None,
+        "scheduled_end": None,
+        "payment_method": None,
+        "total_cad": total,
+        "paid_cad": 0.0,
+        "owing_cad": total,
+        "notes": notes or None,
+    }
 
 
 @app.post("/admin/api/quote-requests/{request_id}/decision")
@@ -393,14 +521,18 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
             notes=body.notes,
             admin_approved_at=now,
         )
-    else:
-        updated = update_quote_request(
-            request_id,
-            status="rejected",
-            notes=body.notes,
-            admin_approved_at=None,
-        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update request")
 
+        job_summary = _create_job_from_request(updated, body.notes)
+        return {"ok": True, "request": updated, "job": job_summary}
+
+    updated = update_quote_request(
+        request_id,
+        status="rejected",
+        notes=body.notes,
+        admin_approved_at=None,
+    )
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update request")
 
