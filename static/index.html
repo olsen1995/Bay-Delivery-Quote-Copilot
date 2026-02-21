@@ -18,6 +18,8 @@
     .error { color: #b00020; font-weight: 700; }
     .section { margin-top: 18px; padding-top: 6px; border-top: 1px dashed #ddd; }
     .hide { display: none; }
+    .card { margin-top: 14px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+    .small { font-size: 0.92em; color: #555; }
   </style>
 </head>
 <body>
@@ -29,16 +31,29 @@
   <div class="row">
     <div>
       <label for="customer_name">Customer Name</label>
-      <input type="text" id="customer_name" name="customer_name" placeholder="Optional" autocomplete="name" />
+      <input type="text" id="customer_name" name="customer_name" placeholder="Required" required autocomplete="name" />
     </div>
     <div>
       <label for="customer_phone">Phone</label>
-      <input type="text" id="customer_phone" name="customer_phone" placeholder="Optional" autocomplete="tel" />
+      <input type="text" id="customer_phone" name="customer_phone" placeholder="Required" required autocomplete="tel" />
     </div>
   </div>
 
   <label for="job_address">Job Address</label>
-  <input type="text" id="job_address" name="job_address" placeholder="Optional" autocomplete="street-address" />
+  <input type="text" id="job_address" name="job_address" placeholder="Required" required autocomplete="street-address" />
+
+  <!-- PICKUP / DROP-OFF (MOVING + ITEM DELIVERY) -->
+  <div class="section hide" id="route_section">
+    <label for="pickup_address">Pickup Address</label>
+    <input type="text" id="pickup_address" name="pickup_address" placeholder="Required for moving/delivery" />
+
+    <label for="dropoff_address">Drop-off Address</label>
+    <input type="text" id="dropoff_address" name="dropoff_address" placeholder="Required for moving/delivery" />
+
+    <div class="muted">
+      For <strong>Small Move</strong> and <strong>Item Delivery</strong>, we need both addresses to estimate properly.
+    </div>
+  </div>
 
   <label for="service_type">Service Type</label>
   <select id="service_type" name="service_type" title="Service Type">
@@ -102,28 +117,6 @@
 
   <!-- MOVING -->
   <div class="section hide" id="moving_section">
-    <div class="row">
-      <div>
-        <label for="move_from_type">Moving From</label>
-        <select id="move_from_type" name="move_from_type" title="Moving From Type">
-          <option value="house">House</option>
-          <option value="apartment">Apartment (single unit)</option>
-          <option value="apartment_building">Apartment Building</option>
-          <option value="storage_locker">Storage Locker</option>
-          <option value="commercial">Commercial Building</option>
-        </select>
-      </div>
-      <div>
-        <label for="move_to_type">Moving To</label>
-        <select id="move_to_type" name="move_to_type" title="Moving To Type">
-          <option value="house">House</option>
-          <option value="apartment">Apartment (single unit)</option>
-          <option value="apartment_building">Apartment Building</option>
-          <option value="storage_locker">Storage Locker</option>
-          <option value="commercial">Commercial Building</option>
-        </select>
-      </div>
-    </div>
     <div class="muted">
       Moving usually needs 3 workers. Minimum 2. We normally charge a minimum 4 hours for moving.
     </div>
@@ -131,22 +124,15 @@
 
   <!-- DEMOLITION -->
   <div class="section hide" id="demo_section">
-    <label for="demo_debris_tier">Debris / Material Removal</label>
-    <select id="demo_debris_tier" name="demo_debris_tier" title="Debris Removal Tier">
-      <option value="none">No (demo only)</option>
-      <option value="small">Yes — Small load</option>
-      <option value="medium">Yes — Medium load</option>
-      <option value="large">Yes — Large load</option>
-    </select>
     <div class="muted">
-      If you want us to remove materials/debris, select a tier. Final price may change after in-person view.
+      Demolition pricing depends on scope and debris. Final confirmed after review.
     </div>
   </div>
 
   <!-- COMMON -->
   <div class="section">
     <label for="description">Description (What are we moving/removing? Any heavy items?)</label>
-    <textarea id="description" name="description" placeholder="Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner."></textarea>
+    <textarea id="description" name="description" required minlength="8" placeholder="Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner."></textarea>
 
     <div class="row">
       <div>
@@ -184,6 +170,9 @@
   const serviceDescEl = document.getElementById("service_description");
 
   const haulAwaySection = document.getElementById("haul_away_section");
+  const routeSection = document.getElementById("route_section");
+  const pickupEl = document.getElementById("pickup_address");
+  const dropoffEl = document.getElementById("dropoff_address");
   const scrapSection = document.getElementById("scrap_section");
   const movingSection = document.getElementById("moving_section");
   const demoSection = document.getElementById("demo_section");
@@ -193,6 +182,8 @@
   const hoursHint = document.getElementById("hours_hint");
   const hoursEl = document.getElementById("estimated_hours");
 
+  let lastQuoteId = null;
+
   function applyServiceDefaults() {
     const service = serviceEl.value;
 
@@ -200,6 +191,11 @@
     scrapSection.classList.toggle("hide", service !== "scrap_pickup");
     movingSection.classList.toggle("hide", service !== "small_move");
     demoSection.classList.toggle("hide", service !== "demolition");
+
+    const needsRoute = (service === "small_move" || service === "item_delivery");
+    routeSection.classList.toggle("hide", !needsRoute);
+    pickupEl.required = needsRoute;
+    dropoffEl.required = needsRoute;
 
     let defaultCrew = 1;
     let minCrew = 1;
@@ -211,38 +207,37 @@
       defaultCrew = 3;
       minCrew = 2;
       crewText = "Moving: default 3 workers (minimum 2).";
-      hoursText = "Moving: you can enter any hours, but pricing uses a minimum 4 hours.";
-      serviceText = "Moving help: labour + travel included in the estimate.";
+      hoursText = "Moving: pricing uses a minimum 4 hours.";
+      serviceText = "Small Move estimate includes labour + travel. Pickup + drop-off required.";
     } else if (service === "demolition") {
       defaultCrew = 4;
       minCrew = 2;
       crewText = "Demolition: default 4 workers (minimum 2).";
       hoursText = "Demolition: enter your best estimate — final confirmed after review.";
-      serviceText = "Demolition help: labour + travel included in the estimate.";
+      serviceText = "Demolition estimate includes labour + travel.";
     } else if (service === "haul_away") {
       defaultCrew = 1;
       minCrew = 1;
-      crewText = "Junk removal / haul away: crew can be 1+ depending on items.";
+      crewText = "Junk removal / haul away: crew depends on items.";
       hoursText = "Enter a rough time estimate (loading + hauling).";
       serviceText = "We load, haul, and dispose — removal & disposal included (if required).";
+    } else if (service === "item_delivery") {
+      defaultCrew = 1;
+      minCrew = 1;
+      crewText = "Item delivery: crew depends on size/weight.";
+      hoursText = "Enter a rough time estimate (loading + delivery).";
+      serviceText = "Item Delivery estimate includes labour + travel. Pickup + drop-off required.";
     } else if (service === "scrap_pickup") {
       defaultCrew = 1;
       minCrew = 1;
       crewText = "Scrap pickup: curbside is free; inside removal is a flat $30.";
       hoursText = "Hours/crew don’t affect scrap pricing (flat-rate).";
       serviceText = "Scrap pickup is flat-rate: curbside free; inside removal $30.";
-    } else {
-      defaultCrew = 1;
-      minCrew = 1;
-      crewText = "Crew size depends on job details.";
-      hoursText = "Enter a rough time estimate.";
-      serviceText = "Estimate includes labour and travel.";
     }
 
     if (!crewEl.dataset.touched) {
       crewEl.value = String(defaultCrew);
     }
-
     const current = parseInt(crewEl.value || "1", 10);
     if (current < minCrew) crewEl.value = String(minCrew);
 
@@ -264,10 +259,6 @@
     applyServiceDefaults();
   });
 
-  hoursEl.addEventListener("input", () => {
-    hoursEl.dataset.touched = "true";
-  });
-
   serviceEl.addEventListener("change", () => {
     crewEl.dataset.touched = "";
     applyServiceDefaults();
@@ -275,17 +266,110 @@
 
   applyServiceDefaults();
 
+  function requiredTrim(id) {
+    return (document.getElementById(id).value || "").trim();
+  }
+
+  function bookingPanelHTML(quoteId) {
+    return `
+      <div class="card">
+        <h4 style="margin:0 0 6px 0;">Request Booking</h4>
+        <div class="small">If you want to book this job, request a date/time window. We’ll review and confirm availability.</div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label for="requested_job_date">Preferred Date</label>
+            <input type="date" id="requested_job_date" />
+          </div>
+          <div>
+            <label for="requested_time_window">Preferred Time Window</label>
+            <input type="text" id="requested_time_window" placeholder="Example: Morning / 1–3pm" />
+          </div>
+        </div>
+
+        <label for="booking_notes">Notes (optional)</label>
+        <input type="text" id="booking_notes" placeholder="Example: call when arriving, gate code, parking info" />
+
+        <button type="button" id="requestBookingBtn">Request Booking</button>
+        <div class="muted" id="bookingStatus"></div>
+      </div>
+    `;
+  }
+
+  async function submitBookingRequest() {
+    const dateVal = (document.getElementById("requested_job_date").value || "").trim();
+    const windowVal = (document.getElementById("requested_time_window").value || "").trim();
+    const notesVal = (document.getElementById("booking_notes").value || "").trim();
+
+    if (!lastQuoteId) {
+      alert("No quote ID found. Please generate an estimate first.");
+      return;
+    }
+    if (!dateVal || !windowVal) {
+      alert("Please enter a preferred date and time window.");
+      return;
+    }
+
+    const statusEl = document.getElementById("bookingStatus");
+    statusEl.textContent = "Submitting booking request…";
+
+    try {
+      const res = await fetch("/quote/request-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quote_id: lastQuoteId,
+          requested_job_date: dateVal,
+          requested_time_window: windowVal,
+          notes: notesVal || null
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        statusEl.innerHTML = `<span class="error">Error:</span> ${JSON.stringify(data)}`;
+        return;
+      }
+
+      statusEl.textContent = `✅ Request sent. Request ID: ${data.request_id}. We will confirm availability.`;
+    } catch (err) {
+      statusEl.innerHTML = `<span class="error">Network error:</span> ${String(err)}`;
+    }
+  }
+
   document.getElementById("quoteForm").addEventListener("submit", async function(e) {
     e.preventDefault();
 
     const service = serviceEl.value;
 
-    const payload = {
-      customer_name: document.getElementById("customer_name").value || null,
-      customer_phone: document.getElementById("customer_phone").value || null,
-      job_address: document.getElementById("job_address").value || null,
-      service_type: service,
+    // Hard guardrail: prevent "no-info" quotes.
+    const nameVal = requiredTrim("customer_name");
+    const phoneVal = requiredTrim("customer_phone");
+    const jobAddrVal = requiredTrim("job_address");
+    const descVal = requiredTrim("description");
 
+    if (!nameVal || !phoneVal || !jobAddrVal || descVal.length < 8) {
+      alert("Please enter your name, phone number, job address, and a short description of the items (at least 8 characters).");
+      return;
+    }
+
+    if (service === "small_move" || service === "item_delivery") {
+      const pickupVal = requiredTrim("pickup_address");
+      const dropVal = requiredTrim("dropoff_address");
+      if (!pickupVal || !dropVal) {
+        alert("For moving or item delivery, please enter both pickup and drop-off addresses.");
+        return;
+      }
+    }
+
+    const payload = {
+      customer_name: nameVal,
+      customer_phone: phoneVal,
+      job_address: jobAddrVal,
+      pickup_address: (requiredTrim("pickup_address") || null),
+      dropoff_address: (requiredTrim("dropoff_address") || null),
+
+      service_type: service,
       estimated_hours: parseFloat(document.getElementById("estimated_hours").value || "0"),
       crew_size: parseInt(document.getElementById("crew_size").value || "1", 10),
 
@@ -305,19 +389,7 @@
         ? document.getElementById("scrap_pickup_location").value
         : "curbside",
 
-      move_from_type: service === "small_move"
-        ? document.getElementById("move_from_type").value
-        : null,
-
-      move_to_type: service === "small_move"
-        ? document.getElementById("move_to_type").value
-        : null,
-
-      demo_debris_tier: service === "demolition"
-        ? document.getElementById("demo_debris_tier").value
-        : "none",
-
-      description: document.getElementById("description").value || null,
+      description: descVal,
       stairs: document.getElementById("stairs").value === "true",
       elevator: document.getElementById("elevator").value === "true",
       difficult_corner: document.getElementById("difficult_corner").value === "true",
@@ -326,6 +398,7 @@
     const div = document.getElementById("result");
     div.classList.remove("hide");
     div.innerHTML = `<div class="muted">Calculating…</div>`;
+    lastQuoteId = null;
 
     try {
       const res = await fetch("/quote/calculate", {
@@ -335,14 +408,14 @@
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         div.innerHTML = `<div class="error">Error:</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
         return;
       }
 
-      const summary = [];
+      lastQuoteId = data.quote_id;
 
+      const summary = [];
       if (service === "scrap_pickup") {
         summary.push("Flat-rate");
         summary.push(payload.scrap_pickup_location === "curbside" ? "Curbside free" : "Inside $30");
@@ -350,28 +423,6 @@
         summary.push("Labour included");
         summary.push("Travel included");
         if (service === "haul_away") summary.push("Removal & disposal included");
-      }
-
-      if (payload.stairs) summary.push("Stairs noted");
-      if (payload.elevator) summary.push("Elevator noted");
-      if (payload.difficult_corner) summary.push("Tight access noted");
-
-      const m = payload.mattresses_count || 0;
-      const b = payload.box_springs_count || 0;
-
-      let mattressNote = "";
-      if ((m > 0 || b > 0) && service === "haul_away") {
-        mattressNote = `<div class="muted"><strong>Note:</strong> Mattresses/box springs may have an additional disposal cost if included.</div>`;
-      }
-
-      let movingNote = "";
-      if (service === "small_move") {
-        movingNote = `<div class="muted">Moving note: pricing uses a minimum 4 hours (even if you enter less).</div>`;
-      }
-
-      let demoNote = "";
-      if (service === "demolition") {
-        demoNote = `<div class="muted">Demolition note: debris removal tier affects estimate; final confirmed after review.</div>`;
       }
 
       div.innerHTML = `
@@ -384,14 +435,16 @@
           ${summary.map(s => `<span class="pill">${s}</span>`).join("")}
         </div>
 
-        ${mattressNote}
-        ${movingNote}
-        ${demoNote}
-
         <div class="muted">
           <strong>Important:</strong> ${data.disclaimer}
         </div>
+
+        ${bookingPanelHTML(data.quote_id)}
       `;
+
+      // Wire the booking button after render
+      document.getElementById("requestBookingBtn").addEventListener("click", submitBookingRequest);
+
     } catch (err) {
       div.innerHTML = `<div class="error">Network error:</div><pre>${String(err)}</pre>`;
     }

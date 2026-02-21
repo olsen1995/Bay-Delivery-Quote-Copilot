@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bay Delivery – Admin</title>
+  <link rel="stylesheet" href="/static/admin.css" />
+</head>
+<body>
+
+<h2>Bay Delivery – Admin Dashboard</h2>
+<div class="muted">
+  View recent estimates and booking requests. Approvals are required before a request becomes confirmed.
+</div>
+
+<div class="card mt14">
+  <div class="small">
+    Optional security: if you set <code>BAYDELIVERY_ADMIN_TOKEN</code> on your server, include it below to access admin APIs.
+  </div>
+
+  <div class="rowToken">
+    <input id="adminToken" type="password" placeholder="Admin token (optional)" />
+    <button id="refreshBtn">Refresh</button>
+  </div>
+
+  <div class="muted" id="statusLine"></div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h3>Recent Estimates</h3>
+    <div class="muted">Latest stored quotes (for ops review).</div>
+    <div id="quotesBox"></div>
+  </div>
+
+  <div class="card">
+    <h3>Booking Requests</h3>
+    <div class="muted">Customer accepted quote and requested a booking. You must approve or reject.</div>
+    <div id="requestsBox"></div>
+  </div>
+</div>
+
+<script>
+  const statusLine = document.getElementById("statusLine");
+
+  async function fetchJSON(path) {
+    const t = (document.getElementById("adminToken").value || "").trim();
+    const headers = {};
+    if (t) headers["X-Admin-Token"] = t;
+
+    const res = await fetch(path, { headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(JSON.stringify(data));
+    return data;
+  }
+
+  function renderQuotes(items) {
+    if (!items || items.length === 0) {
+      document.getElementById("quotesBox").innerHTML = "<div class='muted'>No quotes yet.</div>";
+      return;
+    }
+
+    const rows = items.map(q => `
+      <tr>
+        <td><code>${q.quote_id}</code></td>
+        <td>${q.created_at}</td>
+        <td><span class="pill">${q.job_type}</span></td>
+        <td>$${Number(q.total_cad).toFixed(2)}</td>
+      </tr>
+    `).join("");
+
+    document.getElementById("quotesBox").innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Quote ID</th><th>Created</th><th>Type</th><th>Total (cash)</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  async function decide(requestId, action) {
+    const notes = prompt(`Admin notes (${action}) – optional:`) || "";
+    statusLine.textContent = "Saving decision…";
+
+    const t = (document.getElementById("adminToken").value || "").trim();
+    const headers = { "Content-Type": "application/json" };
+    if (t) headers["X-Admin-Token"] = t;
+
+    const res = await fetch(`/admin/api/quote-requests/${encodeURIComponent(requestId)}/decision`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action, notes: notes.trim() || null })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      statusLine.innerHTML = `<span class="bad">Error:</span> ${JSON.stringify(data)}`;
+      return;
+    }
+
+    statusLine.innerHTML = `<span class="ok">Saved:</span> ${action.toUpperCase()} for ${requestId}`;
+    await refreshAll();
+  }
+
+  function renderRequests(items) {
+    if (!items || items.length === 0) {
+      document.getElementById("requestsBox").innerHTML = "<div class='muted'>No booking requests yet.</div>";
+      return;
+    }
+
+    const rows = items.map(r => `
+      <tr>
+        <td><code>${r.request_id}</code><div class="small">${r.created_at}</div></td>
+        <td>
+          <div><strong>${r.customer_name || ""}</strong></div>
+          <div class="small">${r.customer_phone || ""}</div>
+        </td>
+        <td class="small">
+          <div>${r.job_address || ""}</div>
+          <div><span class="pill">${r.service_type}</span></div>
+        </td>
+        <td class="small">
+          <div><strong>Date:</strong> ${r.requested_job_date || "-"}</div>
+          <div><strong>Window:</strong> ${r.requested_time_window || "-"}</div>
+        </td>
+        <td>
+          <div class="small"><strong>Status:</strong> <span class="pill">${r.status}</span></div>
+          <div class="small"><strong>Cash:</strong> $${Number(r.cash_total_cad).toFixed(2)}</div>
+          <div class="small"><strong>EMT:</strong> $${Number(r.emt_total_cad).toFixed(2)}</div>
+        </td>
+        <td>
+          <button onclick="window.__approve('${r.request_id}')">Approve</button>
+          <button onclick="window.__reject('${r.request_id}')" class="btnSpacer">Reject</button>
+        </td>
+      </tr>
+    `).join("");
+
+    document.getElementById("requestsBox").innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Request</th><th>Customer</th><th>Job</th><th>Requested</th><th>Totals</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  async function refreshAll() {
+    try {
+      statusLine.textContent = "Loading…";
+
+      const quotes = await fetchJSON(`/admin/api/quotes`);
+      renderQuotes(quotes.items || []);
+
+      const reqs = await fetchJSON(`/admin/api/quote-requests`);
+      renderRequests(reqs.items || []);
+
+      statusLine.innerHTML = `<span class="ok">Loaded.</span>`;
+    } catch (err) {
+      statusLine.innerHTML = `<span class="bad">Admin API error:</span> ${String(err)}`;
+    }
+  }
+
+  window.__approve = (id) => decide(id, "approve");
+  window.__reject = (id) => decide(id, "reject");
+
+  document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+  refreshAll();
+</script>
+
+</body>
+</html>

@@ -1,15 +1,33 @@
 # Bay Delivery – Quote Copilot
 
-Local quote/estimate tool for Bay Delivery (North Bay, Ontario).  
-This project provides a simple web UI plus a FastAPI backend to generate customer-safe estimates.
+Local quote/estimate tool for Bay Delivery (North Bay, Ontario).
 
-## What it does
+This project provides:
 
-- Customer-facing quote form (served at `/`)
-- API endpoint to calculate quotes: `POST /quote/calculate`
-- Stores each quote request + internal breakdown for admin review (SQLite)
+- Customer-facing quote UI (served at `/`)
+- Quote API (`POST /quote/calculate`)
+- Booking request workflow + admin approval
+- SQLite storage for ops review
 
-## Core pricing rules (current)
+---
+
+## Required customer info (prevents no-info estimates)
+
+All quotes require:
+
+- `customer_name`
+- `customer_phone`
+- `job_address`
+- `description` (must include item/job details)
+
+For `small_move` and `item_delivery`, also required:
+
+- `pickup_address`
+- `dropoff_address`
+
+---
+
+## Pricing rules (canonical)
 
 ### Tax policy
 
@@ -18,17 +36,44 @@ This project provides a simple web UI plus a FastAPI backend to generate custome
 
 ### Service types
 
-- **Junk Removal / Haul Away** (Junk + Dump are treated as the same service)
-  - The estimate total may include disposal/dump handling internally.
-  - **Dump/disposal is NOT itemized** on the customer-facing output.
-  - **Mattress/box spring**: allowed as a special note (not itemized line items).
+- **Junk Removal / Haul Away** (Junk + Dump are the same service)
+  - Disposal may be included in the **total**
+  - Disposal is **NOT itemized** as a customer fee line/toggle
+  - Mattress/box spring is **note-only**
 
 - **Scrap Pickup**
-  - **Curbside/outside:** $0 (picked up next time we’re in the area)
-  - **Inside removal:** $30 flat
-  - Scrap pickup bypasses labour/travel/disposal logic (flat-rate only).
+  - Curbside/outside: **$0**
+  - Inside removal: **$30 flat**
+  - Scrap bypasses labour/travel/disposal logic completely
 
-Other service types may exist for future expansion (moving, delivery, demolition), but the primary enforced rules above are the current operational defaults.
+---
+
+## Booking request workflow (customer → admin approval)
+
+1) Customer generates an estimate on `/`
+2) Customer clicks **Request Booking** and submits date/time window
+3) System stores a `quote_requests` row with status `customer_requested`
+4) Admin reviews in `/admin` and either:
+   - Approves → status `admin_approved`
+   - Rejects → status `rejected`
+
+---
+
+## Admin access protection (recommended for Render)
+
+If your deployment is public, set an admin token:
+
+- Environment variable: `BAYDELIVERY_ADMIN_TOKEN`
+
+Admin endpoints require:
+
+- Header: `X-Admin-Token: <token>` OR query param `?token=<token>`
+
+Admin page:
+
+- `/admin`
+
+---
 
 ## Running locally (Windows PowerShell)
 

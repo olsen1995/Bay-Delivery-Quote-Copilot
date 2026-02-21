@@ -146,6 +146,7 @@ def save_quote(
 
 
 def get_quote(quote_id: str) -> Optional[Dict[str, Any]]:
+    """Returns the stored response_json only (kept for backward compatibility)."""
     with _connect() as conn:
         row = conn.execute(
             "SELECT response_json FROM quotes WHERE quote_id = ?",
@@ -154,6 +155,30 @@ def get_quote(quote_id: str) -> Optional[Dict[str, Any]]:
         if not row:
             return None
         return json.loads(row["response_json"])
+
+
+def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
+    """Returns full quote record including request_json + response_json for workflow features."""
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT quote_id, created_at, job_type, total_cad, request_json, response_json
+            FROM quotes
+            WHERE quote_id = ?
+            """,
+            (quote_id,),
+        ).fetchone()
+        if not row:
+            return None
+
+        return {
+            "quote_id": row["quote_id"],
+            "created_at": row["created_at"],
+            "job_type": row["job_type"],
+            "total_cad": float(row["total_cad"]),
+            "request_obj": json.loads(row["request_json"]),
+            "response_obj": json.loads(row["response_json"]),
+        }
 
 
 def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
@@ -338,84 +363,6 @@ def list_jobs(
     ]
 
 
-def update_job_fields(
-    job_id: str,
-    *,
-    status: Optional[str] = None,
-    customer_name: Optional[str] = None,
-    customer_phone: Optional[str] = None,
-    job_address: Optional[str] = None,
-    job_description_customer: Optional[str] = None,
-    job_description_internal: Optional[str] = None,
-    scheduled_start: Optional[str] = None,
-    scheduled_end: Optional[str] = None,
-    payment_method: Optional[str] = None,
-    total_cad: Optional[float] = None,
-    paid_cad: Optional[float] = None,
-    notes: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
-    job = get_job(job_id)
-    if not job:
-        return None
-
-    if status is not None:
-        job["status"] = status
-    if customer_name is not None:
-        job["customer_name"] = customer_name
-    if customer_phone is not None:
-        job["customer_phone"] = customer_phone
-    if job_address is not None:
-        job["job_address"] = job_address
-    if job_description_customer is not None:
-        job["job_description_customer"] = job_description_customer
-    if job_description_internal is not None:
-        job["job_description_internal"] = job_description_internal
-    if scheduled_start is not None:
-        job["scheduled_start"] = scheduled_start
-    if scheduled_end is not None:
-        job["scheduled_end"] = scheduled_end
-    if payment_method is not None:
-        job["payment_method"] = payment_method
-    if notes is not None:
-        job["notes"] = notes
-
-    if total_cad is not None:
-        new_total = max(0.0, float(total_cad))
-        job["total_cad"] = new_total
-        paid_now = float(job.get("paid_cad", 0.0))
-        job["owing_cad"] = max(0.0, new_total - paid_now)
-
-    if paid_cad is not None:
-        paid = max(0.0, float(paid_cad))
-        total_now = float(job.get("total_cad", 0.0))
-        job["paid_cad"] = paid
-        job["owing_cad"] = max(0.0, total_now - paid)
-
-    save_job(
-        {
-            "job_id": job["job_id"],
-            "created_at": job["created_at"],
-            "quote_id": job["quote_id"],
-            "status": job["status"],
-            "customer_name": job.get("customer_name"),
-            "customer_phone": job.get("customer_phone"),
-            "job_address": job.get("job_address"),
-            "job_description_customer": job.get("job_description_customer"),
-            "job_description_internal": job.get("job_description_internal"),
-            "scheduled_start": job.get("scheduled_start"),
-            "scheduled_end": job.get("scheduled_end"),
-            "payment_method": job.get("payment_method"),
-            "total_cad": float(job.get("total_cad", 0.0)),
-            "paid_cad": float(job.get("paid_cad", 0.0)),
-            "owing_cad": float(job.get("owing_cad", 0.0)),
-            "notes": job.get("notes"),
-            "job_json": job,
-        }
-    )
-
-    return job
-
-
 # =========================
 # Quote Requests
 # =========================
@@ -547,16 +494,6 @@ def update_quote_request(
     request_id: str,
     *,
     status: Optional[str] = None,
-    quote_id: Optional[str] = None,
-    cash_total_cad: Optional[float] = None,
-    emt_total_cad: Optional[float] = None,
-    customer_name: Optional[str] = None,
-    customer_phone: Optional[str] = None,
-    job_address: Optional[str] = None,
-    job_description_customer: Optional[str] = None,
-    job_description_internal: Optional[str] = None,
-    service_type: Optional[str] = None,
-    request_json: Optional[Dict[str, Any]] = None,
     notes: Optional[str] = None,
     requested_job_date: Optional[str] = None,
     requested_time_window: Optional[str] = None,
@@ -571,29 +508,8 @@ def update_quote_request(
 
     if status is not None:
         updated["status"] = status
-    if quote_id is not None:
-        updated["quote_id"] = quote_id
-    if cash_total_cad is not None:
-        updated["cash_total_cad"] = float(cash_total_cad)
-    if emt_total_cad is not None:
-        updated["emt_total_cad"] = float(emt_total_cad)
-    if customer_name is not None:
-        updated["customer_name"] = customer_name
-    if customer_phone is not None:
-        updated["customer_phone"] = customer_phone
-    if job_address is not None:
-        updated["job_address"] = job_address
-    if job_description_customer is not None:
-        updated["job_description_customer"] = job_description_customer
-    if job_description_internal is not None:
-        updated["job_description_internal"] = job_description_internal
-    if service_type is not None:
-        updated["service_type"] = service_type
-    if request_json is not None:
-        updated["request_json"] = request_json
     if notes is not None:
         updated["notes"] = notes
-
     if requested_job_date is not None:
         updated["requested_job_date"] = requested_job_date
     if requested_time_window is not None:
