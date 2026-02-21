@@ -16,7 +16,6 @@ from app.quote_engine import calculate_quote
 from app.storage import init_db, save_quote
 
 try:
-    # Python 3.9+
     from zoneinfo import ZoneInfo
 except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
@@ -54,7 +53,7 @@ def root():
 
 
 class ServiceType(str, Enum):
-    haul_away = "haul_away"         # junk + dump are the same
+    haul_away = "haul_away"
     scrap_pickup = "scrap_pickup"
     small_move = "small_move"
     item_delivery = "item_delivery"
@@ -118,8 +117,7 @@ class QuoteRequest(BaseModel):
 
 class QuoteResponse(BaseModel):
     quote_id: str
-    created_at: str               # UTC ISO-8601
-    created_at_local: str         # America/Toronto ISO-8601
+    created_at: str  # America/Toronto ISO-8601 with offset
     currency: str = CAD
     service_type: ServiceType
     total_cash_cad: NonNegFloat
@@ -127,24 +125,17 @@ class QuoteResponse(BaseModel):
     disclaimer: str
 
 
-def _now_utc_and_local() -> tuple[str, str]:
-    """
-    Returns (utc_iso, local_iso).
-    utc_iso ends with 'Z' for clarity.
-    """
-    now_utc = datetime.now(timezone.utc)
+def _now_local_iso() -> str:
+    # Use timezone-aware local time so it stays correct across DST
+    now_utc = datetime.now(timezone.utc).replace(microsecond=0)
 
     if ZoneInfo is not None:
-        local_tz = ZoneInfo(LOCAL_TZ_NAME)
-        now_local = now_utc.astimezone(local_tz)
+        tz = ZoneInfo(LOCAL_TZ_NAME)
+        now_local = now_utc.astimezone(tz).replace(microsecond=0)
     else:
-        # Fallback: if ZoneInfo unavailable, use system local time
-        now_local = datetime.now()
+        now_local = datetime.now().replace(microsecond=0)
 
-    utc_iso = now_utc.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    # Keep offset in local time (e.g. -05:00)
-    local_iso = now_local.replace(microsecond=0).isoformat()
-    return utc_iso, local_iso
+    return now_local.isoformat()
 
 
 @app.get("/health")
@@ -176,22 +167,23 @@ def quote_calculate(req: QuoteRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     quote_id = str(uuid4())
-    created_at, created_at_local = _now_utc_and_local()
+    created_at_local = _now_local_iso()
 
     internal = result.get("_internal", {})
+    normalized_job_type = str(result.get("service_type", req.service_type.value))
 
+    # Store local timestamp (simple ops view)
     save_quote(
         quote_id=quote_id,
-        created_at=created_at,
-        job_type=str(result.get("service_type", req.service_type.value)),  # store normalized
+        created_at=created_at_local,
+        job_type=normalized_job_type,
         total_cad=float(result["total_cash_cad"]),
         request_obj=req.model_dump(),
         response_obj={
             "quote_id": quote_id,
-            "created_at": created_at,
-            "created_at_local": created_at_local,
+            "created_at": created_at_local,
             "currency": CAD,
-            "service_type": str(result.get("service_type", req.service_type.value)),
+            "service_type": normalized_job_type,
             "total_cash_cad": float(result["total_cash_cad"]),
             "total_emt_cad": float(result["total_emt_cad"]),
             "disclaimer": str(result["disclaimer"]),
@@ -201,8 +193,7 @@ def quote_calculate(req: QuoteRequest):
 
     return QuoteResponse(
         quote_id=quote_id,
-        created_at=created_at,
-        created_at_local=created_at_local,
+        created_at=created_at_local,
         service_type=req.service_type,
         total_cash_cad=float(result["total_cash_cad"]),
         total_emt_cad=float(result["total_emt_cad"]),

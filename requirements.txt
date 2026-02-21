@@ -7,5 +7,5 @@ python-dotenv
 python-multipart>=0.0.9
 apscheduler
 openai
-# Critical: avoid AnyIO v4 module layout changes that can break FastAPI/Starlette combos
 anyio==3.7.1
+requests

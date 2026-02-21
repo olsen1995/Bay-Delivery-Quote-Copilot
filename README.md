@@ -1,123 +1,41 @@
-# 🚛 Bay Delivery Quote Copilot
+# Bay Delivery – Quote Copilot
 
-Backend system for generating customer job estimates, managing quote approvals, and tracking Bay Delivery operations.
+Local quote/estimate tool for Bay Delivery (North Bay, Ontario).  
+This project provides a simple web UI plus a FastAPI backend to generate customer-safe estimates.
 
-Deployed on Render:
-https://bay-delivery-quote-copilot.onrender.com
+## What it does
 
----
+- Customer-facing quote form (served at `/`)
+- API endpoint to calculate quotes: `POST /quote/calculate`
+- Stores each quote request + internal breakdown for admin review (SQLite)
 
-## 🧠 What This System Does
+## Core pricing rules (current)
 
-- Generate customer job estimates
-- Track submitted quote requests
-- Admin review & approval workflow
-- Job tracking system
-- Cash vs EMT pricing logic
-- Mattress & box spring disposal logic
-- Simple database storage (SQLite)
+### Tax policy
 
----
+- **Cash:** no HST
+- **EMT / e-transfer:** add **13% HST** to the total
 
-## 📦 Core Features
+### Service types
 
-### 🔹 Customer Side
-- Submit quote requests
-- View estimate totals
-- Accept quotes
-- Request job date (minimum next day)
+- **Junk Removal / Haul Away** (Junk + Dump are treated as the same service)
+  - The estimate total may include disposal/dump handling internally.
+  - **Dump/disposal is NOT itemized** on the customer-facing output.
+  - **Mattress/box spring**: allowed as a special note (not itemized line items).
 
-### 🔹 Admin Side
-- Secure admin login
-- Review quote submissions
-- Approve or reject jobs
-- Convert approved quotes into active jobs
-- Track job status
+- **Scrap Pickup**
+  - **Curbside/outside:** $0 (picked up next time we’re in the area)
+  - **Inside removal:** $30 flat
+  - Scrap pickup bypasses labour/travel/disposal logic (flat-rate only).
 
----
+Other service types may exist for future expansion (moving, delivery, demolition), but the primary enforced rules above are the current operational defaults.
 
-## 💰 Pricing Rules
+## Running locally (Windows PowerShell)
 
-- Minimum job: $50
-- EMT payments: +13% HST
-- Mattress disposal: $50 each
-- Box spring disposal: $50 each
-- Labour + disposal fees shown separately
-- Final price subject to in-person review
+### Create/activate venv (recommended: Python 3.11)
 
----
-
-## 🛠️ Tech Stack
-
-- FastAPI
-- SQLite
-- Uvicorn
-- Render (Deployment)
-- Pydantic
-- Python 3.11
-
----
-
-## 🚀 Running Locally
-
-```bash
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Visit:
-http://127.0.0.1:8000/health
-
----
-
-## 🌐 Deployment (Render)
-
-Build Command:
-```
-pip install -r requirements.txt
-```
-
-Start Command:
-```
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
-
----
-
-## 🔐 Environment Variables
-
-Required:
-
-```
-ADMIN_USERNAME=your_admin_username
-ADMIN_PASSWORD=your_admin_password
-```
-
-Optional (future):
-```
-GOOGLE_MAPS_API_KEY=your_key
-BAYDELIVERY_BASE_ADDRESS=your_base_address
-```
-
----
-
-## 🗺️ Roadmap
-
-- Frontend customer quote form
-- Admin dashboard UI
-- Google Calendar auto-booking
-- SMS notifications
-- Distance auto-calculation (Google Maps API)
-- Multi-trip pricing logic
-- Analytics dashboard
-
----
-
-## 📍 Service Area
-
-North Bay, Ontario  
-Surrounding areas upon request
-
----
-
-Built for real-world operations.
