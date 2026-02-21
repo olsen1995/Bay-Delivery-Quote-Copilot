@@ -2,30 +2,79 @@
   "business_name": "Bay Delivery",
   "service_area": "North Bay, Ontario",
   "currency": "CAD",
+  "tax_policy": {
+    "cash_hst_rate": 0.0,
+    "emt_hst_rate": 0.13,
+    "note": "Cash is tax-free; EMT/e-transfer adds 13% HST."
+  },
+  "service_type_aliases": {
+    "dump_run": "haul_away",
+    "junk_removal": "haul_away",
+    "junk": "haul_away",
+    "haulaway": "haul_away",
+    "moving": "small_move",
+    "delivery": "item_delivery"
+  },
   "services": {
-    "dump_run": {
-      "hourly_rate": 95,
-      "minimum_hours": 1
-    },
-    "moving": {
-      "hourly_rate": 110,
-      "minimum_hours": 2
+    "haul_away": {
+      "label": "Junk Removal / Haul Away",
+      "hourly_rate_primary": 20,
+      "hourly_rate_helper": 16,
+      "minimum_hours": 1,
+      "minimum_total": 50,
+      "includes_text": "We load, haul, and dispose — removal & disposal included (if required).",
+      "disposal_allowance_by_bags": {
+        "tiers": [
+          { "max_bags": 5, "allowance": 50 },
+          { "max_bags": 15, "allowance": 80 },
+          { "max_bags": 9999, "allowance": 120 }
+        ],
+        "note": "Included in estimate total only (not itemized)."
+      },
+      "mattress_boxspring": {
+        "enabled": true,
+        "fee_each": 50,
+        "customer_note": "Mattresses/box springs may have an additional disposal cost if included.",
+        "note": "Fee is included in total only (not itemized)."
+      }
     },
     "scrap_pickup": {
-      "hourly_rate": 85,
-      "minimum_hours": 1
+      "label": "Scrap Pickup",
+      "flat_rates": {
+        "curbside": 0,
+        "inside": 30
+      },
+      "note": "Flat-rate only; bypasses labour/travel/disposal."
+    },
+    "small_move": {
+      "label": "Small Move",
+      "hourly_rate_primary": 20,
+      "hourly_rate_helper": 16,
+      "minimum_hours": 4,
+      "minimum_crew": 2,
+      "default_crew": 3,
+      "minimum_total": 60
+    },
+    "item_delivery": {
+      "label": "Item Delivery",
+      "minimum_total": 50
     },
     "demolition": {
-      "hourly_rate": 120,
-      "minimum_hours": 2
+      "label": "Demolition",
+      "hourly_rate_primary": 20,
+      "hourly_rate_helper": 16,
+      "minimum_hours": 2,
+      "minimum_crew": 2,
+      "default_crew": 4,
+      "minimum_total": 75
     }
   },
   "minimum_charges": {
     "gas": 20,
     "wear_and_tear": 20
   },
-  "notes": [
-    "Quotes are estimates pending site confirmation.",
-    "Dump fees vary depending on material and weight."
-  ]
+  "customer_disclaimer": {
+    "base": "This estimate is based on the information provided and may change after an in-person view (stairs, heavy items, access, actual load size, multiple trips, etc.).",
+    "include_removal_disposal": true
+  }
 }
