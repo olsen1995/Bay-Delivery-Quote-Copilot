@@ -131,8 +131,14 @@
 
   <!-- COMMON -->
   <div class="section">
-    <label for="description">Description (What are we moving/removing? Any heavy items?)</label>
-    <textarea id="description" name="description" required minlength="8" placeholder="Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner."></textarea>
+    <label for="description" id="description_label">Description (What are we moving/removing? Any heavy items?)</label>
+    <textarea
+      id="description"
+      name="description"
+      required
+      minlength="8"
+      placeholder="Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner."
+    ></textarea>
 
     <div class="row">
       <div>
@@ -182,6 +188,9 @@
   const hoursHint = document.getElementById("hours_hint");
   const hoursEl = document.getElementById("estimated_hours");
 
+  const descEl = document.getElementById("description");
+  const descLabelEl = document.getElementById("description_label");
+
   let lastQuoteId = null;
 
   function applyServiceDefaults() {
@@ -196,6 +205,26 @@
     routeSection.classList.toggle("hide", !needsRoute);
     pickupEl.required = needsRoute;
     dropoffEl.required = needsRoute;
+
+    // Service-specific description prompts (placeholder + label)
+    const descPlaceholders = {
+      haul_away: "Example: 12 garbage bags, 1 couch, small dresser. Basement stairs. Tight hallway corner.",
+      scrap_pickup: "Example: 1 broken fridge, 2 metal shelves, 1 BBQ. Curbside pickup (or inside removal).",
+      small_move: "Example: 1 bed + frame, 2 dressers, 15 boxes. Any stairs/elevator? Tight corners?",
+      item_delivery: "Example: Marketplace couch. Pickup + drop-off addresses. Any stairs/help needed?",
+      demolition: "Example: Remove old flooring in a 12x14 room and haul debris. Any nails/screws present?"
+    };
+
+    const descLabels = {
+      haul_away: "Description (What are we removing/hauling away? Any heavy items?)",
+      scrap_pickup: "Description (What scrap items are we picking up? Any large/heavy pieces?)",
+      small_move: "Description (What are we moving? Approx boxes/furniture + any heavy items?)",
+      item_delivery: "Description (What item are we delivering? Size/weight + any stairs?)",
+      demolition: "Description (What are we demolishing/removing? Materials + access notes?)"
+    };
+
+    descEl.placeholder = descPlaceholders[service] || descPlaceholders.haul_away;
+    descLabelEl.textContent = descLabels[service] || descLabels.haul_away;
 
     let defaultCrew = 1;
     let minCrew = 1;
