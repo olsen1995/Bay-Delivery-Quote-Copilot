@@ -16,7 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 
-
 from app.storage import (
     init_db,
     save_quote,
@@ -56,10 +55,7 @@ INDEX_HTML_PATH = BASE_DIR / "static" / "index.html"
 
 @app.get("/")
 def root():
-    """
-    Serve the quote page.
-    Keeps API routes like /health working normally.
-    """
+    """Serve the quote page."""
     if not INDEX_HTML_PATH.exists():
         raise HTTPException(
             status_code=500,
@@ -74,8 +70,8 @@ def root():
 
 HST_RATE_EMT = 0.13
 
-# Minimums per service (your call)
-MINIMUM_DUMP_RUN_CAD = 50.0
+# Minimums per service
+MINIMUM_HAUL_AWAY_CAD = 50.0
 MINIMUM_MOVING_CAD = 60.0
 MINIMUM_DEMOLITION_CAD = 75.0
 MINIMUM_OTHER_CAD = 50.0
@@ -84,28 +80,28 @@ MINIMUM_OTHER_CAD = 50.0
 MIN_GAS_CAD = 20.0
 MIN_WEAR_CAD = 20.0
 
-# Labour rates (internal defaults — you can tune later)
+# Labour rates (internal defaults — tune later)
 DEFAULT_PRIMARY_RATE_CAD = 20.0
 DEFAULT_HELPER_RATE_CAD = 16.0
 
-# Disposal
+# Mattress/boxspring (internal only: included in total; customer sees note, not itemized $)
 MATTRESS_FEE_EACH_CAD = 50.0
 BOXSPRING_FEE_EACH_CAD = 50.0
 
-# Dump run: bag tiers (includes dump travel + margin)
+# Haul-away disposal allowance (bag tiers; includes dump travel + margin)
 BAG_TIER_SMALL_MAX = 5
 BAG_TIER_MEDIUM_MAX = 15
 BAG_TIER_SMALL_PRICE = 50.0
 BAG_TIER_MEDIUM_PRICE = 80.0
 BAG_TIER_LARGE_PRICE = 120.0
 
-# Scrap pickup
+# Scrap pickup (flat rate)
 SCRAP_CURBSIDE_PRICE = 0.0
 SCRAP_INSIDE_PRICE = 30.0
 
-# Cash rounding (you don’t like $22.50 etc)
+
 def round_cash_to_nearest_5(x: float) -> float:
-    # nearest $5
+    """Cash: nearest $5."""
     return float(int((x + 2.5) // 5) * 5)
 
 
@@ -114,7 +110,7 @@ def round_cash_to_nearest_5(x: float) -> float:
 # =========================
 
 class ServiceType(str, Enum):
-    dump_run = "dump_run"
+    haul_away = "haul_away"  # junk removal / dump run (same)
     scrap_pickup = "scrap_pickup"
     small_move = "small_move"  # canonical internal value
     item_delivery = "item_delivery"
@@ -122,9 +118,16 @@ class ServiceType(str, Enum):
 
     @classmethod
     def normalize(cls, value: str) -> "ServiceType":
-        # Allow both 'small_move' and 'small_moving' externally.
-        if value == "small_moving":
-            return cls.small_move
+        # Back-compat aliases
+        aliases = {
+            "dump_run": cls.haul_away,
+            "junk_removal": cls.haul_away,
+            "junk": cls.haul_away,
+            "haulaway": cls.haul_away,
+            "small_moving": cls.small_move,
+        }
+        if value in aliases:
+            return aliases[value]
         return cls(value)
 
 
@@ -149,7 +152,7 @@ PosInt = Annotated[int, Field(ge=1)]
 # =========================
 
 class QuoteRequest(BaseModel):
-    service_type: ServiceType = ServiceType.dump_run
+    service_type: ServiceType = ServiceType.haul_away
 
     @field_validator("service_type", mode="before")
     @classmethod
@@ -161,7 +164,7 @@ class QuoteRequest(BaseModel):
     customer_phone: Optional[str] = None
     job_address: Optional[str] = None
 
-    # Description (this is what we will eventually "scan" / refine with)
+    # Description (stored for admin review)
     description: Optional[str] = Field(
         None,
         description="Customer description of items / job details. Stored for admin review.",
@@ -176,10 +179,10 @@ class QuoteRequest(BaseModel):
         description="Optional crew size. We clamp to service minimums.",
     )
 
-    # Dump run specific
+    # Haul-away specific (optional)
     garbage_bag_count: NonNegInt = 0
 
-    # Mattresses / boxsprings (shown explicitly to customer only if >0)
+    # Mattress / box spring (customer indicates quantity; we include in total, show note only)
     mattresses_count: NonNegInt = 0
     box_springs_count: NonNegInt = 0
 
@@ -198,17 +201,9 @@ class QuoteResponse(BaseModel):
     currency: str = CAD
     service_type: ServiceType
 
-    # Minimal customer-facing totals
+    # Customer-facing totals only
     total_cash_cad: NonNegFloat
     total_emt_cad: NonNegFloat
-
-    # helpful metadata for admin + debugging
-    crew_size: int
-    travel_min_cad: NonNegFloat
-    labor_cad: NonNegFloat
-    disposal_cad: NonNegFloat
-    mattress_boxspring_cad: NonNegFloat
-    scrap_cad: NonNegFloat
 
     disclaimer: str
 
@@ -217,9 +212,10 @@ class QuoteResponse(BaseModel):
 # Quote Logic
 # =========================
 
+
 def _service_minimum(service_type: ServiceType) -> float:
-    if service_type == ServiceType.dump_run:
-        return MINIMUM_DUMP_RUN_CAD
+    if service_type == ServiceType.haul_away:
+        return MINIMUM_HAUL_AWAY_CAD
     if service_type == ServiceType.small_move:
         return MINIMUM_MOVING_CAD
     if service_type == ServiceType.demolition:
@@ -229,9 +225,9 @@ def _service_minimum(service_type: ServiceType) -> float:
 
 def _service_min_crew(service_type: ServiceType) -> int:
     # Your guidance:
-    # - dump_run: can be 1 (sometimes 2)
+    # - haul_away: can be 1 (sometimes 2)
     # - moving: never below 2; default 3
-    # - demolition: usually 2+; common 4 on big jobs (we set minimum 2, default 4)
+    # - demolition: usually 2+
     if service_type == ServiceType.small_move:
         return 2
     if service_type == ServiceType.demolition:
@@ -252,20 +248,17 @@ def _calc_travel_min() -> float:
 
 
 def _calc_labor(estimated_hours: float, crew_size: int) -> float:
-    # Simple but realistic:
-    # primary + (crew-1)*helper
+    """primary + (crew-1)*helper"""
     if estimated_hours <= 0:
         return 0.0
     hourly_total = DEFAULT_PRIMARY_RATE_CAD + max(0, crew_size - 1) * DEFAULT_HELPER_RATE_CAD
     return float(estimated_hours * hourly_total)
 
 
-def _calc_dump_run_disposal(garbage_bag_count: int) -> float:
+def _calc_haul_away_disposal(garbage_bag_count: int) -> float:
+    # This is an internal allowance (dump is by yards, varies; we keep simple tiers).
     if garbage_bag_count <= 0:
-        # if it's a dump run, even 0 bags could be "junk items" — but we only apply this bag-tier
-        # when they give us bags. Minimums + labour/travel cover the rest.
         return 0.0
-
     if garbage_bag_count <= BAG_TIER_SMALL_MAX:
         return float(BAG_TIER_SMALL_PRICE)
     if garbage_bag_count <= BAG_TIER_MEDIUM_MAX:
@@ -277,15 +270,43 @@ def _calc_mattress_boxspring(m: int, b: int) -> float:
     return float(m * MATTRESS_FEE_EACH_CAD + b * BOXSPRING_FEE_EACH_CAD)
 
 
-def _calc_scrap(req: QuoteRequest) -> float:
-    if req.service_type != ServiceType.scrap_pickup:
-        return 0.0
-    if req.scrap_pickup_location == ScrapPickupLocation.curbside:
+def _calc_scrap(location: ScrapPickupLocation) -> float:
+    if location == ScrapPickupLocation.curbside:
         return float(SCRAP_CURBSIDE_PRICE)
     return float(SCRAP_INSIDE_PRICE)
 
 
 def calculate_quote(req: QuoteRequest) -> Dict[str, Any]:
+    # -----------------------------
+    # 1) Scrap pickup: hard lock
+    # -----------------------------
+    if req.service_type == ServiceType.scrap_pickup:
+        cash_total = float(_calc_scrap(req.scrap_pickup_location))
+        emt_total = round(cash_total * (1.0 + HST_RATE_EMT), 2)
+
+        disclaimer = (
+            "Scrap pickup is flat-rate: curbside is free (picked up next time we’re in the area); "
+            "inside removal is $30. Cash is tax-free; EMT/e-transfer adds 13% HST."
+        )
+
+        return {
+            "total_cash_cad": round(cash_total, 2),
+            "total_emt_cad": round(emt_total, 2),
+            "disclaimer": disclaimer,
+            # Internal breakdown (stored only; not returned to customer)
+            "_internal": {
+                "crew_size": 1,
+                "travel_min_cad": 0.0,
+                "labor_cad": 0.0,
+                "disposal_cad": 0.0,
+                "mattress_boxspring_cad": 0.0,
+                "scrap_cad": cash_total,
+            },
+        }
+
+    # -----------------------------
+    # 2) All other services
+    # -----------------------------
     service_min = _service_minimum(req.service_type)
 
     min_crew = _service_min_crew(req.service_type)
@@ -299,13 +320,12 @@ def calculate_quote(req: QuoteRequest) -> Dict[str, Any]:
     labor = _calc_labor(float(req.estimated_hours), crew)
 
     disposal = 0.0
-    if req.service_type == ServiceType.dump_run:
-        disposal = _calc_dump_run_disposal(int(req.garbage_bag_count))
+    if req.service_type == ServiceType.haul_away:
+        disposal = _calc_haul_away_disposal(int(req.garbage_bag_count))
 
     mattress_boxspring = _calc_mattress_boxspring(int(req.mattresses_count), int(req.box_springs_count))
-    scrap = _calc_scrap(req)
 
-    raw_cash = travel + labor + disposal + mattress_boxspring + scrap
+    raw_cash = travel + labor + disposal + mattress_boxspring
 
     # enforce minimum per service
     cash_before_round = max(service_min, raw_cash)
@@ -313,25 +333,32 @@ def calculate_quote(req: QuoteRequest) -> Dict[str, Any]:
     # cash: round to nearest $5
     cash_total = round_cash_to_nearest_5(cash_before_round)
 
-    # EMT: cents are fine (don’t “round to 5”)
+    # EMT: cents are fine
     emt_total = round(cash_total * (1.0 + HST_RATE_EMT), 2)
 
+    # Customer-facing disclaimer
+    # (No dump fee line items. Mattress note allowed.)
     disclaimer = (
-        "This estimate is solely based on the information provided and may change after an in-person view "
+        "This estimate is based on the information provided and may change after an in-person view "
         "(stairs, heavy items, access, actual load size, multiple trips, etc.). "
+        "Removal & disposal included (if required). "
+        "Mattresses/box springs may have an additional disposal cost if included. "
         "Cash is tax-free; EMT/e-transfer adds 13% HST."
     )
 
     return {
         "total_cash_cad": round(cash_total, 2),
         "total_emt_cad": round(emt_total, 2),
-        "crew_size": crew,
-        "travel_min_cad": round(travel, 2),
-        "labor_cad": round(labor, 2),
-        "disposal_cad": round(disposal, 2),
-        "mattress_boxspring_cad": round(mattress_boxspring, 2),
-        "scrap_cad": round(scrap, 2),
         "disclaimer": disclaimer,
+        # Internal breakdown (stored only; not returned to customer)
+        "_internal": {
+            "crew_size": int(crew),
+            "travel_min_cad": round(travel, 2),
+            "labor_cad": round(labor, 2),
+            "disposal_cad": round(disposal, 2),
+            "mattress_boxspring_cad": round(mattress_boxspring, 2),
+            "scrap_cad": 0.0,
+        },
     }
 
 
@@ -356,7 +383,9 @@ def quote_calculate(req: QuoteRequest):
     quote_id = str(uuid4())
     created_at = datetime.utcnow().isoformat() + "Z"
 
-    # Store full request + response for admin review later
+    internal = result.get("_internal", {})
+
+    # Store full request + internal breakdown for admin review later
     save_quote(
         quote_id=quote_id,
         created_at=created_at,
@@ -368,7 +397,11 @@ def quote_calculate(req: QuoteRequest):
             "created_at": created_at,
             "currency": CAD,
             "service_type": req.service_type.value,
-            **result,
+            "total_cash_cad": float(result["total_cash_cad"]),
+            "total_emt_cad": float(result["total_emt_cad"]),
+            "disclaimer": str(result["disclaimer"]),
+            # keep internal breakdown stored, not returned
+            "internal": internal,
         },
     )
 
@@ -378,11 +411,5 @@ def quote_calculate(req: QuoteRequest):
         service_type=req.service_type,
         total_cash_cad=float(result["total_cash_cad"]),
         total_emt_cad=float(result["total_emt_cad"]),
-        crew_size=int(result["crew_size"]),
-        travel_min_cad=float(result["travel_min_cad"]),
-        labor_cad=float(result["labor_cad"]),
-        disposal_cad=float(result["disposal_cad"]),
-        mattress_boxspring_cad=float(result["mattress_boxspring_cad"]),
-        scrap_cad=float(result["scrap_cad"]),
         disclaimer=str(result["disclaimer"]),
     )
