@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Annotated
@@ -14,6 +14,12 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.quote_engine import calculate_quote
 from app.storage import init_db, save_quote
+
+try:
+    # Python 3.9+
+    from zoneinfo import ZoneInfo
+except Exception:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
 
 APP_VERSION = "0.9.0"
 
@@ -34,6 +40,7 @@ app.add_middleware(
 init_db()
 
 CAD = "CAD"
+LOCAL_TZ_NAME = "America/Toronto"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 INDEX_HTML_PATH = BASE_DIR / "static" / "index.html"
@@ -44,9 +51,6 @@ def root():
     if not INDEX_HTML_PATH.exists():
         raise HTTPException(status_code=500, detail=f"Missing frontend file: {INDEX_HTML_PATH.as_posix()}")
     return FileResponse(INDEX_HTML_PATH)
-
-
-HST_RATE_EMT = 0.13
 
 
 class ServiceType(str, Enum):
@@ -114,12 +118,33 @@ class QuoteRequest(BaseModel):
 
 class QuoteResponse(BaseModel):
     quote_id: str
-    created_at: str
+    created_at: str               # UTC ISO-8601
+    created_at_local: str         # America/Toronto ISO-8601
     currency: str = CAD
     service_type: ServiceType
     total_cash_cad: NonNegFloat
     total_emt_cad: NonNegFloat
     disclaimer: str
+
+
+def _now_utc_and_local() -> tuple[str, str]:
+    """
+    Returns (utc_iso, local_iso).
+    utc_iso ends with 'Z' for clarity.
+    """
+    now_utc = datetime.now(timezone.utc)
+
+    if ZoneInfo is not None:
+        local_tz = ZoneInfo(LOCAL_TZ_NAME)
+        now_local = now_utc.astimezone(local_tz)
+    else:
+        # Fallback: if ZoneInfo unavailable, use system local time
+        now_local = datetime.now()
+
+    utc_iso = now_utc.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # Keep offset in local time (e.g. -05:00)
+    local_iso = now_local.replace(microsecond=0).isoformat()
+    return utc_iso, local_iso
 
 
 @app.get("/health")
@@ -129,12 +154,12 @@ def health():
         "version": APP_VERSION,
         "base_address": os.getenv("BAYDELIVERY_BASE_ADDRESS"),
         "distance_autocalc_enabled": bool(os.getenv("GOOGLE_MAPS_API_KEY")),
+        "local_timezone": LOCAL_TZ_NAME,
     }
 
 
 @app.post("/quote/calculate", response_model=QuoteResponse)
 def quote_calculate(req: QuoteRequest):
-    # Default crew if missing
     crew = int(req.crew_size) if req.crew_size is not None else 1
 
     try:
@@ -151,26 +176,25 @@ def quote_calculate(req: QuoteRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     quote_id = str(uuid4())
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at, created_at_local = _now_utc_and_local()
 
     internal = result.get("_internal", {})
 
-    # Store full request + internal breakdown for admin review later
     save_quote(
         quote_id=quote_id,
         created_at=created_at,
-        job_type=req.service_type.value,
+        job_type=str(result.get("service_type", req.service_type.value)),  # store normalized
         total_cad=float(result["total_cash_cad"]),
         request_obj=req.model_dump(),
         response_obj={
             "quote_id": quote_id,
             "created_at": created_at,
+            "created_at_local": created_at_local,
             "currency": CAD,
-            "service_type": req.service_type.value,
+            "service_type": str(result.get("service_type", req.service_type.value)),
             "total_cash_cad": float(result["total_cash_cad"]),
             "total_emt_cad": float(result["total_emt_cad"]),
             "disclaimer": str(result["disclaimer"]),
-            # internal stays stored for admin, not displayed in UI
             "internal": internal,
         },
     )
@@ -178,6 +202,7 @@ def quote_calculate(req: QuoteRequest):
     return QuoteResponse(
         quote_id=quote_id,
         created_at=created_at,
+        created_at_local=created_at_local,
         service_type=req.service_type,
         total_cash_cad=float(result["total_cash_cad"]),
         total_emt_cad=float(result["total_emt_cad"]),
