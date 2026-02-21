@@ -3,6 +3,8 @@
   "python.analysis.extraPaths": [
     "./.venv/Lib/site-packages"
   ],
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": [],
   "cSpell.words": [
     "Amana",
     "Behaviour",
@@ -43,7 +45,5 @@
     "umami",
     "undervolting",
     "Workwear"
-  ],
-  "python-envs.defaultEnvManager": "ms-python.python:system",
-  "python-envs.pythonProjects": []
+  ]
 }
