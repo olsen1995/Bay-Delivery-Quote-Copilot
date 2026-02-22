@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bay Delivery — Get a Quote</title>
+  <link rel="stylesheet" href="/static/admin.css" />
+  <link rel="stylesheet" href="/static/quote.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brandMark">BD</div>
+        <div class="brandTitle">
+          <strong>Bay Delivery</strong><br />
+          <span class="muted">Quote System</span>
+        </div>
+      </div>
+
+      <div class="toplinks">
+        <a class="badgeLink" href="/">Home</a>
+        <a class="badgeLink" href="/admin">Admin</a>
+      </div>
+    </div>
+
+    <div class="heroCard card">
+      <h1>Get a Quote</h1>
+      <p class="muted">Fill this out and we’ll calculate your quote instantly (cash vs EMT).</p>
+    </div>
+
+    <div class="card">
+      <h2>Job Details</h2>
+
+      <form id="quoteForm" class="formWrap">
+
+        <div class="row">
+          <div>
+            <label for="customer_name">Customer name</label>
+            <input id="customer_name" name="customer_name" placeholder="Austin Olsen" required />
+          </div>
+          <div>
+            <label for="customer_phone">Customer phone</label>
+            <input id="customer_phone" name="customer_phone" placeholder="705-___-____" required />
+          </div>
+        </div>
+
+        <label for="job_address">Job address</label>
+        <input id="job_address" name="job_address" placeholder="North Bay, ON" required />
+
+        <div class="row">
+          <div>
+            <label for="service_type">Service type</label>
+            <select id="service_type" name="service_type">
+              <option value="haul_away">Dump run / Junk removal</option>
+              <option value="scrap_pickup">Scrap pickup</option>
+              <option value="small_move">Small move</option>
+              <option value="item_delivery">Item delivery</option>
+              <option value="demolition">Demolition</option>
+            </select>
+          </div>
+          <div>
+            <label for="estimated_hours">Estimated hours</label>
+            <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="crew_size">Crew size</label>
+            <select id="crew_size" name="crew_size">
+              <option value="1">1 worker</option>
+              <option value="2">2 workers</option>
+            </select>
+          </div>
+          <div>
+            <label for="scrap_pickup_location">Scrap pickup location</label>
+            <select id="scrap_pickup_location" name="scrap_pickup_location">
+              <option value="curbside">Curbside (free)</option>
+              <option value="inside">Inside removal ($30)</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="4"
+          placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
+          required></textarea>
+
+        <div class="btnRow">
+          <button class="btn" id="btnCalc" type="submit">Calculate Quote</button>
+          <button class="btn secondary" id="btnClear" type="button">Clear</button>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="card resultBox hidden" id="resultBox"></div>
+
+    <div class="footer">
+      <div>Cash = no HST • EMT = +13% HST</div>
+      <div class="muted">Bay Delivery — North Bay, Ontario</div>
+    </div>
+  </div>
+
+<script>
+  const el = (id) => document.getElementById(id);
+
+  function setResult(text) {
+    const box = el("resultBox");
+    box.classList.remove("hidden");
+    box.textContent = text;
+  }
+
+  function clearForm() {
+    el("quoteForm").reset();
+    el("resultBox").classList.add("hidden");
+    el("resultBox").textContent = "";
+  }
+
+  el("btnClear").addEventListener("click", (e) => {
+    e.preventDefault();
+    clearForm();
+  });
+
+  el("quoteForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      service_type: el("service_type").value,
+      customer_name: el("customer_name").value,
+      customer_phone: el("customer_phone").value,
+      job_address: el("job_address").value,
+      pickup_address: null,
+      dropoff_address: null,
+      description: el("description").value,
+      estimated_hours: parseFloat(el("estimated_hours").value || "0"),
+      crew_size: parseInt(el("crew_size").value || "1", 10),
+      garbage_bag_count: 0,
+      mattresses_count: 0,
+      box_springs_count: 0,
+      scrap_pickup_location: el("scrap_pickup_location").value,
+      stairs: false,
+      elevator: false,
+      difficult_corner: false
+    };
+
+    try {
+      const res = await fetch("/quote/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setResult("Error:\n" + (data.detail || "Unknown error"));
+        return;
+      }
+
+      setResult(
+        "Quote ID: " + data.quote_id + "\n" +
+        "Created: " + data.created_at + "\n\n" +
+        "Cash total (no HST): $" + Number(data.total_cash_cad).toFixed(2) + " CAD\n" +
+        "EMT total (+13% HST): $" + Number(data.total_emt_cad).toFixed(2) + " CAD\n\n" +
+        "Note:\n" + data.disclaimer
+      );
+    } catch (err) {
+      setResult("Error:\nFailed to contact server.");
+    }
+  });
+</script>
+</body>
+</html>

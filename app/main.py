@@ -71,7 +71,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 HOME_HTML_PATH = STATIC_DIR / "home.html"
-QUOTE_HTML_PATH = STATIC_DIR / "index.html"
+# IMPORTANT:
+# Some deploys ended up with static/index.html not being the quote page (file mix-up).
+# We now serve a dedicated quote.html to prevent CSS/text blobs from showing on /quote.
+QUOTE_HTML_PATH = STATIC_DIR / "quote.html"
+LEGACY_INDEX_HTML_PATH = STATIC_DIR / "index.html"
+
 ADMIN_HTML_PATH = STATIC_DIR / "admin.html"
 
 if STATIC_DIR.exists():
@@ -126,7 +131,10 @@ def _require_admin(request: Request) -> None:
             raise _unauthorized_basic()
 
         username, password = decoded.split(":", 1)
-        if not (secrets.compare_digest(username, user_required) and secrets.compare_digest(password, pass_required)):
+        if not (
+            secrets.compare_digest(username, user_required)
+            and secrets.compare_digest(password, pass_required)
+        ):
             raise _unauthorized_basic()
         return
 
@@ -145,14 +153,22 @@ def home():
     # fallback if home.html isn't present yet
     if QUOTE_HTML_PATH.exists():
         return FileResponse(QUOTE_HTML_PATH)
+    if LEGACY_INDEX_HTML_PATH.exists():
+        return FileResponse(LEGACY_INDEX_HTML_PATH)
     raise HTTPException(status_code=500, detail=f"Missing frontend files under: {STATIC_DIR.as_posix()}")
 
 
 @app.get("/quote")
 def quote_page():
-    if not QUOTE_HTML_PATH.exists():
-        raise HTTPException(status_code=500, detail=f"Missing quote page: {QUOTE_HTML_PATH.as_posix()}")
-    return FileResponse(QUOTE_HTML_PATH)
+    # Serve the dedicated quote page first (prevents accidental CSS/text file being served)
+    if QUOTE_HTML_PATH.exists():
+        return FileResponse(QUOTE_HTML_PATH)
+
+    # Legacy fallback ONLY if quote.html is missing
+    if LEGACY_INDEX_HTML_PATH.exists():
+        return FileResponse(LEGACY_INDEX_HTML_PATH)
+
+    raise HTTPException(status_code=500, detail=f"Missing quote page: {QUOTE_HTML_PATH.as_posix()}")
 
 
 @app.get("/admin")
@@ -426,7 +442,6 @@ def admin_list_jobs(request: Request, limit: int = 50, status: Optional[str] = N
     return {"items": list_jobs(limit=int(limit), status=status)}
 
 
-
 @app.get("/admin/api/db/export")
 def admin_export_db(request: Request):
     _require_admin(request)
@@ -461,6 +476,7 @@ def admin_import_db(request: Request, body: AdminDBImport):
         raise HTTPException(status_code=500, detail=f"Import failed: {e}")
 
     return result
+
 
 class AdminDecision(BaseModel):
     action: str = Field(..., description="approve|reject")

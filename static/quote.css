@@ -1,0 +1,14 @@
+.btnRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.resultBox {
+  white-space: pre-wrap;
+}
+
+.hidden {
+  display: none;
+}
