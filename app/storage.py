@@ -102,7 +102,7 @@ def init_db() -> None:
             """
         )
 
-        # ✅ Workflow / booking-request columns (migrations)
+        # Workflow / booking-request columns (migrations)
         _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
         _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
         _try_add_column(conn, "quote_requests", "customer_accepted_at TEXT")
@@ -306,6 +306,50 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
         return json.loads(row["job_json"])
 
 
+def get_job_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Returns the most recent job row for a given quote_id.
+    Used to prevent duplicate job creation on admin approval.
+    """
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                job_id, created_at, quote_id, status,
+                customer_name, customer_phone, job_address,
+                scheduled_start, scheduled_end,
+                payment_method,
+                total_cad, paid_cad, owing_cad,
+                notes
+            FROM jobs
+            WHERE quote_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (quote_id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "job_id": row["job_id"],
+            "created_at": row["created_at"],
+            "quote_id": row["quote_id"],
+            "status": row["status"],
+            "customer_name": row["customer_name"],
+            "customer_phone": row["customer_phone"],
+            "job_address": row["job_address"],
+            "scheduled_start": row["scheduled_start"],
+            "scheduled_end": row["scheduled_end"],
+            "payment_method": row["payment_method"],
+            "total_cad": float(row["total_cad"]),
+            "paid_cad": float(row["paid_cad"]),
+            "owing_cad": float(row["owing_cad"]),
+            "notes": row["notes"],
+        }
+
+
 def list_jobs(
     limit: int = 50,
     status: Optional[str] = None,
@@ -332,7 +376,8 @@ def list_jobs(
             customer_name, customer_phone, job_address,
             scheduled_start, scheduled_end,
             payment_method,
-            total_cad, paid_cad, owing_cad
+            total_cad, paid_cad, owing_cad,
+            notes
         FROM jobs
         {where_sql}
         ORDER BY created_at DESC
@@ -358,6 +403,7 @@ def list_jobs(
             "total_cad": float(r["total_cad"]),
             "paid_cad": float(r["paid_cad"]),
             "owing_cad": float(r["owing_cad"]),
+            "notes": r["notes"],
         }
         for r in rows
     ]
