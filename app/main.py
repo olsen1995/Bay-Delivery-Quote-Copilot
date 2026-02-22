@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import base64
+import json
 import os
 import secrets
 from datetime import datetime, timezone
@@ -9,8 +9,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Annotated
 from uuid import uuid4
+from urllib.request import Request as UrlRequest, urlopen
+from urllib.error import URLError, HTTPError
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -46,9 +48,13 @@ LOCAL_TZ_NAME = "America/Toronto"
 # Admin auth options (either works):
 # 1) Token auth (simple)
 ADMIN_TOKEN_ENV = "BAYDELIVERY_ADMIN_TOKEN"
-# 2) Basic auth (username/password) - matches what you already set on Render
+# 2) Basic auth (username/password)
 ADMIN_USERNAME_ENV = "ADMIN_USERNAME"
 ADMIN_PASSWORD_ENV = "ADMIN_PASSWORD"
+
+# Optional (for image analysis)
+OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
+OPENAI_VISION_MODEL_ENV = "OPENAI_VISION_MODEL"  # default below
 
 
 app = FastAPI(
@@ -71,12 +77,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 HOME_HTML_PATH = STATIC_DIR / "home.html"
-# IMPORTANT:
-# Some deploys ended up with static/index.html not being the quote page (file mix-up).
-# We now serve a dedicated quote.html to prevent CSS/text blobs from showing on /quote.
 QUOTE_HTML_PATH = STATIC_DIR / "quote.html"
 LEGACY_INDEX_HTML_PATH = STATIC_DIR / "index.html"
-
 ADMIN_HTML_PATH = STATIC_DIR / "admin.html"
 
 if STATIC_DIR.exists():
@@ -92,7 +94,6 @@ def _now_local_iso() -> str:
 
 
 def _unauthorized_basic() -> HTTPException:
-    # Browser will show a login prompt if you hit /admin directly.
     return HTTPException(
         status_code=401,
         detail="Admin authentication required",
@@ -101,12 +102,6 @@ def _unauthorized_basic() -> HTTPException:
 
 
 def _require_admin(request: Request) -> None:
-    """
-    Admin protection logic:
-    - If BAYDELIVERY_ADMIN_TOKEN is set -> require token (header X-Admin-Token or ?token=)
-    - Else if ADMIN_USERNAME + ADMIN_PASSWORD are set -> require HTTP Basic Auth
-    - Else -> admin endpoints are open (NOT recommended for public Render deploy)
-    """
     token_required = os.getenv(ADMIN_TOKEN_ENV)
     if token_required:
         token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
@@ -138,19 +133,17 @@ def _require_admin(request: Request) -> None:
             raise _unauthorized_basic()
         return
 
-    # If you deploy publicly, DO NOT leave this empty.
     return
 
 
 # =========================
-# Pages (All-in-one site)
+# Pages
 # =========================
 
 @app.get("/")
 def home():
     if HOME_HTML_PATH.exists():
         return FileResponse(HOME_HTML_PATH)
-    # fallback if home.html isn't present yet
     if QUOTE_HTML_PATH.exists():
         return FileResponse(QUOTE_HTML_PATH)
     if LEGACY_INDEX_HTML_PATH.exists():
@@ -160,14 +153,10 @@ def home():
 
 @app.get("/quote")
 def quote_page():
-    # Serve the dedicated quote page first (prevents accidental CSS/text file being served)
     if QUOTE_HTML_PATH.exists():
         return FileResponse(QUOTE_HTML_PATH)
-
-    # Legacy fallback ONLY if quote.html is missing
     if LEGACY_INDEX_HTML_PATH.exists():
         return FileResponse(LEGACY_INDEX_HTML_PATH)
-
     raise HTTPException(status_code=500, detail=f"Missing quote page: {QUOTE_HTML_PATH.as_posix()}")
 
 
@@ -223,12 +212,10 @@ class QuoteRequest(BaseModel):
     def validate_service_type(cls, v):
         return normalize_service_type(v)
 
-    # Required for ALL quotes (prevents no-info estimates)
     customer_name: str = Field(..., min_length=1, max_length=120)
     customer_phone: str = Field(..., min_length=7, max_length=40)
     job_address: str = Field(..., min_length=5, max_length=240)
 
-    # Required for moving + item delivery
     pickup_address: Optional[str] = Field(None, max_length=240)
     dropoff_address: Optional[str] = Field(None, max_length=240)
 
@@ -292,6 +279,7 @@ def health():
         "local_timezone": LOCAL_TZ_NAME,
         "admin_token_configured": bool(os.getenv(ADMIN_TOKEN_ENV)),
         "admin_basic_configured": bool(os.getenv(ADMIN_USERNAME_ENV) and os.getenv(ADMIN_PASSWORD_ENV)),
+        "openai_key_configured": bool(os.getenv(OPENAI_API_KEY_ENV)),
     }
 
 
@@ -312,6 +300,7 @@ def quote_calculate(req: QuoteRequest):
             mattresses_count=int(req.mattresses_count),
             box_springs_count=int(req.box_springs_count),
             scrap_pickup_location=str(req.scrap_pickup_location or "curbside"),
+            travel_zone="in_town",  # customer side always in_town; admin can adjust later
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -348,6 +337,172 @@ def quote_calculate(req: QuoteRequest):
         total_emt_cad=float(result["total_emt_cad"]),
         disclaimer=str(result["disclaimer"]),
     )
+
+
+class ImageAnalysisResponse(BaseModel):
+    ok: bool = True
+    suggestions: dict
+    message: str
+
+
+def _call_openai_vision_json(prompt: str, images_data_urls: list[str]) -> dict:
+    api_key = os.getenv(OPENAI_API_KEY_ENV)
+    if not api_key:
+        raise HTTPException(status_code=501, detail="Image analysis is not configured (missing OPENAI_API_KEY).")
+
+    model = os.getenv(OPENAI_VISION_MODEL_ENV) or "gpt-4o-mini"
+
+    input_content = [{"type": "input_text", "text": prompt}]
+    for url in images_data_urls:
+        input_content.append({"type": "input_image", "image_url": url})
+
+    payload = {
+        "model": model,
+        "input": [
+            {
+                "role": "user",
+                "content": input_content,
+            }
+        ],
+        # Force JSON output style (we still validate/parse safely)
+        "text": {"format": {"type": "json_object"}},
+    }
+
+    req = UrlRequest(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(req, timeout=45) as resp:
+            body = resp.read().decode("utf-8")
+    except HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8")
+        except Exception:
+            detail = str(e)
+        raise HTTPException(status_code=502, detail=f"OpenAI error: {detail}")
+    except URLError as e:
+        raise HTTPException(status_code=502, detail=f"OpenAI unreachable: {e}")
+
+    raw = json.loads(body)
+
+    # Responses API returns output items; easiest: collect any output_text blocks
+    # but to keep dependencies zero, we handle a couple common shapes safely.
+    text_out = None
+    if isinstance(raw, dict):
+        # SDK convenience property sometimes exists in docs; but not guaranteed.
+        if isinstance(raw.get("output_text"), str):
+            text_out = raw.get("output_text")
+        elif isinstance(raw.get("output"), list):
+            for item in raw["output"]:
+                if isinstance(item, dict) and item.get("type") in ("output_text", "message"):
+                    # Some items have content array with output_text blocks
+                    content = item.get("content")
+                    if isinstance(content, list):
+                        for c in content:
+                            if isinstance(c, dict) and c.get("type") in ("output_text", "text"):
+                                if isinstance(c.get("text"), str):
+                                    text_out = c["text"]
+                                    break
+                if text_out:
+                    break
+
+    if not text_out:
+        raise HTTPException(status_code=502, detail="OpenAI response parsing failed (no text output).")
+
+    # We asked for json_object, so parse it
+    try:
+        return json.loads(text_out)
+    except Exception:
+        # If model returns raw text, try to salvage by stripping
+        try:
+            return json.loads(text_out.strip())
+        except Exception:
+            raise HTTPException(status_code=502, detail="OpenAI returned non-JSON output.")
+
+
+@app.post("/quote/analyze-images", response_model=ImageAnalysisResponse)
+async def quote_analyze_images(files: list[UploadFile] = File(...)):
+    """
+    Customer-facing image analysis (suggestions only).
+    - No storage; in-memory only.
+    - Requires OPENAI_API_KEY on the server to work.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files received.")
+
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Too many images (max 5).")
+
+    images_data_urls: list[str] = []
+    total_bytes = 0
+
+    for f in files:
+        content_type = (f.content_type or "").lower()
+        if not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image uploads are allowed.")
+
+        b = await f.read()
+        if not b:
+            raise HTTPException(status_code=400, detail="One of the images was empty.")
+
+        total_bytes += len(b)
+        if total_bytes > 8_000_000:  # ~8MB total cap for safety
+            raise HTTPException(status_code=400, detail="Images too large (max ~8MB total).")
+
+        b64 = base64.b64encode(b).decode("utf-8")
+        # data URL format for input_image
+        images_data_urls.append(f"data:{content_type};base64,{b64}")
+
+    prompt = (
+        "You are estimating a hauling/junk removal job from photos. "
+        "Return ONLY JSON with these keys:\n"
+        "- estimated_hours (number, e.g. 1.5)\n"
+        "- recommended_crew_size (integer 1 or 2)\n"
+        "- estimated_garbage_bag_count (integer 0-30) (bag-equivalent)\n"
+        "- estimated_mattresses_count (integer 0-10)\n"
+        "- estimated_box_springs_count (integer 0-10)\n"
+        "- confidence (number 0-1)\n"
+        "- notes (string)\n"
+        "Be conservative: if unsure, lower confidence and put assumptions in notes."
+    )
+
+    suggestions = _call_openai_vision_json(prompt, images_data_urls)
+
+    # Defensive normalization
+    def _num(x, default=0.0):
+        try:
+            return float(x)
+        except Exception:
+            return float(default)
+
+    def _int(x, default=0):
+        try:
+            return int(float(x))
+        except Exception:
+            return int(default)
+
+    cleaned = {
+        "estimated_hours": max(0.0, _num(suggestions.get("estimated_hours", 0.0))),
+        "recommended_crew_size": max(1, min(2, _int(suggestions.get("recommended_crew_size", 1)))),
+        "estimated_garbage_bag_count": max(0, min(30, _int(suggestions.get("estimated_garbage_bag_count", 0)))),
+        "estimated_mattresses_count": max(0, min(10, _int(suggestions.get("estimated_mattresses_count", 0)))),
+        "estimated_box_springs_count": max(0, min(10, _int(suggestions.get("estimated_box_springs_count", 0)))),
+        "confidence": max(0.0, min(1.0, _num(suggestions.get("confidence", 0.5)))),
+        "notes": str(suggestions.get("notes", "") or "").strip(),
+    }
+
+    return {
+        "ok": True,
+        "suggestions": cleaned,
+        "message": "Photo analysis complete. These are suggestions only — you can adjust before calculating.",
+    }
 
 
 # =========================

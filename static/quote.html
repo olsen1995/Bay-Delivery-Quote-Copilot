@@ -31,10 +31,28 @@
     </div>
 
     <div class="card">
+      <h2>Optional: Upload Photos (Suggestions Only)</h2>
+      <p class="muted">
+        Upload up to 5 photos and we’ll suggest hours/crew/bag-equivalent. You can edit before calculating.
+      </p>
+
+      <div class="formWrap">
+        <label for="photos">Job photos</label>
+        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+
+        <div class="btnRow">
+          <button class="btn secondary" id="btnAnalyze" type="button">Analyze Photos</button>
+          <button class="btn secondary" id="btnApplySuggestions" type="button" disabled>Apply Suggestions</button>
+        </div>
+
+        <div class="suggestionsBox hidden" id="suggestionsBox"></div>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Job Details</h2>
 
       <form id="quoteForm" class="formWrap">
-
         <div class="row">
           <div>
             <label for="customer_name">Customer name</label>
@@ -83,6 +101,28 @@
           </div>
         </div>
 
+        <div class="row">
+          <div>
+            <label for="garbage_bag_count">Garbage bag count (bag-equivalent)</label>
+            <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
+          </div>
+          <div>
+            <label for="mattresses_count">Mattresses</label>
+            <input id="mattresses_count" name="mattresses_count" type="number" min="0" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="box_springs_count">Box springs</label>
+            <input id="box_springs_count" name="box_springs_count" type="number" min="0" step="1" value="0" />
+          </div>
+          <div>
+            <label class="muted">Tip</label>
+            <div class="hint">Photos can suggest these counts — then you can tweak.</div>
+          </div>
+        </div>
+
         <label for="description">Description</label>
         <textarea id="description" name="description" rows="4"
           placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
@@ -92,7 +132,6 @@
           <button class="btn" id="btnCalc" type="submit">Calculate Quote</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
-
       </form>
     </div>
 
@@ -107,16 +146,27 @@
 <script>
   const el = (id) => document.getElementById(id);
 
-  function setResult(text) {
-    const box = el("resultBox");
+  let lastSuggestions = null;
+
+  function showBox(boxId, text) {
+    const box = el(boxId);
     box.classList.remove("hidden");
     box.textContent = text;
   }
 
+  function hideBox(boxId) {
+    const box = el(boxId);
+    box.classList.add("hidden");
+    box.textContent = "";
+  }
+
   function clearForm() {
     el("quoteForm").reset();
-    el("resultBox").classList.add("hidden");
-    el("resultBox").textContent = "";
+    hideBox("resultBox");
+    hideBox("suggestionsBox");
+    el("btnApplySuggestions").disabled = true;
+    lastSuggestions = null;
+    el("photos").value = "";
   }
 
   el("btnClear").addEventListener("click", (e) => {
@@ -124,8 +174,75 @@
     clearForm();
   });
 
+  el("btnAnalyze").addEventListener("click", async () => {
+    hideBox("suggestionsBox");
+    el("btnApplySuggestions").disabled = true;
+    lastSuggestions = null;
+
+    const input = el("photos");
+    if (!input.files || input.files.length === 0) {
+      showBox("suggestionsBox", "No photos selected.");
+      return;
+    }
+    if (input.files.length > 5) {
+      showBox("suggestionsBox", "Too many photos selected (max 5).");
+      return;
+    }
+
+    const formData = new FormData();
+    for (const f of input.files) formData.append("files", f);
+
+    showBox("suggestionsBox", "Analyzing photos…");
+
+    try {
+      const res = await fetch("/quote/analyze-images", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showBox("suggestionsBox", "Error:\n" + (data.detail || "Unknown error"));
+        return;
+      }
+
+      lastSuggestions = data.suggestions || null;
+
+      const s = lastSuggestions || {};
+      const text =
+        "Suggestions (you can apply or edit):\n\n" +
+        "- Estimated hours: " + (s.estimated_hours ?? "") + "\n" +
+        "- Recommended crew: " + (s.recommended_crew_size ?? "") + "\n" +
+        "- Bag-equivalent: " + (s.estimated_garbage_bag_count ?? "") + "\n" +
+        "- Mattresses: " + (s.estimated_mattresses_count ?? "") + "\n" +
+        "- Box springs: " + (s.estimated_box_springs_count ?? "") + "\n" +
+        "- Confidence: " + (s.confidence ?? "") + "\n\n" +
+        (s.notes ? ("Notes: " + s.notes) : "");
+
+      showBox("suggestionsBox", text);
+      el("btnApplySuggestions").disabled = !lastSuggestions;
+
+    } catch (err) {
+      showBox("suggestionsBox", "Error:\nFailed to contact server.");
+    }
+  });
+
+  el("btnApplySuggestions").addEventListener("click", () => {
+    if (!lastSuggestions) return;
+
+    const s = lastSuggestions;
+    if (typeof s.estimated_hours === "number") el("estimated_hours").value = String(s.estimated_hours);
+    if (typeof s.recommended_crew_size === "number") el("crew_size").value = String(s.recommended_crew_size);
+    if (typeof s.estimated_garbage_bag_count === "number") el("garbage_bag_count").value = String(s.estimated_garbage_bag_count);
+    if (typeof s.estimated_mattresses_count === "number") el("mattresses_count").value = String(s.estimated_mattresses_count);
+    if (typeof s.estimated_box_springs_count === "number") el("box_springs_count").value = String(s.estimated_box_springs_count);
+
+    showBox("suggestionsBox", "Applied suggestions. You can still edit anything before calculating.");
+  });
+
   el("quoteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    hideBox("resultBox");
 
     const payload = {
       service_type: el("service_type").value,
@@ -137,9 +254,9 @@
       description: el("description").value,
       estimated_hours: parseFloat(el("estimated_hours").value || "0"),
       crew_size: parseInt(el("crew_size").value || "1", 10),
-      garbage_bag_count: 0,
-      mattresses_count: 0,
-      box_springs_count: 0,
+      garbage_bag_count: parseInt(el("garbage_bag_count").value || "0", 10),
+      mattresses_count: parseInt(el("mattresses_count").value || "0", 10),
+      box_springs_count: parseInt(el("box_springs_count").value || "0", 10),
       scrap_pickup_location: el("scrap_pickup_location").value,
       stairs: false,
       elevator: false,
@@ -155,11 +272,12 @@
 
       const data = await res.json();
       if (!res.ok) {
-        setResult("Error:\n" + (data.detail || "Unknown error"));
+        showBox("resultBox", "Error:\n" + (data.detail || "Unknown error"));
         return;
       }
 
-      setResult(
+      showBox(
+        "resultBox",
         "Quote ID: " + data.quote_id + "\n" +
         "Created: " + data.created_at + "\n\n" +
         "Cash total (no HST): $" + Number(data.total_cash_cad).toFixed(2) + " CAD\n" +
@@ -167,7 +285,7 @@
         "Note:\n" + data.disclaimer
       );
     } catch (err) {
-      setResult("Error:\nFailed to contact server.");
+      showBox("resultBox", "Error:\nFailed to contact server.");
     }
   });
 </script>

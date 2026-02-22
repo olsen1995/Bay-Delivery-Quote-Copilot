@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 CONFIG_PATH = Path("config/business_profile.json")
 
@@ -25,6 +25,13 @@ DEFAULT_BAG_TIER_MEDIUM_MAX = 15
 DEFAULT_BAG_TIER_SMALL_PRICE = 50.0
 DEFAULT_BAG_TIER_MEDIUM_PRICE = 80.0
 DEFAULT_BAG_TIER_LARGE_PRICE = 120.0
+
+# Admin-only travel zone adders (profit protection)
+TRAVEL_ZONE_ADDERS = {
+    "in_town": 0.0,
+    "surrounding": 20.0,
+    "out_of_town": 40.0,
+}
 
 
 def load_config() -> Dict[str, Any]:
@@ -162,6 +169,7 @@ def calculate_quote(
     mattresses_count: int = 0,
     box_springs_count: int = 0,
     scrap_pickup_location: str = "curbside",
+    travel_zone: str = "in_town",
 ) -> Dict[str, Any]:
     """
     Customer-safe output:
@@ -195,6 +203,8 @@ def calculate_quote(
                 "crew_size": 1,
                 "billable_hours": 0.0,
                 "travel_min_cad": 0.0,
+                "travel_zone": "n/a",
+                "travel_zone_adder_cad": 0.0,
                 "labor_cad": 0.0,
                 "disposal_allowance_cad": 0.0,
                 "mattress_boxspring_cad": 0.0,
@@ -219,7 +229,14 @@ def calculate_quote(
     else:
         crew_size = max(int(crew_size), 1)
 
-    travel = _travel_min(config)
+    base_travel = _travel_min(config)
+
+    tz = (travel_zone or "in_town").strip().lower()
+    if tz not in TRAVEL_ZONE_ADDERS:
+        tz = "in_town"
+    travel_adder = float(TRAVEL_ZONE_ADDERS[tz])
+    travel = base_travel + travel_adder
+
     labor = _labor(billable_hours, crew_size, rates["primary"], rates["helper"])
 
     disposal_allowance = 0.0
@@ -263,7 +280,10 @@ def calculate_quote(
             "billable_hours": round(float(billable_hours), 2),
             "primary_rate_cad": round(float(rates["primary"]), 2),
             "helper_rate_cad": round(float(rates["helper"]), 2),
-            "travel_min_cad": round(float(travel), 2),
+            "travel_min_cad": round(float(base_travel), 2),
+            "travel_zone": tz,
+            "travel_zone_adder_cad": round(float(travel_adder), 2),
+            "travel_total_cad": round(float(travel), 2),
             "labor_cad": round(float(labor), 2),
             "disposal_allowance_cad": round(float(disposal_allowance), 2),
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
