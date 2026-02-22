@@ -31,3 +31,8 @@ button { padding: 8px 10px; cursor:pointer; font-weight:700; }
 .bad { color: #b00020; font-weight: 700; }
 
 input { padding:8px; width:100%; box-sizing:border-box; }
+
+.rowBackup { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: center; }
+@media (max-width: 720px) { .rowBackup { grid-template-columns: 1fr; } }
+.importBox { display: grid; grid-template-columns: 1fr 220px; gap: 10px; align-items: center; }
+@media (max-width: 720px) { .importBox { grid-template-columns: 1fr; } }

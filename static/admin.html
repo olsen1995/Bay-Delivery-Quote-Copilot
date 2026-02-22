@@ -31,6 +31,27 @@
   <div class="muted" id="statusLine"></div>
 </div>
 
+
+<div class="card mt14">
+  <h3>DB Backup (Render Free Tier)</h3>
+  <div class="muted">
+    Render free tier has no persistent disk. Use <strong>Export</strong> to download a JSON backup and keep it safe.
+    Use <strong>Import</strong> to restore the database after a redeploy/reset.
+  </div>
+
+  <div class="rowBackup mt10">
+    <button id="exportDbBtn">Export DB to JSON</button>
+
+    <div class="importBox">
+      <input id="importFile" type="file" accept="application/json" />
+      <button id="importDbBtn" class="btnSpacer">Import JSON Backup</button>
+    </div>
+  </div>
+
+  <div class="muted small mt10" id="backupStatus"></div>
+</div>
+
+
 <div class="row">
   <div class="card">
     <h3>Recent Estimates</h3>
@@ -200,8 +221,84 @@
     }
   }
 
+
+  async function exportDb() {
+    try {
+      backupStatus.textContent = "Exporting...";
+      const headers = authHeaders();
+      const res = await fetch("/admin/api/db/export", { headers });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(JSON.stringify(data));
+      }
+
+      const blob = await res.blob();
+      const dispo = res.headers.get("Content-Disposition") || "";
+      let filename = "bay_delivery_backup.json";
+      const m = dispo.match(/filename="([^"]+)"/i);
+      if (m && m[1]) filename = m[1];
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      backupStatus.innerHTML = "<span class='ok'>Exported.</span> Saved as <code>" + filename + "</code>";
+    } catch (err) {
+      backupStatus.innerHTML = "<span class='bad'>Export failed:</span> " + String(err);
+    }
+  }
+
+  async function importDb() {
+    try {
+      const file = document.getElementById("importFile").files[0];
+      if (!file) {
+        backupStatus.innerHTML = "<span class='bad'>Choose a JSON file first.</span>";
+        return;
+      }
+
+      if (!confirm("This will WIPE the current DB and restore from the JSON backup. Continue?")) {
+        return;
+      }
+
+      backupStatus.textContent = "Importing...";
+
+      const text = await file.text();
+      const payload = JSON.parse(text);
+
+      const headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
+      const res = await fetch("/admin/api/db/import", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ payload })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(JSON.stringify(data));
+
+      const restored = data.restored || {};
+      backupStatus.innerHTML =
+        "<span class='ok'>Imported.</span> " +
+        "quotes=" + (restored.quotes || 0) + ", " +
+        "quote_requests=" + (restored.quote_requests || 0) + ", " +
+        "jobs=" + (restored.jobs || 0);
+
+      await refreshAll();
+    } catch (err) {
+      backupStatus.innerHTML = "<span class='bad'>Import failed:</span> " + String(err);
+    }
+  }
+
+
   window.__approve = (id) => decide(id, "approve");
   window.__reject = (id) => decide(id, "reject");
+
+  document.getElementById("exportDbBtn").addEventListener("click", exportDb);
+  document.getElementById("importDbBtn").addEventListener("click", importDb);
 
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 </script>

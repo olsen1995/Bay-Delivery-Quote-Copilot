@@ -8,6 +8,11 @@ from typing import Any, Dict, List, Optional
 DB_PATH = Path("app/data/bay_delivery.sqlite3")
 
 
+# These are the only tables the app relies on today.
+# Keeping the list explicit makes export/import predictable and safer.
+KNOWN_TABLES = ["quotes", "quote_requests", "jobs"]
+
+
 def _connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -589,3 +594,150 @@ def update_quote_request(
     )
 
     return updated
+
+# =========================
+# Admin backup / restore
+# =========================
+
+def export_db_to_json() -> Dict[str, Any]:
+    """Export all known tables to a JSON-serializable dict.
+
+    Notes:
+    - JSON columns are exported as parsed JSON objects (not strings).
+    - Unknown tables are ignored by design.
+    """
+    payload: Dict[str, Any] = {
+        "meta": {
+            "format": "bay-delivery-sqlite-backup",
+            "version": 1,
+        },
+        "tables": {},
+    }
+
+    with _connect() as conn:
+        for table in KNOWN_TABLES:
+            # Table might not exist if schema changes or init_db wasn't called.
+            try:
+                rows = conn.execute(f"SELECT * FROM {table}").fetchall()
+            except sqlite3.OperationalError:
+                payload["tables"][table] = []
+                continue
+
+            out_rows: List[Dict[str, Any]] = []
+            for r in rows:
+                row_dict: Dict[str, Any] = dict(r)
+
+                # Convert JSON text columns back to objects for readability.
+                for k in list(row_dict.keys()):
+                    if k.endswith("_json") or k in {"request_json", "response_json"}:
+                        v = row_dict.get(k)
+                        if v is None:
+                            continue
+                        if isinstance(v, str):
+                            try:
+                                row_dict[k] = json.loads(v)
+                            except Exception:
+                                # If corrupted or non-JSON, keep raw string.
+                                row_dict[k] = v
+                out_rows.append(row_dict)
+
+            payload["tables"][table] = out_rows
+
+    return payload
+
+
+def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Import DB rows from an export payload.
+
+    This wipes existing data in KNOWN_TABLES then restores from the payload.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("Backup payload must be a JSON object")
+
+    tables = payload.get("tables")
+    if not isinstance(tables, dict):
+        raise ValueError("Backup payload missing 'tables' object")
+
+    # Ensure schema exists.
+    init_db()
+
+    restored_counts: Dict[str, int] = {}
+
+    with _connect() as conn:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            conn.execute("BEGIN")
+
+            # Wipe
+            for table in KNOWN_TABLES:
+                try:
+                    conn.execute(f"DELETE FROM {table}")
+                except sqlite3.OperationalError:
+                    # Table might not exist; ignore.
+                    continue
+
+            # Restore
+            for table in KNOWN_TABLES:
+                rows_in = tables.get(table, [])
+                if not rows_in:
+                    restored_counts[table] = 0
+                    continue
+
+                if not isinstance(rows_in, list):
+                    raise ValueError(f"Table '{table}' must be a list of rows")
+
+                # Introspect columns (so we ignore future/unknown fields safely)
+                try:
+                    col_rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+                except sqlite3.OperationalError:
+                    restored_counts[table] = 0
+                    continue
+
+                cols = [c["name"] for c in col_rows]
+                if not cols:
+                    restored_counts[table] = 0
+                    continue
+
+                insert_cols = cols
+                placeholders = ",".join(["?"] * len(insert_cols))
+                col_sql = ",".join(insert_cols)
+                sql = f"INSERT OR REPLACE INTO {table} ({col_sql}) VALUES ({placeholders})"
+
+                values_to_insert: List[List[Any]] = []
+                for raw in rows_in:
+                    if not isinstance(raw, dict):
+                        raise ValueError(f"Row in '{table}' must be an object")
+
+                    row_vals: List[Any] = []
+                    for col in insert_cols:
+                        v = raw.get(col)
+
+                        # Serialize JSON columns back to strings.
+                        if col.endswith("_json") or col in {"request_json", "response_json"}:
+                            if v is None:
+                                row_vals.append(None)
+                            elif isinstance(v, str):
+                                # Allow already-serialized JSON.
+                                row_vals.append(v)
+                            else:
+                                row_vals.append(json.dumps(v, ensure_ascii=False))
+                            continue
+
+                        row_vals.append(v)
+
+                    values_to_insert.append(row_vals)
+
+                conn.executemany(sql, values_to_insert)
+                restored_counts[table] = len(values_to_insert)
+
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        finally:
+            conn.execute("PRAGMA foreign_keys = ON")
+
+    return {
+        "ok": True,
+        "restored": restored_counts,
+    }

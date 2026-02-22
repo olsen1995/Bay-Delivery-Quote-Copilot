@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import base64
 import os
 import secrets
@@ -11,7 +12,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -28,6 +29,8 @@ from app.storage import (
     save_job,
     list_jobs,
     get_job_by_quote_id,
+    export_db_to_json,
+    import_db_from_json,
 )
 
 try:
@@ -422,6 +425,42 @@ def admin_list_jobs(request: Request, limit: int = 50, status: Optional[str] = N
     _require_admin(request)
     return {"items": list_jobs(limit=int(limit), status=status)}
 
+
+
+@app.get("/admin/api/db/export")
+def admin_export_db(request: Request):
+    _require_admin(request)
+
+    payload = export_db_to_json()
+    payload["meta"]["exported_at"] = _now_local_iso()
+    payload["meta"]["db_path"] = str(Path("app/data/bay_delivery.sqlite3"))
+
+    filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+class AdminDBImport(BaseModel):
+    payload: dict
+
+
+@app.post("/admin/api/db/import")
+def admin_import_db(request: Request, body: AdminDBImport):
+    _require_admin(request)
+
+    try:
+        result = import_db_from_json(body.payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {e}")
+
+    return result
 
 class AdminDecision(BaseModel):
     action: str = Field(..., description="approve|reject")
