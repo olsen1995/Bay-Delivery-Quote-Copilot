@@ -7,10 +7,8 @@ from typing import Any, Dict, List, Optional
 
 DB_PATH = Path("app/data/bay_delivery.sqlite3")
 
-
-# These are the only tables the app relies on today.
-# Keeping the list explicit makes export/import predictable and safer.
-KNOWN_TABLES = ["quotes", "quote_requests", "jobs"]
+# Explicit table list keeps backup/restore deterministic and safe.
+KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
 
 
 def _connect() -> sqlite3.Connection:
@@ -50,7 +48,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_job_type ON quotes(job_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_total_cad ON quotes(total_cad)")
 
-        # Jobs (base schema)
+        # Jobs
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS jobs (
@@ -70,8 +68,6 @@ def init_db() -> None:
             )
             """
         )
-
-        # lightweight migrations (mirrored columns for easier listing)
         _try_add_column(conn, "jobs", "customer_phone TEXT")
         _try_add_column(conn, "jobs", "job_description_customer TEXT")
         _try_add_column(conn, "jobs", "job_description_internal TEXT")
@@ -82,7 +78,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_quote_id ON jobs(quote_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_customer_name ON jobs(customer_name)")
 
-        # Quote Requests (lead capture / confirmation workflow)
+        # Quote Requests
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS quote_requests (
@@ -106,8 +102,6 @@ def init_db() -> None:
             )
             """
         )
-
-        # Workflow / booking-request columns (migrations)
         _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
         _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
         _try_add_column(conn, "quote_requests", "customer_accepted_at TEXT")
@@ -118,6 +112,31 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_service_type ON quote_requests(service_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_quote_id ON quote_requests(quote_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_requested_job_date ON quote_requests(requested_job_date)")
+
+        # Attachments (Google Drive references)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attachments (
+                attachment_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+
+                quote_id TEXT,
+                request_id TEXT,
+                job_id TEXT,
+
+                filename TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                size_bytes INTEGER,
+
+                drive_file_id TEXT NOT NULL,
+                drive_web_view_link TEXT
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments(created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_quote_id ON attachments(quote_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_request_id ON attachments(request_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_job_id ON attachments(job_id)")
 
 
 # =========================
@@ -151,19 +170,14 @@ def save_quote(
 
 
 def get_quote(quote_id: str) -> Optional[Dict[str, Any]]:
-    """Returns the stored response_json only (kept for backward compatibility)."""
     with _connect() as conn:
-        row = conn.execute(
-            "SELECT response_json FROM quotes WHERE quote_id = ?",
-            (quote_id,),
-        ).fetchone()
+        row = conn.execute("SELECT response_json FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
         if not row:
             return None
         return json.loads(row["response_json"])
 
 
 def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
-    """Returns full quote record including request_json + response_json for workflow features."""
     with _connect() as conn:
         row = conn.execute(
             """
@@ -199,12 +213,7 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
         ).fetchall()
 
     return [
-        {
-            "quote_id": r["quote_id"],
-            "created_at": r["created_at"],
-            "job_type": r["job_type"],
-            "total_cad": float(r["total_cad"]),
-        }
+        {"quote_id": r["quote_id"], "created_at": r["created_at"], "job_type": r["job_type"], "total_cad": float(r["total_cad"])}
         for r in rows
     ]
 
@@ -250,12 +259,7 @@ def search_quotes(
         rows = conn.execute(sql, params).fetchall()
 
     return [
-        {
-            "quote_id": r["quote_id"],
-            "created_at": r["created_at"],
-            "job_type": r["job_type"],
-            "total_cad": float(r["total_cad"]),
-        }
+        {"quote_id": r["quote_id"], "created_at": r["created_at"], "job_type": r["job_type"], "total_cad": float(r["total_cad"])}
         for r in rows
     ]
 
@@ -302,20 +306,13 @@ def save_job(job_obj: Dict[str, Any]) -> None:
 
 def get_job(job_id: str) -> Optional[Dict[str, Any]]:
     with _connect() as conn:
-        row = conn.execute(
-            "SELECT job_json FROM jobs WHERE job_id = ?",
-            (job_id,),
-        ).fetchone()
+        row = conn.execute("SELECT job_json FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
         if not row:
             return None
         return json.loads(row["job_json"])
 
 
 def get_job_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Returns the most recent job row for a given quote_id.
-    Used to prevent duplicate job creation on admin approval.
-    """
     with _connect() as conn:
         row = conn.execute(
             """
@@ -592,31 +589,89 @@ def update_quote_request(
             "admin_approved_at": updated.get("admin_approved_at"),
         }
     )
-
     return updated
+
+
+# =========================
+# Attachments
+# =========================
+
+def save_attachment(att: Dict[str, Any]) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO attachments
+            (attachment_id, created_at, quote_id, request_id, job_id,
+             filename, mime_type, size_bytes, drive_file_id, drive_web_view_link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                att["attachment_id"],
+                att["created_at"],
+                att.get("quote_id"),
+                att.get("request_id"),
+                att.get("job_id"),
+                att["filename"],
+                att["mime_type"],
+                int(att["size_bytes"]) if att.get("size_bytes") is not None else None,
+                att["drive_file_id"],
+                att.get("drive_web_view_link"),
+            ),
+        )
+
+
+def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    where: List[str] = []
+    params: List[Any] = []
+
+    if quote_id:
+        where.append("quote_id = ?")
+        params.append(quote_id)
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    sql = f"""
+        SELECT
+            attachment_id, created_at, quote_id, request_id, job_id,
+            filename, mime_type, size_bytes, drive_file_id, drive_web_view_link
+        FROM attachments
+        {where_sql}
+        ORDER BY created_at DESC
+        LIMIT ?
+    """
+    params.append(int(limit))
+
+    with _connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
+
+    return [
+        {
+            "attachment_id": r["attachment_id"],
+            "created_at": r["created_at"],
+            "quote_id": r["quote_id"],
+            "request_id": r["request_id"],
+            "job_id": r["job_id"],
+            "filename": r["filename"],
+            "mime_type": r["mime_type"],
+            "size_bytes": r["size_bytes"],
+            "drive_file_id": r["drive_file_id"],
+            "drive_web_view_link": r["drive_web_view_link"],
+        }
+        for r in rows
+    ]
+
 
 # =========================
 # Admin backup / restore
 # =========================
 
 def export_db_to_json() -> Dict[str, Any]:
-    """Export all known tables to a JSON-serializable dict.
-
-    Notes:
-    - JSON columns are exported as parsed JSON objects (not strings).
-    - Unknown tables are ignored by design.
-    """
     payload: Dict[str, Any] = {
-        "meta": {
-            "format": "bay-delivery-sqlite-backup",
-            "version": 1,
-        },
+        "meta": {"format": "bay-delivery-sqlite-backup", "version": 1},
         "tables": {},
     }
 
     with _connect() as conn:
         for table in KNOWN_TABLES:
-            # Table might not exist if schema changes or init_db wasn't called.
             try:
                 rows = conn.execute(f"SELECT * FROM {table}").fetchall()
             except sqlite3.OperationalError:
@@ -626,8 +681,6 @@ def export_db_to_json() -> Dict[str, Any]:
             out_rows: List[Dict[str, Any]] = []
             for r in rows:
                 row_dict: Dict[str, Any] = dict(r)
-
-                # Convert JSON text columns back to objects for readability.
                 for k in list(row_dict.keys()):
                     if k.endswith("_json") or k in {"request_json", "response_json"}:
                         v = row_dict.get(k)
@@ -637,7 +690,6 @@ def export_db_to_json() -> Dict[str, Any]:
                             try:
                                 row_dict[k] = json.loads(v)
                             except Exception:
-                                # If corrupted or non-JSON, keep raw string.
                                 row_dict[k] = v
                 out_rows.append(row_dict)
 
@@ -647,10 +699,6 @@ def export_db_to_json() -> Dict[str, Any]:
 
 
 def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Import DB rows from an export payload.
-
-    This wipes existing data in KNOWN_TABLES then restores from the payload.
-    """
     if not isinstance(payload, dict):
         raise ValueError("Backup payload must be a JSON object")
 
@@ -658,9 +706,7 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(tables, dict):
         raise ValueError("Backup payload missing 'tables' object")
 
-    # Ensure schema exists.
     init_db()
-
     restored_counts: Dict[str, int] = {}
 
     with _connect() as conn:
@@ -668,25 +714,20 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             conn.execute("BEGIN")
 
-            # Wipe
             for table in KNOWN_TABLES:
                 try:
                     conn.execute(f"DELETE FROM {table}")
                 except sqlite3.OperationalError:
-                    # Table might not exist; ignore.
                     continue
 
-            # Restore
             for table in KNOWN_TABLES:
                 rows_in = tables.get(table, [])
                 if not rows_in:
                     restored_counts[table] = 0
                     continue
-
                 if not isinstance(rows_in, list):
                     raise ValueError(f"Table '{table}' must be a list of rows")
 
-                # Introspect columns (so we ignore future/unknown fields safely)
                 try:
                     col_rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
                 except sqlite3.OperationalError:
@@ -698,9 +739,8 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                     restored_counts[table] = 0
                     continue
 
-                insert_cols = cols
-                placeholders = ",".join(["?"] * len(insert_cols))
-                col_sql = ",".join(insert_cols)
+                placeholders = ",".join(["?"] * len(cols))
+                col_sql = ",".join(cols)
                 sql = f"INSERT OR REPLACE INTO {table} ({col_sql}) VALUES ({placeholders})"
 
                 values_to_insert: List[List[Any]] = []
@@ -709,20 +749,16 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                         raise ValueError(f"Row in '{table}' must be an object")
 
                     row_vals: List[Any] = []
-                    for col in insert_cols:
+                    for col in cols:
                         v = raw.get(col)
-
-                        # Serialize JSON columns back to strings.
                         if col.endswith("_json") or col in {"request_json", "response_json"}:
                             if v is None:
                                 row_vals.append(None)
                             elif isinstance(v, str):
-                                # Allow already-serialized JSON.
                                 row_vals.append(v)
                             else:
                                 row_vals.append(json.dumps(v, ensure_ascii=False))
                             continue
-
                         row_vals.append(v)
 
                     values_to_insert.append(row_vals)
@@ -737,7 +773,4 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
         finally:
             conn.execute("PRAGMA foreign_keys = ON")
 
-    return {
-        "ok": True,
-        "restored": restored_counts,
-    }
+    return {"ok": True, "restored": restored_counts}

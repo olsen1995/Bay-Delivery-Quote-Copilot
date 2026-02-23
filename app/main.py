@@ -9,10 +9,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Annotated
 from uuid import uuid4
-from urllib.request import Request as UrlRequest, urlopen
-from urllib.error import URLError, HTTPError
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -33,7 +31,10 @@ from app.storage import (
     get_job_by_quote_id,
     export_db_to_json,
     import_db_from_json,
+    save_attachment,
+    list_attachments,
 )
+from app import gdrive
 
 try:
     from zoneinfo import ZoneInfo
@@ -45,16 +46,11 @@ APP_VERSION = "0.9.0"
 CAD = "CAD"
 LOCAL_TZ_NAME = "America/Toronto"
 
-# Admin auth options (either works):
-# 1) Token auth (simple)
 ADMIN_TOKEN_ENV = "BAYDELIVERY_ADMIN_TOKEN"
-# 2) Basic auth (username/password)
 ADMIN_USERNAME_ENV = "ADMIN_USERNAME"
 ADMIN_PASSWORD_ENV = "ADMIN_PASSWORD"
 
-# Optional (for image analysis)
-OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
-OPENAI_VISION_MODEL_ENV = "OPENAI_VISION_MODEL"  # default below
+GDRIVE_AUTO_SNAPSHOT_ENV = "GDRIVE_AUTO_SNAPSHOT"
 
 
 app = FastAPI(
@@ -80,6 +76,7 @@ HOME_HTML_PATH = STATIC_DIR / "home.html"
 QUOTE_HTML_PATH = STATIC_DIR / "quote.html"
 LEGACY_INDEX_HTML_PATH = STATIC_DIR / "index.html"
 ADMIN_HTML_PATH = STATIC_DIR / "admin.html"
+ADMIN_UPLOADS_HTML_PATH = STATIC_DIR / "admin_uploads.html"
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -136,6 +133,46 @@ def _require_admin(request: Request) -> None:
     return
 
 
+def _drive_enabled() -> bool:
+    return gdrive.is_configured()
+
+
+def _drive_snapshot_db() -> dict:
+    if not _drive_enabled():
+        return {"ok": False, "message": "Google Drive not configured."}
+
+    vault = gdrive.ensure_vault_subfolders()
+    payload = export_db_to_json()
+    payload["meta"]["exported_at"] = _now_local_iso()
+    payload["meta"]["db_path"] = "app/data/bay_delivery.sqlite3"
+
+    filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+    uploaded = gdrive.upload_bytes(
+        parent_id=vault["db_backups"],
+        filename=filename,
+        mime_type="application/json",
+        content=body,
+    )
+
+    keep = gdrive.backup_keep_count()
+    backups = gdrive.list_files(vault["db_backups"], limit=200)
+    if len(backups) > keep:
+        for f in backups[keep:]:
+            try:
+                gdrive.delete_file(f.file_id)
+            except Exception:
+                pass
+
+    return {"ok": True, "file_id": uploaded.file_id, "web_view_link": uploaded.web_view_link, "name": uploaded.name}
+
+
+def _maybe_auto_snapshot(background_tasks: BackgroundTasks) -> None:
+    if os.getenv(GDRIVE_AUTO_SNAPSHOT_ENV, "").strip() == "1" and _drive_enabled():
+        background_tasks.add_task(_drive_snapshot_db)
+
+
 # =========================
 # Pages
 # =========================
@@ -166,6 +203,14 @@ def admin_page(request: Request):
     if not ADMIN_HTML_PATH.exists():
         raise HTTPException(status_code=500, detail=f"Missing admin file: {ADMIN_HTML_PATH.as_posix()}")
     return FileResponse(ADMIN_HTML_PATH)
+
+
+@app.get("/admin/uploads")
+def admin_uploads_page(request: Request):
+    _require_admin(request)
+    if not ADMIN_UPLOADS_HTML_PATH.exists():
+        raise HTTPException(status_code=500, detail=f"Missing admin uploads file: {ADMIN_UPLOADS_HTML_PATH.as_posix()}")
+    return FileResponse(ADMIN_UPLOADS_HTML_PATH)
 
 
 # =========================
@@ -277,9 +322,8 @@ def health():
         "ok": True,
         "version": APP_VERSION,
         "local_timezone": LOCAL_TZ_NAME,
-        "admin_token_configured": bool(os.getenv(ADMIN_TOKEN_ENV)),
         "admin_basic_configured": bool(os.getenv(ADMIN_USERNAME_ENV) and os.getenv(ADMIN_PASSWORD_ENV)),
-        "openai_key_configured": bool(os.getenv(OPENAI_API_KEY_ENV)),
+        "drive_configured": _drive_enabled(),
     }
 
 
@@ -288,7 +332,7 @@ def health():
 # =========================
 
 @app.post("/quote/calculate", response_model=QuoteResponse)
-def quote_calculate(req: QuoteRequest):
+def quote_calculate(req: QuoteRequest, background_tasks: BackgroundTasks):
     crew = int(req.crew_size) if req.crew_size is not None else 1
 
     try:
@@ -300,7 +344,6 @@ def quote_calculate(req: QuoteRequest):
             mattresses_count=int(req.mattresses_count),
             box_springs_count=int(req.box_springs_count),
             scrap_pickup_location=str(req.scrap_pickup_location or "curbside"),
-            travel_zone="in_town",  # customer side always in_town; admin can adjust later
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -329,6 +372,8 @@ def quote_calculate(req: QuoteRequest):
         },
     )
 
+    _maybe_auto_snapshot(background_tasks)
+
     return QuoteResponse(
         quote_id=quote_id,
         created_at=created_at_local,
@@ -339,240 +384,81 @@ def quote_calculate(req: QuoteRequest):
     )
 
 
-class ImageAnalysisResponse(BaseModel):
-    ok: bool = True
-    suggestions: dict
-    message: str
+@app.post("/quote/upload-photos")
+async def quote_upload_photos(
+    background_tasks: BackgroundTasks,
+    quote_id: str = Form(...),
+    files: list[UploadFile] = File(...),
+):
+    record = get_quote_record(quote_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Quote not found (invalid quote_id).")
 
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Photo upload is not configured (Google Drive not set).")
 
-def _call_openai_vision_json(prompt: str, images_data_urls: list[str]) -> dict:
-    api_key = os.getenv(OPENAI_API_KEY_ENV)
-    if not api_key:
-        raise HTTPException(status_code=501, detail="Image analysis is not configured (missing OPENAI_API_KEY).")
-
-    model = os.getenv(OPENAI_VISION_MODEL_ENV) or "gpt-4o-mini"
-
-    input_content = [{"type": "input_text", "text": prompt}]
-    for url in images_data_urls:
-        input_content.append({"type": "input_image", "image_url": url})
-
-    payload = {
-        "model": model,
-        "input": [
-            {
-                "role": "user",
-                "content": input_content,
-            }
-        ],
-        # Force JSON output style (we still validate/parse safely)
-        "text": {"format": {"type": "json_object"}},
-    }
-
-    req = UrlRequest(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    try:
-        with urlopen(req, timeout=45) as resp:
-            body = resp.read().decode("utf-8")
-    except HTTPError as e:
-        try:
-            detail = e.read().decode("utf-8")
-        except Exception:
-            detail = str(e)
-        raise HTTPException(status_code=502, detail=f"OpenAI error: {detail}")
-    except URLError as e:
-        raise HTTPException(status_code=502, detail=f"OpenAI unreachable: {e}")
-
-    raw = json.loads(body)
-
-    # Responses API returns output items; easiest: collect any output_text blocks
-    # but to keep dependencies zero, we handle a couple common shapes safely.
-    text_out = None
-    if isinstance(raw, dict):
-        # SDK convenience property sometimes exists in docs; but not guaranteed.
-        if isinstance(raw.get("output_text"), str):
-            text_out = raw.get("output_text")
-        elif isinstance(raw.get("output"), list):
-            for item in raw["output"]:
-                if isinstance(item, dict) and item.get("type") in ("output_text", "message"):
-                    # Some items have content array with output_text blocks
-                    content = item.get("content")
-                    if isinstance(content, list):
-                        for c in content:
-                            if isinstance(c, dict) and c.get("type") in ("output_text", "text"):
-                                if isinstance(c.get("text"), str):
-                                    text_out = c["text"]
-                                    break
-                if text_out:
-                    break
-
-    if not text_out:
-        raise HTTPException(status_code=502, detail="OpenAI response parsing failed (no text output).")
-
-    # We asked for json_object, so parse it
-    try:
-        return json.loads(text_out)
-    except Exception:
-        # If model returns raw text, try to salvage by stripping
-        try:
-            return json.loads(text_out.strip())
-        except Exception:
-            raise HTTPException(status_code=502, detail="OpenAI returned non-JSON output.")
-
-
-@app.post("/quote/analyze-images", response_model=ImageAnalysisResponse)
-async def quote_analyze_images(files: list[UploadFile] = File(...)):
-    """
-    Customer-facing image analysis (suggestions only).
-    - No storage; in-memory only.
-    - Requires OPENAI_API_KEY on the server to work.
-    """
     if not files:
         raise HTTPException(status_code=400, detail="No files received.")
-
     if len(files) > 5:
         raise HTTPException(status_code=400, detail="Too many images (max 5).")
 
-    images_data_urls: list[str] = []
     total_bytes = 0
+    vault = gdrive.ensure_vault_subfolders()
+    uploads_root = vault["uploads"]
 
+    quote_folder = gdrive.ensure_folder(f"quote_{quote_id}", uploads_root)
+
+    uploaded_items = []
     for f in files:
-        content_type = (f.content_type or "").lower()
-        if not content_type.startswith("image/"):
+        ct = (f.content_type or "").lower()
+        if not ct.startswith("image/"):
             raise HTTPException(status_code=400, detail="Only image uploads are allowed.")
 
         b = await f.read()
         if not b:
-            raise HTTPException(status_code=400, detail="One of the images was empty.")
+            continue
 
         total_bytes += len(b)
-        if total_bytes > 8_000_000:  # ~8MB total cap for safety
-            raise HTTPException(status_code=400, detail="Images too large (max ~8MB total).")
+        if total_bytes > 10_000_000:
+            raise HTTPException(status_code=400, detail="Images too large (max ~10MB total).")
 
-        b64 = base64.b64encode(b).decode("utf-8")
-        # data URL format for input_image
-        images_data_urls.append(f"data:{content_type};base64,{b64}")
+        safe_name = (f.filename or "upload.jpg").replace("/", "_").replace("\\", "_")
+        df = gdrive.upload_bytes(
+            parent_id=quote_folder.file_id,
+            filename=safe_name,
+            mime_type=ct or "image/jpeg",
+            content=b,
+        )
 
-    prompt = (
-        "You are estimating a hauling/junk removal job from photos. "
-        "Return ONLY JSON with these keys:\n"
-        "- estimated_hours (number, e.g. 1.5)\n"
-        "- recommended_crew_size (integer 1 or 2)\n"
-        "- estimated_garbage_bag_count (integer 0-30) (bag-equivalent)\n"
-        "- estimated_mattresses_count (integer 0-10)\n"
-        "- estimated_box_springs_count (integer 0-10)\n"
-        "- confidence (number 0-1)\n"
-        "- notes (string)\n"
-        "Be conservative: if unsure, lower confidence and put assumptions in notes."
-    )
+        att_id = str(uuid4())
+        created_at = _now_local_iso()
+        save_attachment(
+            {
+                "attachment_id": att_id,
+                "created_at": created_at,
+                "quote_id": quote_id,
+                "request_id": None,
+                "job_id": None,
+                "filename": safe_name,
+                "mime_type": ct or "image/jpeg",
+                "size_bytes": len(b),
+                "drive_file_id": df.file_id,
+                "drive_web_view_link": df.web_view_link,
+            }
+        )
 
-    suggestions = _call_openai_vision_json(prompt, images_data_urls)
+        uploaded_items.append(
+            {
+                "attachment_id": att_id,
+                "filename": safe_name,
+                "drive_file_id": df.file_id,
+                "drive_web_view_link": df.web_view_link,
+            }
+        )
 
-    # Defensive normalization
-    def _num(x, default=0.0):
-        try:
-            return float(x)
-        except Exception:
-            return float(default)
+    _maybe_auto_snapshot(background_tasks)
 
-    def _int(x, default=0):
-        try:
-            return int(float(x))
-        except Exception:
-            return int(default)
-
-    cleaned = {
-        "estimated_hours": max(0.0, _num(suggestions.get("estimated_hours", 0.0))),
-        "recommended_crew_size": max(1, min(2, _int(suggestions.get("recommended_crew_size", 1)))),
-        "estimated_garbage_bag_count": max(0, min(30, _int(suggestions.get("estimated_garbage_bag_count", 0)))),
-        "estimated_mattresses_count": max(0, min(10, _int(suggestions.get("estimated_mattresses_count", 0)))),
-        "estimated_box_springs_count": max(0, min(10, _int(suggestions.get("estimated_box_springs_count", 0)))),
-        "confidence": max(0.0, min(1.0, _num(suggestions.get("confidence", 0.5)))),
-        "notes": str(suggestions.get("notes", "") or "").strip(),
-    }
-
-    return {
-        "ok": True,
-        "suggestions": cleaned,
-        "message": "Photo analysis complete. These are suggestions only — you can adjust before calculating.",
-    }
-
-
-# =========================
-# Customer: request booking
-# =========================
-
-class BookingRequest(BaseModel):
-    quote_id: str = Field(..., min_length=10, max_length=80)
-    requested_job_date: str = Field(..., min_length=4, max_length=40)
-    requested_time_window: str = Field(..., min_length=2, max_length=80)
-    notes: Optional[str] = Field(None, max_length=1000)
-
-    @field_validator("quote_id", "requested_job_date", "requested_time_window", "notes", mode="before")
-    @classmethod
-    def strip(cls, v):
-        if v is None:
-            return None
-        if isinstance(v, str):
-            return v.strip()
-        return v
-
-
-@app.post("/quote/request-booking")
-def quote_request_booking(body: BookingRequest):
-    record = get_quote_record(body.quote_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Quote not found")
-
-    req_obj = record["request_obj"]
-    resp_obj = record["response_obj"]
-
-    request_id = str(uuid4())
-    created_at = _now_local_iso()
-
-    save_quote_request(
-        {
-            "request_id": request_id,
-            "created_at": created_at,
-            "status": "customer_requested",
-            "quote_id": body.quote_id,
-            "customer_name": req_obj.get("customer_name"),
-            "customer_phone": req_obj.get("customer_phone"),
-            "job_address": req_obj.get("job_address"),
-            "job_description_customer": req_obj.get("description"),
-            "job_description_internal": None,
-            "service_type": str(resp_obj.get("service_type") or req_obj.get("service_type") or "unknown"),
-            "cash_total_cad": float(resp_obj.get("total_cash_cad", 0.0)),
-            "emt_total_cad": float(resp_obj.get("total_emt_cad", 0.0)),
-            "request_json": {
-                "quote_request_type": "booking_request",
-                "quote_id": body.quote_id,
-                "requested_job_date": body.requested_job_date,
-                "requested_time_window": body.requested_time_window,
-                "notes": body.notes,
-                "quote_request_created_at": created_at,
-            },
-            "notes": body.notes,
-            "requested_job_date": body.requested_job_date,
-            "requested_time_window": body.requested_time_window,
-            "customer_accepted_at": created_at,
-            "admin_approved_at": None,
-        }
-    )
-
-    return {
-        "ok": True,
-        "request_id": request_id,
-        "status": "customer_requested",
-        "message": "Booking request received. We will review and confirm availability.",
-    }
+    return {"ok": True, "uploaded": uploaded_items}
 
 
 # =========================
@@ -597,10 +483,61 @@ def admin_list_jobs(request: Request, limit: int = 50, status: Optional[str] = N
     return {"items": list_jobs(limit=int(limit), status=status)}
 
 
+@app.get("/admin/api/uploads")
+def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: int = 50):
+    _require_admin(request)
+    return {"items": list_attachments(quote_id=quote_id, limit=int(limit))}
+
+
+@app.post("/admin/api/drive/snapshot")
+def admin_drive_snapshot(request: Request):
+    _require_admin(request)
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Google Drive not configured.")
+    return _drive_snapshot_db()
+
+
+@app.get("/admin/api/drive/backups")
+def admin_drive_backups(request: Request, limit: int = 20):
+    _require_admin(request)
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Google Drive not configured.")
+    vault = gdrive.ensure_vault_subfolders()
+    files = gdrive.list_files(vault["db_backups"], limit=int(limit))
+    return {
+        "items": [
+            {
+                "file_id": f.file_id,
+                "name": f.name,
+                "created_time": f.created_time,
+                "web_view_link": f.web_view_link,
+                "size": f.size,
+            }
+            for f in files
+        ]
+    }
+
+
+class AdminDriveRestore(BaseModel):
+    file_id: str
+
+
+@app.post("/admin/api/drive/restore")
+def admin_drive_restore(request: Request, body: AdminDriveRestore):
+    _require_admin(request)
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Google Drive not configured.")
+    raw = gdrive.download_file(body.file_id)
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Backup file was not valid JSON.")
+    return import_db_from_json(payload)
+
+
 @app.get("/admin/api/db/export")
 def admin_export_db(request: Request):
     _require_admin(request)
-
     payload = export_db_to_json()
     payload["meta"]["exported_at"] = _now_local_iso()
     payload["meta"]["db_path"] = str(Path("app/data/bay_delivery.sqlite3"))
@@ -622,14 +559,12 @@ class AdminDBImport(BaseModel):
 @app.post("/admin/api/db/import")
 def admin_import_db(request: Request, body: AdminDBImport):
     _require_admin(request)
-
     try:
         result = import_db_from_json(body.payload)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Import failed: {e}")
-
     return result
 
 
@@ -684,11 +619,7 @@ def _create_job_from_request(request_row: dict, admin_notes: Optional[str]) -> d
         "paid_cad": 0.0,
         "owing_cad": total,
         "notes": notes or None,
-        "job_json": {
-            "source": "quote_request_approved",
-            "quote_request": request_row,
-            "admin_notes": admin_notes,
-        },
+        "job_json": {"source": "quote_request_approved", "quote_request": request_row, "admin_notes": admin_notes},
     }
 
     save_job(job_obj)
@@ -711,7 +642,7 @@ def _create_job_from_request(request_row: dict, admin_notes: Optional[str]) -> d
 
 
 @app.post("/admin/api/quote-requests/{request_id}/decision")
-def admin_decide_quote_request(request: Request, request_id: str, body: AdminDecision):
+def admin_decide_quote_request(request: Request, request_id: str, body: AdminDecision, background_tasks: BackgroundTasks):
     _require_admin(request)
 
     existing = get_quote_request(request_id)
@@ -735,6 +666,7 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
             raise HTTPException(status_code=500, detail="Failed to update request")
 
         job_summary = _create_job_from_request(updated, body.notes)
+        _maybe_auto_snapshot(background_tasks)
         return {"ok": True, "request": updated, "job": job_summary}
 
     updated = update_quote_request(
@@ -746,4 +678,5 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update request")
 
+    _maybe_auto_snapshot(background_tasks)
     return {"ok": True, "request": updated}

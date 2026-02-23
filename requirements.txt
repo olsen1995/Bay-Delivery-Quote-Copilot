@@ -9,3 +9,4 @@ apscheduler
 openai
 anyio==3.7.1
 requests
+google-auth

@@ -31,25 +31,6 @@
     </div>
 
     <div class="card">
-      <h2>Optional: Upload Photos (Suggestions Only)</h2>
-      <p class="muted">
-        Upload up to 5 photos and we’ll suggest hours/crew/bag-equivalent. You can edit before calculating.
-      </p>
-
-      <div class="formWrap">
-        <label for="photos">Job photos</label>
-        <input id="photos" name="photos" type="file" accept="image/*" multiple />
-
-        <div class="btnRow">
-          <button class="btn secondary" id="btnAnalyze" type="button">Analyze Photos</button>
-          <button class="btn secondary" id="btnApplySuggestions" type="button" disabled>Apply Suggestions</button>
-        </div>
-
-        <div class="suggestionsBox hidden" id="suggestionsBox"></div>
-      </div>
-    </div>
-
-    <div class="card">
       <h2>Job Details</h2>
 
       <form id="quoteForm" class="formWrap">
@@ -119,7 +100,7 @@
           </div>
           <div>
             <label class="muted">Tip</label>
-            <div class="hint">Photos can suggest these counts — then you can tweak.</div>
+            <div class="hint">You can upload photos after the quote is generated.</div>
           </div>
         </div>
 
@@ -137,6 +118,22 @@
 
     <div class="card resultBox hidden" id="resultBox"></div>
 
+    <div class="card hidden" id="uploadCard">
+      <h2>Optional: Upload Photos</h2>
+      <p class="muted">These photos are saved for admin review.</p>
+
+      <div class="formWrap">
+        <label for="photos">Job photos</label>
+        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+
+        <div class="btnRow">
+          <button class="btn secondary" id="btnUpload" type="button">Upload Photos</button>
+        </div>
+
+        <div class="statusBox hidden" id="uploadStatus"></div>
+      </div>
+    </div>
+
     <div class="footer">
       <div>Cash = no HST • EMT = +13% HST</div>
       <div class="muted">Bay Delivery — North Bay, Ontario</div>
@@ -145,17 +142,15 @@
 
 <script>
   const el = (id) => document.getElementById(id);
+  let lastQuoteId = null;
 
-  let lastSuggestions = null;
-
-  function showBox(boxId, text) {
-    const box = el(boxId);
+  function showBox(id, text) {
+    const box = el(id);
     box.classList.remove("hidden");
     box.textContent = text;
   }
-
-  function hideBox(boxId) {
-    const box = el(boxId);
+  function hideBox(id) {
+    const box = el(id);
     box.classList.add("hidden");
     box.textContent = "";
   }
@@ -163,9 +158,9 @@
   function clearForm() {
     el("quoteForm").reset();
     hideBox("resultBox");
-    hideBox("suggestionsBox");
-    el("btnApplySuggestions").disabled = true;
-    lastSuggestions = null;
+    hideBox("uploadStatus");
+    el("uploadCard").classList.add("hidden");
+    lastQuoteId = null;
     el("photos").value = "";
   }
 
@@ -174,75 +169,12 @@
     clearForm();
   });
 
-  el("btnAnalyze").addEventListener("click", async () => {
-    hideBox("suggestionsBox");
-    el("btnApplySuggestions").disabled = true;
-    lastSuggestions = null;
-
-    const input = el("photos");
-    if (!input.files || input.files.length === 0) {
-      showBox("suggestionsBox", "No photos selected.");
-      return;
-    }
-    if (input.files.length > 5) {
-      showBox("suggestionsBox", "Too many photos selected (max 5).");
-      return;
-    }
-
-    const formData = new FormData();
-    for (const f of input.files) formData.append("files", f);
-
-    showBox("suggestionsBox", "Analyzing photos…");
-
-    try {
-      const res = await fetch("/quote/analyze-images", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        showBox("suggestionsBox", "Error:\n" + (data.detail || "Unknown error"));
-        return;
-      }
-
-      lastSuggestions = data.suggestions || null;
-
-      const s = lastSuggestions || {};
-      const text =
-        "Suggestions (you can apply or edit):\n\n" +
-        "- Estimated hours: " + (s.estimated_hours ?? "") + "\n" +
-        "- Recommended crew: " + (s.recommended_crew_size ?? "") + "\n" +
-        "- Bag-equivalent: " + (s.estimated_garbage_bag_count ?? "") + "\n" +
-        "- Mattresses: " + (s.estimated_mattresses_count ?? "") + "\n" +
-        "- Box springs: " + (s.estimated_box_springs_count ?? "") + "\n" +
-        "- Confidence: " + (s.confidence ?? "") + "\n\n" +
-        (s.notes ? ("Notes: " + s.notes) : "");
-
-      showBox("suggestionsBox", text);
-      el("btnApplySuggestions").disabled = !lastSuggestions;
-
-    } catch (err) {
-      showBox("suggestionsBox", "Error:\nFailed to contact server.");
-    }
-  });
-
-  el("btnApplySuggestions").addEventListener("click", () => {
-    if (!lastSuggestions) return;
-
-    const s = lastSuggestions;
-    if (typeof s.estimated_hours === "number") el("estimated_hours").value = String(s.estimated_hours);
-    if (typeof s.recommended_crew_size === "number") el("crew_size").value = String(s.recommended_crew_size);
-    if (typeof s.estimated_garbage_bag_count === "number") el("garbage_bag_count").value = String(s.estimated_garbage_bag_count);
-    if (typeof s.estimated_mattresses_count === "number") el("mattresses_count").value = String(s.estimated_mattresses_count);
-    if (typeof s.estimated_box_springs_count === "number") el("box_springs_count").value = String(s.estimated_box_springs_count);
-
-    showBox("suggestionsBox", "Applied suggestions. You can still edit anything before calculating.");
-  });
-
   el("quoteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     hideBox("resultBox");
+    hideBox("uploadStatus");
+    el("uploadCard").classList.add("hidden");
+    lastQuoteId = null;
 
     const payload = {
       service_type: el("service_type").value,
@@ -276,6 +208,9 @@
         return;
       }
 
+      lastQuoteId = data.quote_id;
+      el("uploadCard").classList.remove("hidden");
+
       showBox(
         "resultBox",
         "Quote ID: " + data.quote_id + "\n" +
@@ -286,6 +221,43 @@
       );
     } catch (err) {
       showBox("resultBox", "Error:\nFailed to contact server.");
+    }
+  });
+
+  el("btnUpload").addEventListener("click", async () => {
+    hideBox("uploadStatus");
+
+    if (!lastQuoteId) {
+      showBox("uploadStatus", "No quote_id available yet. Calculate quote first.");
+      return;
+    }
+
+    const input = el("photos");
+    if (!input.files || input.files.length === 0) {
+      showBox("uploadStatus", "No photos selected.");
+      return;
+    }
+    if (input.files.length > 5) {
+      showBox("uploadStatus", "Too many photos selected (max 5).");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("quote_id", lastQuoteId);
+    for (const f of input.files) formData.append("files", f);
+
+    showBox("uploadStatus", "Uploading photos…");
+
+    try {
+      const res = await fetch("/quote/upload-photos", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        showBox("uploadStatus", "Error:\n" + (data.detail || "Unknown error"));
+        return;
+      }
+      showBox("uploadStatus", "Uploaded successfully. Admin will review your photos.");
+    } catch (err) {
+      showBox("uploadStatus", "Error:\nFailed to contact server.");
     }
   });
 </script>

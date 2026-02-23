@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bay Delivery — Admin Uploads</title>
+  <link rel="stylesheet" href="/static/admin.css" />
+</head>
+
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brandMark">BD</div>
+        <div class="brandTitle">
+          <strong>Bay Delivery</strong><br />
+          <span class="muted">Admin — Uploads</span>
+        </div>
+      </div>
+      <div class="toplinks">
+        <a class="badgeLink" href="/admin">Dashboard</a>
+        <a class="badgeLink" href="/">Home</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h1>Customer Uploads</h1>
+      <p class="muted">Search by Quote ID to see photos stored in Google Drive.</p>
+
+      <div class="formWrap">
+        <label for="quote_id">Quote ID</label>
+        <input id="quote_id" placeholder="paste quote id here" />
+        <div class="btnRow" style="margin-top:12px;">
+          <button class="btn" id="btnSearch" type="button">Search</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none;">
+      <h2>Results</h2>
+      <div id="results"></div>
+    </div>
+  </div>
+
+<script>
+  const el = (id) => document.getElementById(id);
+
+  function showResults(items) {
+    const card = el("resultsCard");
+    const out = el("results");
+    card.style.display = "block";
+    out.innerHTML = "";
+
+    if (!items || items.length === 0) {
+      out.textContent = "No uploads found for that quote_id.";
+      return;
+    }
+
+    for (const it of items) {
+      const div = document.createElement("div");
+      div.style.padding = "10px 0";
+      div.style.borderBottom = "1px solid rgba(255,255,255,0.10)";
+
+      const name = document.createElement("div");
+      name.innerHTML = "<strong>" + (it.filename || "file") + "</strong> <span class='muted'>(" + (it.mime_type || "") + ")</span>";
+
+      const link = document.createElement("a");
+      link.href = it.drive_web_view_link || "#";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = it.drive_web_view_link ? "Open in Drive" : "No link";
+
+      const meta = document.createElement("div");
+      meta.className = "muted";
+      meta.textContent = "Uploaded: " + (it.created_at || "") + " • Size: " + (it.size_bytes || 0) + " bytes";
+
+      div.appendChild(name);
+      div.appendChild(link);
+      div.appendChild(meta);
+      out.appendChild(div);
+    }
+  }
+
+  el("btnSearch").addEventListener("click", async () => {
+    const q = (el("quote_id").value || "").trim();
+    if (!q) return;
+
+    const res = await fetch("/admin/api/uploads?quote_id=" + encodeURIComponent(q));
+    const data = await res.json();
+    showResults(data.items || []);
+  });
+</script>
+</body>
+</html>
