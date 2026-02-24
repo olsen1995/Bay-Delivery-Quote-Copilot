@@ -118,6 +118,40 @@
 
     <div class="card resultBox hidden" id="resultBox"></div>
 
+    <div class="card hidden" id="decisionCard">
+      <h2>Quote Decision</h2>
+      <p class="muted">If this works for you, accept and we’ll send it for admin confirmation.</p>
+
+      <div class="formWrap">
+        <div class="row">
+          <div>
+            <label for="preferredDate">Preferred date (optional)</label>
+            <input id="preferredDate" type="date" />
+          </div>
+          <div>
+            <label for="preferredWindow">Preferred time window (optional)</label>
+            <select id="preferredWindow">
+              <option value="">Select one</option>
+              <option value="morning">Morning</option>
+              <option value="afternoon">Afternoon</option>
+              <option value="evening">Evening</option>
+              <option value="flexible">Flexible</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="decisionNotes">Notes (optional)</label>
+        <textarea id="decisionNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
+
+        <div class="btnRow">
+          <button class="btn" id="btnAccept" type="button">Accept Quote</button>
+          <button class="btn secondary" id="btnDecline" type="button">Decline</button>
+        </div>
+
+        <div class="statusBox hidden" id="decisionStatus"></div>
+      </div>
+    </div>
+
     <div class="card hidden" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
       <p class="muted">These photos are saved for admin review.</p>
@@ -159,9 +193,53 @@
     el("quoteForm").reset();
     hideBox("resultBox");
     hideBox("uploadStatus");
+    hideBox("decisionStatus");
     el("uploadCard").classList.add("hidden");
+    el("decisionCard").classList.add("hidden");
     lastQuoteId = null;
     el("photos").value = "";
+    el("preferredDate").value = "";
+    el("preferredWindow").value = "";
+    el("decisionNotes").value = "";
+  }
+
+  async function submitDecision(action) {
+    hideBox("decisionStatus");
+
+    if (!lastQuoteId) {
+      showBox("decisionStatus", "No quote_id available yet. Calculate quote first.");
+      return;
+    }
+
+    const payload = {
+      action,
+      requested_job_date: el("preferredDate").value || null,
+      requested_time_window: el("preferredWindow").value || null,
+      notes: el("decisionNotes").value || null
+    };
+
+    showBox("decisionStatus", "Submitting decision...");
+
+    try {
+      const res = await fetch("/quote/" + encodeURIComponent(lastQuoteId) + "/decision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showBox("decisionStatus", "Error:\n" + (data.detail || "Unknown error"));
+        return;
+      }
+
+      if (action === "accept") {
+        showBox("decisionStatus", "Submitted for admin confirmation.");
+      } else {
+        showBox("decisionStatus", "Thanks — no booking requested.");
+      }
+    } catch (err) {
+      showBox("decisionStatus", "Error:\nFailed to contact server.");
+    }
   }
 
   el("btnClear").addEventListener("click", (e) => {
@@ -169,11 +247,16 @@
     clearForm();
   });
 
+  el("btnAccept").addEventListener("click", () => submitDecision("accept"));
+  el("btnDecline").addEventListener("click", () => submitDecision("decline"));
+
   el("quoteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     hideBox("resultBox");
     hideBox("uploadStatus");
+    hideBox("decisionStatus");
     el("uploadCard").classList.add("hidden");
+    el("decisionCard").classList.add("hidden");
     lastQuoteId = null;
 
     const payload = {
@@ -210,6 +293,7 @@
 
       lastQuoteId = data.quote_id;
       el("uploadCard").classList.remove("hidden");
+      el("decisionCard").classList.remove("hidden");
 
       showBox(
         "resultBox",

@@ -25,6 +25,7 @@ from app.storage import (
     save_quote_request,
     list_quote_requests,
     get_quote_request,
+    get_quote_request_by_quote_id,
     update_quote_request,
     save_job,
     list_jobs,
@@ -130,7 +131,10 @@ def _require_admin(request: Request) -> None:
             raise _unauthorized_basic()
         return
 
-    return
+    raise HTTPException(
+        status_code=401,
+        detail="Admin authentication is not configured",
+    )
 
 
 def _drive_enabled() -> bool:
@@ -306,6 +310,25 @@ class QuoteRequest(BaseModel):
         return self
 
 
+
+
+class QuoteDecisionRequest(BaseModel):
+    action: str = Field(..., description="accept|decline")
+    requested_job_date: Optional[str] = Field(None, max_length=40)
+    requested_time_window: Optional[str] = Field(None, max_length=80)
+    notes: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("action", "requested_job_date", "requested_time_window", "notes", mode="before")
+    @classmethod
+    def strip_values(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            cleaned = v.strip()
+            return cleaned or None
+        return v
+
+
 class QuoteResponse(BaseModel):
     quote_id: str
     created_at: str
@@ -382,6 +405,72 @@ def quote_calculate(req: QuoteRequest, background_tasks: BackgroundTasks):
         total_emt_cad=float(result["total_emt_cad"]),
         disclaimer=str(result["disclaimer"]),
     )
+
+
+
+
+@app.post("/quote/{quote_id}/decision")
+def quote_decision(quote_id: str, body: QuoteDecisionRequest, background_tasks: BackgroundTasks):
+    quote = get_quote_record(quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found (invalid quote_id).")
+
+    action = (body.action or "").lower()
+    if action not in {"accept", "decline"}:
+        raise HTTPException(status_code=400, detail="Invalid action (use accept|decline)")
+
+    status = "customer_accepted_pending_admin" if action == "accept" else "customer_declined"
+    customer_accepted_at = _now_local_iso() if action == "accept" else None
+
+    existing = get_quote_request_by_quote_id(quote_id)
+    if existing:
+        updated = update_quote_request(
+            existing["request_id"],
+            status=status,
+            notes=body.notes,
+            requested_job_date=body.requested_job_date,
+            requested_time_window=body.requested_time_window,
+            customer_accepted_at=customer_accepted_at,
+            admin_approved_at=None,
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update quote request")
+        _maybe_auto_snapshot(background_tasks)
+        return {"ok": True, "request_id": updated["request_id"], "status": updated["status"]}
+
+    request_id = str(uuid4())
+    created_at = _now_local_iso()
+    request_payload = quote.get("request") or {}
+    response_payload = quote.get("response") or {}
+
+    save_quote_request(
+        {
+            "request_id": request_id,
+            "created_at": created_at,
+            "status": status,
+            "quote_id": quote_id,
+            "customer_name": request_payload.get("customer_name"),
+            "customer_phone": request_payload.get("customer_phone"),
+            "job_address": request_payload.get("job_address"),
+            "job_description_customer": request_payload.get("description"),
+            "job_description_internal": request_payload.get("description"),
+            "service_type": str(response_payload.get("service_type") or request_payload.get("service_type") or "haul_away"),
+            "cash_total_cad": float(response_payload.get("total_cash_cad") or 0.0),
+            "emt_total_cad": float(response_payload.get("total_emt_cad") or 0.0),
+            "request_json": {
+                "quote_request": request_payload,
+                "decision_action": action,
+            },
+            "notes": body.notes,
+            "requested_job_date": body.requested_job_date,
+            "requested_time_window": body.requested_time_window,
+            "customer_accepted_at": customer_accepted_at,
+            "admin_approved_at": None,
+        }
+    )
+
+    _maybe_auto_snapshot(background_tasks)
+    return {"ok": True, "request_id": request_id, "status": status}
 
 
 @app.post("/quote/upload-photos")
@@ -489,7 +578,7 @@ def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: 
     return {"items": list_attachments(quote_id=quote_id, limit=int(limit))}
 
 
-@app.post("/admin/api/drive/snapshot")
+@app.api_route("/admin/api/drive/snapshot", methods=["GET", "POST"])
 def admin_drive_snapshot(request: Request):
     _require_admin(request)
     if not _drive_enabled():
