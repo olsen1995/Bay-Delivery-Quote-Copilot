@@ -31,6 +31,21 @@
   <div class="muted" id="statusLine"></div>
 </div>
 
+<div class="card mt14">
+  <h3>Drive Vault</h3>
+  <div class="muted">
+    Check Drive setup, trigger a DB snapshot, and list recent Drive backups for demo/recovery.
+  </div>
+
+  <div class="btnRow mt10">
+    <button id="driveStatusBtn">Check Drive Status</button>
+    <button id="driveSnapshotBtn" class="btnSpacer">Snapshot DB to Drive</button>
+    <button id="driveBackupsBtn" class="btnSpacer">List Drive Backups</button>
+  </div>
+
+  <div class="muted small mt10" id="driveStatusLine"></div>
+  <div id="driveBackupsBox"></div>
+</div>
 
 <div class="card mt14">
   <h3>DB Backup (Render Free Tier)</h3>
@@ -43,6 +58,7 @@
     <button id="exportDbBtn">Export DB to JSON</button>
 
     <div class="importBox">
+      <label for="importFile">Import backup file</label>
       <input id="importFile" type="file" accept="application/json" />
       <button id="importDbBtn" class="btnSpacer">Import JSON Backup</button>
     </div>
@@ -50,7 +66,6 @@
 
   <div class="muted small mt10" id="backupStatus"></div>
 </div>
-
 
 <div class="row">
   <div class="card">
@@ -74,6 +89,9 @@
 
 <script>
   const statusLine = document.getElementById("statusLine");
+  const backupStatus = document.getElementById("backupStatus");
+  const driveStatusLine = document.getElementById("driveStatusLine");
+  const driveBackupsBox = document.getElementById("driveBackupsBox");
 
   function authHeaders() {
     const u = (document.getElementById("adminUsername").value || "").trim();
@@ -112,6 +130,25 @@
       + "<thead><tr><th>Quote ID</th><th>Created</th><th>Type</th><th>Total (cash)</th></tr></thead>"
       + "<tbody>" + rows + "</tbody>"
       + "</table>";
+  }
+
+  function statusLabel(status) {
+    const map = {
+      customer_accepted_pending_admin: "Customer accepted (pending admin)",
+      customer_declined: "Customer declined",
+      admin_approved: "Admin approved",
+      rejected: "Rejected"
+    };
+    return map[status] || (status || "unknown");
+  }
+
+  function requestActionsHtml(r) {
+    const st = (r.status || "").toLowerCase();
+    if (st === "customer_declined" || st === "rejected") {
+      return "<span class='muted small'>No action needed</span>";
+    }
+    return "<button onclick=\"window.__approve('" + (r.request_id || "") + "')\">Approve</button>"
+      + "<button onclick=\"window.__reject('" + (r.request_id || "") + "')\" class=\"btnSpacer\">Reject</button>";
   }
 
   async function decide(requestId, action) {
@@ -157,14 +194,11 @@
         + "<td class='small'><div>" + (r.job_address || "") + "</div><div><span class='pill'>" + (r.service_type || "") + "</span></div></td>"
         + "<td class='small'><div><strong>Date:</strong> " + (r.requested_job_date || "-") + "</div><div><strong>Window:</strong> " + (r.requested_time_window || "-") + "</div></td>"
         + "<td>"
-        + "<div class='small'><strong>Status:</strong> <span class='pill'>" + (r.status || "") + "</span></div>"
+        + "<div class='small'><strong>Status:</strong> <span class='pill'>" + statusLabel(r.status) + "</span></div>"
         + "<div class='small'><strong>Cash:</strong> $" + Number(r.cash_total_cad || 0).toFixed(2) + "</div>"
         + "<div class='small'><strong>EMT:</strong> $" + Number(r.emt_total_cad || 0).toFixed(2) + "</div>"
         + "</td>"
-        + "<td>"
-        + "<button onclick=\"window.__approve('" + (r.request_id || "") + "')\">Approve</button>"
-        + "<button onclick=\"window.__reject('" + (r.request_id || "") + "')\" class=\"btnSpacer\">Reject</button>"
-        + "</td>"
+        + "<td>" + requestActionsHtml(r) + "</td>"
         + "</tr>";
     }
 
@@ -202,6 +236,32 @@
       + "</table>";
   }
 
+  function renderDriveBackups(items) {
+    if (!items || items.length === 0) {
+      driveBackupsBox.innerHTML = "<div class='muted'>No Drive backups found.</div>";
+      return;
+    }
+
+    let rows = "";
+    for (const f of items) {
+      const link = f.web_view_link
+        ? "<a href='" + f.web_view_link + "' target='_blank' rel='noopener noreferrer'>Open</a>"
+        : "-";
+      rows += "<tr>"
+        + "<td><code>" + (f.name || "") + "</code></td>"
+        + "<td>" + (f.created_time || "") + "</td>"
+        + "<td>" + (f.size || "-") + "</td>"
+        + "<td>" + link + "</td>"
+        + "</tr>";
+    }
+
+    driveBackupsBox.innerHTML =
+      "<table>"
+      + "<thead><tr><th>Name</th><th>Created</th><th>Size (bytes)</th><th>Link</th></tr></thead>"
+      + "<tbody>" + rows + "</tbody>"
+      + "</table>";
+  }
+
   async function refreshAll() {
     try {
       statusLine.textContent = "Loading...";
@@ -221,6 +281,45 @@
     }
   }
 
+  async function checkDriveStatus() {
+    try {
+      driveStatusLine.textContent = "Checking Drive...";
+      const data = await fetchJSON("/health");
+      const configured = data && data.drive_configured;
+      driveStatusLine.innerHTML = configured
+        ? "<span class='ok'>Drive configured.</span>"
+        : "<span class='bad'>Drive not configured.</span>";
+    } catch (err) {
+      driveStatusLine.innerHTML = "<span class='bad'>Drive status check failed:</span> " + String(err);
+    }
+  }
+
+  async function snapshotDrive() {
+    try {
+      driveStatusLine.textContent = "Creating Drive snapshot...";
+      const headers = authHeaders();
+      const res = await fetch("/admin/api/drive/snapshot", { method: "POST", headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(JSON.stringify(data));
+      const name = data.name || data.file_id || "backup";
+      driveStatusLine.innerHTML = "<span class='ok'>Snapshot complete:</span> <code>" + name + "</code>";
+      await listDriveBackups();
+    } catch (err) {
+      driveStatusLine.innerHTML = "<span class='bad'>Snapshot failed:</span> " + String(err);
+    }
+  }
+
+  async function listDriveBackups() {
+    try {
+      driveStatusLine.textContent = "Loading Drive backups...";
+      const data = await fetchJSON("/admin/api/drive/backups?limit=20");
+      renderDriveBackups(data.items || []);
+      driveStatusLine.innerHTML = "<span class='ok'>Loaded Drive backups.</span>";
+    } catch (err) {
+      driveBackupsBox.innerHTML = "";
+      driveStatusLine.innerHTML = "<span class='bad'>Could not list Drive backups:</span> " + String(err);
+    }
+  }
 
   async function exportDb() {
     try {
@@ -293,13 +392,14 @@
     }
   }
 
-
   window.__approve = (id) => decide(id, "approve");
   window.__reject = (id) => decide(id, "reject");
 
+  document.getElementById("driveStatusBtn").addEventListener("click", checkDriveStatus);
+  document.getElementById("driveSnapshotBtn").addEventListener("click", snapshotDrive);
+  document.getElementById("driveBackupsBtn").addEventListener("click", listDriveBackups);
   document.getElementById("exportDbBtn").addEventListener("click", exportDb);
   document.getElementById("importDbBtn").addEventListener("click", importDb);
-
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 </script>
 

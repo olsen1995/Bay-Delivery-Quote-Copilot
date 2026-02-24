@@ -494,6 +494,51 @@ def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
         }
 
 
+
+
+def get_quote_request_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                request_id, created_at, status, quote_id,
+                customer_name, customer_phone, job_address,
+                job_description_customer, job_description_internal,
+                service_type, cash_total_cad, emt_total_cad,
+                request_json, notes,
+                requested_job_date, requested_time_window,
+                customer_accepted_at, admin_approved_at
+            FROM quote_requests
+            WHERE quote_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (quote_id,),
+        ).fetchone()
+        if not row:
+            return None
+
+        return {
+            "request_id": row["request_id"],
+            "created_at": row["created_at"],
+            "status": row["status"],
+            "quote_id": row["quote_id"],
+            "customer_name": row["customer_name"],
+            "customer_phone": row["customer_phone"],
+            "job_address": row["job_address"],
+            "job_description_customer": row["job_description_customer"],
+            "job_description_internal": row["job_description_internal"],
+            "service_type": row["service_type"],
+            "cash_total_cad": float(row["cash_total_cad"]),
+            "emt_total_cad": float(row["emt_total_cad"]),
+            "request_json": json.loads(row["request_json"]),
+            "notes": row["notes"],
+            "requested_job_date": row["requested_job_date"],
+            "requested_time_window": row["requested_time_window"],
+            "customer_accepted_at": row["customer_accepted_at"],
+            "admin_approved_at": row["admin_approved_at"],
+        }
+
 def list_quote_requests(limit: int = 50, status: Optional[str] = None) -> List[Dict[str, Any]]:
     where: List[str] = []
     params: List[Any] = []
