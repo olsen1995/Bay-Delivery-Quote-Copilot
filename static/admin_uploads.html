@@ -50,11 +50,7 @@
   function authHeaders() {
     const token = (qs.get("token") || "").trim();
     if (token) return { "X-Admin-Token": token };
-
-    const u = (qs.get("u") || "").trim();
-    const p = (qs.get("p") || "").trim();
-    if (!u || !p) return {};
-    return { "Authorization": "Basic " + btoa(u + ":" + p) };
+    return {};
   }
 
   function showResults(items) {
@@ -103,7 +99,7 @@
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         el("resultsCard").classList.remove("resultsHidden");
-        el("results").textContent = "Unauthorized — provide token or credentials.";
+        el("results").textContent = "Unauthorized — provide ?token=... or authenticate in your browser.";
         return;
       }
       throw new Error(JSON.stringify(data));
