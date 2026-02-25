@@ -67,7 +67,8 @@ If your deployment is public, set an admin token:
 
 Admin endpoints require:
 
-- Header: `X-Admin-Token: <token>` OR query param `?token=<token>`
+- Header: `X-Admin-Token: <token>` for all admin APIs.
+- Optional convenience bootstrap: open `/admin?token=<token>` once; frontend stores it in `sessionStorage`, strips it from URL, and uses the header afterwards.
 
 Admin page:
 
@@ -108,6 +109,15 @@ Open:
 - `GDRIVE_SA_KEY_B64`
 - `GDRIVE_BACKUP_KEEP` (optional)
 - `GDRIVE_AUTO_SNAPSHOT=1` (optional)
+
+### CORS (optional)
+
+- `BAYDELIVERY_CORS_ORIGINS` (comma-separated origins, e.g. `https://your-render-domain.onrender.com`)
+- If not set, CORS middleware is not enabled (same-origin only).
+
+### Versioning
+
+- `VERSION` is the source of truth for app version metadata (`/health` uses this).
 
 ---
 

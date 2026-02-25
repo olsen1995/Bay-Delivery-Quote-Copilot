@@ -16,6 +16,7 @@
 <div class="card mt14">
   <div class="small">
     Admin access uses your Render environment variables: <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
+    You can also open this page with <code>?token=...</code> once; it is moved to session storage and removed from the URL.
   </div>
 
   <div class="rowCreds">
@@ -96,43 +97,80 @@
   const driveStatusLine = document.getElementById("driveStatusLine");
   const driveBackupsBox = document.getElementById("driveBackupsBox");
 
+  function bootstrapTokenFromUrl() {
+    const url = new URL(window.location.href);
+    const token = (url.searchParams.get("token") || "").trim();
+    if (!token) return;
+    sessionStorage.setItem("bay_admin_token", token);
+    url.searchParams.delete("token");
+    window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+  }
+
   function authHeaders() {
+    const headers = {};
+
+    const token = (sessionStorage.getItem("bay_admin_token") || "").trim();
+    if (token) {
+      headers["X-Admin-Token"] = token;
+    }
+
     const u = (document.getElementById("adminUsername").value || "").trim();
     const p = (document.getElementById("adminPassword").value || "").trim();
-    if (!u || !p) return {};
-    return { "Authorization": "Basic " + btoa(u + ":" + p) };
+    if (u && p) {
+      headers["Authorization"] = "Basic " + btoa(u + ":" + p);
+    }
+    return headers;
+  }
+
+  function setLine(el, level, msg, suffixCode) {
+    el.textContent = "";
+    const span = document.createElement("span");
+    if (level === "ok") span.className = "ok";
+    if (level === "bad") span.className = "bad";
+    span.textContent = msg;
+    el.appendChild(span);
+
+    if (suffixCode) {
+      el.appendChild(document.createTextNode(" "));
+      const code = document.createElement("code");
+      code.textContent = suffixCode;
+      el.appendChild(code);
+    }
+  }
+
+  function clearNode(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  function createTable(headers) {
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const tr = document.createElement("tr");
+    headers.forEach((h) => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    return { table, tbody };
+  }
+
+  function addEmptyState(container, text) {
+    clearNode(container);
+    const div = document.createElement("div");
+    div.className = "muted";
+    div.textContent = text;
+    container.appendChild(div);
   }
 
   async function fetchJSON(path) {
-    const headers = authHeaders();
-    const res = await fetch(path, { headers });
+    const res = await fetch(path, { headers: authHeaders() });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(JSON.stringify(data));
     return data;
-  }
-
-  function renderQuotes(items) {
-    const box = document.getElementById("quotesBox");
-    if (!items || items.length === 0) {
-      box.innerHTML = "<div class='muted'>No quotes yet.</div>";
-      return;
-    }
-
-    let rows = "";
-    for (const q of items) {
-      rows += "<tr>"
-        + "<td><code>" + (q.quote_id || "") + "</code></td>"
-        + "<td>" + (q.created_at || "") + "</td>"
-        + "<td><span class='pill'>" + (q.job_type || "") + "</span></td>"
-        + "<td>$" + Number(q.total_cad || 0).toFixed(2) + "</td>"
-        + "</tr>";
-    }
-
-    box.innerHTML =
-      "<table>"
-      + "<thead><tr><th>Quote ID</th><th>Created</th><th>Type</th><th>Total (cash)</th></tr></thead>"
-      + "<tbody>" + rows + "</tbody>"
-      + "</table>";
   }
 
   function statusLabel(status) {
@@ -145,13 +183,38 @@
     return map[status] || (status || "unknown");
   }
 
-  function requestActionsHtml(r) {
-    const st = (r.status || "").toLowerCase();
-    if (st === "customer_declined" || st === "rejected") {
-      return "<span class='muted small'>No action needed</span>";
-    }
-    return "<button onclick=\"window.__approve('" + (r.request_id || "") + "')\">Approve</button>"
-      + "<button onclick=\"window.__reject('" + (r.request_id || "") + "')\" class=\"btnSpacer\">Reject</button>";
+  function renderQuotes(items) {
+    const box = document.getElementById("quotesBox");
+    if (!items || items.length === 0) return addEmptyState(box, "No quotes yet.");
+    clearNode(box);
+
+    const { table, tbody } = createTable(["Quote ID", "Created", "Type", "Total (cash)"]);
+
+    items.forEach((q) => {
+      const tr = document.createElement("tr");
+
+      const tdId = document.createElement("td");
+      const code = document.createElement("code");
+      code.textContent = q.quote_id || "";
+      tdId.appendChild(code);
+
+      const tdCreated = document.createElement("td");
+      tdCreated.textContent = q.created_at || "";
+
+      const tdType = document.createElement("td");
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = q.job_type || "";
+      tdType.appendChild(pill);
+
+      const tdTotal = document.createElement("td");
+      tdTotal.textContent = "$" + Number(q.total_cad || 0).toFixed(2);
+
+      tr.append(tdId, tdCreated, tdType, tdTotal);
+      tbody.appendChild(tr);
+    });
+
+    box.appendChild(table);
   }
 
   async function decide(requestId, action) {
@@ -159,176 +222,275 @@
     statusLine.textContent = "Saving decision...";
 
     const headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
-
     const res = await fetch("/admin/api/quote-requests/" + encodeURIComponent(requestId) + "/decision", {
       method: "POST",
       headers,
-      body: JSON.stringify({ action: action, notes: (notes.trim() || null) })
+      body: JSON.stringify({ action, notes: (notes.trim() || null) })
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      statusLine.innerHTML = "<span class='bad'>Error:</span> " + JSON.stringify(data);
+      setLine(statusLine, "bad", "Error:");
+      statusLine.appendChild(document.createTextNode(" " + JSON.stringify(data)));
       return;
     }
 
-    const jobId = data && data.job && data.job.job_id ? data.job.job_id : null;
+    const jobId = data && data.job && data.job.job_id;
     if (jobId) {
-      statusLine.innerHTML = "<span class='ok'>Approved.</span> Job created: <code>" + jobId + "</code>";
+      setLine(statusLine, "ok", "Approved. Job created:", jobId);
     } else {
-      statusLine.innerHTML = "<span class='ok'>Saved:</span> " + action.toUpperCase() + " for " + requestId;
+      setLine(statusLine, "ok", "Saved: " + action.toUpperCase() + " for");
+      statusLine.appendChild(document.createTextNode(" " + requestId));
     }
 
     await refreshAll();
   }
 
+  function actionCell(item) {
+    const td = document.createElement("td");
+    const st = (item.status || "").toLowerCase();
+
+    if (st === "customer_declined" || st === "rejected") {
+      const noAction = document.createElement("span");
+      noAction.className = "muted small";
+      noAction.textContent = "No action needed";
+      td.appendChild(noAction);
+      return td;
+    }
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.textContent = "Approve";
+    approveBtn.addEventListener("click", () => decide(item.request_id || "", "approve"));
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "btnSpacer";
+    rejectBtn.textContent = "Reject";
+    rejectBtn.addEventListener("click", () => decide(item.request_id || "", "reject"));
+
+    td.append(approveBtn, rejectBtn);
+    return td;
+  }
+
   function renderRequests(items) {
     const box = document.getElementById("requestsBox");
-    if (!items || items.length === 0) {
-      box.innerHTML = "<div class='muted'>No booking requests yet.</div>";
-      return;
-    }
+    if (!items || items.length === 0) return addEmptyState(box, "No booking requests yet.");
+    clearNode(box);
 
-    let rows = "";
-    for (const r of items) {
-      rows += "<tr>"
-        + "<td><code>" + (r.request_id || "") + "</code><div class='small'>" + (r.created_at || "") + "</div></td>"
-        + "<td><div><strong>" + (r.customer_name || "") + "</strong></div><div class='small'>" + (r.customer_phone || "") + "</div></td>"
-        + "<td class='small'><div>" + (r.job_address || "") + "</div><div><span class='pill'>" + (r.service_type || "") + "</span></div></td>"
-        + "<td class='small'><div><strong>Date:</strong> " + (r.requested_job_date || "-") + "</div><div><strong>Window:</strong> " + (r.requested_time_window || "-") + "</div></td>"
-        + "<td>"
-        + "<div class='small'><strong>Status:</strong> <span class='pill'>" + statusLabel(r.status) + "</span></div>"
-        + "<div class='small'><strong>Cash:</strong> $" + Number(r.cash_total_cad || 0).toFixed(2) + "</div>"
-        + "<div class='small'><strong>EMT:</strong> $" + Number(r.emt_total_cad || 0).toFixed(2) + "</div>"
-        + "</td>"
-        + "<td>" + requestActionsHtml(r) + "</td>"
-        + "</tr>";
-    }
+    const { table, tbody } = createTable(["Request", "Customer", "Job", "Requested", "Totals", "Actions"]);
 
-    box.innerHTML =
-      "<table>"
-      + "<thead><tr><th>Request</th><th>Customer</th><th>Job</th><th>Requested</th><th>Totals</th><th>Actions</th></tr></thead>"
-      + "<tbody>" + rows + "</tbody>"
-      + "</table>";
+    items.forEach((r) => {
+      const tr = document.createElement("tr");
+
+      const tdReq = document.createElement("td");
+      const reqCode = document.createElement("code");
+      reqCode.textContent = r.request_id || "";
+      const reqDate = document.createElement("div");
+      reqDate.className = "small";
+      reqDate.textContent = r.created_at || "";
+      tdReq.append(reqCode, reqDate);
+
+      const tdCustomer = document.createElement("td");
+      const cName = document.createElement("div");
+      cName.textContent = r.customer_name || "";
+      const cPhone = document.createElement("div");
+      cPhone.className = "small";
+      cPhone.textContent = r.customer_phone || "";
+      tdCustomer.append(cName, cPhone);
+
+      const tdJob = document.createElement("td");
+      tdJob.className = "small";
+      const addr = document.createElement("div");
+      addr.textContent = r.job_address || "";
+      const svc = document.createElement("div");
+      svc.textContent = "Service: " + (r.service_type || "");
+      tdJob.append(addr, svc);
+
+      const tdRequested = document.createElement("td");
+      tdRequested.className = "small";
+      const date = document.createElement("div");
+      date.textContent = "Date: " + (r.requested_job_date || "-");
+      const windowEl = document.createElement("div");
+      windowEl.textContent = "Window: " + (r.requested_time_window || "-");
+      tdRequested.append(date, windowEl);
+
+      const tdTotals = document.createElement("td");
+      const stWrap = document.createElement("div");
+      stWrap.className = "small";
+      const stPill = document.createElement("span");
+      stPill.className = "pill";
+      stPill.textContent = statusLabel(r.status);
+      stWrap.appendChild(document.createTextNode("Status: "));
+      stWrap.appendChild(stPill);
+
+      const cash = document.createElement("div");
+      cash.className = "small";
+      cash.textContent = "Cash: $" + Number(r.cash_total_cad || 0).toFixed(2);
+
+      const emt = document.createElement("div");
+      emt.className = "small";
+      emt.textContent = "EMT: $" + Number(r.emt_total_cad || 0).toFixed(2);
+
+      tdTotals.append(stWrap, cash, emt);
+
+      tr.append(tdReq, tdCustomer, tdJob, tdRequested, tdTotals, actionCell(r));
+      tbody.appendChild(tr);
+    });
+
+    box.appendChild(table);
   }
 
   function renderJobs(items) {
     const box = document.getElementById("jobsBox");
-    if (!items || items.length === 0) {
-      box.innerHTML = "<div class='muted'>No jobs yet.</div>";
-      return;
-    }
+    if (!items || items.length === 0) return addEmptyState(box, "No jobs yet.");
+    clearNode(box);
 
-    let rows = "";
-    for (const j of items) {
-      rows += "<tr>"
-        + "<td><code>" + (j.job_id || "") + "</code><div class='small'>" + (j.created_at || "") + "</div></td>"
-        + "<td><code>" + (j.quote_id || "") + "</code></td>"
-        + "<td><span class='pill'>" + (j.status || "") + "</span></td>"
-        + "<td><div><strong>" + (j.customer_name || "") + "</strong></div><div class='small'>" + (j.customer_phone || "") + "</div></td>"
-        + "<td class='small'>" + (j.job_address || "") + "</td>"
-        + "<td>$" + Number(j.total_cad || 0).toFixed(2) + "</td>"
-        + "<td class='small'>" + (j.notes || "") + "</td>"
-        + "</tr>";
-    }
+    const { table, tbody } = createTable(["Job", "Quote", "Status", "Customer", "Address", "Total", "Notes"]);
 
-    box.innerHTML =
-      "<table>"
-      + "<thead><tr><th>Job</th><th>Quote</th><th>Status</th><th>Customer</th><th>Address</th><th>Total</th><th>Notes</th></tr></thead>"
-      + "<tbody>" + rows + "</tbody>"
-      + "</table>";
+    items.forEach((j) => {
+      const tr = document.createElement("tr");
+
+      const tdJob = document.createElement("td");
+      const jobCode = document.createElement("code");
+      jobCode.textContent = j.job_id || "";
+      const created = document.createElement("div");
+      created.className = "small";
+      created.textContent = j.created_at || "";
+      tdJob.append(jobCode, created);
+
+      const tdQuote = document.createElement("td");
+      const qCode = document.createElement("code");
+      qCode.textContent = j.quote_id || "";
+      tdQuote.appendChild(qCode);
+
+      const tdStatus = document.createElement("td");
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = j.status || "";
+      tdStatus.appendChild(pill);
+
+      const tdCustomer = document.createElement("td");
+      const name = document.createElement("div");
+      const strong = document.createElement("strong");
+      strong.textContent = j.customer_name || "";
+      name.appendChild(strong);
+      const phone = document.createElement("div");
+      phone.className = "small";
+      phone.textContent = j.customer_phone || "";
+      tdCustomer.append(name, phone);
+
+      const tdAddress = document.createElement("td");
+      tdAddress.className = "small";
+      tdAddress.textContent = j.job_address || "";
+
+      const tdTotal = document.createElement("td");
+      tdTotal.textContent = "$" + Number(j.total_cad || 0).toFixed(2);
+
+      const tdNotes = document.createElement("td");
+      tdNotes.className = "small";
+      tdNotes.textContent = j.notes || "";
+
+      tr.append(tdJob, tdQuote, tdStatus, tdCustomer, tdAddress, tdTotal, tdNotes);
+      tbody.appendChild(tr);
+    });
+
+    box.appendChild(table);
   }
 
   function renderDriveBackups(items) {
-    if (!items || items.length === 0) {
-      driveBackupsBox.innerHTML = "<div class='muted'>No Drive backups found.</div>";
-      return;
-    }
+    if (!items || items.length === 0) return addEmptyState(driveBackupsBox, "No Drive backups found.");
+    clearNode(driveBackupsBox);
 
-    let rows = "";
-    for (const f of items) {
-      const link = f.web_view_link
-        ? "<a href='" + f.web_view_link + "' target='_blank' rel='noopener noreferrer'>Open</a>"
-        : "-";
-      rows += "<tr>"
-        + "<td><code>" + (f.name || "") + "</code></td>"
-        + "<td>" + (f.created_time || "") + "</td>"
-        + "<td>" + (f.size || "-") + "</td>"
-        + "<td>" + link + "</td>"
-        + "</tr>";
-    }
+    const { table, tbody } = createTable(["Name", "Created", "Size (bytes)", "Link"]);
 
-    driveBackupsBox.innerHTML =
-      "<table>"
-      + "<thead><tr><th>Name</th><th>Created</th><th>Size (bytes)</th><th>Link</th></tr></thead>"
-      + "<tbody>" + rows + "</tbody>"
-      + "</table>";
+    items.forEach((f) => {
+      const tr = document.createElement("tr");
+
+      const tdName = document.createElement("td");
+      const code = document.createElement("code");
+      code.textContent = f.name || "";
+      tdName.appendChild(code);
+
+      const tdCreated = document.createElement("td");
+      tdCreated.textContent = f.created_time || "";
+
+      const tdSize = document.createElement("td");
+      tdSize.textContent = String(f.size || "-");
+
+      const tdLink = document.createElement("td");
+      if (f.web_view_link) {
+        const a = document.createElement("a");
+        a.href = f.web_view_link;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = "Open";
+        tdLink.appendChild(a);
+      } else {
+        tdLink.textContent = "-";
+      }
+
+      tr.append(tdName, tdCreated, tdSize, tdLink);
+      tbody.appendChild(tr);
+    });
+
+    driveBackupsBox.appendChild(table);
   }
 
   async function refreshAll() {
     try {
       statusLine.textContent = "Loading...";
-
-      const quotes = await fetchJSON("/admin/api/quotes");
-      renderQuotes(quotes.items || []);
-
-      const reqs = await fetchJSON("/admin/api/quote-requests");
-      renderRequests(reqs.items || []);
-
-      const jobs = await fetchJSON("/admin/api/jobs");
-      renderJobs(jobs.items || []);
-
-      statusLine.innerHTML = "<span class='ok'>Loaded.</span>";
+      renderQuotes((await fetchJSON("/admin/api/quotes")).items || []);
+      renderRequests((await fetchJSON("/admin/api/quote-requests")).items || []);
+      renderJobs((await fetchJSON("/admin/api/jobs")).items || []);
+      setLine(statusLine, "ok", "Loaded.");
     } catch (err) {
-      statusLine.innerHTML = "<span class='bad'>Admin API error:</span> " + String(err);
+      setLine(statusLine, "bad", "Admin API error:");
+      statusLine.appendChild(document.createTextNode(" " + String(err)));
     }
   }
 
   async function checkDriveStatus() {
     try {
       driveStatusLine.textContent = "Checking Drive...";
-      const data = await fetchJSON("/health");
-      const configured = data && data.drive_configured;
-      driveStatusLine.innerHTML = configured
-        ? "<span class='ok'>Drive configured.</span>"
-        : "<span class='bad'>Drive not configured.</span>";
+      const configured = Boolean((await fetchJSON("/health")).drive_configured);
+      setLine(driveStatusLine, configured ? "ok" : "bad", configured ? "Drive configured." : "Drive not configured.");
     } catch (err) {
-      driveStatusLine.innerHTML = "<span class='bad'>Drive status check failed:</span> " + String(err);
+      setLine(driveStatusLine, "bad", "Drive status check failed:");
+      driveStatusLine.appendChild(document.createTextNode(" " + String(err)));
     }
   }
 
   async function snapshotDrive() {
     try {
       driveStatusLine.textContent = "Creating Drive snapshot...";
-      const headers = authHeaders();
-      const res = await fetch("/admin/api/drive/snapshot", { method: "POST", headers });
+      const res = await fetch("/admin/api/drive/snapshot", { method: "POST", headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(JSON.stringify(data));
-      const name = data.name || data.file_id || "backup";
-      driveStatusLine.innerHTML = "<span class='ok'>Snapshot complete:</span> <code>" + name + "</code>";
+      setLine(driveStatusLine, "ok", "Snapshot complete:", data.name || data.file_id || "backup");
       await listDriveBackups();
     } catch (err) {
-      driveStatusLine.innerHTML = "<span class='bad'>Snapshot failed:</span> " + String(err);
+      setLine(driveStatusLine, "bad", "Snapshot failed:");
+      driveStatusLine.appendChild(document.createTextNode(" " + String(err)));
     }
   }
 
   async function listDriveBackups() {
     try {
       driveStatusLine.textContent = "Loading Drive backups...";
-      const data = await fetchJSON("/admin/api/drive/backups?limit=20");
-      renderDriveBackups(data.items || []);
-      driveStatusLine.innerHTML = "<span class='ok'>Loaded Drive backups.</span>";
+      renderDriveBackups((await fetchJSON("/admin/api/drive/backups?limit=20")).items || []);
+      setLine(driveStatusLine, "ok", "Loaded Drive backups.");
     } catch (err) {
-      driveBackupsBox.innerHTML = "";
-      driveStatusLine.innerHTML = "<span class='bad'>Could not list Drive backups:</span> " + String(err);
+      clearNode(driveBackupsBox);
+      setLine(driveStatusLine, "bad", "Could not list Drive backups:");
+      driveStatusLine.appendChild(document.createTextNode(" " + String(err)));
     }
   }
 
   async function exportDb() {
     try {
       backupStatus.textContent = "Exporting...";
-      const headers = authHeaders();
-      const res = await fetch("/admin/api/db/export", { headers });
+      const res = await fetch("/admin/api/db/export", { headers: authHeaders() });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(JSON.stringify(data));
@@ -349,9 +511,10 @@
       a.remove();
       URL.revokeObjectURL(url);
 
-      backupStatus.innerHTML = "<span class='ok'>Exported.</span> Saved as <code>" + filename + "</code>";
+      setLine(backupStatus, "ok", "Exported. Saved as", filename);
     } catch (err) {
-      backupStatus.innerHTML = "<span class='bad'>Export failed:</span> " + String(err);
+      setLine(backupStatus, "bad", "Export failed:");
+      backupStatus.appendChild(document.createTextNode(" " + String(err)));
     }
   }
 
@@ -359,7 +522,7 @@
     try {
       const file = document.getElementById("importFile").files[0];
       if (!file) {
-        backupStatus.innerHTML = "<span class='bad'>Choose a JSON file first.</span>";
+        setLine(backupStatus, "bad", "Choose a JSON file first.");
         return;
       }
 
@@ -368,9 +531,7 @@
       }
 
       backupStatus.textContent = "Importing...";
-
-      const text = await file.text();
-      const payload = JSON.parse(text);
+      const payload = JSON.parse(await file.text());
 
       const headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
       const res = await fetch("/admin/api/db/import", {
@@ -383,20 +544,19 @@
       if (!res.ok) throw new Error(JSON.stringify(data));
 
       const restored = data.restored || {};
-      backupStatus.innerHTML =
-        "<span class='ok'>Imported.</span> " +
-        "quotes=" + (restored.quotes || 0) + ", " +
-        "quote_requests=" + (restored.quote_requests || 0) + ", " +
-        "jobs=" + (restored.jobs || 0);
+      setLine(backupStatus, "ok", "Imported.");
+      backupStatus.appendChild(document.createTextNode(
+        " quotes=" + (restored.quotes || 0)
+        + ", quote_requests=" + (restored.quote_requests || 0)
+        + ", jobs=" + (restored.jobs || 0)
+      ));
 
       await refreshAll();
     } catch (err) {
-      backupStatus.innerHTML = "<span class='bad'>Import failed:</span> " + String(err);
+      setLine(backupStatus, "bad", "Import failed:");
+      backupStatus.appendChild(document.createTextNode(" " + String(err)));
     }
   }
-
-  window.__approve = (id) => decide(id, "approve");
-  window.__reject = (id) => decide(id, "reject");
 
   document.getElementById("driveStatusBtn").addEventListener("click", checkDriveStatus);
   document.getElementById("driveSnapshotBtn").addEventListener("click", snapshotDrive);
@@ -404,6 +564,9 @@
   document.getElementById("exportDbBtn").addEventListener("click", exportDb);
   document.getElementById("importDbBtn").addEventListener("click", importDb);
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+
+  bootstrapTokenFromUrl();
+  refreshAll();
 </script>
 
 </body>

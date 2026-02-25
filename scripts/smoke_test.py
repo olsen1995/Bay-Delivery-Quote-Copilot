@@ -202,6 +202,15 @@ def main() -> int:
         require(status == 200, f"GET /admin/api/uploads with auth expected 200, got {status}")
         print("[ok] /admin/api/uploads authed")
 
+        token = headers.get("X-Admin-Token", "").strip()
+        if token:
+            status, query_token_uploads = api("GET", f"/admin/api/uploads?limit=1&token={token}")
+            require(
+                status in (401, 403),
+                f"GET /admin/api/uploads with query token expected 401/403, got {status}",
+            )
+            print("[ok] /admin/api/uploads query token denied")
+
     if isinstance(health, dict) and health.get("drive_configured") is True:
         require(bool(headers), "Drive is configured but admin auth env vars are missing for backup check")
         status, backups = api("GET", "/admin/api/drive/backups", headers=headers)
