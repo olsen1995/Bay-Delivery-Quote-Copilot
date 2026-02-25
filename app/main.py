@@ -101,40 +101,40 @@ def _unauthorized_basic() -> HTTPException:
 
 def _require_admin(request: Request) -> None:
     token_required = os.getenv(ADMIN_TOKEN_ENV)
+    user_required = os.getenv(ADMIN_USERNAME_ENV)
+    pass_required = os.getenv(ADMIN_PASSWORD_ENV)
+
+    if not token_required and not (user_required and pass_required):
+        raise HTTPException(
+            status_code=401,
+            detail="Admin authentication is not configured",
+        )
+
     if token_required:
         token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
         if token != token_required:
             raise HTTPException(status_code=401, detail="Admin token required")
         return
 
-    user_required = os.getenv(ADMIN_USERNAME_ENV)
-    pass_required = os.getenv(ADMIN_PASSWORD_ENV)
-    if user_required and pass_required:
-        auth = request.headers.get("Authorization") or ""
-        if not auth.startswith("Basic "):
-            raise _unauthorized_basic()
+    auth = request.headers.get("Authorization") or ""
+    if not auth.startswith("Basic "):
+        raise _unauthorized_basic()
 
-        b64 = auth.split(" ", 1)[1].strip()
-        try:
-            decoded = base64.b64decode(b64).decode("utf-8")
-        except Exception:
-            raise _unauthorized_basic()
+    b64 = auth.split(" ", 1)[1].strip()
+    try:
+        decoded = base64.b64decode(b64).decode("utf-8")
+    except Exception:
+        raise _unauthorized_basic()
 
-        if ":" not in decoded:
-            raise _unauthorized_basic()
+    if ":" not in decoded:
+        raise _unauthorized_basic()
 
-        username, password = decoded.split(":", 1)
-        if not (
-            secrets.compare_digest(username, user_required)
-            and secrets.compare_digest(password, pass_required)
-        ):
-            raise _unauthorized_basic()
-        return
-
-    raise HTTPException(
-        status_code=401,
-        detail="Admin authentication is not configured",
-    )
+    username, password = decoded.split(":", 1)
+    if not (
+        secrets.compare_digest(username, user_required)
+        and secrets.compare_digest(password, pass_required)
+    ):
+        raise _unauthorized_basic()
 
 
 def _drive_enabled() -> bool:
