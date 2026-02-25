@@ -82,6 +82,17 @@
           </div>
         </div>
 
+        <div class="row hidden" id="routeRow">
+          <div>
+            <label for="pickup_address">Pickup address</label>
+            <input id="pickup_address" name="pickup_address" placeholder="Pickup location" />
+          </div>
+          <div>
+            <label for="dropoff_address">Dropoff address</label>
+            <input id="dropoff_address" name="dropoff_address" placeholder="Dropoff location" />
+          </div>
+        </div>
+
         <div class="row">
           <div>
             <label for="garbage_bag_count">Garbage bag count (bag-equivalent)</label>
@@ -191,6 +202,7 @@
 
   function clearForm() {
     el("quoteForm").reset();
+    syncRouteFields();
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
@@ -201,6 +213,26 @@
     el("preferredDate").value = "";
     el("preferredWindow").value = "";
     el("decisionNotes").value = "";
+  }
+
+  function requiresRouteFields(serviceType) {
+    return serviceType === "small_move" || serviceType === "item_delivery";
+  }
+
+  function syncRouteFields() {
+    const needRoutes = requiresRouteFields(el("service_type").value);
+    const routeRow = el("routeRow");
+    const pickup = el("pickup_address");
+    const dropoff = el("dropoff_address");
+
+    routeRow.classList.toggle("hidden", !needRoutes);
+    pickup.required = needRoutes;
+    dropoff.required = needRoutes;
+
+    if (!needRoutes) {
+      pickup.value = "";
+      dropoff.value = "";
+    }
   }
 
   async function submitDecision(action) {
@@ -254,6 +286,7 @@
 
   el("btnAccept").addEventListener("click", () => submitDecision("accept"));
   el("btnDecline").addEventListener("click", () => submitDecision("decline"));
+  el("service_type").addEventListener("change", syncRouteFields);
 
   el("quoteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -264,14 +297,23 @@
     el("decisionCard").classList.add("hidden");
     lastQuoteId = null;
 
+    const serviceType = el("service_type").value;
+    const pickupAddress = (el("pickup_address").value || "").trim();
+    const dropoffAddress = (el("dropoff_address").value || "").trim();
+
+    if (requiresRouteFields(serviceType) && (!pickupAddress || !dropoffAddress)) {
+      showBox("resultBox", "Error:\nPickup and dropoff addresses are required for small moves and item delivery.");
+      return;
+    }
+
     const payload = {
-      service_type: el("service_type").value,
-      customer_name: el("customer_name").value,
-      customer_phone: el("customer_phone").value,
-      job_address: el("job_address").value,
-      pickup_address: null,
-      dropoff_address: null,
-      description: el("description").value,
+      service_type: serviceType,
+      customer_name: (el("customer_name").value || "").trim(),
+      customer_phone: (el("customer_phone").value || "").trim(),
+      job_address: (el("job_address").value || "").trim(),
+      pickup_address: pickupAddress || null,
+      dropoff_address: dropoffAddress || null,
+      description: (el("description").value || "").trim(),
       estimated_hours: parseFloat(el("estimated_hours").value || "0"),
       crew_size: parseInt(el("crew_size").value || "1", 10),
       garbage_bag_count: parseInt(el("garbage_bag_count").value || "0", 10),
@@ -349,6 +391,8 @@
       showBox("uploadStatus", "Error:\nFailed to contact server.");
     }
   });
+
+  syncRouteFields();
 </script>
 </body>
 </html>

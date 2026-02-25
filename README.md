@@ -84,3 +84,37 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Open:
+
+- Home: `http://127.0.0.1:8000/`
+- Quote page: `http://127.0.0.1:8000/quote`
+- Admin page: `http://127.0.0.1:8000/admin`
+
+---
+
+## Environment variables
+
+### Admin auth
+
+- `BAYDELIVERY_ADMIN_TOKEN` (recommended for Render/public deploys)
+- OR `ADMIN_USERNAME` + `ADMIN_PASSWORD` for HTTP Basic auth
+
+### Google Drive (optional)
+
+- `GDRIVE_FOLDER_ID`
+- `GDRIVE_SA_KEY_B64`
+- `GDRIVE_BACKUP_KEEP` (optional)
+- `GDRIVE_AUTO_SNAPSHOT=1` (optional)
+
+---
+
+## Smoke test
+
+With the server running locally:
+
+```powershell
+python scripts/smoke_test.py
+```

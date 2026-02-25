@@ -87,6 +87,12 @@ def error_detail(body: Any) -> str:
     return str(body)
 
 
+def clone_payload(base: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+    out = dict(base)
+    out.update(kwargs)
+    return out
+
+
 def main() -> int:
     print(f"Smoke test target: {base_url()}")
 
@@ -117,6 +123,50 @@ def main() -> int:
     quote_id = str(quote["quote_id"])
     print(f"[ok] /quote/calculate -> {quote_id}")
 
+    status, missing_routes = api(
+        "POST",
+        "/quote/calculate",
+        payload=clone_payload(quote_payload, service_type="small_move", pickup_address=None, dropoff_address=None),
+    )
+    require(status in (400, 422), f"small_move without routes expected 400/422, got {status}")
+    detail = error_detail(missing_routes).lower()
+    require(
+        ("pickup_address" in detail) or ("dropoff_address" in detail),
+        f"small_move missing-routes error should mention pickup/dropoff, got: {missing_routes}",
+    )
+    print("[ok] /quote/calculate small_move missing routes rejected")
+
+    status, small_move_ok = api(
+        "POST",
+        "/quote/calculate",
+        payload=clone_payload(
+            quote_payload,
+            service_type="small_move",
+            pickup_address="111 Pickup Rd",
+            dropoff_address="222 Dropoff Ave",
+            crew_size=2,
+            estimated_hours=4,
+        ),
+    )
+    require(status == 200, f"small_move with routes expected 200, got {status}")
+    require(isinstance(small_move_ok, dict) and bool(small_move_ok.get("quote_id")), "small_move expected quote_id")
+    print("[ok] /quote/calculate small_move with routes")
+
+    status, delivery_ok = api(
+        "POST",
+        "/quote/calculate",
+        payload=clone_payload(
+            quote_payload,
+            service_type="item_delivery",
+            pickup_address="111 Pickup Rd",
+            dropoff_address="222 Dropoff Ave",
+            estimated_hours=1,
+        ),
+    )
+    require(status == 200, f"item_delivery with routes expected 200, got {status}")
+    require(isinstance(delivery_ok, dict) and bool(delivery_ok.get("quote_id")), "item_delivery expected quote_id")
+    print("[ok] /quote/calculate item_delivery with routes")
+
     status, decision = api("POST", f"/quote/{quote_id}/decision", payload={"action": "accept"})
     if status == 404:
         if decision == {"detail": "Not Found"}:
@@ -133,8 +183,21 @@ def main() -> int:
             f"POST /quote/{{quote_id}}/decision expected 200/201, 401/403, or route-missing 404; got {status} with body: {decision}"
         )
 
+    status, unauth_uploads = api("GET", "/admin/api/uploads?limit=1")
+    if status in (401, 403):
+        print("[ok] /admin/api/uploads unauth denied")
+    elif status == 200:
+        print("[warn] /admin/api/uploads unauth allowed (admin auth not configured)")
+    else:
+        raise AssertionError(f"GET /admin/api/uploads expected 200/401/403, got {status} ({unauth_uploads})")
+
+    headers = admin_headers()
+    if headers:
+        status, authed_uploads = api("GET", "/admin/api/uploads?limit=1", headers=headers)
+        require(status == 200, f"GET /admin/api/uploads with auth expected 200, got {status}")
+        print("[ok] /admin/api/uploads authed")
+
     if isinstance(health, dict) and health.get("drive_configured") is True:
-        headers = admin_headers()
         require(bool(headers), "Drive is configured but admin auth env vars are missing for backup check")
         status, backups = api("GET", "/admin/api/drive/backups", headers=headers)
         require(status == 200, f"GET /admin/api/drive/backups expected 200, got {status}")
