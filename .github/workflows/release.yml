@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bump VERSION
+        id: bump
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bump = "${{ github.event.inputs.bump }}".strip().lower()
+          version_file = Path("VERSION")
+          raw = version_file.read_text(encoding="utf-8").strip().lstrip("v")
+          parts = raw.split(".")
+          if len(parts) != 3 or not all(p.isdigit() for p in parts):
+              raise SystemExit(f"Unsupported VERSION format: {raw!r}; expected X.Y.Z")
+
+          major, minor, patch = map(int, parts)
+          if bump == "major":
+              major += 1
+              minor = 0
+              patch = 0
+          elif bump == "minor":
+              minor += 1
+              patch = 0
+          else:
+              patch += 1
+
+          new_version = f"{major}.{minor}.{patch}"
+          version_file.write_text(new_version + "\n", encoding="utf-8")
+
+          out = Path("$GITHUB_OUTPUT")
+          with out.open("a", encoding="utf-8") as f:
+              f.write(f"version={new_version}\n")
+          print(f"Bumped VERSION to {new_version}")
+          PY
+
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin HEAD:main
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          name: v${{ steps.bump.outputs.version }}
+          generate_release_notes: true

@@ -45,10 +45,18 @@
 
 <script>
   const el = (id) => document.getElementById(id);
-  const qs = new URLSearchParams(window.location.search);
+
+  function bootstrapTokenFromUrl() {
+    const url = new URL(window.location.href);
+    const token = (url.searchParams.get("token") || "").trim();
+    if (!token) return;
+    sessionStorage.setItem("bay_admin_token", token);
+    url.searchParams.delete("token");
+    window.history.replaceState({}, "", url.toString());
+  }
 
   function authHeaders() {
-    const token = (qs.get("token") || "").trim();
+    const token = (sessionStorage.getItem("bay_admin_token") || "").trim();
     if (token) return { "X-Admin-Token": token };
     return {};
   }
@@ -69,7 +77,12 @@
       div.className = "resultRow";
 
       const name = document.createElement("div");
-      name.innerHTML = "<strong>" + (it.filename || "file") + "</strong> <span class='muted'>(" + (it.mime_type || "") + ")</span>";
+      const strong = document.createElement("strong");
+      strong.textContent = it.filename || "file";
+      const mime = document.createElement("span");
+      mime.className = "muted";
+      mime.textContent = " (" + (it.mime_type || "") + ")";
+      name.append(strong, mime);
 
       const link = document.createElement("a");
       link.href = it.drive_web_view_link || "#";
@@ -99,13 +112,15 @@
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         el("resultsCard").classList.remove("resultsHidden");
-        el("results").textContent = "Unauthorized — provide ?token=... or authenticate in your browser.";
+        el("results").textContent = "Unauthorized — open /admin or /admin/uploads with ?token=... once, or authenticate in your browser.";
         return;
       }
       throw new Error(JSON.stringify(data));
     }
     showResults(data.items || []);
   });
+
+  bootstrapTokenFromUrl();
 </script>
 </body>
 </html>

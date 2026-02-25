@@ -6,7 +6,7 @@ This project provides:
 
 - Customer-facing quote UI (served at `/`)
 - Quote API (`POST /quote/calculate`)
-- Booking request workflow + admin approval
+- Booking decision workflow + admin approval
 - SQLite storage for ops review
 
 ---
@@ -48,12 +48,14 @@ For `small_move` and `item_delivery`, also required:
 
 ---
 
-## Booking request workflow (customer → admin approval)
+## Booking decision workflow (customer → admin approval)
 
 1) Customer generates an estimate on `/`
-2) Customer clicks **Request Booking** and submits date/time window
-3) System stores a `quote_requests` row with status `customer_requested`
-4) Admin reviews in `/admin` and either:
+2) Customer uses the decision endpoint to **Accept** or **Decline** the quote
+3) System stores/updates the `quote_requests` row with status:
+   - `customer_accepted_pending_admin` when accepted
+   - `customer_declined` when declined
+4) Admin reviews accepted requests in `/admin` and either:
    - Approves → status `admin_approved`
    - Rejects → status `rejected`
 
@@ -67,7 +69,8 @@ If your deployment is public, set an admin token:
 
 Admin endpoints require:
 
-- Header: `X-Admin-Token: <token>` OR query param `?token=<token>`
+- Header: `X-Admin-Token: <token>` for all admin APIs.
+- Optional convenience bootstrap: open `/admin?token=<token>` once; frontend stores it in `sessionStorage`, strips it from URL, and uses the header afterwards.
 
 Admin page:
 
@@ -108,6 +111,17 @@ Open:
 - `GDRIVE_SA_KEY_B64`
 - `GDRIVE_BACKUP_KEEP` (optional)
 - `GDRIVE_AUTO_SNAPSHOT=1` (optional)
+
+### CORS (optional)
+
+- `BAYDELIVERY_CORS_ORIGINS` (comma-separated origins, e.g. `https://your-render-domain.onrender.com`)
+- If not set, CORS middleware is not enabled (same-origin only).
+
+### Versioning
+
+- `VERSION` is the source of truth for app version metadata (`/health` uses this).
+- Releases are Python-first (no Node tooling): run the **Release** GitHub Action and choose a bump type (`patch`/`minor`/`major`).
+- The release workflow updates `VERSION`, creates a `vX.Y.Z` tag, and publishes a GitHub Release.
 
 ---
 

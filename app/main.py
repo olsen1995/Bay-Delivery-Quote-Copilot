@@ -43,7 +43,18 @@ except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
 
 
-APP_VERSION = "0.9.0"
+VERSION_FILE = Path(__file__).resolve().parent.parent / "VERSION"
+
+
+def _load_app_version() -> str:
+    try:
+        raw = VERSION_FILE.read_text(encoding="utf-8").strip()
+        return raw.lstrip("v") or "0.0.0"
+    except Exception:
+        return "0.0.0"
+
+
+APP_VERSION = _load_app_version()
 CAD = "CAD"
 LOCAL_TZ_NAME = "America/Toronto"
 
@@ -52,6 +63,7 @@ ADMIN_USERNAME_ENV = "ADMIN_USERNAME"
 ADMIN_PASSWORD_ENV = "ADMIN_PASSWORD"
 
 GDRIVE_AUTO_SNAPSHOT_ENV = "GDRIVE_AUTO_SNAPSHOT"
+CORS_ORIGINS_ENV = "BAYDELIVERY_CORS_ORIGINS"
 
 
 app = FastAPI(
@@ -60,13 +72,19 @@ app = FastAPI(
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + admin workflow.",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_origins = [
+    o.strip()
+    for o in os.getenv(CORS_ORIGINS_ENV, "").split(",")
+    if o.strip()
+]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Admin-Token"],
+    )
 
 init_db()
 
@@ -99,10 +117,12 @@ def _unauthorized_basic() -> HTTPException:
     )
 
 
-def _require_admin(request: Request) -> None:
+def _require_admin(request: Request, *, allow_query_token: bool = False) -> None:
     token_required = os.getenv(ADMIN_TOKEN_ENV)
     if token_required:
-        token = request.headers.get("X-Admin-Token") or request.query_params.get("token")
+        token = request.headers.get("X-Admin-Token")
+        if allow_query_token and not token:
+            token = request.query_params.get("token")
         if token != token_required:
             raise HTTPException(status_code=401, detail="Admin token required")
         return
@@ -203,7 +223,7 @@ def quote_page():
 
 @app.get("/admin")
 def admin_page(request: Request):
-    _require_admin(request)
+    _require_admin(request, allow_query_token=True)
     if not ADMIN_HTML_PATH.exists():
         raise HTTPException(status_code=500, detail=f"Missing admin file: {ADMIN_HTML_PATH.as_posix()}")
     return FileResponse(ADMIN_HTML_PATH)
@@ -211,7 +231,7 @@ def admin_page(request: Request):
 
 @app.get("/admin/uploads")
 def admin_uploads_page(request: Request):
-    _require_admin(request)
+    _require_admin(request, allow_query_token=True)
     if not ADMIN_UPLOADS_HTML_PATH.exists():
         raise HTTPException(status_code=500, detail=f"Missing admin uploads file: {ADMIN_UPLOADS_HTML_PATH.as_posix()}")
     return FileResponse(ADMIN_UPLOADS_HTML_PATH)
@@ -346,6 +366,7 @@ def health():
         "version": APP_VERSION,
         "local_timezone": LOCAL_TZ_NAME,
         "admin_basic_configured": bool(os.getenv(ADMIN_USERNAME_ENV) and os.getenv(ADMIN_PASSWORD_ENV)),
+        "admin_token_configured": bool(os.getenv(ADMIN_TOKEN_ENV)),
         "drive_configured": _drive_enabled(),
     }
 
