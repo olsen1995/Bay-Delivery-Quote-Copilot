@@ -24,9 +24,13 @@
     <input id="adminPassword" type="password" placeholder="Admin password" />
   </div>
 
+  <div class="muted small mt10" id="authStatusLine"></div>
+
   <div class="rowToken mt10">
-    <div></div>
-    <button id="refreshBtn">Refresh</button>
+    <div>
+      <button id="clearTokenBtn" type="button">Clear token</button>
+    </div>
+    <button id="refreshBtn" type="button">Refresh</button>
   </div>
 
   <div class="muted" id="statusLine"></div>
@@ -93,6 +97,7 @@
 
 <script>
   const statusLine = document.getElementById("statusLine");
+  const authStatusLine = document.getElementById("authStatusLine");
   const backupStatus = document.getElementById("backupStatus");
   const driveStatusLine = document.getElementById("driveStatusLine");
   const driveBackupsBox = document.getElementById("driveBackupsBox");
@@ -120,6 +125,18 @@
       headers["Authorization"] = "Basic " + btoa(u + ":" + p);
     }
     return headers;
+  }
+
+  function updateAuthStatus() {
+    const token = (sessionStorage.getItem("bay_admin_token") || "").trim();
+    authStatusLine.textContent = token
+      ? "Auth status: token in sessionStorage"
+      : "Auth status: not authenticated (no token stored)";
+  }
+
+  function clearToken() {
+    sessionStorage.removeItem("bay_admin_token");
+    updateAuthStatus();
   }
 
   function setLine(el, level, msg, suffixCode) {
@@ -564,8 +581,10 @@
   document.getElementById("exportDbBtn").addEventListener("click", exportDb);
   document.getElementById("importDbBtn").addEventListener("click", importDb);
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+  document.getElementById("clearTokenBtn").addEventListener("click", clearToken);
 
   bootstrapTokenFromUrl();
+  updateAuthStatus();
   refreshAll();
 </script>
 
