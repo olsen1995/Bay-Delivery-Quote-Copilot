@@ -9,6 +9,7 @@ DB_PATH = Path("app/data/bay_delivery.sqlite3")
 
 # Explicit table list keeps backup/restore deterministic and safe.
 KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
+_UNSET = object()
 
 
 def _connect() -> sqlite3.Connection:
@@ -627,55 +628,46 @@ def list_quote_requests(limit: int = 50, status: Optional[str] = None) -> List[D
 def update_quote_request(
     request_id: str,
     *,
-    status: Optional[str] = None,
-    notes: Optional[str] = None,
-    requested_job_date: Optional[str] = None,
-    requested_time_window: Optional[str] = None,
-    customer_accepted_at: Optional[str] = None,
-    admin_approved_at: Optional[str] = None,
+    status: Any = _UNSET,
+    notes: Any = _UNSET,
+    requested_job_date: Any = _UNSET,
+    requested_time_window: Any = _UNSET,
+    customer_accepted_at: Any = _UNSET,
+    admin_approved_at: Any = _UNSET,
 ) -> Optional[Dict[str, Any]]:
     existing = get_quote_request(request_id)
     if not existing:
         return None
 
-    updated: Dict[str, Any] = dict(existing)
+    updatable_fields = {
+        "status": status,
+        "notes": notes,
+        "requested_job_date": requested_job_date,
+        "requested_time_window": requested_time_window,
+        "customer_accepted_at": customer_accepted_at,
+        "admin_approved_at": admin_approved_at,
+    }
 
-    if status is not None:
-        updated["status"] = status
-    if notes is not None:
-        updated["notes"] = notes
-    if requested_job_date is not None:
-        updated["requested_job_date"] = requested_job_date
-    if requested_time_window is not None:
-        updated["requested_time_window"] = requested_time_window
-    if customer_accepted_at is not None:
-        updated["customer_accepted_at"] = customer_accepted_at
-    if admin_approved_at is not None:
-        updated["admin_approved_at"] = admin_approved_at
+    set_clauses: List[str] = []
+    params: List[Any] = []
+    for column, value in updatable_fields.items():
+        if value is _UNSET:
+            continue
+        set_clauses.append(f"{column} = ?")
+        params.append(value)
 
-    save_quote_request(
-        {
-            "request_id": updated["request_id"],
-            "created_at": updated["created_at"],
-            "status": updated["status"],
-            "quote_id": updated["quote_id"],
-            "customer_name": updated.get("customer_name"),
-            "customer_phone": updated.get("customer_phone"),
-            "job_address": updated.get("job_address"),
-            "job_description_customer": updated.get("job_description_customer"),
-            "job_description_internal": updated.get("job_description_internal"),
-            "service_type": updated["service_type"],
-            "cash_total_cad": float(updated["cash_total_cad"]),
-            "emt_total_cad": float(updated["emt_total_cad"]),
-            "request_json": updated["request_json"],
-            "notes": updated.get("notes"),
-            "requested_job_date": updated.get("requested_job_date"),
-            "requested_time_window": updated.get("requested_time_window"),
-            "customer_accepted_at": updated.get("customer_accepted_at"),
-            "admin_approved_at": updated.get("admin_approved_at"),
-        }
-    )
-    return updated
+    if not set_clauses:
+        return existing
+
+    params.append(request_id)
+
+    with _connect() as conn:
+        conn.execute(
+            f"UPDATE quote_requests SET {', '.join(set_clauses)} WHERE request_id = ?",
+            params,
+        )
+
+    return get_quote_request(request_id)
 
 
 # =========================
