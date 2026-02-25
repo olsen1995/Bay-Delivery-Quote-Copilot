@@ -24,7 +24,6 @@ def admin_headers() -> Dict[str, str]:
     token = os.getenv("BAYDELIVERY_ADMIN_TOKEN", "").strip()
     if token:
         headers["X-Admin-Token"] = token
-        return headers
 
     user = os.getenv("ADMIN_USERNAME", "").strip()
     password = os.getenv("ADMIN_PASSWORD", "").strip()
@@ -131,8 +130,8 @@ def main() -> int:
     require(status in (400, 422), f"small_move without routes expected 400/422, got {status}")
     detail = error_detail(missing_routes).lower()
     require(
-        ("pickup_address" in detail) or ("dropoff_address" in detail),
-        f"small_move missing-routes error should mention pickup/dropoff, got: {missing_routes}",
+        ("pickup_address" in detail) and ("dropoff_address" in detail),
+        f"small_move missing-routes error should mention both pickup/dropoff, got: {missing_routes}",
     )
     print("[ok] /quote/calculate small_move missing routes rejected")
 
@@ -169,7 +168,8 @@ def main() -> int:
 
     status, decision = api("POST", f"/quote/{quote_id}/decision", payload={"action": "accept"})
     if status == 404:
-        if decision == {"detail": "Not Found"}:
+        detail = error_detail(decision)
+        if "Not Found" in detail:
             print("SKIP: /quote/{quote_id}/decision route missing on this deployment")
         else:
             raise AssertionError(f"POST /quote/{{quote_id}}/decision returned 404: {error_detail(decision)}")
