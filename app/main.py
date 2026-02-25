@@ -222,16 +222,14 @@ def quote_page():
 
 
 @app.get("/admin")
-def admin_page(request: Request):
-    _require_admin(request, allow_query_token=True)
+def admin_page():
     if not ADMIN_HTML_PATH.exists():
         raise HTTPException(status_code=500, detail=f"Missing admin file: {ADMIN_HTML_PATH.as_posix()}")
     return FileResponse(ADMIN_HTML_PATH)
 
 
 @app.get("/admin/uploads")
-def admin_uploads_page(request: Request):
-    _require_admin(request, allow_query_token=True)
+def admin_uploads_page():
     if not ADMIN_UPLOADS_HTML_PATH.exists():
         raise HTTPException(status_code=500, detail=f"Missing admin uploads file: {ADMIN_UPLOADS_HTML_PATH.as_posix()}")
     return FileResponse(ADMIN_UPLOADS_HTML_PATH)
