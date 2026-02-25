@@ -34,7 +34,12 @@ def admin_headers() -> Dict[str, str]:
     return headers
 
 
-def _req_requests(method: str, path: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Any]:
+def _req_requests(
+    method: str,
+    path: str,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[int, Any]:
     assert requests is not None
     url = base_url() + path
     res = requests.request(method, url, json=payload, headers=headers or {}, timeout=20)
@@ -45,7 +50,12 @@ def _req_requests(method: str, path: str, payload: Optional[Dict[str, Any]] = No
     return res.status_code, data
 
 
-def _req_urllib(method: str, path: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Any]:
+def _req_urllib(
+    method: str,
+    path: str,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[int, Any]:
     url = base_url() + path
     body = None
     req_headers = dict(headers or {})
@@ -70,7 +80,12 @@ def _req_urllib(method: str, path: str, payload: Optional[Dict[str, Any]] = None
         return int(err.code), parsed
 
 
-def api(method: str, path: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Any]:
+def api(
+    method: str,
+    path: str,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[int, Any]:
     if requests is not None:
         return _req_requests(method, path, payload, headers)
     return _req_urllib(method, path, payload, headers)
@@ -85,6 +100,24 @@ def error_detail(body: Any) -> str:
     if isinstance(body, dict) and "detail" in body:
         return str(body["detail"])
     return str(body)
+
+
+def parse_json_object(body: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(body, dict):
+        return body
+    if isinstance(body, str):
+        try:
+            parsed = json.loads(body)
+        except Exception:
+            return None
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def is_missing_decision_route_404(body: Any) -> bool:
+    parsed = parse_json_object(body)
+    return parsed == {"detail": "Not Found"}
 
 
 def main() -> int:
@@ -119,7 +152,7 @@ def main() -> int:
 
     status, decision = api("POST", f"/quote/{quote_id}/decision", payload={"action": "accept"})
     if status == 404:
-        if decision == {"detail": "Not Found"}:
+        if is_missing_decision_route_404(decision):
             print("SKIP: /quote/{quote_id}/decision route missing on this deployment")
         else:
             raise AssertionError(f"POST /quote/{{quote_id}}/decision returned 404: {error_detail(decision)}")
