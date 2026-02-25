@@ -232,10 +232,15 @@
         return;
       }
 
+      const confirmation =
+        "Decision saved successfully.\n" +
+        "Request ID: " + data.request_id + "\n" +
+        "Status: " + data.status;
+
       if (action === "accept") {
-        showBox("decisionStatus", "Submitted for admin confirmation.");
+        showBox("decisionStatus", confirmation + "\n\nThanks! We will follow up to confirm scheduling.");
       } else {
-        showBox("decisionStatus", "Thanks — no booking requested.");
+        showBox("decisionStatus", confirmation + "\n\nYou declined this quote. No booking will be created.");
       }
     } catch (err) {
       showBox("decisionStatus", "Error:\nFailed to contact server.");

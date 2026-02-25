@@ -440,8 +440,8 @@ def quote_decision(quote_id: str, body: QuoteDecisionRequest, background_tasks: 
 
     request_id = str(uuid4())
     created_at = _now_local_iso()
-    request_payload = quote.get("request") or {}
-    response_payload = quote.get("response") or {}
+    request_payload = quote.get("request_obj") or {}
+    response_payload = quote.get("response_obj") or {}
 
     save_quote_request(
         {

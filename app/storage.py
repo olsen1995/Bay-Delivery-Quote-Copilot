@@ -111,6 +111,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_service_type ON quote_requests(service_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_quote_id ON quote_requests(quote_id)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_requested_job_date ON quote_requests(requested_job_date)")
 
         # Attachments (Google Drive references)
