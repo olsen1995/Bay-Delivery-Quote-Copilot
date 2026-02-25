@@ -29,6 +29,45 @@ def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
         raise
 
 
+def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
+    """Backfill cleanup for pre-unique-index databases.
+
+    Keeps the newest row per quote_id (by created_at, then rowid) and removes
+    older duplicates so unique index creation succeeds on startup.
+    """
+    duplicate_quote_ids = conn.execute(
+        """
+        SELECT quote_id
+        FROM quote_requests
+        GROUP BY quote_id
+        HAVING COUNT(*) > 1
+        """
+    ).fetchall()
+
+    for row in duplicate_quote_ids:
+        quote_id = row["quote_id"]
+        rows = conn.execute(
+            """
+            SELECT rowid
+            FROM quote_requests
+            WHERE quote_id = ?
+            ORDER BY datetime(created_at) DESC, rowid DESC
+            """,
+            (quote_id,),
+        ).fetchall()
+
+        # Keep the newest row and remove the rest.
+        rowids_to_delete = [r["rowid"] for r in rows[1:]]
+        if not rowids_to_delete:
+            continue
+
+        placeholders = ",".join("?" for _ in rowids_to_delete)
+        conn.execute(
+            f"DELETE FROM quote_requests WHERE rowid IN ({placeholders})",
+            rowids_to_delete,
+        )
+
+
 def init_db() -> None:
     with _connect() as conn:
         # Quotes
@@ -111,6 +150,8 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_service_type ON quote_requests(service_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_quote_id ON quote_requests(quote_id)")
+        _dedupe_quote_requests_by_quote_id(conn)
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_requested_job_date ON quote_requests(requested_job_date)")
 
         # Attachments (Google Drive references)
