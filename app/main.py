@@ -470,10 +470,7 @@ def quote_decision(quote_id: str, body: QuoteDecisionRequest, background_tasks: 
         if "requested_time_window" in body.model_fields_set:
             updates["requested_time_window"] = body.requested_time_window
 
-        updated = update_quote_request(
-            existing["request_id"],
-            **updates,
-        )
+        updated = update_quote_request(existing["request_id"], **updates)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update quote request")
         _maybe_auto_snapshot(background_tasks)
@@ -796,10 +793,7 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
         if "notes" in body.model_fields_set:
             updates["notes"] = body.notes
 
-        updated = update_quote_request(
-            request_id,
-            **updates,
-        )
+        updated = update_quote_request(request_id, **updates)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update request")
 
