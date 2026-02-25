@@ -458,14 +458,21 @@ def quote_decision(quote_id: str, body: QuoteDecisionRequest, background_tasks: 
 
     existing = get_quote_request_by_quote_id(quote_id)
     if existing:
+        updates: dict[str, Any] = {
+            "status": status,
+            "customer_accepted_at": customer_accepted_at,
+            "admin_approved_at": None,
+        }
+        if "notes" in body.model_fields_set:
+            updates["notes"] = body.notes
+        if "requested_job_date" in body.model_fields_set:
+            updates["requested_job_date"] = body.requested_job_date
+        if "requested_time_window" in body.model_fields_set:
+            updates["requested_time_window"] = body.requested_time_window
+
         updated = update_quote_request(
             existing["request_id"],
-            status=status,
-            notes=body.notes,
-            requested_job_date=body.requested_job_date,
-            requested_time_window=body.requested_time_window,
-            customer_accepted_at=customer_accepted_at,
-            admin_approved_at=None,
+            **updates,
         )
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update quote request")
@@ -782,11 +789,16 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
         raise HTTPException(status_code=400, detail="Invalid action (use approve|reject)")
 
     if action == "approve":
+        updates: dict[str, Any] = {
+            "status": "admin_approved",
+            "admin_approved_at": now,
+        }
+        if "notes" in body.model_fields_set:
+            updates["notes"] = body.notes
+
         updated = update_quote_request(
             request_id,
-            status="admin_approved",
-            notes=body.notes,
-            admin_approved_at=now,
+            **updates,
         )
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update request")
@@ -795,12 +807,14 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
         _maybe_auto_snapshot(background_tasks)
         return {"ok": True, "request": updated, "job": job_summary}
 
-    updated = update_quote_request(
-        request_id,
-        status="rejected",
-        notes=body.notes,
-        admin_approved_at=None,
-    )
+    updates: dict[str, Any] = {
+        "status": "rejected",
+        "admin_approved_at": None,
+    }
+    if "notes" in body.model_fields_set:
+        updates["notes"] = body.notes
+
+    updated = update_quote_request(request_id, **updates)
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update request")
 
