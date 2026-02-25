@@ -578,7 +578,10 @@ def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: 
     return {"items": list_attachments(quote_id=quote_id, limit=int(limit))}
 
 
-@app.api_route("/admin/api/drive/snapshot", methods=["GET","POST"])
+@app.get("/admin/api/drive/snapshot")
+@app.get("/admin/api/drive/snapshot/")
+@app.post("/admin/api/drive/snapshot")
+@app.post("/admin/api/drive/snapshot/")
 def admin_drive_snapshot(request: Request):
     _require_admin(request)
     if not _drive_enabled():
