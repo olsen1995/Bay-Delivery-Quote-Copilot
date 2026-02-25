@@ -1,8 +1,11 @@
 services:
   - type: web
     name: bay-delivery-quote-copilot
-    env: python
+    runtime: python
     plan: free
-    runtime: python-3.11.9
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
