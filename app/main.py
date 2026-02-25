@@ -366,6 +366,7 @@ def health():
         "version": APP_VERSION,
         "local_timezone": LOCAL_TZ_NAME,
         "admin_basic_configured": bool(os.getenv(ADMIN_USERNAME_ENV) and os.getenv(ADMIN_PASSWORD_ENV)),
+        "admin_token_configured": bool(os.getenv(ADMIN_TOKEN_ENV)),
         "drive_configured": _drive_enabled(),
     }
 

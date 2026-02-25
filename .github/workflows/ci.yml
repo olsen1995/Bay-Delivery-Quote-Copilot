@@ -16,6 +16,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
         run: |
@@ -40,3 +42,9 @@ jobs:
 
       - name: Run smoke test
         run: python scripts/smoke_test.py
+
+      - name: Print uvicorn logs on failure
+        if: failure()
+        run: |
+          echo "==== /tmp/uvicorn.log ===="
+          cat /tmp/uvicorn.log || true

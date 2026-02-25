@@ -16,7 +16,7 @@
 <div class="card mt14">
   <div class="small">
     Admin access uses your Render environment variables: <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
-    You can also open this page with <code>?token=...</code>; it is copied to session storage for API calls and kept in the URL for page reloads.
+    Open with <code>?token=...</code> once; it is saved to session storage and removed from the URL. API calls use <code>X-Admin-Token</code>.
   </div>
 
   <div class="rowCreds">
@@ -102,6 +102,8 @@
     const token = (url.searchParams.get("token") || "").trim();
     if (!token) return;
     sessionStorage.setItem("bay_admin_token", token);
+    url.searchParams.delete("token");
+    window.history.replaceState({}, "", url.toString());
   }
 
   function authHeaders() {
