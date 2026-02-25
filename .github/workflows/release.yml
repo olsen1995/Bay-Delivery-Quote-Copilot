@@ -34,6 +34,7 @@ jobs:
         id: bump
         run: |
           python - <<'PY'
+          import os
           from pathlib import Path
 
           bump = "${{ github.event.inputs.bump }}".strip().lower()
@@ -57,7 +58,7 @@ jobs:
           new_version = f"{major}.{minor}.{patch}"
           version_file.write_text(new_version + "\n", encoding="utf-8")
 
-          out = Path("$GITHUB_OUTPUT")
+          out = Path(os.environ["GITHUB_OUTPUT"])
           with out.open("a", encoding="utf-8") as f:
               f.write(f"version={new_version}\n")
           print(f"Bumped VERSION to {new_version}")

@@ -67,14 +67,17 @@ If your deployment is public, set an admin token:
 
 - Environment variable: `BAYDELIVERY_ADMIN_TOKEN`
 
-Admin endpoints require:
+Admin APIs require:
 
-- Header: `X-Admin-Token: <token>` for all admin APIs.
-- Optional convenience bootstrap: open `/admin?token=<token>` once; frontend stores it in `sessionStorage`, strips it from URL, and uses the header afterwards.
+- Header: `X-Admin-Token: <token>` for all `/admin/api/*` routes.
+- Optional convenience bootstrap: open `/admin?token=<token>` (or `/admin/uploads?token=<token>`) once; frontend stores it in `sessionStorage`, strips it from URL, and uses the header afterwards.
 
-Admin page:
+Admin pages:
 
 - `/admin`
+- `/admin/uploads`
+
+Note: the HTML pages are intentionally viewable without admin auth so refresh/direct navigation never lock out. Protected actions remain on `/admin/api/*`.
 
 ---
 
