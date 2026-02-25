@@ -45,6 +45,13 @@
 
 <script>
   const el = (id) => document.getElementById(id);
+  const qs = new URLSearchParams(window.location.search);
+
+  function authHeaders() {
+    const token = (qs.get("token") || "").trim();
+    if (token) return { "X-Admin-Token": token };
+    return {};
+  }
 
   function showResults(items) {
     const card = el("resultsCard");
@@ -85,8 +92,18 @@
     const q = (el("quote_id").value || "").trim();
     if (!q) return;
 
-    const res = await fetch("/admin/api/uploads?quote_id=" + encodeURIComponent(q));
-    const data = await res.json();
+    const res = await fetch("/admin/api/uploads?quote_id=" + encodeURIComponent(q), {
+      headers: authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        el("resultsCard").classList.remove("resultsHidden");
+        el("results").textContent = "Unauthorized — provide ?token=... or authenticate in your browser.";
+        return;
+      }
+      throw new Error(JSON.stringify(data));
+    }
     showResults(data.items || []);
   });
 </script>

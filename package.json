@@ -1,33 +1,28 @@
 {
-  "name": "life-os-private-practical-co-pilot",
+  "name": "bay-delivery-quote-copilot",
   "version": "1.1.0",
-  "description": "![Manifest Hygiene](https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/actions/workflows/manifest-hygiene.yml/badge.svg)",
+  "description": "Release/commit tooling for Bay Delivery Quote Copilot",
   "main": "index.js",
   "directories": {
-    "doc": "docs",
-    "test": "tests"
+    "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"No JS tests configured\"",
     "release": "standard-version",
-    "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1",
-    "lint-manifest": "powershell -ExecutionPolicy Bypass -File scripts/manifest_lint.ps1",
-    "fix-manifest": "powershell -ExecutionPolicy Bypass -File scripts/manifest_order_fix.ps1",
-    "hygiene": "powershell -ExecutionPolicy Bypass -File scripts/manifest_hygiene.ps1",
-    "precommit": "powershell -ExecutionPolicy Bypass -File scripts/pre-commit.ps1"
+    "lint:commit": "commitlint --from=HEAD~1 --to=HEAD"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot.git"
+    "url": "git+https://github.com/olsen1995/Bay-Delivery-Quote-Copilot.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot/issues"
+    "url": "https://github.com/olsen1995/Bay-Delivery-Quote-Copilot/issues"
   },
-  "homepage": "https://github.com/olsen1995/Life-OS-Private-Practical-Co-Pilot#readme",
+  "homepage": "https://github.com/olsen1995/Bay-Delivery-Quote-Copilot#readme",
   "devDependencies": {
     "@commitlint/cli": "^20.3.1",
     "@commitlint/config-conventional": "^20.3.1",
