@@ -110,6 +110,20 @@ class QuoteRequestTransitionTests(unittest.TestCase):
         self.assertIsNone(update_kwargs["notes"])
         self.assertIsNone(update_kwargs["requested_job_date"])
 
+    def test_optional_fields_support_pydantic_v1_fields_set(self) -> None:
+        class DecisionBody:
+            def __init__(self) -> None:
+                self.notes = None
+                self.__fields_set__ = {"notes"}
+
+        body = DecisionBody()
+        update_kwargs: dict[str, object] = {}
+
+        include_optional_update_fields(body, update_kwargs, ("notes",))
+
+        self.assertIn("notes", update_kwargs)
+        self.assertIsNone(update_kwargs["notes"])
+
 
 if __name__ == "__main__":
     unittest.main()
