@@ -4,9 +4,47 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Bay Delivery</title>
-  <meta http-equiv="refresh" content="0; url=/" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 0; background: #0b0f14; color: #e8eef6; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 18px; }
+    .card { background: #121a24; border: 1px solid #243244; border-radius: 14px; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    p { margin: 8px 0; line-height: 1.45; color: #c9d6e6; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+    a.btn { display: block; text-decoration: none; padding: 14px 14px; border-radius: 12px; border: 1px solid #2b3b52; background: #0f1620; color: #e8eef6; }
+    a.btn:hover { background: #142033; border-color: #3a516f; }
+    .tag { display: inline-block; font-size: 12px; padding: 4px 8px; border-radius: 999px; background: #0f253a; border: 1px solid #244a6a; color: #bfe3ff; margin-left: 8px; }
+    .small { font-size: 12px; color: #9fb2c9; margin-top: 14px; }
+    code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 6px; }
+  </style>
 </head>
 <body>
-  <p>Redirecting to <a href="/">Bay Delivery Home</a>…</p>
+  <div class="wrap">
+    <div class="card">
+      <h1>Bay Delivery Quote Copilot <span class="tag">North Bay, ON</span></h1>
+      <p>Use the customer quote form to generate an estimate, then use the admin pages to review requests and uploads.</p>
+
+      <div class="grid">
+        <a class="btn" href="/quote">
+          <strong>Customer Quote Form</strong>
+          <div class="small">Create a quote + (optional) upload photos</div>
+        </a>
+
+        <a class="btn" href="/admin">
+          <strong>Admin Dashboard</strong>
+          <div class="small">Review quote requests + approve/reject jobs</div>
+        </a>
+
+        <a class="btn" href="/admin/uploads">
+          <strong>Admin Uploads</strong>
+          <div class="small">View uploaded customer photos</div>
+        </a>
+      </div>
+
+      <p class="small">
+        Quick check: <code>/health</code>
+      </p>
+    </div>
+  </div>
 </body>
 </html>
