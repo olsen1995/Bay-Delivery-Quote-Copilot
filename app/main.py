@@ -441,8 +441,6 @@ def quote_calculate(req: QuoteRequest, background_tasks: BackgroundTasks):
     )
 
 
-
-
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: QuoteDecisionRequest, background_tasks: BackgroundTasks):
     quote = get_quote_record(quote_id)
