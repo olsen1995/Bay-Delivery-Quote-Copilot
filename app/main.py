@@ -271,13 +271,9 @@ class QuoteRequestPayload(BaseModel):
 @app.post("/quote/calculate")
 def quote_calculate(payload: QuoteRequestPayload):
     request_payload = payload.model_dump()
-    service_type = request_payload["service_type"]
-    if service_type in {"small_move", "item_delivery"}:
-        if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
-            raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
 
     engine_quote = calculate_quote(
-        service_type=service_type,
+        service_type=str(request_payload.get("service_type", "")),
         hours=float(request_payload.get("estimated_hours", 0.0)),
         crew_size=int(request_payload.get("crew_size", 1)),
         garbage_bag_count=int(request_payload.get("garbage_bag_count", 0)),
@@ -286,6 +282,14 @@ def quote_calculate(payload: QuoteRequestPayload):
         scrap_pickup_location=str(request_payload.get("scrap_pickup_location", "curbside")),
         travel_zone=str(request_payload.get("travel_zone", "in_town")),
     )
+
+    # IMPORTANT:
+    # Validate required route fields using the *normalized* service type returned by the engine.
+    # This prevents alias bypass (e.g., "moving" -> "small_move") from skipping pickup/dropoff validation.
+    normalized_service_type = str(engine_quote.get("service_type", "")).strip().lower()
+    if normalized_service_type in {"small_move", "item_delivery"}:
+        if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
+            raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
 
     normalized_request = {
         "customer_name": request_payload.get("customer_name"),
@@ -316,7 +320,14 @@ def quote_calculate(payload: QuoteRequestPayload):
         },
     }
 
-    save_quote({"quote_id": quote["quote_id"], "created_at": quote["created_at"], "request": quote["request"], "response": quote["response"]})
+    save_quote(
+        {
+            "quote_id": quote["quote_id"],
+            "created_at": quote["created_at"],
+            "request": quote["request"],
+            "response": quote["response"],
+        }
+    )
     return quote
 
 
