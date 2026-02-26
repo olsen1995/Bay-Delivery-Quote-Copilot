@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 DB_PATH = Path("app/data/bay_delivery.sqlite3")
+UNSET = object()
 
 # Explicit table list keeps backup/restore deterministic and safe.
 KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
@@ -69,55 +70,20 @@ def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    with _connect() as conn:
-        # Quotes
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = _connect()
+    try:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS quotes (
                 quote_id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
-                job_type TEXT NOT NULL,
-                total_cad REAL NOT NULL,
                 request_json TEXT NOT NULL,
                 response_json TEXT NOT NULL
             )
             """
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON quotes(created_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_job_type ON quotes(job_type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quotes_total_cad ON quotes(total_cad)")
 
-        # Jobs
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS jobs (
-                job_id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                quote_id TEXT NOT NULL,
-                status TEXT NOT NULL,
-                customer_name TEXT,
-                job_address TEXT,
-                scheduled_start TEXT,
-                scheduled_end TEXT,
-                total_cad REAL NOT NULL,
-                paid_cad REAL NOT NULL,
-                owing_cad REAL NOT NULL,
-                notes TEXT,
-                job_json TEXT NOT NULL
-            )
-            """
-        )
-        _try_add_column(conn, "jobs", "customer_phone TEXT")
-        _try_add_column(conn, "jobs", "job_description_customer TEXT")
-        _try_add_column(conn, "jobs", "job_description_internal TEXT")
-        _try_add_column(conn, "jobs", "payment_method TEXT")
-
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_quote_id ON jobs(quote_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_customer_name ON jobs(customer_name)")
-
-        # Quote Requests
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS quote_requests (
@@ -125,339 +91,181 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 status TEXT NOT NULL,
                 quote_id TEXT NOT NULL,
-
                 customer_name TEXT,
                 customer_phone TEXT,
                 job_address TEXT,
                 job_description_customer TEXT,
                 job_description_internal TEXT,
-
                 service_type TEXT NOT NULL,
                 cash_total_cad REAL NOT NULL,
                 emt_total_cad REAL NOT NULL,
+                request_json TEXT NOT NULL,
+                notes TEXT,
+                requested_job_date TEXT,
+                requested_time_window TEXT,
+                customer_accepted_at TEXT,
+                admin_approved_at TEXT
+            )
+            """
+        )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                quote_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                customer_name TEXT,
+                customer_phone TEXT,
+                job_address TEXT,
+                job_description_customer TEXT,
+                job_description_internal TEXT,
+                service_type TEXT NOT NULL,
+                cash_total_cad REAL NOT NULL,
+                emt_total_cad REAL NOT NULL,
                 request_json TEXT NOT NULL,
                 notes TEXT
             )
             """
         )
-        _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
-        _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
-        _try_add_column(conn, "quote_requests", "customer_accepted_at TEXT")
-        _try_add_column(conn, "quote_requests", "admin_approved_at TEXT")
 
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_created_at ON quote_requests(created_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_service_type ON quote_requests(service_type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_quote_id ON quote_requests(quote_id)")
-        _dedupe_quote_requests_by_quote_id(conn)
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_requests_requested_job_date ON quote_requests(requested_job_date)")
-
-        # Attachments (Google Drive references)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS attachments (
                 attachment_id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
-
                 quote_id TEXT,
                 request_id TEXT,
                 job_id TEXT,
-
                 filename TEXT NOT NULL,
                 mime_type TEXT NOT NULL,
                 size_bytes INTEGER,
-
                 drive_file_id TEXT NOT NULL,
                 drive_web_view_link TEXT
             )
             """
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments(created_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_quote_id ON attachments(quote_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_request_id ON attachments(request_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_attachments_job_id ON attachments(job_id)")
+
+        # Backfill: add missing columns if older DB is present
+        _try_add_column(conn, "quote_requests", "notes TEXT")
+        _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
+        _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
+        _try_add_column(conn, "quote_requests", "customer_accepted_at TEXT")
+        _try_add_column(conn, "quote_requests", "admin_approved_at TEXT")
+
+        # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
+        try:
+            _dedupe_quote_requests_by_quote_id(conn)
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)"
+            )
+        except Exception:
+            # Don't block startup; worst case we just don't get the unique index.
+            pass
+
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # =========================
 # Quotes
 # =========================
 
-def save_quote(
-    quote_id: str,
-    created_at: str,
-    job_type: str,
-    total_cad: float,
-    request_obj: Dict[str, Any],
-    response_obj: Dict[str, Any],
-) -> None:
-    with _connect() as conn:
+def save_quote(record: Dict[str, Any]) -> None:
+    conn = _connect()
+    try:
         conn.execute(
             """
-            INSERT OR REPLACE INTO quotes
-            (quote_id, created_at, job_type, total_cad, request_json, response_json)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO quotes (quote_id, created_at, request_json, response_json)
+            VALUES (?, ?, ?, ?)
             """,
             (
-                quote_id,
-                created_at,
-                job_type,
-                float(total_cad),
-                json.dumps(request_obj, ensure_ascii=False),
-                json.dumps(response_obj, ensure_ascii=False),
+                record["quote_id"],
+                record["created_at"],
+                json.dumps(record["request"], ensure_ascii=False),
+                json.dumps(record["response"], ensure_ascii=False),
             ),
         )
-
-
-def get_quote(quote_id: str) -> Optional[Dict[str, Any]]:
-    with _connect() as conn:
-        row = conn.execute("SELECT response_json FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
-        if not row:
-            return None
-        return json.loads(row["response_json"])
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
-    with _connect() as conn:
-        row = conn.execute(
-            """
-            SELECT quote_id, created_at, job_type, total_cad, request_json, response_json
-            FROM quotes
-            WHERE quote_id = ?
-            """,
-            (quote_id,),
-        ).fetchone()
-        if not row:
-            return None
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT * FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
+    finally:
+        conn.close()
 
-        return {
-            "quote_id": row["quote_id"],
-            "created_at": row["created_at"],
-            "job_type": row["job_type"],
-            "total_cad": float(row["total_cad"]),
-            "request_obj": json.loads(row["request_json"]),
-            "response_obj": json.loads(row["response_json"]),
-        }
+    if not row:
+        return None
+
+    try:
+        request_obj = json.loads(row["request_json"])
+    except Exception:
+        request_obj = row["request_json"]
+
+    try:
+        response_obj = json.loads(row["response_json"])
+    except Exception:
+        response_obj = row["response_json"]
+
+    return {
+        "quote_id": row["quote_id"],
+        "created_at": row["created_at"],
+        "request": request_obj,
+        "response": response_obj,
+    }
 
 
 def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
-    with _connect() as conn:
+    conn = _connect()
+    try:
         rows = conn.execute(
             """
-            SELECT quote_id, created_at, job_type, total_cad
+            SELECT quote_id, created_at, request_json, response_json
             FROM quotes
-            ORDER BY created_at DESC
+            ORDER BY datetime(created_at) DESC
             LIMIT ?
             """,
             (int(limit),),
         ).fetchall()
+    finally:
+        conn.close()
 
-    return [
-        {"quote_id": r["quote_id"], "created_at": r["created_at"], "job_type": r["job_type"], "total_cad": float(r["total_cad"])}
-        for r in rows
-    ]
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        try:
+            req = json.loads(r["request_json"])
+        except Exception:
+            req = r["request_json"]
+        try:
+            resp = json.loads(r["response_json"])
+        except Exception:
+            resp = r["response_json"]
 
-
-def search_quotes(
-    limit: int = 50,
-    job_type: Optional[str] = None,
-    min_total: Optional[float] = None,
-    max_total: Optional[float] = None,
-    after: Optional[str] = None,
-    before: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    where: List[str] = []
-    params: List[Any] = []
-
-    if job_type:
-        where.append("job_type = ?")
-        params.append(job_type)
-    if min_total is not None:
-        where.append("total_cad >= ?")
-        params.append(float(min_total))
-    if max_total is not None:
-        where.append("total_cad <= ?")
-        params.append(float(max_total))
-    if after:
-        where.append("created_at >= ?")
-        params.append(after)
-    if before:
-        where.append("created_at <= ?")
-        params.append(before)
-
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-    sql = f"""
-        SELECT quote_id, created_at, job_type, total_cad
-        FROM quotes
-        {where_sql}
-        ORDER BY created_at DESC
-        LIMIT ?
-    """
-    params.append(int(limit))
-
-    with _connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-
-    return [
-        {"quote_id": r["quote_id"], "created_at": r["created_at"], "job_type": r["job_type"], "total_cad": float(r["total_cad"])}
-        for r in rows
-    ]
-
-
-# =========================
-# Jobs
-# =========================
-
-def save_job(job_obj: Dict[str, Any]) -> None:
-    with _connect() as conn:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO jobs
-            (job_id, created_at, quote_id, status,
-             customer_name, customer_phone, job_address,
-             job_description_customer, job_description_internal,
-             scheduled_start, scheduled_end,
-             payment_method,
-             total_cad, paid_cad, owing_cad,
-             notes, job_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                job_obj["job_id"],
-                job_obj["created_at"],
-                job_obj["quote_id"],
-                job_obj["status"],
-                job_obj.get("customer_name"),
-                job_obj.get("customer_phone"),
-                job_obj.get("job_address"),
-                job_obj.get("job_description_customer"),
-                job_obj.get("job_description_internal"),
-                job_obj.get("scheduled_start"),
-                job_obj.get("scheduled_end"),
-                job_obj.get("payment_method"),
-                float(job_obj["total_cad"]),
-                float(job_obj["paid_cad"]),
-                float(job_obj["owing_cad"]),
-                job_obj.get("notes"),
-                json.dumps(job_obj["job_json"], ensure_ascii=False),
-            ),
+        out.append(
+            {
+                "quote_id": r["quote_id"],
+                "created_at": r["created_at"],
+                "request": req,
+                "response": resp,
+            }
         )
-
-
-def get_job(job_id: str) -> Optional[Dict[str, Any]]:
-    with _connect() as conn:
-        row = conn.execute("SELECT job_json FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
-        if not row:
-            return None
-        return json.loads(row["job_json"])
-
-
-def get_job_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
-    with _connect() as conn:
-        row = conn.execute(
-            """
-            SELECT
-                job_id, created_at, quote_id, status,
-                customer_name, customer_phone, job_address,
-                scheduled_start, scheduled_end,
-                payment_method,
-                total_cad, paid_cad, owing_cad,
-                notes
-            FROM jobs
-            WHERE quote_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (quote_id,),
-        ).fetchone()
-
-        if not row:
-            return None
-
-        return {
-            "job_id": row["job_id"],
-            "created_at": row["created_at"],
-            "quote_id": row["quote_id"],
-            "status": row["status"],
-            "customer_name": row["customer_name"],
-            "customer_phone": row["customer_phone"],
-            "job_address": row["job_address"],
-            "scheduled_start": row["scheduled_start"],
-            "scheduled_end": row["scheduled_end"],
-            "payment_method": row["payment_method"],
-            "total_cad": float(row["total_cad"]),
-            "paid_cad": float(row["paid_cad"]),
-            "owing_cad": float(row["owing_cad"]),
-            "notes": row["notes"],
-        }
-
-
-def list_jobs(
-    limit: int = 50,
-    status: Optional[str] = None,
-    after: Optional[str] = None,
-    before: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    where: List[str] = []
-    params: List[Any] = []
-
-    if status:
-        where.append("status = ?")
-        params.append(status)
-    if after:
-        where.append("created_at >= ?")
-        params.append(after)
-    if before:
-        where.append("created_at <= ?")
-        params.append(before)
-
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-    sql = f"""
-        SELECT
-            job_id, created_at, quote_id, status,
-            customer_name, customer_phone, job_address,
-            scheduled_start, scheduled_end,
-            payment_method,
-            total_cad, paid_cad, owing_cad,
-            notes
-        FROM jobs
-        {where_sql}
-        ORDER BY created_at DESC
-        LIMIT ?
-    """
-    params.append(int(limit))
-
-    with _connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-
-    return [
-        {
-            "job_id": r["job_id"],
-            "created_at": r["created_at"],
-            "quote_id": r["quote_id"],
-            "status": r["status"],
-            "customer_name": r["customer_name"],
-            "customer_phone": r["customer_phone"],
-            "job_address": r["job_address"],
-            "scheduled_start": r["scheduled_start"],
-            "scheduled_end": r["scheduled_end"],
-            "payment_method": r["payment_method"],
-            "total_cad": float(r["total_cad"]),
-            "paid_cad": float(r["paid_cad"]),
-            "owing_cad": float(r["owing_cad"]),
-            "notes": r["notes"],
-        }
-        for r in rows
-    ]
+    return out
 
 
 # =========================
-# Quote Requests
+# Quote requests
 # =========================
 
-def save_quote_request(req_obj: Dict[str, Any]) -> None:
-    with _connect() as conn:
+def save_quote_request(record: Dict[str, Any]) -> None:
+    conn = _connect()
+    try:
         conn.execute(
             """
             INSERT OR REPLACE INTO quote_requests
@@ -465,174 +273,117 @@ def save_quote_request(req_obj: Dict[str, Any]) -> None:
              customer_name, customer_phone, job_address,
              job_description_customer, job_description_internal,
              service_type, cash_total_cad, emt_total_cad,
-             request_json, notes,
-             requested_job_date, requested_time_window,
+             request_json, notes, requested_job_date, requested_time_window,
              customer_accepted_at, admin_approved_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                req_obj["request_id"],
-                req_obj["created_at"],
-                req_obj["status"],
-                req_obj["quote_id"],
-                req_obj.get("customer_name"),
-                req_obj.get("customer_phone"),
-                req_obj.get("job_address"),
-                req_obj.get("job_description_customer"),
-                req_obj.get("job_description_internal"),
-                req_obj["service_type"],
-                float(req_obj["cash_total_cad"]),
-                float(req_obj["emt_total_cad"]),
-                json.dumps(req_obj["request_json"], ensure_ascii=False),
-                req_obj.get("notes"),
-                req_obj.get("requested_job_date"),
-                req_obj.get("requested_time_window"),
-                req_obj.get("customer_accepted_at"),
-                req_obj.get("admin_approved_at"),
+                record["request_id"],
+                record["created_at"],
+                record["status"],
+                record["quote_id"],
+                record.get("customer_name"),
+                record.get("customer_phone"),
+                record.get("job_address"),
+                record.get("job_description_customer"),
+                record.get("job_description_internal"),
+                record["service_type"],
+                float(record["cash_total_cad"]),
+                float(record["emt_total_cad"]),
+                json.dumps(record["request_json"], ensure_ascii=False),
+                record.get("notes"),
+                record.get("requested_job_date"),
+                record.get("requested_time_window"),
+                record.get("customer_accepted_at"),
+                record.get("admin_approved_at"),
             ),
         )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
-    with _connect() as conn:
-        row = conn.execute(
-            """
-            SELECT
-                request_id, created_at, status, quote_id,
-                customer_name, customer_phone, job_address,
-                job_description_customer, job_description_internal,
-                service_type, cash_total_cad, emt_total_cad,
-                request_json, notes,
-                requested_job_date, requested_time_window,
-                customer_accepted_at, admin_approved_at
-            FROM quote_requests
-            WHERE request_id = ?
-            """,
-            (request_id,),
-        ).fetchone()
-        if not row:
-            return None
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT * FROM quote_requests WHERE request_id = ?", (request_id,)).fetchone()
+    finally:
+        conn.close()
 
-        return {
-            "request_id": row["request_id"],
-            "created_at": row["created_at"],
-            "status": row["status"],
-            "quote_id": row["quote_id"],
-            "customer_name": row["customer_name"],
-            "customer_phone": row["customer_phone"],
-            "job_address": row["job_address"],
-            "job_description_customer": row["job_description_customer"],
-            "job_description_internal": row["job_description_internal"],
-            "service_type": row["service_type"],
-            "cash_total_cad": float(row["cash_total_cad"]),
-            "emt_total_cad": float(row["emt_total_cad"]),
-            "request_json": json.loads(row["request_json"]),
-            "notes": row["notes"],
-            "requested_job_date": row["requested_job_date"],
-            "requested_time_window": row["requested_time_window"],
-            "customer_accepted_at": row["customer_accepted_at"],
-            "admin_approved_at": row["admin_approved_at"],
-        }
+    if not row:
+        return None
 
+    try:
+        req = json.loads(row["request_json"])
+    except Exception:
+        req = row["request_json"]
 
+    return {
+        "request_id": row["request_id"],
+        "created_at": row["created_at"],
+        "status": row["status"],
+        "quote_id": row["quote_id"],
+        "customer_name": row["customer_name"],
+        "customer_phone": row["customer_phone"],
+        "job_address": row["job_address"],
+        "job_description_customer": row["job_description_customer"],
+        "job_description_internal": row["job_description_internal"],
+        "service_type": row["service_type"],
+        "cash_total_cad": row["cash_total_cad"],
+        "emt_total_cad": row["emt_total_cad"],
+        "request_json": req,
+        "notes": row["notes"],
+        "requested_job_date": row["requested_job_date"],
+        "requested_time_window": row["requested_time_window"],
+        "customer_accepted_at": row["customer_accepted_at"],
+        "admin_approved_at": row["admin_approved_at"],
+    }
 
 
 def get_quote_request_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
-    with _connect() as conn:
-        row = conn.execute(
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT request_id FROM quote_requests WHERE quote_id = ?", (quote_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return get_quote_request(row["request_id"])
+
+
+def list_quote_requests(limit: int = 50) -> List[Dict[str, Any]]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
             """
-            SELECT
-                request_id, created_at, status, quote_id,
-                customer_name, customer_phone, job_address,
-                job_description_customer, job_description_internal,
-                service_type, cash_total_cad, emt_total_cad,
-                request_json, notes,
-                requested_job_date, requested_time_window,
-                customer_accepted_at, admin_approved_at
+            SELECT request_id
             FROM quote_requests
-            WHERE quote_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
             """,
-            (quote_id,),
-        ).fetchone()
-        if not row:
-            return None
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
 
-        return {
-            "request_id": row["request_id"],
-            "created_at": row["created_at"],
-            "status": row["status"],
-            "quote_id": row["quote_id"],
-            "customer_name": row["customer_name"],
-            "customer_phone": row["customer_phone"],
-            "job_address": row["job_address"],
-            "job_description_customer": row["job_description_customer"],
-            "job_description_internal": row["job_description_internal"],
-            "service_type": row["service_type"],
-            "cash_total_cad": float(row["cash_total_cad"]),
-            "emt_total_cad": float(row["emt_total_cad"]),
-            "request_json": json.loads(row["request_json"]),
-            "notes": row["notes"],
-            "requested_job_date": row["requested_job_date"],
-            "requested_time_window": row["requested_time_window"],
-            "customer_accepted_at": row["customer_accepted_at"],
-            "admin_approved_at": row["admin_approved_at"],
-        }
-
-def list_quote_requests(limit: int = 50, status: Optional[str] = None) -> List[Dict[str, Any]]:
-    where: List[str] = []
-    params: List[Any] = []
-
-    if status:
-        where.append("status = ?")
-        params.append(status)
-
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-    sql = f"""
-        SELECT
-            request_id, created_at, status, quote_id,
-            customer_name, customer_phone, job_address,
-            service_type, cash_total_cad, emt_total_cad,
-            requested_job_date, requested_time_window
-        FROM quote_requests
-        {where_sql}
-        ORDER BY created_at DESC
-        LIMIT ?
-    """
-    params.append(int(limit))
-
-    with _connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-
-    return [
-        {
-            "request_id": r["request_id"],
-            "created_at": r["created_at"],
-            "status": r["status"],
-            "quote_id": r["quote_id"],
-            "customer_name": r["customer_name"],
-            "customer_phone": r["customer_phone"],
-            "job_address": r["job_address"],
-            "service_type": r["service_type"],
-            "cash_total_cad": float(r["cash_total_cad"]),
-            "emt_total_cad": float(r["emt_total_cad"]),
-            "requested_job_date": r["requested_job_date"],
-            "requested_time_window": r["requested_time_window"],
-        }
-        for r in rows
-    ]
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        item = get_quote_request(r["request_id"])
+        if item is not None:
+            out.append(item)
+    return out
 
 
 def update_quote_request(
     request_id: str,
     *,
     status: Optional[str] = None,
-    notes: Optional[str] = None,
-    requested_job_date: Optional[str] = None,
-    requested_time_window: Optional[str] = None,
-    customer_accepted_at: Optional[str] = None,
-    admin_approved_at: Optional[str] = None,
+    notes: Any = UNSET,
+    requested_job_date: Any = UNSET,
+    requested_time_window: Any = UNSET,
+    customer_accepted_at: Any = UNSET,
+    admin_approved_at: Any = UNSET,
 ) -> Optional[Dict[str, Any]]:
     existing = get_quote_request(request_id)
     if not existing:
@@ -640,17 +391,20 @@ def update_quote_request(
 
     updated: Dict[str, Any] = dict(existing)
 
+    # Status is not nullable in our schema; `None` means "leave unchanged".
     if status is not None:
         updated["status"] = status
-    if notes is not None:
+
+    # Nullable fields: UNSET means "leave unchanged", None means "clear"
+    if notes is not UNSET:
         updated["notes"] = notes
-    if requested_job_date is not None:
+    if requested_job_date is not UNSET:
         updated["requested_job_date"] = requested_job_date
-    if requested_time_window is not None:
+    if requested_time_window is not UNSET:
         updated["requested_time_window"] = requested_time_window
-    if customer_accepted_at is not None:
+    if customer_accepted_at is not UNSET:
         updated["customer_accepted_at"] = customer_accepted_at
-    if admin_approved_at is not None:
+    if admin_approved_at is not UNSET:
         updated["admin_approved_at"] = admin_approved_at
 
     save_quote_request(
@@ -679,11 +433,120 @@ def update_quote_request(
 
 
 # =========================
+# Jobs
+# =========================
+
+def save_job(job: Dict[str, Any]) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO jobs
+            (job_id, created_at, status, quote_id, request_id,
+             customer_name, customer_phone, job_address,
+             job_description_customer, job_description_internal,
+             service_type, cash_total_cad, emt_total_cad, request_json, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                job["job_id"],
+                job["created_at"],
+                job["status"],
+                job["quote_id"],
+                job["request_id"],
+                job.get("customer_name"),
+                job.get("customer_phone"),
+                job.get("job_address"),
+                job.get("job_description_customer"),
+                job.get("job_description_internal"),
+                job["service_type"],
+                float(job["cash_total_cad"]),
+                float(job["emt_total_cad"]),
+                json.dumps(job["request_json"], ensure_ascii=False),
+                job.get("notes"),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+
+    try:
+        req = json.loads(row["request_json"])
+    except Exception:
+        req = row["request_json"]
+
+    return {
+        "job_id": row["job_id"],
+        "created_at": row["created_at"],
+        "status": row["status"],
+        "quote_id": row["quote_id"],
+        "request_id": row["request_id"],
+        "customer_name": row["customer_name"],
+        "customer_phone": row["customer_phone"],
+        "job_address": row["job_address"],
+        "job_description_customer": row["job_description_customer"],
+        "job_description_internal": row["job_description_internal"],
+        "service_type": row["service_type"],
+        "cash_total_cad": row["cash_total_cad"],
+        "emt_total_cad": row["emt_total_cad"],
+        "request_json": req,
+        "notes": row["notes"],
+    }
+
+
+def get_job_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT job_id FROM jobs WHERE quote_id = ?", (quote_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return get_job(row["job_id"])
+
+
+def list_jobs(limit: int = 50) -> List[Dict[str, Any]]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT job_id
+            FROM jobs
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        item = get_job(r["job_id"])
+        if item is not None:
+            out.append(item)
+    return out
+
+
+# =========================
 # Attachments
 # =========================
 
 def save_attachment(att: Dict[str, Any]) -> None:
-    with _connect() as conn:
+    conn = _connect()
+    try:
         conn.execute(
             """
             INSERT OR REPLACE INTO attachments
@@ -704,6 +567,9 @@ def save_attachment(att: Dict[str, Any]) -> None:
                 att.get("drive_web_view_link"),
             ),
         )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
@@ -726,8 +592,11 @@ def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Di
     """
     params.append(int(limit))
 
-    with _connect() as conn:
+    conn = _connect()
+    try:
         rows = conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
 
     return [
         {
@@ -756,7 +625,8 @@ def export_db_to_json() -> Dict[str, Any]:
         "tables": {},
     }
 
-    with _connect() as conn:
+    conn = _connect()
+    try:
         for table in KNOWN_TABLES:
             try:
                 rows = conn.execute(f"SELECT * FROM {table}").fetchall()
@@ -780,6 +650,8 @@ def export_db_to_json() -> Dict[str, Any]:
                 out_rows.append(row_dict)
 
             payload["tables"][table] = out_rows
+    finally:
+        conn.close()
 
     return payload
 
@@ -795,68 +667,72 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     init_db()
     restored_counts: Dict[str, int] = {}
 
-    with _connect() as conn:
+    conn = _connect()
+    try:
         conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("BEGIN")
+
+        for table in KNOWN_TABLES:
+            try:
+                conn.execute(f"DELETE FROM {table}")
+            except sqlite3.OperationalError:
+                continue
+
+        for table in KNOWN_TABLES:
+            rows_in = tables.get(table, [])
+            if not rows_in:
+                restored_counts[table] = 0
+                continue
+            if not isinstance(rows_in, list):
+                raise ValueError(f"Table '{table}' must be a list of rows")
+
+            try:
+                col_rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+            except sqlite3.OperationalError:
+                restored_counts[table] = 0
+                continue
+
+            cols = [c["name"] for c in col_rows]
+            if not cols:
+                restored_counts[table] = 0
+                continue
+
+            placeholders = ",".join(["?"] * len(cols))
+            col_sql = ",".join(cols)
+            sql = f"INSERT OR REPLACE INTO {table} ({col_sql}) VALUES ({placeholders})"
+
+            values_to_insert: List[List[Any]] = []
+            for raw in rows_in:
+                if not isinstance(raw, dict):
+                    raise ValueError(f"Row in '{table}' must be an object")
+
+                row_vals: List[Any] = []
+                for col in cols:
+                    v = raw.get(col)
+                    if col.endswith("_json") or col in {"request_json", "response_json"}:
+                        if v is None:
+                            row_vals.append(None)
+                        elif isinstance(v, str):
+                            row_vals.append(v)
+                        else:
+                            row_vals.append(json.dumps(v, ensure_ascii=False))
+                        continue
+                    row_vals.append(v)
+
+                values_to_insert.append(row_vals)
+
+            conn.executemany(sql, values_to_insert)
+            restored_counts[table] = len(values_to_insert)
+
+        conn.execute("COMMIT")
+        conn.execute("PRAGMA foreign_keys = ON")
+    except Exception:
         try:
-            conn.execute("BEGIN")
-
-            for table in KNOWN_TABLES:
-                try:
-                    conn.execute(f"DELETE FROM {table}")
-                except sqlite3.OperationalError:
-                    continue
-
-            for table in KNOWN_TABLES:
-                rows_in = tables.get(table, [])
-                if not rows_in:
-                    restored_counts[table] = 0
-                    continue
-                if not isinstance(rows_in, list):
-                    raise ValueError(f"Table '{table}' must be a list of rows")
-
-                try:
-                    col_rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-                except sqlite3.OperationalError:
-                    restored_counts[table] = 0
-                    continue
-
-                cols = [c["name"] for c in col_rows]
-                if not cols:
-                    restored_counts[table] = 0
-                    continue
-
-                placeholders = ",".join(["?"] * len(cols))
-                col_sql = ",".join(cols)
-                sql = f"INSERT OR REPLACE INTO {table} ({col_sql}) VALUES ({placeholders})"
-
-                values_to_insert: List[List[Any]] = []
-                for raw in rows_in:
-                    if not isinstance(raw, dict):
-                        raise ValueError(f"Row in '{table}' must be an object")
-
-                    row_vals: List[Any] = []
-                    for col in cols:
-                        v = raw.get(col)
-                        if col.endswith("_json") or col in {"request_json", "response_json"}:
-                            if v is None:
-                                row_vals.append(None)
-                            elif isinstance(v, str):
-                                row_vals.append(v)
-                            else:
-                                row_vals.append(json.dumps(v, ensure_ascii=False))
-                            continue
-                        row_vals.append(v)
-
-                    values_to_insert.append(row_vals)
-
-                conn.executemany(sql, values_to_insert)
-                restored_counts[table] = len(values_to_insert)
-
-            conn.execute("COMMIT")
-        except Exception:
             conn.execute("ROLLBACK")
-            raise
-        finally:
-            conn.execute("PRAGMA foreign_keys = ON")
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
 
     return {"ok": True, "restored": restored_counts}
