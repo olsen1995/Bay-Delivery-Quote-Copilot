@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 DB_PATH = Path("app/data/bay_delivery.sqlite3")
+UNSET = object()
 
 # Explicit table list keeps backup/restore deterministic and safe.
 KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
@@ -628,11 +629,11 @@ def update_quote_request(
     request_id: str,
     *,
     status: Optional[str] = None,
-    notes: Optional[str] = None,
-    requested_job_date: Optional[str] = None,
-    requested_time_window: Optional[str] = None,
-    customer_accepted_at: Optional[str] = None,
-    admin_approved_at: Optional[str] = None,
+    notes: Any = UNSET,
+    requested_job_date: Any = UNSET,
+    requested_time_window: Any = UNSET,
+    customer_accepted_at: Any = UNSET,
+    admin_approved_at: Any = UNSET,
 ) -> Optional[Dict[str, Any]]:
     existing = get_quote_request(request_id)
     if not existing:
@@ -642,15 +643,15 @@ def update_quote_request(
 
     if status is not None:
         updated["status"] = status
-    if notes is not None:
+    if notes is not UNSET:
         updated["notes"] = notes
-    if requested_job_date is not None:
+    if requested_job_date is not UNSET:
         updated["requested_job_date"] = requested_job_date
-    if requested_time_window is not None:
+    if requested_time_window is not UNSET:
         updated["requested_time_window"] = requested_time_window
-    if customer_accepted_at is not None:
+    if customer_accepted_at is not UNSET:
         updated["customer_accepted_at"] = customer_accepted_at
-    if admin_approved_at is not None:
+    if admin_approved_at is not UNSET:
         updated["admin_approved_at"] = admin_approved_at
 
     save_quote_request(
