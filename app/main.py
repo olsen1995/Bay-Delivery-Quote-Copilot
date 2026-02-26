@@ -3,40 +3,46 @@ from __future__ import annotations
 import base64
 import json
 import os
-import secrets
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Annotated
+from typing import Any, Optional
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks, Form
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from app import gdrive
 from app.quote_engine import calculate_quote
 from app.storage import (
-    init_db,
-    save_quote,
-    list_quotes,
+    export_db_to_json,
+    get_job_by_quote_id,
     get_quote_record,
-    save_quote_request,
-    list_quote_requests,
     get_quote_request,
     get_quote_request_by_quote_id,
-    update_quote_request,
-    save_job,
-    list_jobs,
-    get_job_by_quote_id,
-    save_attachment,
-    list_attachments,
-    export_db_to_json,
     import_db_from_json,
+    init_db,
+    list_attachments,
+    list_jobs,
+    list_quote_requests,
+    list_quotes,
+    save_attachment,
+    save_job,
+    save_quote,
+    save_quote_request,
+    update_quote_request,
 )
 from app.update_fields import include_optional_update_fields
-from app import gdrive
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 
@@ -67,12 +73,22 @@ def _now_local_iso() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+def _drive_enabled() -> bool:
+    return gdrive.is_configured()
+
+
 def _require_admin(request: Request) -> None:
+    """
+    Admin auth: Basic Auth using ADMIN_USERNAME / ADMIN_PASSWORD.
+
+    IMPORTANT (CI + smoke tests):
+    - If creds are not configured, we must NOT return 503 (dependency failure).
+      Smoke tests expect 200/401/403.
+    - Therefore: missing creds => 401.
+    """
     expected_user = os.getenv("ADMIN_USERNAME", "").strip()
     expected_pass = os.getenv("ADMIN_PASSWORD", "").strip()
 
-    # Fail-closed: if credentials aren't configured, admin endpoints should not be accessible.
-    # IMPORTANT: return 401 (not 503) so CI smoke-tests treat this as "auth missing", not "service broken".
     if not expected_user or not expected_pass:
         raise HTTPException(status_code=401, detail="Admin credentials are not configured.")
 
@@ -88,10 +104,6 @@ def _require_admin(request: Request) -> None:
 
     if user != expected_user or pw != expected_pass:
         raise HTTPException(status_code=401, detail="Invalid credentials.")
-
-
-def _drive_enabled() -> bool:
-    return gdrive.is_configured()
 
 
 # =========================
@@ -221,7 +233,7 @@ def admin_uploads_page():
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": APP_VERSION}
+    return {"ok": True, "version": APP_VERSION, "drive_configured": _drive_enabled()}
 
 
 # =========================
@@ -284,9 +296,7 @@ def quote_calculate(payload: QuoteRequestPayload):
         travel_zone=str(request_payload.get("travel_zone", "in_town")),
     )
 
-    # IMPORTANT:
-    # Validate required route fields using the *normalized* service type returned by the engine.
-    # This prevents alias bypass (e.g., "moving" -> "small_move") from skipping pickup/dropoff validation.
+    # Validate required route fields using *normalized* service type returned by the engine.
     normalized_service_type = str(engine_quote.get("service_type", "")).strip().lower()
     if normalized_service_type in {"small_move", "item_delivery"}:
         if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
@@ -333,7 +343,7 @@ def quote_calculate(payload: QuoteRequestPayload):
 
 
 class CustomerDecision(BaseModel):
-    action: str = Field(..., description="accept|decline")
+    action: str = Field(..., description="accept|decline|approve|reject")
     requested_job_date: Optional[str] = Field(None, max_length=50)
     requested_time_window: Optional[str] = Field(None, max_length=50)
     notes: Optional[str] = Field(None, max_length=1000)
@@ -509,6 +519,19 @@ async def quote_upload_photos(
 # Admin APIs
 # =========================
 
+@app.get("/admin/api/smoke_uploads")
+def admin_smoke_uploads(request: Request):
+    """
+    Used by CI smoke tests.
+    Must return:
+      - 200 if authorized
+      - 401/403 if unauthorized
+    (Never 503 just because env vars aren't set.)
+    """
+    _require_admin(request)
+    return {"ok": True}
+
+
 @app.get("/admin/api/quotes")
 def admin_list_quotes(request: Request, limit: int = 50):
     _require_admin(request)
@@ -534,7 +557,12 @@ def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: 
 
 
 @app.post("/admin/api/quote-requests/{request_id}/decision")
-def admin_decide_quote_request(request: Request, request_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
+def admin_decide_quote_request(
+    request: Request,
+    request_id: str,
+    body: CustomerDecision,
+    background_tasks: BackgroundTasks,
+):
     _require_admin(request)
 
     existing = get_quote_request(request_id)
@@ -558,6 +586,7 @@ def admin_decide_quote_request(request: Request, request_id: str, body: Customer
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update request")
 
+        created_job: Optional[dict[str, Any]] = None
         if not get_job_by_quote_id(updated["quote_id"]):
             job = {
                 "job_id": str(uuid4()),
@@ -577,9 +606,10 @@ def admin_decide_quote_request(request: Request, request_id: str, body: Customer
                 "notes": updated.get("notes"),
             }
             save_job(job)
+            created_job = job
 
         _maybe_auto_snapshot(background_tasks)
-        return {"ok": True, "request": updated}
+        return {"ok": True, "request": updated, "job": created_job}
 
     # reject
     reject_kwargs: dict[str, Any] = {"status": "rejected", "admin_approved_at": None}
@@ -589,3 +619,79 @@ def admin_decide_quote_request(request: Request, request_id: str, body: Customer
         raise HTTPException(status_code=500, detail="Failed to update request")
     _maybe_auto_snapshot(background_tasks)
     return {"ok": True, "request": updated}
+
+
+# =========================
+# Admin DB Backup/Restore (JSON)
+# =========================
+
+@app.get("/admin/api/db/export")
+def admin_db_export(request: Request):
+    _require_admin(request)
+
+    payload = export_db_to_json()
+    payload["meta"]["exported_at"] = _now_local_iso()
+    payload["meta"]["db_path"] = "app/data/bay_delivery.sqlite3"
+
+    filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Type": "application/json; charset=utf-8",
+    }
+    return Response(content=body, headers=headers, media_type="application/json")
+
+
+class ImportPayload(BaseModel):
+    payload: dict = Field(...)
+
+
+@app.post("/admin/api/db/import")
+def admin_db_import(request: Request, body: ImportPayload, background_tasks: BackgroundTasks):
+    _require_admin(request)
+    result = import_db_from_json(body.payload)
+    _maybe_auto_snapshot(background_tasks)
+    return result
+
+
+# =========================
+# Admin Drive Vault
+# =========================
+
+@app.get("/admin/api/drive/status")
+def admin_drive_status(request: Request):
+    _require_admin(request)
+    return {"ok": True, "drive_configured": _drive_enabled()}
+
+
+@app.post("/admin/api/drive/snapshot")
+def admin_drive_snapshot(request: Request):
+    _require_admin(request)
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Google Drive not configured.")
+    return _drive_snapshot_db()
+
+
+@app.get("/admin/api/drive/backups")
+def admin_drive_backups(request: Request, limit: int = 20):
+    _require_admin(request)
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Google Drive not configured.")
+
+    vault = _drive_call("vault setup", lambda: gdrive.ensure_vault_subfolders())
+    backups = _drive_call("list backups", lambda: gdrive.list_files(vault["db_backups"], limit=int(limit)))
+
+    items = []
+    for f in backups:
+        items.append(
+            {
+                "file_id": f.file_id,
+                "name": f.name,
+                "created_time": getattr(f, "created_time", None) or getattr(f, "createdTime", None) or "",
+                "size": getattr(f, "size", None) or "",
+                "web_view_link": f.web_view_link,
+            }
+        )
+
+    return {"items": items}
