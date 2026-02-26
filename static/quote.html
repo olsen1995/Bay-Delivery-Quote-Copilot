@@ -346,9 +346,9 @@
         "resultBox",
         "Quote ID: " + data.quote_id + "\n" +
         "Created: " + data.created_at + "\n\n" +
-        "Cash total (no HST): $" + Number(data.total_cash_cad).toFixed(2) + " CAD\n" +
-        "EMT total (+13% HST): $" + Number(data.total_emt_cad).toFixed(2) + " CAD\n\n" +
-        "Note:\n" + data.disclaimer
+        "Cash total (no HST): $" + Number(data.response.cash_total_cad).toFixed(2) + " CAD\n" +
+        "EMT total (+13% HST): $" + Number(data.response.emt_total_cad).toFixed(2) + " CAD\n\n" +
+        "Note:\n" + data.response.disclaimer
       );
     } catch (err) {
       showBox("resultBox", "Error:\nFailed to contact server.");
