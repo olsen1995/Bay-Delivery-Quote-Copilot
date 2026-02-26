@@ -15,13 +15,16 @@
 
 <div class="card mt14">
   <div class="small">
-    Admin access uses your Render environment variables: <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
-    Open with <code>?token=...</code> once; it is saved to session storage and removed from the URL. API calls use <code>X-Admin-Token</code>.
+    Admin access uses <strong>Basic Auth</strong> with your Render environment variables:
+    <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
+    <div class="muted small mt10">
+      Note: token-based auth (<code>?token=</code> / <code>X-Admin-Token</code>) is not used by the backend.
+    </div>
   </div>
 
-  <div class="rowCreds">
-    <input id="adminUsername" type="text" placeholder="Admin username" />
-    <input id="adminPassword" type="password" placeholder="Admin password" />
+  <div class="rowCreds mt10">
+    <input id="adminUsername" type="text" placeholder="Admin username" autocomplete="username" />
+    <input id="adminPassword" type="password" placeholder="Admin password" autocomplete="current-password" />
   </div>
 
   <div class="rowToken mt10">
@@ -30,45 +33,6 @@
   </div>
 
   <div class="muted" id="statusLine"></div>
-</div>
-
-<div class="card mt14">
-  <h3>Drive Vault</h3>
-  <div class="muted">
-    Check Drive setup, trigger a DB snapshot, and list recent Drive backups for demo/recovery.
-  </div>
-
-  <div class="btnRow mt10">
-    <button id="driveStatusBtn">Check Drive Status</button>
-    <button id="driveSnapshotBtn" class="btnSpacer">Snapshot DB to Drive</button>
-    <button id="driveBackupsBtn" class="btnSpacer">List Drive Backups</button>
-  </div>
-
-  <div class="muted small mt10" id="driveStatusLine"></div>
-  <div id="driveBackupsBox"></div>
-</div>
-
-<div class="card mt14">
-  <h3>DB Backup (Render Free Tier)</h3>
-  <div class="muted">
-    Render free tier has no persistent disk. Use <strong>Export</strong> to download a JSON backup and keep it safe.
-    Use <strong>Import</strong> to restore the database after a redeploy/reset.
-  </div>
-  <div class="muted small mt10">
-    Note: Google Drive snapshot/list/restore endpoints require Drive env vars to be configured on the server.
-  </div>
-
-  <div class="rowBackup mt10">
-    <button id="exportDbBtn">Export DB to JSON</button>
-
-    <div class="importBox">
-      <label for="importFile">Import backup file</label>
-      <input id="importFile" type="file" accept="application/json" />
-      <button id="importDbBtn" class="btnSpacer">Import JSON Backup</button>
-    </div>
-  </div>
-
-  <div class="muted small mt10" id="backupStatus"></div>
 </div>
 
 <div class="row">
@@ -87,33 +51,15 @@
 
 <div class="card mt14">
   <h3>Jobs</h3>
-  <div class="muted">Jobs created after admin approval (baseline total uses cash quote; payment method set later).</div>
+  <div class="muted">Jobs created after admin approval.</div>
   <div id="jobsBox"></div>
 </div>
 
 <script>
   const statusLine = document.getElementById("statusLine");
-  const backupStatus = document.getElementById("backupStatus");
-  const driveStatusLine = document.getElementById("driveStatusLine");
-  const driveBackupsBox = document.getElementById("driveBackupsBox");
-
-  function bootstrapTokenFromUrl() {
-    const url = new URL(window.location.href);
-    const token = (url.searchParams.get("token") || "").trim();
-    if (!token) return;
-    sessionStorage.setItem("bay_admin_token", token);
-    url.searchParams.delete("token");
-    window.history.replaceState({}, "", url.toString());
-  }
 
   function authHeaders() {
     const headers = {};
-
-    const token = (sessionStorage.getItem("bay_admin_token") || "").trim();
-    if (token) {
-      headers["X-Admin-Token"] = token;
-    }
-
     const u = (document.getElementById("adminUsername").value || "").trim();
     const p = (document.getElementById("adminPassword").value || "").trim();
     if (u && p) {
@@ -168,19 +114,41 @@
 
   async function fetchJSON(path) {
     const res = await fetch(path, { headers: authHeaders() });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(JSON.stringify(data));
+
+    // Some auth failures come back non-JSON; handle safely.
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+
+    if (!res.ok) {
+      // keep the backend message intact
+      throw new Error(JSON.stringify(data));
+    }
     return data;
+  }
+
+  function safeGet(obj, path, fallback = "") {
+    try {
+      return path.split(".").reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj) ?? fallback;
+    } catch {
+      return fallback;
+    }
   }
 
   function statusLabel(status) {
     const map = {
-      customer_accepted_pending_admin: "Customer accepted (pending admin)",
+      customer_pending: "Customer pending",
+      customer_accepted: "Customer accepted",
       customer_declined: "Customer declined",
       admin_approved: "Admin approved",
       rejected: "Rejected"
     };
-    return map[status] || (status || "unknown");
+    return map[(status || "").toLowerCase()] || (status || "unknown");
+  }
+
+  function money(n) {
+    const x = Number(n || 0);
+    return "$" + x.toFixed(2);
   }
 
   function renderQuotes(items) {
@@ -188,7 +156,7 @@
     if (!items || items.length === 0) return addEmptyState(box, "No quotes yet.");
     clearNode(box);
 
-    const { table, tbody } = createTable(["Quote ID", "Created", "Type", "Total (cash)"]);
+    const { table, tbody } = createTable(["Quote ID", "Created", "Service", "Cash Total"]);
 
     items.forEach((q) => {
       const tr = document.createElement("tr");
@@ -201,16 +169,16 @@
       const tdCreated = document.createElement("td");
       tdCreated.textContent = q.created_at || "";
 
-      const tdType = document.createElement("td");
+      const tdSvc = document.createElement("td");
       const pill = document.createElement("span");
       pill.className = "pill";
-      pill.textContent = q.job_type || "";
-      tdType.appendChild(pill);
+      pill.textContent = safeGet(q, "request.service_type", "");
+      tdSvc.appendChild(pill);
 
       const tdTotal = document.createElement("td");
-      tdTotal.textContent = "$" + Number(q.total_cad || 0).toFixed(2);
+      tdTotal.textContent = money(safeGet(q, "response.cash_total_cad", 0));
 
-      tr.append(tdId, tdCreated, tdType, tdTotal);
+      tr.append(tdId, tdCreated, tdSvc, tdTotal);
       tbody.appendChild(tr);
     });
 
@@ -228,20 +196,18 @@
       body: JSON.stringify({ action, notes: (notes.trim() || null) })
     });
 
-    const data = await res.json().catch(() => ({}));
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+
     if (!res.ok) {
       setLine(statusLine, "bad", "Error:");
       statusLine.appendChild(document.createTextNode(" " + JSON.stringify(data)));
       return;
     }
 
-    const jobId = data && data.job && data.job.job_id;
-    if (jobId) {
-      setLine(statusLine, "ok", "Approved. Job created:", jobId);
-    } else {
-      setLine(statusLine, "ok", "Saved: " + action.toUpperCase() + " for");
-      statusLine.appendChild(document.createTextNode(" " + requestId));
-    }
+    const newStatus = safeGet(data, "request.status", "");
+    setLine(statusLine, "ok", "Saved:", (newStatus || action.toUpperCase()));
 
     await refreshAll();
   }
@@ -250,10 +216,12 @@
     const td = document.createElement("td");
     const st = (item.status || "").toLowerCase();
 
-    if (st === "customer_declined" || st === "rejected") {
+    // Only allow admin action once customer accepted
+    if (st !== "customer_accepted") {
       const noAction = document.createElement("span");
       noAction.className = "muted small";
-      noAction.textContent = "No action needed";
+      if (st === "customer_pending") noAction.textContent = "Waiting on customer";
+      else noAction.textContent = "No action needed";
       td.appendChild(noAction);
       return td;
     }
@@ -326,11 +294,11 @@
 
       const cash = document.createElement("div");
       cash.className = "small";
-      cash.textContent = "Cash: $" + Number(r.cash_total_cad || 0).toFixed(2);
+      cash.textContent = "Cash: " + money(r.cash_total_cad);
 
       const emt = document.createElement("div");
       emt.className = "small";
-      emt.textContent = "EMT: $" + Number(r.emt_total_cad || 0).toFixed(2);
+      emt.textContent = "EMT: " + money(r.emt_total_cad);
 
       tdTotals.append(stWrap, cash, emt);
 
@@ -346,7 +314,7 @@
     if (!items || items.length === 0) return addEmptyState(box, "No jobs yet.");
     clearNode(box);
 
-    const { table, tbody } = createTable(["Job", "Quote", "Status", "Customer", "Address", "Total", "Notes"]);
+    const { table, tbody } = createTable(["Job", "Quote", "Status", "Customer", "Address", "Cash Total", "Notes"]);
 
     items.forEach((j) => {
       const tr = document.createElement("tr");
@@ -385,7 +353,7 @@
       tdAddress.textContent = j.job_address || "";
 
       const tdTotal = document.createElement("td");
-      tdTotal.textContent = "$" + Number(j.total_cad || 0).toFixed(2);
+      tdTotal.textContent = money(j.cash_total_cad);
 
       const tdNotes = document.createElement("td");
       tdNotes.className = "small";
@@ -398,51 +366,19 @@
     box.appendChild(table);
   }
 
-  function renderDriveBackups(items) {
-    if (!items || items.length === 0) return addEmptyState(driveBackupsBox, "No Drive backups found.");
-    clearNode(driveBackupsBox);
-
-    const { table, tbody } = createTable(["Name", "Created", "Size (bytes)", "Link"]);
-
-    items.forEach((f) => {
-      const tr = document.createElement("tr");
-
-      const tdName = document.createElement("td");
-      const code = document.createElement("code");
-      code.textContent = f.name || "";
-      tdName.appendChild(code);
-
-      const tdCreated = document.createElement("td");
-      tdCreated.textContent = f.created_time || "";
-
-      const tdSize = document.createElement("td");
-      tdSize.textContent = String(f.size || "-");
-
-      const tdLink = document.createElement("td");
-      if (f.web_view_link) {
-        const a = document.createElement("a");
-        a.href = f.web_view_link;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.textContent = "Open";
-        tdLink.appendChild(a);
-      } else {
-        tdLink.textContent = "-";
-      }
-
-      tr.append(tdName, tdCreated, tdSize, tdLink);
-      tbody.appendChild(tr);
-    });
-
-    driveBackupsBox.appendChild(table);
-  }
-
   async function refreshAll() {
     try {
       statusLine.textContent = "Loading...";
-      renderQuotes((await fetchJSON("/admin/api/quotes")).items || []);
-      renderRequests((await fetchJSON("/admin/api/quote-requests")).items || []);
-      renderJobs((await fetchJSON("/admin/api/jobs")).items || []);
+
+      const quotes = await fetchJSON("/admin/api/quotes");
+      renderQuotes((quotes.items || []));
+
+      const reqs = await fetchJSON("/admin/api/quote-requests");
+      renderRequests((reqs.items || []));
+
+      const jobs = await fetchJSON("/admin/api/jobs");
+      renderJobs((jobs.items || []));
+
       setLine(statusLine, "ok", "Loaded.");
     } catch (err) {
       setLine(statusLine, "bad", "Admin API error:");
@@ -450,123 +386,10 @@
     }
   }
 
-  async function checkDriveStatus() {
-    try {
-      driveStatusLine.textContent = "Checking Drive...";
-      const configured = Boolean((await fetchJSON("/health")).drive_configured);
-      setLine(driveStatusLine, configured ? "ok" : "bad", configured ? "Drive configured." : "Drive not configured.");
-    } catch (err) {
-      setLine(driveStatusLine, "bad", "Drive status check failed:");
-      driveStatusLine.appendChild(document.createTextNode(" " + String(err)));
-    }
-  }
-
-  async function snapshotDrive() {
-    try {
-      driveStatusLine.textContent = "Creating Drive snapshot...";
-      const res = await fetch("/admin/api/drive/snapshot", { method: "POST", headers: authHeaders() });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(JSON.stringify(data));
-      setLine(driveStatusLine, "ok", "Snapshot complete:", data.name || data.file_id || "backup");
-      await listDriveBackups();
-    } catch (err) {
-      setLine(driveStatusLine, "bad", "Snapshot failed:");
-      driveStatusLine.appendChild(document.createTextNode(" " + String(err)));
-    }
-  }
-
-  async function listDriveBackups() {
-    try {
-      driveStatusLine.textContent = "Loading Drive backups...";
-      renderDriveBackups((await fetchJSON("/admin/api/drive/backups?limit=20")).items || []);
-      setLine(driveStatusLine, "ok", "Loaded Drive backups.");
-    } catch (err) {
-      clearNode(driveBackupsBox);
-      setLine(driveStatusLine, "bad", "Could not list Drive backups:");
-      driveStatusLine.appendChild(document.createTextNode(" " + String(err)));
-    }
-  }
-
-  async function exportDb() {
-    try {
-      backupStatus.textContent = "Exporting...";
-      const res = await fetch("/admin/api/db/export", { headers: authHeaders() });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(JSON.stringify(data));
-      }
-
-      const blob = await res.blob();
-      const dispo = res.headers.get("Content-Disposition") || "";
-      let filename = "bay_delivery_backup.json";
-      const m = dispo.match(/filename="([^"]+)"/i);
-      if (m && m[1]) filename = m[1];
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      setLine(backupStatus, "ok", "Exported. Saved as", filename);
-    } catch (err) {
-      setLine(backupStatus, "bad", "Export failed:");
-      backupStatus.appendChild(document.createTextNode(" " + String(err)));
-    }
-  }
-
-  async function importDb() {
-    try {
-      const file = document.getElementById("importFile").files[0];
-      if (!file) {
-        setLine(backupStatus, "bad", "Choose a JSON file first.");
-        return;
-      }
-
-      if (!confirm("This will WIPE the current DB and restore from the JSON backup. Continue?")) {
-        return;
-      }
-
-      backupStatus.textContent = "Importing...";
-      const payload = JSON.parse(await file.text());
-
-      const headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
-      const res = await fetch("/admin/api/db/import", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ payload })
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(JSON.stringify(data));
-
-      const restored = data.restored || {};
-      setLine(backupStatus, "ok", "Imported.");
-      backupStatus.appendChild(document.createTextNode(
-        " quotes=" + (restored.quotes || 0)
-        + ", quote_requests=" + (restored.quote_requests || 0)
-        + ", jobs=" + (restored.jobs || 0)
-      ));
-
-      await refreshAll();
-    } catch (err) {
-      setLine(backupStatus, "bad", "Import failed:");
-      backupStatus.appendChild(document.createTextNode(" " + String(err)));
-    }
-  }
-
-  document.getElementById("driveStatusBtn").addEventListener("click", checkDriveStatus);
-  document.getElementById("driveSnapshotBtn").addEventListener("click", snapshotDrive);
-  document.getElementById("driveBackupsBtn").addEventListener("click", listDriveBackups);
-  document.getElementById("exportDbBtn").addEventListener("click", exportDb);
-  document.getElementById("importDbBtn").addEventListener("click", importDb);
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 
-  bootstrapTokenFromUrl();
-  refreshAll();
+  // On first load, we *don't* auto-refresh with empty creds — it will just 401 and look “broken”.
+  setLine(statusLine, "bad", "Enter admin username/password, then click Refresh.");
 </script>
 
 </body>
