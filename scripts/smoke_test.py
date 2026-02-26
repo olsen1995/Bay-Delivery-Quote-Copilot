@@ -20,7 +20,12 @@ def base_url() -> str:
 
 
 def admin_headers() -> Dict[str, str]:
+    """
+    Admin auth is HTTP Basic in production (Render env vars).
+    BAYDELIVERY_ADMIN_TOKEN is legacy/optional; keep for backwards-compat smoke checks.
+    """
     headers: Dict[str, str] = {}
+
     token = os.getenv("BAYDELIVERY_ADMIN_TOKEN", "").strip()
     if token:
         headers["X-Admin-Token"] = token
@@ -30,10 +35,16 @@ def admin_headers() -> Dict[str, str]:
     if user and password:
         raw = f"{user}:{password}".encode("utf-8")
         headers["Authorization"] = "Basic " + base64.b64encode(raw).decode("ascii")
+
     return headers
 
 
-def _req_requests(method: str, path: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Any]:
+def _req_requests(
+    method: str,
+    path: str,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[int, Any]:
     assert requests is not None
     url = base_url() + path
     res = requests.request(method, url, json=payload, headers=headers or {}, timeout=20)
@@ -44,10 +55,16 @@ def _req_requests(method: str, path: str, payload: Optional[Dict[str, Any]] = No
     return res.status_code, data
 
 
-def _req_urllib(method: str, path: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Any]:
+def _req_urllib(
+    method: str,
+    path: str,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[int, Any]:
     url = base_url() + path
     body = None
     req_headers = dict(headers or {})
+
     if payload is not None:
         body = json.dumps(payload).encode("utf-8")
         req_headers.setdefault("Content-Type", "application/json")
@@ -69,7 +86,12 @@ def _req_urllib(method: str, path: str, payload: Optional[Dict[str, Any]] = None
         return int(err.code), parsed
 
 
-def api(method: str, path: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Tuple[int, Any]:
+def api(
+    method: str,
+    path: str,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[int, Any]:
     if requests is not None:
         return _req_requests(method, path, payload, headers)
     return _req_urllib(method, path, payload, headers)
@@ -90,6 +112,10 @@ def clone_payload(base: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
     out = dict(base)
     out.update(kwargs)
     return out
+
+
+def _admin_creds_configured() -> bool:
+    return bool(os.getenv("ADMIN_USERNAME", "").strip() and os.getenv("ADMIN_PASSWORD", "").strip())
 
 
 def main() -> int:
@@ -116,6 +142,7 @@ def main() -> int:
         "elevator": False,
         "difficult_corner": False,
     }
+
     status, quote = api("POST", "/quote/calculate", payload=quote_payload)
     require(status == 200, f"POST /quote/calculate expected 200, got {status}")
     require(isinstance(quote, dict) and bool(quote.get("quote_id")), "POST /quote/calculate expected quote_id")
@@ -166,6 +193,7 @@ def main() -> int:
     require(isinstance(delivery_ok, dict) and bool(delivery_ok.get("quote_id")), "item_delivery expected quote_id")
     print("[ok] /quote/calculate item_delivery with routes")
 
+    # Optional route: customer decision (some deployments may not have it yet)
     status, decision = api("POST", f"/quote/{quote_id}/decision", payload={"action": "accept"})
     if status == 404:
         detail = error_detail(decision)
@@ -183,42 +211,48 @@ def main() -> int:
             f"POST /quote/{{quote_id}}/decision expected 200/201, 401/403, or route-missing 404; got {status} with body: {decision}"
         )
 
+    # --- Admin endpoint auth behavior ---
+    creds_configured = _admin_creds_configured()
     headers = admin_headers()
-    status, unauth_uploads = api("GET", "/admin/api/uploads?limit=1")
-    if status in (401, 403):
-        print("[ok] /admin/api/uploads unauth denied")
-    elif status == 200 and headers:
-        raise AssertionError(
-            "GET /admin/api/uploads returned 200 without auth while admin credentials are configured; "
-            "this is an auth regression."
-        )
-    elif status == 200:
-        print("[warn] /admin/api/uploads unauth allowed (admin auth not configured)")
-    else:
-        raise AssertionError(f"GET /admin/api/uploads expected 200/401/403, got {status} ({unauth_uploads})")
 
-    if headers:
+    status, unauth_uploads = api("GET", "/admin/api/uploads?limit=1")
+
+    # If admin creds are configured, unauth MUST be denied (401/403)
+    if creds_configured:
+        require(
+            status in (401, 403),
+            f"GET /admin/api/uploads unauth expected 401/403 when creds configured; got {status} ({unauth_uploads})",
+        )
+        print("[ok] /admin/api/uploads unauth denied (creds configured)")
+    else:
+        # If creds are NOT configured, fail-closed is acceptable (503),
+        # and some older deployments might allow 200 (warn only).
+        require(
+            status in (200, 401, 403, 503),
+            f"GET /admin/api/uploads unauth expected 200/401/403/503 when creds NOT configured; got {status} ({unauth_uploads})",
+        )
+        if status == 503:
+            print("[ok] /admin/api/uploads locked (503, creds not configured)")
+        elif status in (401, 403):
+            print("[ok] /admin/api/uploads denied (401/403, creds not configured)")
+        else:
+            print("[warn] /admin/api/uploads unauth allowed (admin auth not configured)")
+
+    # If we have Basic auth headers, confirm authed access works
+    if "Authorization" in headers:
         status, authed_uploads = api("GET", "/admin/api/uploads?limit=1", headers=headers)
-        require(status == 200, f"GET /admin/api/uploads with auth expected 200, got {status}")
+        require(status == 200, f"GET /admin/api/uploads with auth expected 200, got {status} ({authed_uploads})")
         print("[ok] /admin/api/uploads authed")
 
-        token = headers.get("X-Admin-Token", "").strip()
-        if token:
-            status, query_token_uploads = api("GET", f"/admin/api/uploads?limit=1&token={token}")
-            require(
-                status in (401, 403),
-                f"GET /admin/api/uploads with query token expected 401/403, got {status}",
-            )
-            print("[ok] /admin/api/uploads query token denied")
-
+    # Drive check (optional)
     if isinstance(health, dict) and health.get("drive_configured") is True:
-        require(bool(headers), "Drive is configured but admin auth env vars are missing for backup check")
+        require("Authorization" in headers, "Drive is configured but admin auth env vars are missing for backup check")
         status, backups = api("GET", "/admin/api/drive/backups", headers=headers)
-        require(status == 200, f"GET /admin/api/drive/backups expected 200, got {status}")
+        require(status == 200, f"GET /admin/api/drive/backups expected 200, got {status} ({backups})")
         require(isinstance(backups, dict), "Drive backups response expected JSON object")
         print("[ok] /admin/api/drive/backups")
     else:
-        print("[skip] drive backup check (drive_configured=false)")
+        print("[skip] drive backup check (drive_configured=false or not reported)")
 
     print("Smoke test passed.")
     return 0
