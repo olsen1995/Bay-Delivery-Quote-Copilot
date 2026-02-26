@@ -36,6 +36,7 @@ from app.storage import (
     list_attachments,
 )
 from app import gdrive
+from app.update_fields import include_optional_update_fields
 
 try:
     from zoneinfo import ZoneInfo
@@ -362,6 +363,7 @@ class QuoteDecisionRequest(BaseModel):
         return v
 
 
+
 class QuoteResponse(BaseModel):
     quote_id: str
     created_at: str
@@ -463,12 +465,11 @@ def quote_decision(quote_id: str, body: QuoteDecisionRequest, background_tasks: 
             "customer_accepted_at": customer_accepted_at,
             "admin_approved_at": None,
         }
-        if body.notes is not None:
-            update_kwargs["notes"] = body.notes
-        if body.requested_job_date is not None:
-            update_kwargs["requested_job_date"] = body.requested_job_date
-        if body.requested_time_window is not None:
-            update_kwargs["requested_time_window"] = body.requested_time_window
+        include_optional_update_fields(
+            body,
+            update_kwargs,
+            ("notes", "requested_job_date", "requested_time_window"),
+        )
 
         updated = update_quote_request(
             existing["request_id"],
@@ -793,8 +794,7 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
             "status": "admin_approved",
             "admin_approved_at": now,
         }
-        if body.notes is not None:
-            approve_update_kwargs["notes"] = body.notes
+        include_optional_update_fields(body, approve_update_kwargs, ("notes",))
 
         updated = update_quote_request(
             request_id,
@@ -811,8 +811,7 @@ def admin_decide_quote_request(request: Request, request_id: str, body: AdminDec
         "status": "rejected",
         "admin_approved_at": None,
     }
-    if body.notes is not None:
-        reject_update_kwargs["notes"] = body.notes
+    include_optional_update_fields(body, reject_update_kwargs, ("notes",))
 
     updated = update_quote_request(
         request_id,

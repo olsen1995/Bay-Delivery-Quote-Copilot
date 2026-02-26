@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from app.update_fields import include_optional_update_fields
 from app import storage
 
 
@@ -85,6 +86,29 @@ class QuoteRequestTransitionTests(unittest.TestCase):
 
         persisted = storage.get_quote_request(request_id)
         self.assertIsNone(persisted["admin_approved_at"])
+
+    def test_optional_fields_include_explicit_nulls_and_skip_omitted_values(self) -> None:
+        class DecisionBody:
+            def __init__(self) -> None:
+                self.notes = None
+                self.requested_job_date = None
+                self.requested_time_window = None
+                self.model_fields_set = {"notes", "requested_job_date"}
+
+        body = DecisionBody()
+
+        update_kwargs: dict[str, object] = {"status": "customer_declined"}
+        include_optional_update_fields(
+            body,
+            update_kwargs,
+            ("notes", "requested_job_date", "requested_time_window"),
+        )
+
+        self.assertIn("notes", update_kwargs)
+        self.assertIn("requested_job_date", update_kwargs)
+        self.assertNotIn("requested_time_window", update_kwargs)
+        self.assertIsNone(update_kwargs["notes"])
+        self.assertIsNone(update_kwargs["requested_job_date"])
 
 
 if __name__ == "__main__":
