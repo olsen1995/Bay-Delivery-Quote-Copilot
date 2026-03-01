@@ -9,6 +9,22 @@
 *.txt  text eol=lf
 *.py   text eol=lf
 
+# Force LF for common web/static assets (prevents CRLF churn on Windows)
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.svg  text eol=lf
+*.xml  text eol=lf
+
+# Optional: common config/dev files (uncomment if you use them)
+*.toml text eol=lf
+*.ini  text eol=lf
+*.env  text eol=lf
+*.sh   text eol=lf
+
 # Force CRLF for Windows-native scripts
 *.ps1  text eol=crlf
 *.cmd  text eol=crlf
