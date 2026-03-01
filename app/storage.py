@@ -5,6 +5,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.update_fields import validate_quote_request_transition
+
 DB_PATH = Path("app/data/bay_delivery.sqlite3")
 UNSET = object()
 
@@ -393,6 +395,7 @@ def update_quote_request(
 
     # Status is not nullable in our schema; `None` means "leave unchanged".
     if status is not None:
+        validate_quote_request_transition(existing["status"], status)
         updated["status"] = status
 
     # Nullable fields: UNSET means "leave unchanged", None means "clear"

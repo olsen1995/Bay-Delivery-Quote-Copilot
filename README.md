@@ -61,6 +61,31 @@ For `small_move` and `item_delivery`, also required:
 
 ---
 
+## quote_request status lifecycle (server-enforced)
+
+Canonical statuses:
+
+- `customer_pending`
+- `customer_accepted`
+- `customer_declined`
+- `admin_approved`
+- `rejected`
+
+Allowed transitions:
+
+- `customer_pending` -> `customer_accepted`
+- `customer_pending` -> `customer_declined`
+- `customer_accepted` -> `admin_approved`
+- `customer_accepted` -> `rejected`
+
+Terminal statuses (no outgoing transitions):
+
+- `customer_declined`
+- `admin_approved`
+- `rejected`
+
+---
+
 ## Admin access protection (recommended for Render)
 
 If your deployment is public, set admin Basic Auth credentials:

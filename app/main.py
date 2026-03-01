@@ -18,7 +18,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
@@ -42,7 +42,7 @@ from app.storage import (
     save_quote_request,
     update_quote_request,
 )
-from app.update_fields import include_optional_update_fields
+from app.update_fields import InvalidQuoteRequestTransition, include_optional_update_fields, validate_quote_request_transition
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 
@@ -128,6 +128,22 @@ def _drive_call(desc: str, fn):
     except Exception as e:
         # 502 = upstream dependency failure
         raise HTTPException(status_code=502, detail=f"Google Drive error during {desc}: {e}")
+
+
+def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": "invalid_status_transition",
+            "from": e.from_status,
+            "to": e.to_status,
+            "allowed": e.allowed,
+            "detail": (
+                f"Invalid status transition from {e.from_status} to {e.to_status}. "
+                f"Allowed: {e.allowed}"
+            ),
+        },
+    )
 
 
 def _looks_like_supported_image(content: bytes) -> bool:
@@ -372,12 +388,23 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
         raise HTTPException(status_code=400, detail="Invalid action (use accept|decline).")
 
     if not existing:
+        initial_status = "customer_pending"
+        if action == "accept":
+            initial_status = "customer_accepted"
+        elif action == "decline":
+            initial_status = "customer_declined"
+
+        try:
+            validate_quote_request_transition("__new__", initial_status)
+        except InvalidQuoteRequestTransition as e:
+            return _invalid_status_transition_response(e)
+
         request_id = str(uuid4())
         save_quote_request(
             {
                 "request_id": request_id,
                 "created_at": now,
-                "status": "customer_pending",
+                "status": initial_status,
                 "quote_id": quote_id,
                 "customer_name": quote["request"].get("customer_name"),
                 "customer_phone": quote["request"].get("customer_phone"),
@@ -405,7 +432,10 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
         }
         include_optional_update_fields(body, update_kwargs, ("notes", "requested_job_date", "requested_time_window"))
 
-        updated = update_quote_request(existing["request_id"], **update_kwargs)
+        try:
+            updated = update_quote_request(existing["request_id"], **update_kwargs)
+        except InvalidQuoteRequestTransition as e:
+            return _invalid_status_transition_response(e)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update quote request")
         _maybe_auto_snapshot(background_tasks)
@@ -414,7 +444,10 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
     # decline
     update_kwargs = {"status": "customer_declined", "customer_accepted_at": None, "admin_approved_at": None}
     include_optional_update_fields(body, update_kwargs, ("notes", "requested_job_date", "requested_time_window"))
-    updated = update_quote_request(existing["request_id"], **update_kwargs)
+    try:
+        updated = update_quote_request(existing["request_id"], **update_kwargs)
+    except InvalidQuoteRequestTransition as e:
+        return _invalid_status_transition_response(e)
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update quote request")
     _maybe_auto_snapshot(background_tasks)
@@ -582,7 +615,10 @@ def admin_decide_quote_request(
         }
         include_optional_update_fields(body, update_kwargs, ("notes",))
 
-        updated = update_quote_request(request_id, **update_kwargs)
+        try:
+            updated = update_quote_request(request_id, **update_kwargs)
+        except InvalidQuoteRequestTransition as e:
+            return _invalid_status_transition_response(e)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update request")
 
@@ -614,7 +650,10 @@ def admin_decide_quote_request(
     # reject
     reject_kwargs: dict[str, Any] = {"status": "rejected", "admin_approved_at": None}
     include_optional_update_fields(body, reject_kwargs, ("notes",))
-    updated = update_quote_request(request_id, **reject_kwargs)
+    try:
+        updated = update_quote_request(request_id, **reject_kwargs)
+    except InvalidQuoteRequestTransition as e:
+        return _invalid_status_transition_response(e)
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update request")
     _maybe_auto_snapshot(background_tasks)
