@@ -53,7 +53,7 @@ For `small_move` and `item_delivery`, also required:
 1) Customer generates an estimate on `/`
 2) Customer uses the decision endpoint to **Accept** or **Decline** the quote
 3) System stores/updates the `quote_requests` row with status:
-   - `customer_accepted_pending_admin` when accepted
+   - `customer_accepted` when accepted
    - `customer_declined` when declined
 4) Admin reviews accepted requests in `/admin` and either:
    - Approves → status `admin_approved`
@@ -63,9 +63,9 @@ For `small_move` and `item_delivery`, also required:
 
 ## Admin access protection (recommended for Render)
 
-If your deployment is public, set an admin token:
+If your deployment is public, set admin Basic Auth credentials:
 
-- Environment variable: `BAYDELIVERY_ADMIN_TOKEN`
+- Environment variables: `ADMIN_USERNAME` and `ADMIN_PASSWORD`
 
 Admin APIs require:
 
@@ -105,8 +105,7 @@ Open:
 
 ### Admin auth
 
-- `BAYDELIVERY_ADMIN_TOKEN` (recommended for Render/public deploys)
-- OR `ADMIN_USERNAME` + `ADMIN_PASSWORD` for HTTP Basic auth
+- `ADMIN_USERNAME` + `ADMIN_PASSWORD` for HTTP Basic auth (used by `/admin` and admin APIs)
 
 ### Google Drive (optional)
 
@@ -115,10 +114,10 @@ Open:
 - `GDRIVE_BACKUP_KEEP` (optional)
 - `GDRIVE_AUTO_SNAPSHOT=1` (optional)
 
-### CORS (optional)
+### CORS
 
-- `BAYDELIVERY_CORS_ORIGINS` (comma-separated origins, e.g. `https://your-render-domain.onrender.com`)
-- If not set, CORS middleware is not enabled (same-origin only).
+- Controlled by `BAYDELIVERY_CORS_ORIGINS` (comma-separated origins, e.g. `https://your-render-domain.onrender.com`).
+- If not set, the app currently falls back to `*` (wildcard) for development convenience. Tighten this before a public demo.
 
 ### Versioning
 

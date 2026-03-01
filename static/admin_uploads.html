@@ -37,6 +37,27 @@
       </div>
     </div>
 
+
+      <div class="card mt14">
+        <div class="small">
+          Admin access uses <strong>Basic Auth</strong> (<code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>).
+        </div>
+        <div class="rowCreds mt10">
+          <div class="field">
+            <label for="adminUsername">Admin Username</label>
+            <input id="adminUsername" placeholder="ADMIN_USERNAME" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label for="adminPassword">Admin Password</label>
+            <input id="adminPassword" type="password" placeholder="ADMIN_PASSWORD" autocomplete="current-password" />
+          </div>
+        </div>
+        <div class="muted small mt10">
+          Note: token-based auth (<code>?token=</code> / <code>X-Admin-Token</code>) is not used by the backend.
+        </div>
+      </div>
+
+
     <div class="card resultsHidden" id="resultsCard">
       <h2>Results</h2>
       <div id="results"></div>
@@ -46,20 +67,16 @@
 <script>
   const el = (id) => document.getElementById(id);
 
-  function bootstrapTokenFromUrl() {
-    const url = new URL(window.location.href);
-    const token = (url.searchParams.get("token") || "").trim();
-    if (!token) return;
-    sessionStorage.setItem("bay_admin_token", token);
-    url.searchParams.delete("token");
-    window.history.replaceState({}, "", url.toString());
+  function authHeaders() {
+    const headers = {};
+    const u = (el("adminUsername").value || "").trim();
+    const p = (el("adminPassword").value || "").trim();
+    if (u && p) {
+      headers["Authorization"] = "Basic " + btoa(u + ":" + p);
+    }
+    return headers;
   }
 
-  function authHeaders() {
-    const token = (sessionStorage.getItem("bay_admin_token") || "").trim();
-    if (token) return { "X-Admin-Token": token };
-    return {};
-  }
 
   function showResults(items) {
     const card = el("resultsCard");
@@ -112,7 +129,7 @@
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         el("resultsCard").classList.remove("resultsHidden");
-        el("results").textContent = "Unauthorized — open /admin or /admin/uploads with ?token=... once, or authenticate in your browser.";
+        el("results").textContent = "Unauthorized — enter Admin Username/Password above (Basic Auth) and try again.";
         return;
       }
       throw new Error(JSON.stringify(data));
@@ -120,7 +137,6 @@
     showResults(data.items || []);
   });
 
-  bootstrapTokenFromUrl();
 </script>
 </body>
 </html>

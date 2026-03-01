@@ -241,11 +241,11 @@ def health():
 # =========================
 
 class QuoteRequestPayload(BaseModel):
-    customer_name: Optional[str] = Field(None, max_length=120)
-    customer_phone: Optional[str] = Field(None, max_length=50)
-    job_address: Optional[str] = Field(None, max_length=250)
+    customer_name: str = Field(..., min_length=1, max_length=120)
+    customer_phone: str = Field(..., min_length=1, max_length=50)
+    job_address: str = Field(..., min_length=1, max_length=250)
     job_description_customer: Optional[str] = Field(None, max_length=1000)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: str = Field(..., min_length=1, max_length=1000)
     service_type: str = Field(..., max_length=50)
     payment_method: Optional[str] = Field(None, max_length=20)
     pickup_address: Optional[str] = Field(None, max_length=250)
