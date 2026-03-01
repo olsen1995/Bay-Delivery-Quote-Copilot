@@ -3,6 +3,47 @@ from __future__ import annotations
 from typing import Any
 
 
+QUOTE_REQUEST_ALLOWED_TRANSITIONS: dict[str, list[str]] = {
+    "customer_pending": ["customer_accepted", "customer_declined"],
+    "customer_accepted": ["admin_approved", "rejected"],
+    "customer_declined": [],
+    "admin_approved": [],
+    "rejected": [],
+}
+
+QUOTE_REQUEST_INITIAL_ALLOWED: list[str] = [
+    "customer_pending",
+    "customer_accepted",
+    "customer_declined",
+]
+
+
+class InvalidQuoteRequestTransition(ValueError):
+    def __init__(self, from_status: str, to_status: str, allowed: list[str]):
+        self.from_status = from_status
+        self.to_status = to_status
+        self.allowed = allowed
+        super().__init__(f"invalid quote_request status transition: from={from_status}, to={to_status}, allowed={allowed}")
+
+
+def validate_quote_request_transition(old_status: str, new_status: str) -> list[str]:
+    if old_status == "__new__":
+        allowed = list(QUOTE_REQUEST_INITIAL_ALLOWED)
+        if new_status not in allowed:
+            raise InvalidQuoteRequestTransition(old_status, new_status, allowed)
+        return allowed
+
+    allowed = list(QUOTE_REQUEST_ALLOWED_TRANSITIONS.get(old_status, []))
+
+    if old_status == new_status:
+        return allowed
+
+    if new_status not in allowed:
+        raise InvalidQuoteRequestTransition(old_status, new_status, allowed)
+
+    return allowed
+
+
 def include_optional_update_fields(
     body: Any,
     update_kwargs: dict[str, Any],
