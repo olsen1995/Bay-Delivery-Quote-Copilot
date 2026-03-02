@@ -1,32 +1,10 @@
 import math
 from copy import deepcopy
 
-import inspect
-
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-
-
-def _ensure_testclient_httpx_compat() -> None:
-    """Compat for Starlette TestClient with newer httpx that removed `app=` kwarg."""
-    params = inspect.signature(httpx.Client.__init__).parameters
-    if "app" in params:
-        return
-
-    original_init = httpx.Client.__init__
-
-    def patched_init(self, *args, **kwargs):
-        kwargs.pop("app", None)
-        return original_init(self, *args, **kwargs)
-
-    httpx.Client.__init__ = patched_init
-
-
-_ensure_testclient_httpx_compat()
-
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
