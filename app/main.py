@@ -131,6 +131,8 @@ def _drive_call(desc: str, fn):
 
 
 def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSONResponse:
+    allowed_text = ", ".join(e.allowed) if e.allowed else "(none)"
+    detail = f"Invalid status transition from {e.from_status} to {e.to_status}. Allowed: {allowed_text}"
     return JSONResponse(
         status_code=409,
         content={
@@ -138,6 +140,7 @@ def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSO
             "from": e.from_status,
             "to": e.to_status,
             "allowed": e.allowed,
+            "detail": detail,
         },
     )
 
