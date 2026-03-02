@@ -138,9 +138,6 @@ def main() -> int:
         "mattresses_count": 0,
         "box_springs_count": 0,
         "scrap_pickup_location": "curbside",
-        "stairs": False,
-        "elevator": False,
-        "difficult_corner": False,
     }
 
     status, quote = api("POST", "/quote/calculate", payload=quote_payload)
