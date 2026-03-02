@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +46,7 @@ from app.storage import (
 from app.update_fields import InvalidQuoteRequestTransition, include_optional_update_fields, validate_quote_request_transition
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
@@ -296,12 +298,32 @@ class QuoteRequestPayload(BaseModel):
         return v
 
 
+CANONICAL_QUOTE_REQUEST_FIELDS = set(QuoteRequestPayload.model_fields.keys())
+
+
 @app.post("/quote/calculate")
-def quote_calculate(payload: QuoteRequestPayload):
+async def quote_calculate(request: Request, payload: QuoteRequestPayload):
+    raw_payload = await request.json()
+    if isinstance(raw_payload, dict):
+        unknown_fields = sorted(set(raw_payload.keys()) - CANONICAL_QUOTE_REQUEST_FIELDS)
+        if unknown_fields:
+            preview_limit = 25
+            preview_keys = unknown_fields[:preview_limit]
+            remaining = len(unknown_fields) - len(preview_keys)
+            suffix = f" (+{remaining} more)" if remaining > 0 else ""
+            logger.warning(
+                "/quote/calculate received %d unknown request fields: %s%s",
+                len(unknown_fields),
+                ", ".join(preview_keys),
+                suffix,
+            )
+            # TODO: Flip QuoteRequestPayload to extra="forbid" after unknown-field logs stay clean.
+
     request_payload = payload.model_dump()
+    requested_service_type = str(request_payload.get("service_type", "")).strip()
 
     engine_quote = calculate_quote(
-        service_type=str(request_payload.get("service_type", "")),
+        service_type=requested_service_type,
         hours=float(request_payload.get("estimated_hours", 0.0)),
         crew_size=int(request_payload.get("crew_size", 1)),
         garbage_bag_count=int(request_payload.get("garbage_bag_count", 0)),
@@ -312,8 +334,8 @@ def quote_calculate(payload: QuoteRequestPayload):
     )
 
     # Validate required route fields using *normalized* service type returned by the engine.
-    normalized_service_type = str(engine_quote.get("service_type", "")).strip().lower()
-    if normalized_service_type in {"small_move", "item_delivery"}:
+    engine_service_type = str(engine_quote.get("service_type", "")).strip().lower()
+    if engine_service_type in {"small_move", "item_delivery"}:
         if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
             raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
 
