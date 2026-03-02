@@ -52,6 +52,14 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> Tuple[str, ...]:
     return names
 
 
+def _table_info(conn: sqlite3.Connection, table: str) -> List[sqlite3.Row]:
+    """Return PRAGMA table_info rows (uncached; used for NOT NULL detection)."""
+    try:
+        return conn.execute(f"PRAGMA table_info({table})").fetchall()
+    except sqlite3.OperationalError:
+        return []
+
+
 def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
     """Backfill cleanup for pre-unique-index databases.
 
@@ -204,7 +212,6 @@ def _derive_quote_job_type(record: Dict[str, Any]) -> str:
     Forward-compat: some schemas include quotes.job_type NOT NULL.
     Best-effort derive a stable value from the request.
     """
-    # Prefer explicit field if caller provides it
     jt = record.get("job_type")
     if isinstance(jt, str) and jt.strip():
         return jt.strip()
@@ -215,46 +222,107 @@ def _derive_quote_job_type(record: Dict[str, Any]) -> str:
         if isinstance(st, str) and st.strip():
             return st.strip()
 
-    # Last resort: keep NOT NULL happy
     return "unknown"
 
 
+def _derive_quote_total_cad(record: Dict[str, Any]) -> float:
+    """
+    Forward-compat: some schemas include quotes.total_cad NOT NULL.
+    We derive a stable numeric value from the response totals.
+
+    Default: use cash_total_cad as the base amount (pre-HST).
+    Fallback to emt_total_cad, then 0.0.
+    """
+    resp = record.get("response") or {}
+    if isinstance(resp, dict):
+        for key in ("cash_total_cad", "emt_total_cad"):
+            v = resp.get(key)
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                try:
+                    return float(v)
+                except Exception:
+                    pass
+    return 0.0
+
+
+def _missing_required_columns(table_info: List[sqlite3.Row], provided: Dict[str, Any]) -> List[str]:
+    """
+    Identify NOT NULL columns with no default that we're not providing.
+    Skip PK columns (SQLite allows implicit PK behavior in some cases).
+    """
+    missing: List[str] = []
+    for col in table_info:
+        name = col["name"]
+        notnull = int(col["notnull"] or 0) == 1
+        has_default = col["dflt_value"] is not None
+        is_pk = int(col["pk"] or 0) == 1
+
+        if is_pk:
+            continue
+        if not notnull:
+            continue
+        if has_default:
+            continue
+        if name not in provided:
+            missing.append(name)
+
+    return missing
+
+
 def save_quote(record: Dict[str, Any]) -> None:
+    """
+    Persist quote records in a schema-aware, forward-compatible way.
+
+    Strategy:
+    - Determine actual table columns via PRAGMA.
+    - Build an insert dict with values we can derive.
+    - Filter to existing columns.
+    - If schema includes additional NOT NULL columns without defaults, raise a clear error.
+    """
     conn = _connect()
     try:
         cols = _table_columns(conn, "quotes")
+        info = _table_info(conn, "quotes")
 
-        # Default legacy insert
-        if "job_type" not in cols:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO quotes (quote_id, created_at, request_json, response_json)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    record["quote_id"],
-                    record["created_at"],
-                    json.dumps(record["request"], ensure_ascii=False),
-                    json.dumps(record["response"], ensure_ascii=False),
-                ),
+        # Values we can always provide
+        insert_fields: Dict[str, Any] = {
+            "quote_id": record["quote_id"],
+            "created_at": record["created_at"],
+            "request_json": json.dumps(record["request"], ensure_ascii=False),
+            "response_json": json.dumps(record["response"], ensure_ascii=False),
+        }
+
+        # Forward-compat derived columns
+        if "job_type" in cols:
+            insert_fields["job_type"] = _derive_quote_job_type(record)
+        if "total_cad" in cols:
+            insert_fields["total_cad"] = _derive_quote_total_cad(record)
+
+        # Filter to columns that exist
+        filtered = {k: v for k, v in insert_fields.items() if k in cols}
+
+        # Fail fast if the schema requires columns we can't satisfy
+        missing = _missing_required_columns(info, filtered)
+        if missing:
+            raise ValueError(
+                "quotes table has NOT NULL columns without defaults that save_quote() "
+                f"cannot populate: {missing}. "
+                "Make save_quote schema-aware for these columns or add DB defaults."
             )
-            conn.commit()
-            return
 
-        # Newer schema insert includes job_type
-        job_type = _derive_quote_job_type(record)
+        col_names = list(filtered.keys())
+        placeholders = ", ".join(["?"] * len(col_names))
+        col_sql = ", ".join(col_names)
+        values = tuple(filtered[c] for c in col_names)
+
         conn.execute(
-            """
-            INSERT OR REPLACE INTO quotes (quote_id, created_at, job_type, request_json, response_json)
-            VALUES (?, ?, ?, ?, ?)
+            f"""
+            INSERT OR REPLACE INTO quotes ({col_sql})
+            VALUES ({placeholders})
             """,
-            (
-                record["quote_id"],
-                record["created_at"],
-                job_type,
-                json.dumps(record["request"], ensure_ascii=False),
-                json.dumps(record["response"], ensure_ascii=False),
-            ),
+            values,
         )
         conn.commit()
     finally:
@@ -281,16 +349,17 @@ def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
     except Exception:
         response_obj = row["response_json"]
 
-    out = {
+    out: Dict[str, Any] = {
         "quote_id": row["quote_id"],
         "created_at": row["created_at"],
         "request": request_obj,
         "response": response_obj,
     }
 
-    # Forward-compat if column exists
     if "job_type" in row.keys():
         out["job_type"] = row["job_type"]
+    if "total_cad" in row.keys():
+        out["total_cad"] = row["total_cad"]
 
     return out
 
@@ -329,6 +398,8 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
         }
         if "job_type" in r.keys():
             item["job_type"] = r["job_type"]
+        if "total_cad" in r.keys():
+            item["total_cad"] = r["total_cad"]
         out.append(item)
 
     return out
