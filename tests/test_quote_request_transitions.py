@@ -124,10 +124,13 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 409)
         payload = resp.json()
-        self.assertEqual(set(payload.keys()), {"error", "from", "to", "allowed"})
+        self.assertTrue({"error", "from", "to", "allowed"}.issubset(payload.keys()))
         self.assertEqual(payload["error"], "invalid_status_transition")
         self.assertEqual(payload["from"], "customer_declined")
         self.assertEqual(payload["to"], "admin_approved")
+        self.assertIsInstance(payload["detail"], str)
+        self.assertIn(payload["from"], payload["detail"])
+        self.assertIn(payload["to"], payload["detail"])
 
     def test_forbidden_pending_to_admin_approved(self) -> None:
         request_id = "req_pending_approve"
@@ -141,10 +144,13 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 409)
         payload = resp.json()
-        self.assertEqual(set(payload.keys()), {"error", "from", "to", "allowed"})
+        self.assertTrue({"error", "from", "to", "allowed"}.issubset(payload.keys()))
         self.assertEqual(payload["error"], "invalid_status_transition")
         self.assertEqual(payload["from"], "customer_pending")
         self.assertEqual(payload["to"], "admin_approved")
+        self.assertIsInstance(payload["detail"], str)
+        self.assertIn(payload["from"], payload["detail"])
+        self.assertIn(payload["to"], payload["detail"])
 
     def test_forbidden_admin_approved_to_rejected(self) -> None:
         request_id = "req_approved_reject"
@@ -158,10 +164,13 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 409)
         payload = resp.json()
-        self.assertEqual(set(payload.keys()), {"error", "from", "to", "allowed"})
+        self.assertTrue({"error", "from", "to", "allowed"}.issubset(payload.keys()))
         self.assertEqual(payload["error"], "invalid_status_transition")
         self.assertEqual(payload["from"], "admin_approved")
         self.assertEqual(payload["to"], "rejected")
+        self.assertIsInstance(payload["detail"], str)
+        self.assertIn(payload["from"], payload["detail"])
+        self.assertIn(payload["to"], payload["detail"])
 
     def test_forbidden_rejected_to_admin_approved(self) -> None:
         request_id = "req_rejected_approve"
@@ -175,10 +184,13 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 409)
         payload = resp.json()
-        self.assertEqual(set(payload.keys()), {"error", "from", "to", "allowed"})
+        self.assertTrue({"error", "from", "to", "allowed"}.issubset(payload.keys()))
         self.assertEqual(payload["error"], "invalid_status_transition")
         self.assertEqual(payload["from"], "rejected")
         self.assertEqual(payload["to"], "admin_approved")
+        self.assertIsInstance(payload["detail"], str)
+        self.assertIn(payload["from"], payload["detail"])
+        self.assertIn(payload["to"], payload["detail"])
 
 
 if __name__ == "__main__":
