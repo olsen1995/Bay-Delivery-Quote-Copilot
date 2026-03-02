@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.update_fields import validate_quote_request_transition
 
@@ -12,6 +12,9 @@ UNSET = object()
 
 # Explicit table list keeps backup/restore deterministic and safe.
 KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
+
+# Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
+_TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
 
 
 def _connect() -> sqlite3.Connection:
@@ -30,6 +33,23 @@ def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
         if "duplicate column name" in msg:
             return
         raise
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> Tuple[str, ...]:
+    """Return current columns for a table, cached per process."""
+    cached = _TABLE_COL_CACHE.get(table)
+    if cached is not None:
+        return cached
+
+    try:
+        cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    except sqlite3.OperationalError:
+        _TABLE_COL_CACHE[table] = tuple()
+        return tuple()
+
+    names = tuple(c["name"] for c in cols)
+    _TABLE_COL_CACHE[table] = names
+    return names
 
 
 def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
@@ -167,6 +187,9 @@ def init_db() -> None:
             # Don't block startup; worst case we just don't get the unique index.
             pass
 
+        # Refresh schema cache in case init created new tables/cols.
+        _TABLE_COL_CACHE.clear()
+
         conn.commit()
     finally:
         conn.close()
@@ -176,17 +199,59 @@ def init_db() -> None:
 # Quotes
 # =========================
 
+def _derive_quote_job_type(record: Dict[str, Any]) -> str:
+    """
+    Forward-compat: some schemas include quotes.job_type NOT NULL.
+    Best-effort derive a stable value from the request.
+    """
+    # Prefer explicit field if caller provides it
+    jt = record.get("job_type")
+    if isinstance(jt, str) and jt.strip():
+        return jt.strip()
+
+    req = record.get("request") or {}
+    if isinstance(req, dict):
+        st = req.get("service_type") or req.get("job_type")
+        if isinstance(st, str) and st.strip():
+            return st.strip()
+
+    # Last resort: keep NOT NULL happy
+    return "unknown"
+
+
 def save_quote(record: Dict[str, Any]) -> None:
     conn = _connect()
     try:
+        cols = _table_columns(conn, "quotes")
+
+        # Default legacy insert
+        if "job_type" not in cols:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO quotes (quote_id, created_at, request_json, response_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    record["quote_id"],
+                    record["created_at"],
+                    json.dumps(record["request"], ensure_ascii=False),
+                    json.dumps(record["response"], ensure_ascii=False),
+                ),
+            )
+            conn.commit()
+            return
+
+        # Newer schema insert includes job_type
+        job_type = _derive_quote_job_type(record)
         conn.execute(
             """
-            INSERT OR REPLACE INTO quotes (quote_id, created_at, request_json, response_json)
-            VALUES (?, ?, ?, ?)
+            INSERT OR REPLACE INTO quotes (quote_id, created_at, job_type, request_json, response_json)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 record["quote_id"],
                 record["created_at"],
+                job_type,
                 json.dumps(record["request"], ensure_ascii=False),
                 json.dumps(record["response"], ensure_ascii=False),
             ),
@@ -216,12 +281,18 @@ def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
     except Exception:
         response_obj = row["response_json"]
 
-    return {
+    out = {
         "quote_id": row["quote_id"],
         "created_at": row["created_at"],
         "request": request_obj,
         "response": response_obj,
     }
+
+    # Forward-compat if column exists
+    if "job_type" in row.keys():
+        out["job_type"] = row["job_type"]
+
+    return out
 
 
 def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
@@ -229,7 +300,7 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
     try:
         rows = conn.execute(
             """
-            SELECT quote_id, created_at, request_json, response_json
+            SELECT *
             FROM quotes
             ORDER BY datetime(created_at) DESC
             LIMIT ?
@@ -250,14 +321,16 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
         except Exception:
             resp = r["response_json"]
 
-        out.append(
-            {
-                "quote_id": r["quote_id"],
-                "created_at": r["created_at"],
-                "request": req,
-                "response": resp,
-            }
-        )
+        item: Dict[str, Any] = {
+            "quote_id": r["quote_id"],
+            "created_at": r["created_at"],
+            "request": req,
+            "response": resp,
+        }
+        if "job_type" in r.keys():
+            item["job_type"] = r["job_type"]
+        out.append(item)
+
     return out
 
 
@@ -729,6 +802,9 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         conn.execute("COMMIT")
         conn.execute("PRAGMA foreign_keys = ON")
+
+        # Schema cache may now be stale (tables could differ after restore)
+        _TABLE_COL_CACHE.clear()
     except Exception:
         try:
             conn.execute("ROLLBACK")
