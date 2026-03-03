@@ -24,8 +24,10 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         token = base64.b64encode(b"admin:secret").decode("utf-8")
         self._admin_headers = {"Authorization": f"Basic {token}"}
         self.client = TestClient(app)
+        self.client.__enter__()
 
     def tearDown(self) -> None:
+        self.client.__exit__(None, None, None)
         self._tmp.cleanup()
 
     def _seed_quote(self, quote_id: str) -> None:
