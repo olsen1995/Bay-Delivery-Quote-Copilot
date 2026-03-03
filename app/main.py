@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -48,10 +49,17 @@ from app.update_fields import InvalidQuoteRequestTransition, include_optional_up
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="Bay Delivery Quote Copilot API",
     version=APP_VERSION,
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + job tracking.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -211,13 +219,6 @@ def _maybe_auto_snapshot(background_tasks: BackgroundTasks) -> None:
     if os.getenv("AUTO_SNAPSHOT", "1").strip() != "1":
         return
     background_tasks.add_task(_drive_snapshot_db)
-
-
-# =========================
-# App init
-# =========================
-
-init_db()
 
 
 # =========================

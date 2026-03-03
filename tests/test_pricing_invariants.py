@@ -9,7 +9,8 @@ from app.main import app
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def _base_payload(service_type: str = "haul_away") -> dict:
