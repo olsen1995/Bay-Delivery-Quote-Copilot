@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
 from app import gdrive
 from app.quote_engine import calculate_quote
 from app.storage import (
@@ -62,6 +64,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+JSON_SIZE_CAP_BYTES = 256 * 1024
+
+SIZE_LIMIT_RULES = [
+    SizeLimitRule(method="POST", exact_path="/quote/upload-photos", max_bytes=12 * 1024 * 1024),
+    SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", path_regex=re.compile(r"^/quote/[^/]+/decision$"), max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
+]
+
+RATE_LIMIT_RULES = [
+    RateLimitRule(rule_id="quote_calculate", method="POST", exact_path="/quote/calculate", limit=10),
+    RateLimitRule(rule_id="quote_upload_photos", method="POST", exact_path="/quote/upload-photos", limit=6),
+    RateLimitRule(
+        rule_id="quote_decision",
+        method="POST",
+        path_regex=re.compile(r"^/quote/[^/]+/decision$"),
+        limit=12,
+    ),
+    RateLimitRule(rule_id="admin_api", prefix_path="/admin/api/", limit=120),
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -69,6 +92,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
+app.add_middleware(RequestSizeLimitMiddleware, rules=SIZE_LIMIT_RULES)
 
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
