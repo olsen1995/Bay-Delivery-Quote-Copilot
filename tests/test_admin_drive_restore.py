@@ -1,9 +1,15 @@
 import base64
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+
+@pytest.fixture
+def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory) -> None:
+    monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(tmp_path / "test-drive-restore.sqlite3"))
 
 
 def _admin_headers() -> dict[str, str]:
@@ -11,7 +17,7 @@ def _admin_headers() -> dict[str, str]:
     return {"Authorization": f"Basic {token}"}
 
 
-def test_drive_restore_requires_admin(monkeypatch) -> None:
+def test_drive_restore_requires_admin(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
 
@@ -21,7 +27,7 @@ def test_drive_restore_requires_admin(monkeypatch) -> None:
     assert resp.status_code == 401
 
 
-def test_drive_restore_happy_path(monkeypatch) -> None:
+def test_drive_restore_happy_path(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
@@ -46,7 +52,7 @@ def test_drive_restore_happy_path(monkeypatch) -> None:
     }
 
 
-def test_drive_restore_invalid_structure(monkeypatch) -> None:
+def test_drive_restore_invalid_structure(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
@@ -61,7 +67,7 @@ def test_drive_restore_invalid_structure(monkeypatch) -> None:
     assert "tables" in resp.json()["detail"]
 
 
-def test_drive_restore_malformed_json(monkeypatch) -> None:
+def test_drive_restore_malformed_json(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)

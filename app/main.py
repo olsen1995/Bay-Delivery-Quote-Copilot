@@ -793,14 +793,14 @@ def admin_drive_restore(request: Request, body: DriveRestorePayload, background_
 
     meta = payload.get("meta")
     if isinstance(meta, dict):
-        fmt = meta.get("format")
-        if fmt is not None and fmt != "bay-delivery-sqlite-backup":
+        backup_format = meta.get("format")
+        if backup_format is not None and backup_format != "bay-delivery-sqlite-backup":
             raise HTTPException(status_code=400, detail="Unsupported backup format.")
 
     try:
         result = import_db_from_json(payload)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     _maybe_auto_snapshot(background_tasks)
     logger.info("Drive DB restore completed for file_id=%s", body.file_id)
