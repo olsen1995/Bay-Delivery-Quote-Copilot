@@ -708,6 +708,18 @@ class ImportPayload(BaseModel):
     payload: dict = Field(...)
 
 
+class DriveRestorePayload(BaseModel):
+    file_id: str = Field(...)
+
+    @field_validator("file_id")
+    @classmethod
+    def validate_file_id(cls, v: str) -> str:
+        value = v.strip() if isinstance(v, str) else ""
+        if not value:
+            raise ValueError("file_id is required")
+        return value
+
+
 @app.post("/admin/api/db/import")
 def admin_db_import(request: Request, body: ImportPayload, background_tasks: BackgroundTasks):
     _require_admin(request)
@@ -756,3 +768,44 @@ def admin_drive_backups(request: Request, limit: int = 20):
         )
 
     return {"items": items}
+
+
+@app.post("/admin/api/drive/restore")
+def admin_drive_restore(request: Request, body: DriveRestorePayload, background_tasks: BackgroundTasks):
+    _require_admin(request)
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Google Drive not configured.")
+
+    logger.info("Starting Drive DB restore from file_id=%s", body.file_id)
+
+    backup_bytes = _drive_call("download backup", lambda: gdrive.download_file(body.file_id))
+    try:
+        payload = json.loads(backup_bytes.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid backup JSON.")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Backup payload must be a JSON object.")
+
+    tables = payload.get("tables")
+    if not isinstance(tables, dict):
+        raise HTTPException(status_code=400, detail="Backup payload missing 'tables' object.")
+
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        fmt = meta.get("format")
+        if fmt is not None and fmt != "bay-delivery-sqlite-backup":
+            raise HTTPException(status_code=400, detail="Unsupported backup format.")
+
+    try:
+        result = import_db_from_json(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    _maybe_auto_snapshot(background_tasks)
+    logger.info("Drive DB restore completed for file_id=%s", body.file_id)
+    return {
+        "ok": bool(result.get("ok", True)),
+        "restored": result.get("restored", {}),
+        "restored_from_file_id": body.file_id,
+    }
