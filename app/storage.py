@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.update_fields import validate_quote_request_transition
 
 DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
-DB_PATH = DEFAULT_DB_PATH
+DB_PATH = DEFAULT_DB_PATH  # overridable by tests
 UNSET = object()
 
 # Explicit table list keeps backup/restore deterministic and safe.
