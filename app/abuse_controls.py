@@ -119,10 +119,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             bucket.append(now)
 
-            empty_keys = [k for k, q in self._buckets.items() if not q]
-            for empty_key in empty_keys:
-                self._buckets.pop(empty_key, None)
-
         return await call_next(request)
 
     def clear_buckets(self) -> None:
