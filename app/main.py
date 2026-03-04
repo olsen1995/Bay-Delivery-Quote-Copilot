@@ -65,11 +65,13 @@ app = FastAPI(
 )
 
 JSON_SIZE_CAP_BYTES = 256 * 1024
+DB_IMPORT_SIZE_CAP_BYTES = 20 * 1024 * 1024
 
 SIZE_LIMIT_RULES = [
     SizeLimitRule(method="POST", exact_path="/quote/upload-photos", max_bytes=12 * 1024 * 1024),
     SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", path_regex=re.compile(r"^/quote/[^/]+/decision$"), max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", exact_path="/admin/api/db/import", max_bytes=DB_IMPORT_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
 ]
 
@@ -92,8 +94,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
 app.add_middleware(RequestSizeLimitMiddleware, rules=SIZE_LIMIT_RULES)
+app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
 
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

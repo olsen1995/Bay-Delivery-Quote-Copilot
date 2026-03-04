@@ -43,7 +43,7 @@ class TestRateLimits:
         self.client.__exit__(None, None, None)
 
     def test_same_ip_exceeding_limit_returns_429(self):
-        headers = {"x-forwarded-for": "203.0.113.10", "x-enable-rate-limit-tests": "1"}
+        headers = {"x-forwarded-for": "203.0.113.10"}
 
         for _ in range(10):
             response = self.client.post("/quote/calculate", headers=headers, json=BASE_PAYLOAD)
@@ -54,8 +54,8 @@ class TestRateLimits:
         assert blocked.json() == {"detail": "rate limit exceeded"}
 
     def test_different_ip_has_separate_bucket(self):
-        blocked_ip_headers = {"x-forwarded-for": "198.51.100.1", "x-enable-rate-limit-tests": "1"}
-        other_ip_headers = {"x-forwarded-for": "198.51.100.2", "x-enable-rate-limit-tests": "1"}
+        blocked_ip_headers = {"x-forwarded-for": "198.51.100.1"}
+        other_ip_headers = {"x-forwarded-for": "198.51.100.2"}
 
         for _ in range(10):
             response = self.client.post("/quote/calculate", headers=blocked_ip_headers, json=BASE_PAYLOAD)

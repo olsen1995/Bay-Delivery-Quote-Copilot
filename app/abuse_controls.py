@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import re
 import time
 from collections import deque
@@ -102,9 +101,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 break
 
         if not rule:
-            return await call_next(request)
-
-        if os.getenv("PYTEST_CURRENT_TEST") and not request.headers.get("x-enable-rate-limit-tests"):
             return await call_next(request)
 
         ip = extract_client_ip(request)

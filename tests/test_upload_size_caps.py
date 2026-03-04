@@ -48,3 +48,14 @@ def test_normal_upload_succeeds(monkeypatch):
     payload = response.json()
     assert payload["ok"] is True
     assert len(payload["uploaded"]) == 1
+
+
+def test_admin_db_import_allows_larger_than_json_cap():
+    with TestClient(app) as client:
+        response = client.post(
+            "/admin/api/db/import",
+            headers={"content-length": str(1024 * 1024)},
+            json={"meta": {}, "quotes": [], "quote_requests": [], "jobs": [], "attachments": []},
+        )
+
+    assert response.status_code != 413
