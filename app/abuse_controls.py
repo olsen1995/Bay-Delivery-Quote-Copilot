@@ -114,6 +114,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             while bucket and bucket[0] <= window_start:
                 bucket.popleft()
 
+            if not bucket:
+                self._buckets.pop(key, None)
+                bucket = self._buckets.setdefault(key, deque())
+
             if len(bucket) >= rule.limit:
                 return JSONResponse(status_code=429, content={"detail": "rate limit exceeded"})
 
