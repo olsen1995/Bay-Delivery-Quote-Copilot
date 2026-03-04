@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.update_fields import validate_quote_request_transition
 
-DB_PATH = Path("app/data/bay_delivery.sqlite3")
+DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
+DB_PATH = DEFAULT_DB_PATH
 UNSET = object()
 
 # Explicit table list keeps backup/restore deterministic and safe.
@@ -18,10 +20,22 @@ _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
 
 
 def _connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = _resolve_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _resolve_db_path() -> Path:
+    if DB_PATH != DEFAULT_DB_PATH:
+        return DB_PATH
+
+    env_path = os.getenv("BAYDELIVERY_DB_PATH")
+    if env_path:
+        return Path(env_path)
+
+    return DEFAULT_DB_PATH
 
 
 def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
@@ -100,7 +114,8 @@ def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db_path = _resolve_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = _connect()
     try:
         conn.execute(
