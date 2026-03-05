@@ -87,12 +87,19 @@ RATE_LIMIT_RULES = [
     RateLimitRule(rule_id="admin_api", prefix_path="/admin/api/", limit=120),
 ]
 
+# configure CORS origins via environment variable; allowlist is required in prod.
+# fall back to the old CORS_ORIGINS name for backwards compatibility.
+cors_env = os.getenv("BAYDELIVERY_CORS_ORIGINS")
+if cors_env is None:
+    cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+allow_list = cors_env.split(",") if cors_env else []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 app.add_middleware(RequestSizeLimitMiddleware, rules=SIZE_LIMIT_RULES)
 app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
@@ -243,7 +250,12 @@ def _drive_snapshot_db() -> dict:
 def _maybe_auto_snapshot(background_tasks: BackgroundTasks) -> None:
     if not _drive_enabled():
         return
-    if os.getenv("AUTO_SNAPSHOT", "1").strip() != "1":
+    # historically the snapshot toggle was AUTO_SNAPSHOT but the README
+    # advertised GDRIVE_AUTO_SNAPSHOT.  Support either variable (GDRIVE_ wins)
+    val = os.getenv("GDRIVE_AUTO_SNAPSHOT")
+    if val is None:
+        val = os.getenv("AUTO_SNAPSHOT", "1")
+    if val.strip() != "1":
         return
     background_tasks.add_task(_drive_snapshot_db)
 
