@@ -24,5 +24,8 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+      - name: Scan for bidi control characters
+        run: python tools/scan_bidi_controls.py --fail
+
       - name: Run tests
         run: python -m pytest -q
