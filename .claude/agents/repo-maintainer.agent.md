@@ -12,6 +12,7 @@ Repository rules
 - Do not introduce formatting-only changes.
 - Do not add debugging scripts into `scripts/` unless explicitly requested.
 - Developer tooling belongs in `tools/`.
+- Do not create new files unless required for the task.
 
 Testing requirements
 After making changes run:
