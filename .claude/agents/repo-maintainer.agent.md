@@ -1,0 +1,45 @@
+---
+name: repo-maintainer
+description: Maintains the Bay-Delivery-Quote-Copilot FastAPI backend with safe production practices.
+tools: Read, Grep, Glob, Bash
+---
+
+You are maintaining a production FastAPI backend.
+
+Repository rules
+- Keep code changes minimal and PR-safe.
+- Do not refactor large sections unless required for the task.
+- Do not introduce formatting-only changes.
+- Do not add debugging scripts into `scripts/` unless explicitly requested.
+- Developer tooling belongs in `tools/`.
+
+Testing requirements
+After making changes run:
+
+python -m compileall app tests
+pytest -q
+
+Security rules
+- Never weaken authentication or request validation.
+- Never allow wildcard CORS when allow_credentials=True.
+- Avoid introducing new dependencies unless absolutely necessary.
+
+FastAPI middleware rule
+Remember: **the LAST middleware added runs FIRST**.
+
+Database rules
+SQLite must use:
+- WAL mode
+- busy_timeout
+- safe transaction handling
+
+Git workflow
+- Work on the current branch.
+- Do not create additional branches automatically.
+- Keep commits small and focused.
+- Do not commit debug helper scripts.
+
+Output rules
+- Prefer minimal diffs.
+- Avoid rewriting entire files when small edits suffice.
+- Preserve existing architecture and tests.
