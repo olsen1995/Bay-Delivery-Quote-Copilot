@@ -4,10 +4,15 @@ import base64
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from google.oauth2 import service_account
-from google.auth.transport.requests import AuthorizedSession
+# IMPORTANT:
+# We intentionally DO NOT import google-auth libraries at module import time.
+# This repo should be importable + testable even when Drive deps are not installed.
+# We lazy-import them only when a Drive call is actually executed.
+if TYPE_CHECKING:
+    # Only for type-checkers; won't execute at runtime.
+    from google.auth.transport.requests import AuthorizedSession  # pragma: no cover
 
 
 GDRIVE_FOLDER_ID_ENV = "GDRIVE_FOLDER_ID"
@@ -37,6 +42,24 @@ def is_configured() -> bool:
     return bool(os.getenv(GDRIVE_FOLDER_ID_ENV)) and bool(os.getenv(GDRIVE_SA_KEY_B64_ENV))
 
 
+def _require_google_libs():
+    """
+    Import google auth libs lazily so tests/local dev can run without installing them.
+    Raises DriveNotConfigured with a clear message if not installed.
+    """
+    try:
+        from google.oauth2 import service_account  # type: ignore
+        from google.auth.transport.requests import AuthorizedSession  # type: ignore
+    except ModuleNotFoundError as e:
+        raise DriveNotConfigured(
+            "Google Drive support requires google-auth libraries, but they're not installed. "
+            "Either install dependency 'google-auth' (and friends) OR disable Drive features by "
+            "leaving GDRIVE_FOLDER_ID / GDRIVE_SA_KEY_B64 unset."
+        ) from e
+
+    return service_account, AuthorizedSession
+
+
 def _load_service_account_info() -> Dict[str, Any]:
     b64 = os.getenv(GDRIVE_SA_KEY_B64_ENV, "").strip()
     if not b64:
@@ -48,7 +71,8 @@ def _load_service_account_info() -> Dict[str, Any]:
         raise DriveNotConfigured(f"Failed to decode GDRIVE_SA_KEY_B64: {e}")
 
 
-def _session() -> AuthorizedSession:
+def _session():
+    service_account, AuthorizedSession = _require_google_libs()
     info = _load_service_account_info()
     creds = service_account.Credentials.from_service_account_info(info, scopes=[DRIVE_SCOPE])
     return AuthorizedSession(creds)
@@ -71,14 +95,46 @@ def backup_keep_count() -> int:
         return 50
 
 
+def _validate_drive_name(name: str) -> str:
+    """
+    Validate folder name for safe FQL usage.
+    Only allows alphanumeric, spaces, hyphens, underscores, and dots.
+    """
+    if not name or not isinstance(name, str):
+        raise ValueError("Drive folder name must be a non-empty string")
+    if len(name) > 100:  # Reasonable limit
+        raise ValueError("Drive folder name too long")
+    safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_.")
+    if not all(c in safe_chars for c in name):
+        raise ValueError("Drive folder name contains unsafe characters")
+    return name
+
+
+def _validate_drive_parent_id(parent_id: str) -> str:
+    """
+    Validate parent folder ID format.
+    Google Drive file IDs are typically 28-33 alphanumeric characters.
+    """
+    if not parent_id or not isinstance(parent_id, str):
+        raise ValueError("Drive parent ID must be a non-empty string")
+    if len(parent_id) < 20 or len(parent_id) > 50:  # Conservative range
+        raise ValueError("Drive parent ID has invalid length")
+    if not parent_id.replace("-", "").replace("_", "").isalnum():
+        raise ValueError("Drive parent ID contains invalid characters")
+    return parent_id
+
+
 def ensure_folder(name: str, parent_id: str) -> DriveFile:
     sess = _session()
 
-    safe_name = name.replace("'", "\\'")
+    # Validate inputs to prevent FQL injection
+    safe_name = _validate_drive_name(name)
+    safe_parent_id = _validate_drive_parent_id(parent_id)
+
     q = (
         "mimeType='application/vnd.google-apps.folder' and "
         f"name='{safe_name}' and "
-        f"'{parent_id}' in parents and trashed=false"
+        f"'{safe_parent_id}' in parents and trashed=false"
     )
 
     r = sess.get(

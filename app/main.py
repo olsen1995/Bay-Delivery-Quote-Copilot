@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
 from app import gdrive
 from app.quote_engine import calculate_quote
 from app.storage import (
@@ -62,13 +64,47 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+JSON_SIZE_CAP_BYTES = 256 * 1024
+DB_IMPORT_SIZE_CAP_BYTES = 20 * 1024 * 1024
+
+SIZE_LIMIT_RULES = [
+    SizeLimitRule(method="POST", exact_path="/quote/upload-photos", max_bytes=12 * 1024 * 1024),
+    SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", path_regex=re.compile(r"^/quote/[^/]+/decision$"), max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", exact_path="/admin/api/db/import", max_bytes=DB_IMPORT_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
+]
+
+RATE_LIMIT_RULES = [
+    RateLimitRule(rule_id="quote_calculate", method="POST", exact_path="/quote/calculate", limit=10),
+    RateLimitRule(rule_id="quote_upload_photos", method="POST", exact_path="/quote/upload-photos", limit=6),
+    RateLimitRule(
+        rule_id="quote_decision",
+        method="POST",
+        path_regex=re.compile(r"^/quote/[^/]+/decision$"),
+        limit=12,
+    ),
+    RateLimitRule(rule_id="admin_api", prefix_path="/admin/api/", limit=120),
+]
+
+# configure CORS origins via environment variable; allowlist is required in prod.
+# fall back to the old CORS_ORIGINS name for backwards compatibility.
+cors_env = os.getenv("BAYDELIVERY_CORS_ORIGINS")
+if cors_env is None:
+    cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+allow_list = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+if "*" in allow_list:
+    raise ValueError("CORS wildcard origin '*' is not allowed when credentials authentication is enabled.")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+app.add_middleware(RequestSizeLimitMiddleware, rules=SIZE_LIMIT_RULES)
+app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
 
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -136,8 +172,10 @@ def _drive_call(desc: str, fn):
     except HTTPException:
         raise
     except Exception as e:
+        # Log detailed error server-side; return generic message to client
+        logging.error(f"Google Drive error during {desc}: {e}")
         # 502 = upstream dependency failure
-        raise HTTPException(status_code=502, detail=f"Google Drive error during {desc}: {e}")
+        raise HTTPException(status_code=502, detail="Google Drive service unavailable.")
 
 
 def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSONResponse:
@@ -216,7 +254,12 @@ def _drive_snapshot_db() -> dict:
 def _maybe_auto_snapshot(background_tasks: BackgroundTasks) -> None:
     if not _drive_enabled():
         return
-    if os.getenv("AUTO_SNAPSHOT", "1").strip() != "1":
+    # historically the snapshot toggle was AUTO_SNAPSHOT but the README
+    # advertised GDRIVE_AUTO_SNAPSHOT.  Support either variable (GDRIVE_ wins)
+    val = os.getenv("GDRIVE_AUTO_SNAPSHOT")
+    if val is None:
+        val = os.getenv("AUTO_SNAPSHOT", "1")
+    if val.strip() != "1":
         return
     background_tasks.add_task(_drive_snapshot_db)
 

@@ -2,9 +2,28 @@
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
   "python.terminal.activateEnvironment": true,
   "python.terminal.activateEnvInCurrentTerminal": true,
+
   "python.analysis.extraPaths": [
     "${workspaceFolder}/.venv/Lib/site-packages"
   ],
+
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["-q"],
+  "python.testing.cwd": "${workspaceFolder}",
+
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "never",
+    "source.fixAll": "never"
+  },
+
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.eol": "\n",
+
+  "python.analysis.typeCheckingMode": "basic",
+
   "cSpell.words": [
     "Amana",
     "Behaviour",
