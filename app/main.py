@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
@@ -50,6 +52,30 @@ from app.update_fields import InvalidQuoteRequestTransition, include_optional_up
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 logger = logging.getLogger(__name__)
+
+# Admin brute-force protection (in-memory tracking)
+_admin_failed_attempts: dict[str, list[float]] = {}
+_admin_lockout_threshold = 5
+_admin_lockout_window = 300  # seconds
+
+def _check_admin_lockout(client_ip: str) -> bool:
+    """Check if client IP is locked out from too many failed attempts."""
+    now = time.time()
+    if client_ip in _admin_failed_attempts:
+        _admin_failed_attempts[client_ip] = [t for t in _admin_failed_attempts[client_ip] if now - t < _admin_lockout_window]
+        return len(_admin_failed_attempts[client_ip]) >= _admin_lockout_threshold
+    return False
+
+def _record_admin_failure(client_ip: str) -> None:
+    """Record a failed admin authentication attempt."""
+    if client_ip not in _admin_failed_attempts:
+        _admin_failed_attempts[client_ip] = []
+    _admin_failed_attempts[client_ip].append(time.time())
+
+def _reset_admin_attempts(client_ip: str) -> None:
+    """Reset failed admin attempts after successful login."""
+    if client_ip in _admin_failed_attempts:
+        del _admin_failed_attempts[client_ip]
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -106,6 +132,16 @@ app.add_middleware(
 app.add_middleware(RequestSizeLimitMiddleware, rules=SIZE_LIMIT_RULES)
 app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
 
+# Static file cache middleware
+class StaticFileCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        return response
+
+app.add_middleware(StaticFileCacheMiddleware)
+
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -126,12 +162,19 @@ def _drive_enabled() -> bool:
 def _require_admin(request: Request) -> None:
     """
     Admin auth: Basic Auth using ADMIN_USERNAME / ADMIN_PASSWORD.
+    Includes brute-force protection with lockout after 5 failed attempts.
 
     IMPORTANT (CI + smoke tests):
     - If creds are not configured, we must NOT return 503 (dependency failure).
       Smoke tests expect 200/401/403.
     - Therefore: missing creds => 401.
     """
+    client_ip = request.client.host if request.client else "unknown"
+
+    # Check if client is locked out
+    if _check_admin_lockout(client_ip):
+        raise HTTPException(status_code=429, detail="Too many failed login attempts. Try again later.")
+
     expected_user = os.getenv("ADMIN_USERNAME", "").strip()
     expected_pass = os.getenv("ADMIN_PASSWORD", "").strip()
 
@@ -140,16 +183,22 @@ def _require_admin(request: Request) -> None:
 
     header = request.headers.get("authorization") or ""
     if not header.lower().startswith("basic "):
+        _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Missing Basic auth.")
 
     try:
         decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
         user, pw = decoded.split(":", 1)
     except Exception:
+        _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid Basic auth header.")
 
     if user != expected_user or pw != expected_pass:
+        _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials.")
+
+    # Success - reset attempts
+    _reset_admin_attempts(client_ip)
 
 
 # =========================
