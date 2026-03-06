@@ -95,14 +95,46 @@ def backup_keep_count() -> int:
         return 50
 
 
+def _validate_drive_name(name: str) -> str:
+    """
+    Validate folder name for safe FQL usage.
+    Only allows alphanumeric, spaces, hyphens, underscores, and dots.
+    """
+    if not name or not isinstance(name, str):
+        raise ValueError("Drive folder name must be a non-empty string")
+    if len(name) > 100:  # Reasonable limit
+        raise ValueError("Drive folder name too long")
+    safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_.")
+    if not all(c in safe_chars for c in name):
+        raise ValueError("Drive folder name contains unsafe characters")
+    return name
+
+
+def _validate_drive_parent_id(parent_id: str) -> str:
+    """
+    Validate parent folder ID format.
+    Google Drive file IDs are typically 28-33 alphanumeric characters.
+    """
+    if not parent_id or not isinstance(parent_id, str):
+        raise ValueError("Drive parent ID must be a non-empty string")
+    if len(parent_id) < 20 or len(parent_id) > 50:  # Conservative range
+        raise ValueError("Drive parent ID has invalid length")
+    if not parent_id.replace("-", "").replace("_", "").isalnum():
+        raise ValueError("Drive parent ID contains invalid characters")
+    return parent_id
+
+
 def ensure_folder(name: str, parent_id: str) -> DriveFile:
     sess = _session()
 
-    safe_name = name.replace("'", "\\'")
+    # Validate inputs to prevent FQL injection
+    safe_name = _validate_drive_name(name)
+    safe_parent_id = _validate_drive_parent_id(parent_id)
+
     q = (
         "mimeType='application/vnd.google-apps.folder' and "
         f"name='{safe_name}' and "
-        f"'{parent_id}' in parents and trashed=false"
+        f"'{safe_parent_id}' in parents and trashed=false"
     )
 
     r = sess.get(
