@@ -22,18 +22,8 @@ _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
 def _connect() -> sqlite3.Connection:
     db_path = _resolve_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    # enable a longer busy timeout to reduce "database is locked" errors under
-    # concurrent access (workers, Render healty/checks, etc.).  The default 5
-    # seconds was occasionally insufficient during spike tests.
-    conn = sqlite3.connect(db_path, timeout=30)
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    # WAL mode improves concurrency by allowing readers and writers to operate
-    # simultaneously; this mirrors recommendations from the audit.
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-    except sqlite3.OperationalError:
-        # some builds (older SQLite) may not support WAL; fail silently.
-        pass
     return conn
 
 

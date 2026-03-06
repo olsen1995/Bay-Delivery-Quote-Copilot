@@ -36,7 +36,7 @@ class TestDriveNameValidation:
             "name' AND trashed=false",  # FQL injection attempt
             "name;",  # semicolon
             "name\\",  # backslash
-            "name\"",  # double quote
+            'name"',  # double quote
             "name<>",  # angle brackets
             "name|",  # pipe
             "name&",  # ampersand
@@ -50,9 +50,9 @@ class TestDriveNameValidation:
     def test_non_string_names(self):
         """Non-string inputs should raise ValueError."""
         with pytest.raises(ValueError, match="Drive folder name must be a non-empty string"):
-            _validate_drive_name(None)
+            _validate_drive_name(None)  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="Drive folder name must be a non-empty string"):
-            _validate_drive_name(123)
+            _validate_drive_name(123)  # type: ignore[arg-type]
 
 
 class TestDriveParentIdValidation:
@@ -91,6 +91,6 @@ class TestDriveParentIdValidation:
     def test_non_string_parent_ids(self):
         """Non-string inputs should raise ValueError."""
         with pytest.raises(ValueError, match="Drive parent ID must be a non-empty string"):
-            _validate_drive_parent_id(None)
+            _validate_drive_parent_id(None)  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="Drive parent ID must be a non-empty string"):
-            _validate_drive_parent_id(123)
+            _validate_drive_parent_id(123)  # type: ignore[arg-type]
