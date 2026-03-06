@@ -140,7 +140,19 @@ class StaticFileCacheMiddleware(BaseHTTPMiddleware):
             response.headers["Cache-Control"] = "public, max-age=3600"
         return response
 
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
 app.add_middleware(StaticFileCacheMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
