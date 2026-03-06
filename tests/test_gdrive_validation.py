@@ -37,6 +37,7 @@ class TestDriveNameValidation:
             "name;",  # semicolon
             "name\\",  # backslash
             'name"',  # double quote
+            "name\"",  # double quote
             "name<>",  # angle brackets
             "name|",  # pipe
             "name&",  # ampersand
@@ -53,6 +54,9 @@ class TestDriveNameValidation:
             _validate_drive_name(None)  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="Drive folder name must be a non-empty string"):
             _validate_drive_name(123)  # type: ignore[arg-type]
+            _validate_drive_name(None)
+        with pytest.raises(ValueError, match="Drive folder name must be a non-empty string"):
+            _validate_drive_name(123)
 
 
 class TestDriveParentIdValidation:
@@ -94,3 +98,6 @@ class TestDriveParentIdValidation:
             _validate_drive_parent_id(None)  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="Drive parent ID must be a non-empty string"):
             _validate_drive_parent_id(123)  # type: ignore[arg-type]
+            _validate_drive_parent_id(None)
+        with pytest.raises(ValueError, match="Drive parent ID must be a non-empty string"):
+            _validate_drive_parent_id(123)
