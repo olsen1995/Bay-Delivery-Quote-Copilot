@@ -99,3 +99,20 @@ yarn-error.log*
 repo_audit_report.txt
 audit_script_temp.py
 audit.ps1
+
+# ───────────── AI / Audit / Local Dev Helpers ─────────────
+security_audit_report.md
+security_audit_report.txt
+audit_report.md
+
+# Claude / agent temp outputs
+.claude/tmp/
+.claude/logs/
+
+# scratch debugging scripts
+scripts/_scratch/
+scripts/*_demo.py
+scripts/inspect_*.py
+
+# local QA artifacts
+qa_report.txt
