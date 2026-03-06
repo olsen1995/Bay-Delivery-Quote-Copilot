@@ -43,7 +43,15 @@ def _resolve_db_path() -> Path:
 
     env_path = os.getenv("BAYDELIVERY_DB_PATH")
     if env_path:
-        return Path(env_path)
+        env_path_obj = Path(env_path).resolve()
+        app_data_dir = Path("app/data").resolve()
+        try:
+            # Ensure path is within app/data directory to prevent directory traversal
+            env_path_obj.relative_to(app_data_dir)
+            return env_path_obj
+        except ValueError:
+            # Path is outside app/data; silently use default
+            return DEFAULT_DB_PATH
 
     return DEFAULT_DB_PATH
 
