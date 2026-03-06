@@ -1,3 +1,5 @@
+import os
+
 from fastapi.testclient import TestClient
 
 from app.abuse_controls import RateLimitMiddleware
@@ -35,12 +37,16 @@ def _clear_rate_limit_buckets(test_client: TestClient) -> None:
 
 class TestRateLimits:
     def setup_method(self):
+        # Enable X-Forwarded-For trust for rate limit tests that use it
+        os.environ["BAYDELIVERY_TRUST_X_FORWARDED_FOR"] = "true"
         self.client = TestClient(app)
         self.client.__enter__()
         _clear_rate_limit_buckets(self.client)
 
     def teardown_method(self):
         self.client.__exit__(None, None, None)
+        # Clean up the environment variable
+        os.environ.pop("BAYDELIVERY_TRUST_X_FORWARDED_FOR", None)
 
     def test_same_ip_exceeding_limit_returns_429(self):
         headers = {"x-forwarded-for": "203.0.113.10"}

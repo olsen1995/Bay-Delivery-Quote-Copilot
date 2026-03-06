@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ipaddress
+import os
 import re
 import time
 from collections import deque
@@ -32,12 +34,20 @@ class SizeLimitRule:
 
 
 def extract_client_ip(request: Request) -> str:
-    x_forwarded_for = (request.headers.get("x-forwarded-for") or "").strip()
-    if x_forwarded_for:
-        first_ip = x_forwarded_for.split(",", 1)[0].strip()
-        if first_ip:
-            return first_ip
+    # If X-Forwarded-For is explicitly trusted (proxy scenario), use it preferentially
+    if os.getenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "").lower() == "true":
+        x_forwarded_for = (request.headers.get("x-forwarded-for") or "").strip()
+        if x_forwarded_for:
+            first_ip = x_forwarded_for.split(",", 1)[0].strip()
+            try:
+                # Validate the IP address
+                ipaddress.ip_address(first_ip)
+                return first_ip
+            except ValueError:
+                # Invalid IP, fall back to request.client.host
+                pass
 
+    # Prefer request.client.host by default (secure, from direct connection)
     client = request.client
     if client and client.host:
         return client.host

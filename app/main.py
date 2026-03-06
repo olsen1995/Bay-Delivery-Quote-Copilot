@@ -92,7 +92,9 @@ RATE_LIMIT_RULES = [
 cors_env = os.getenv("BAYDELIVERY_CORS_ORIGINS")
 if cors_env is None:
     cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
-allow_list = cors_env.split(",") if cors_env else []
+allow_list = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+if "*" in allow_list:
+    raise ValueError("CORS wildcard origin '*' is not allowed when credentials authentication is enabled.")
 
 app.add_middleware(
     CORSMiddleware,
@@ -170,8 +172,10 @@ def _drive_call(desc: str, fn):
     except HTTPException:
         raise
     except Exception as e:
+        # Log detailed error server-side; return generic message to client
+        logging.error(f"Google Drive error during {desc}: {e}")
         # 502 = upstream dependency failure
-        raise HTTPException(status_code=502, detail=f"Google Drive error during {desc}: {e}")
+        raise HTTPException(status_code=502, detail="Google Drive service unavailable.")
 
 
 def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSONResponse:
