@@ -62,6 +62,50 @@ a:hover { opacity: 0.9; }
   background: linear-gradient(135deg, var(--brand), var(--brand2));
   box-shadow: 0 8px 16px rgba(122,16,32,0.25);
 }
+.trustStrip{
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 12px 0 16px;
+  padding: 12px 16px;
+  background: rgba(122,16,32,0.08);
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+.trustBadge{
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+@media (max-width: 720px){
+  .trustStrip{ gap: 8px; justify-content: space-around; }
+  .trustBadge{ font-size: 12px; }
+}
+.heroSection{
+  position: relative;
+  width: 100%;
+  max-height: 320px;
+  overflow: hidden;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.heroImage{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.heroOverlay{
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5));
+}
 .brandTitle{
   display:flex;
   flex-direction: column;
@@ -245,7 +289,7 @@ a:hover { opacity: 0.9; }
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  aspect-ratio: 4/3;
+  height: 240px;
   background: rgba(255,255,255,0.03);
   border: 1px solid var(--border);
 }
@@ -385,6 +429,42 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
 .error{
   color: #ff6b6b;
   font-weight: 800;
+}
+
+.stickyMobileCall{
+  display: none;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--brand2));
+  box-shadow: 0 8px 24px rgba(122,16,32,0.4);
+  text-decoration: none;
+  color: white;
+  font-weight: 700;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+.stickyMobileCall:hover{
+  box-shadow: 0 12px 32px rgba(122,16,32,0.5);
+  transform: scale(1.1);
+}
+.callIcon{
+  font-size: 24px;
+  margin-bottom: 2px;
+}
+.callText{
+  letter-spacing: 0.2px;
+}
+@media (max-width: 720px){
+  .stickyMobileCall{ display: flex; }
 }
 
 .footer{
