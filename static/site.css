@@ -48,6 +48,13 @@ a:hover { opacity: 0.9; }
   gap: 12px;
   align-items:center;
 }
+.brandLogo{
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 8px 16px rgba(122,16,32,0.25);
+}
 .brandMark{
   width: 44px;
   height: 44px;
@@ -209,6 +216,48 @@ a:hover { opacity: 0.9; }
   font-size: 28px;
   margin-right: 8px;
   margin-bottom: 8px;
+}
+
+.recentWorkSection{
+  margin-top: 24px;
+  margin-bottom: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.sectionDesc{
+  margin: 0 0 16px 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.workGallery{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 900px){
+  .workGallery{ grid-template-columns: 1fr; }
+}
+.workItem{
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  aspect-ratio: 4/3;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+}
+.workItem img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+.workItem:hover img{
+  transform: scale(1.05);
 }
 
 .formWrap{
@@ -408,9 +457,12 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
 }
 .contactCTA{
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
   margin-top: 18px;
+}
+@media (max-width: 820px){
+  .contactCTA{ grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 720px){
   .contactCTA{ grid-template-columns: 1fr; }
