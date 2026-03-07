@@ -58,13 +58,17 @@ _admin_failed_attempts: dict[str, list[float]] = {}
 _admin_lockout_threshold = 5
 _admin_lockout_window = 300  # seconds
 
+
 def _check_admin_lockout(client_ip: str) -> bool:
     """Check if client IP is locked out from too many failed attempts."""
     now = time.time()
     if client_ip in _admin_failed_attempts:
-        _admin_failed_attempts[client_ip] = [t for t in _admin_failed_attempts[client_ip] if now - t < _admin_lockout_window]
+        _admin_failed_attempts[client_ip] = [
+            t for t in _admin_failed_attempts[client_ip] if now - t < _admin_lockout_window
+        ]
         return len(_admin_failed_attempts[client_ip]) >= _admin_lockout_threshold
     return False
+
 
 def _record_admin_failure(client_ip: str) -> None:
     """Record a failed admin authentication attempt."""
@@ -72,10 +76,12 @@ def _record_admin_failure(client_ip: str) -> None:
         _admin_failed_attempts[client_ip] = []
     _admin_failed_attempts[client_ip].append(time.time())
 
+
 def _reset_admin_attempts(client_ip: str) -> None:
     """Reset failed admin attempts after successful login."""
     if client_ip in _admin_failed_attempts:
         del _admin_failed_attempts[client_ip]
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -132,6 +138,7 @@ app.add_middleware(
 app.add_middleware(RequestSizeLimitMiddleware, rules=SIZE_LIMIT_RULES)
 app.add_middleware(RateLimitMiddleware, rules=RATE_LIMIT_RULES)
 
+
 # Static file cache middleware
 class StaticFileCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -140,7 +147,9 @@ class StaticFileCacheMiddleware(BaseHTTPMiddleware):
             response.headers["Cache-Control"] = "public, max-age=3600"
         return response
 
+
 app.add_middleware(StaticFileCacheMiddleware)
+
 
 # Security headers middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -152,6 +161,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; base-uri 'self'"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
+
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -550,6 +560,9 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
             }
         )
         existing = get_quote_request_by_quote_id(quote_id)
+
+    if existing is None:
+        raise HTTPException(status_code=500, detail="Failed to load quote request")
 
     if action == "accept":
         update_kwargs: dict[str, Any] = {
