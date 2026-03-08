@@ -92,11 +92,6 @@ If your deployment is public, set admin Basic Auth credentials:
 
 - Environment variables: `ADMIN_USERNAME` and `ADMIN_PASSWORD`
 
-Admin APIs require:
-
-- Header: `X-Admin-Token: <token>` for all `/admin/api/*` routes.
-- Optional convenience bootstrap: open `/admin?token=<token>` (or `/admin/uploads?token=<token>`) once; frontend stores it in `sessionStorage`, strips it from URL, and uses the header afterwards.
-
 Admin pages:
 
 - `/admin`
