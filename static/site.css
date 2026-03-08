@@ -289,7 +289,7 @@ a:hover { opacity: 0.9; }
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  height: 240px;
+  aspect-ratio: 4/3;
   background: rgba(255,255,255,0.03);
   border: 1px solid var(--border);
 }
