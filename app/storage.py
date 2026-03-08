@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -11,6 +12,23 @@ from app.update_fields import validate_quote_request_transition
 DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
 DB_PATH = DEFAULT_DB_PATH  # overridable by tests
 UNSET = object()
+
+# Token validity in days
+TOKEN_VALIDITY_DAYS = 30
+
+
+def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY_DAYS) -> bool:
+    """Check if a token has expired. Returns True if expired or if created_at is None."""
+    if not token_created_at:
+        return True
+    try:
+        created = datetime.fromisoformat(token_created_at)
+        expiry = created + timedelta(days=days)
+        # Use timezone-aware comparison if the parsed datetime is timezone-aware
+        now = datetime.now(created.tzinfo) if created.tzinfo else datetime.now()
+        return now > expiry
+    except (ValueError, TypeError):
+        return True
 
 # Explicit table list keeps backup/restore deterministic and safe.
 KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
@@ -167,7 +185,10 @@ def init_db() -> None:
                 requested_job_date TEXT,
                 requested_time_window TEXT,
                 customer_accepted_at TEXT,
-                admin_approved_at TEXT
+                admin_approved_at TEXT,
+                accept_token TEXT,
+                booking_token TEXT,
+                booking_token_created_at TEXT
             )
             """
         )
@@ -217,6 +238,9 @@ def init_db() -> None:
         _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
         _try_add_column(conn, "quote_requests", "customer_accepted_at TEXT")
         _try_add_column(conn, "quote_requests", "admin_approved_at TEXT")
+        _try_add_column(conn, "quote_requests", "accept_token TEXT")
+        _try_add_column(conn, "quote_requests", "booking_token TEXT")
+        _try_add_column(conn, "quote_requests", "booking_token_created_at TEXT")
 
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
         try:
@@ -453,8 +477,8 @@ def save_quote_request(record: Dict[str, Any]) -> None:
              job_description_customer, job_description_internal,
              service_type, cash_total_cad, emt_total_cad,
              request_json, notes, requested_job_date, requested_time_window,
-             customer_accepted_at, admin_approved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             customer_accepted_at, admin_approved_at, accept_token, booking_token, booking_token_created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["request_id"],
@@ -475,6 +499,9 @@ def save_quote_request(record: Dict[str, Any]) -> None:
                 record.get("requested_time_window"),
                 record.get("customer_accepted_at"),
                 record.get("admin_approved_at"),
+                record.get("accept_token"),
+                record.get("booking_token"),
+                record.get("booking_token_created_at"),
             ),
         )
         conn.commit()
@@ -516,6 +543,9 @@ def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
         "requested_time_window": row["requested_time_window"],
         "customer_accepted_at": row["customer_accepted_at"],
         "admin_approved_at": row["admin_approved_at"],
+        "accept_token": row["accept_token"],
+        "booking_token": row["booking_token"],
+        "booking_token_created_at": row["booking_token_created_at"],
     }
 
 
@@ -563,6 +593,8 @@ def update_quote_request(
     requested_time_window: Any = UNSET,
     customer_accepted_at: Any = UNSET,
     admin_approved_at: Any = UNSET,
+    booking_token: Any = UNSET,
+    booking_token_created_at: Any = UNSET,
 ) -> Optional[Dict[str, Any]]:
     existing = get_quote_request(request_id)
     if not existing:
@@ -586,6 +618,10 @@ def update_quote_request(
         updated["customer_accepted_at"] = customer_accepted_at
     if admin_approved_at is not UNSET:
         updated["admin_approved_at"] = admin_approved_at
+    if booking_token is not UNSET:
+        updated["booking_token"] = booking_token
+    if booking_token_created_at is not UNSET:
+        updated["booking_token_created_at"] = booking_token_created_at
 
     save_quote_request(
         {
@@ -607,6 +643,9 @@ def update_quote_request(
             "requested_time_window": updated.get("requested_time_window"),
             "customer_accepted_at": updated.get("customer_accepted_at"),
             "admin_approved_at": updated.get("admin_approved_at"),
+            "accept_token": updated.get("accept_token"),
+            "booking_token": updated.get("booking_token"),
+            "booking_token_created_at": updated.get("booking_token_created_at"),
         }
     )
     return updated

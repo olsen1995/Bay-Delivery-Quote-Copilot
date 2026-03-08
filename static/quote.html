@@ -134,23 +134,6 @@
       <p class="muted">If this works for you, accept and we’ll send it for admin confirmation.</p>
 
       <div class="formWrap">
-        <div class="row">
-          <div>
-            <label for="preferredDate">Preferred date (optional)</label>
-            <input id="preferredDate" type="date" />
-          </div>
-          <div>
-            <label for="preferredWindow">Preferred time window (optional)</label>
-            <select id="preferredWindow">
-              <option value="">Select one</option>
-              <option value="morning">Morning</option>
-              <option value="afternoon">Afternoon</option>
-              <option value="evening">Evening</option>
-              <option value="flexible">Flexible</option>
-            </select>
-          </div>
-        </div>
-
         <label for="decisionNotes">Notes (optional)</label>
         <textarea id="decisionNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
 
@@ -160,6 +143,45 @@
         </div>
 
         <div class="statusBox hidden" id="decisionStatus"></div>
+      </div>
+    </div>
+
+    <div class="card hidden" id="bookingCard">
+      <h2>Submit Booking Details</h2>
+      <p class="muted">Provide your preferred scheduling for your accepted quote.</p>
+
+      <div class="formWrap">
+        <p class="muted" style="font-size: 0.9em; margin-bottom: 1em;">
+          <strong>Contact details (from quote):</strong><br/>
+          Name: <span id="bookingNameDisplay"></span><br/>
+          Phone: <span id="bookingPhoneDisplay"></span>
+        </p>
+
+        <div class="row">
+          <div>
+            <label for="bookingDate">Preferred date</label>
+            <input id="bookingDate" type="date" required />
+          </div>
+          <div>
+            <label for="bookingWindow">Preferred time window</label>
+            <select id="bookingWindow" required>
+              <option value="">Select one</option>
+              <option value="morning">Morning</option>
+              <option value="afternoon">Afternoon</option>
+              <option value="evening">Evening</option>
+              <option value="flexible">Flexible</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="bookingNotes">Notes (optional)</label>
+        <textarea id="bookingNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
+
+        <div class="btnRow">
+          <button class="btn" id="btnSubmitBooking" type="button">Submit Booking</button>
+        </div>
+
+        <div class="statusBox hidden" id="bookingStatus"></div>
       </div>
     </div>
 
@@ -188,6 +210,8 @@
 <script>
   const el = (id) => document.getElementById(id);
   let lastQuoteId = null;
+  let lastAcceptToken = null;
+  let lastBookingToken = null;
 
   function showBox(id, text) {
     const box = el(id);
@@ -206,13 +230,18 @@
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
+    hideBox("bookingStatus");
     el("uploadCard").classList.add("hidden");
     el("decisionCard").classList.add("hidden");
+    el("bookingCard").classList.add("hidden");
     lastQuoteId = null;
+    lastAcceptToken = null;
+    lastBookingToken = null;
     el("photos").value = "";
-    el("preferredDate").value = "";
-    el("preferredWindow").value = "";
     el("decisionNotes").value = "";
+    el("bookingDate").value = "";
+    el("bookingWindow").value = "";
+    el("bookingNotes").value = "";
   }
 
   function requiresRouteFields(serviceType) {
@@ -235,18 +264,52 @@
     }
   }
 
+  async function submitBooking() {
+    hideBox("bookingStatus");
+
+    if (!lastQuoteId || !lastBookingToken) {
+      showBox("bookingStatus", "No booking token available. Accept the quote first.");
+      return;
+    }
+
+    const payload = {
+      booking_token: lastBookingToken,
+      requested_job_date: el("bookingDate").value,
+      requested_time_window: el("bookingWindow").value,
+      notes: el("bookingNotes").value || null,
+    };
+
+    showBox("bookingStatus", "Submitting booking...");
+
+    try {
+      const res = await fetch("/quote/" + encodeURIComponent(lastQuoteId) + "/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showBox("bookingStatus", "Error:\n" + (data.detail || "Unknown error"));
+        return;
+      }
+
+      showBox("bookingStatus", "Booking submitted successfully.\nRequest ID: " + data.request_id + "\n\nWe will follow up to confirm scheduling.");
+    } catch (err) {
+      showBox("bookingStatus", "Error:\nFailed to contact server.");
+    }
+  }
+
   async function submitDecision(action) {
     hideBox("decisionStatus");
 
-    if (!lastQuoteId) {
-      showBox("decisionStatus", "No quote_id available yet. Calculate quote first.");
+    if (!lastQuoteId || !lastAcceptToken) {
+      showBox("decisionStatus", "No quote or token available. Calculate quote first.");
       return;
     }
 
     const payload = {
       action,
-      requested_job_date: el("preferredDate").value || null,
-      requested_time_window: el("preferredWindow").value || null,
+      accept_token: lastAcceptToken,
       notes: el("decisionNotes").value || null
     };
 
@@ -270,7 +333,13 @@
         "Status: " + data.status;
 
       if (action === "accept") {
-        showBox("decisionStatus", confirmation + "\n\nThanks! We will follow up to confirm scheduling.");
+        lastBookingToken = data.booking_token;
+        showBox("decisionStatus", confirmation + "\n\nPlease provide your booking details below.");
+        el("decisionCard").classList.add("hidden");
+        el("bookingCard").classList.remove("hidden");
+        // Display confirmed contact details
+        el("bookingNameDisplay").textContent = el("customer_name").value;
+        el("bookingPhoneDisplay").textContent = el("customer_phone").value;
       } else {
         showBox("decisionStatus", confirmation + "\n\nYou declined this quote. No booking will be created.");
       }
@@ -286,6 +355,7 @@
 
   el("btnAccept").addEventListener("click", () => submitDecision("accept"));
   el("btnDecline").addEventListener("click", () => submitDecision("decline"));
+  el("btnSubmitBooking").addEventListener("click", submitBooking);
   el("service_type").addEventListener("change", syncRouteFields);
 
   el("quoteForm").addEventListener("submit", async (e) => {
@@ -336,6 +406,7 @@
       }
 
       lastQuoteId = data.quote_id;
+      lastAcceptToken = data.accept_token;
       el("uploadCard").classList.remove("hidden");
       el("decisionCard").classList.remove("hidden");
 
