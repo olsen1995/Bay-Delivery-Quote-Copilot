@@ -50,7 +50,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             }
         )
 
-    def _seed_request(self, request_id: str, quote_id: str, status: str) -> None:
+    def _seed_request(self, request_id: str, quote_id: str, status: str, accept_token: str = "test_token", booking_token: str = None) -> None:
         storage.save_quote_request(
             {
                 "request_id": request_id,
@@ -71,20 +71,46 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
                 "requested_time_window": None,
                 "customer_accepted_at": None,
                 "admin_approved_at": None,
+                "accept_token": accept_token,
+                "booking_token": booking_token,
+                "booking_token_created_at": "2026-02-26T10:00:00" if booking_token else None,
             }
         )
 
     def test_allowed_pending_to_accepted(self) -> None:
-        quote_id = "q_pending_accept"
-        self._seed_quote(quote_id)
-        resp = self.client.post(f"/quote/{quote_id}/decision", json={"action": "accept"})
+        # Get the quote first to retrieve accept_token and quote_id
+        resp = self.client.post("/quote/calculate", json={
+            "customer_name": "Test",
+            "customer_phone": "555-0101",
+            "job_address": "Somewhere",
+            "description": "desc",
+            "service_type": "haul_away",
+            "estimated_hours": 1.0,
+            "crew_size": 1,
+        })
+        quote_id = resp.json()["quote_id"]
+        accept_token = resp.json()["accept_token"]
+        # Now use the token for decision
+        resp = self.client.post(f"/quote/{quote_id}/decision", json={"action": "accept", "accept_token": accept_token})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["status"], "customer_accepted")
+        self.assertIn("booking_token", resp.json())
 
     def test_allowed_pending_to_declined(self) -> None:
-        quote_id = "q_pending_decline"
-        self._seed_quote(quote_id)
-        resp = self.client.post(f"/quote/{quote_id}/decision", json={"action": "decline"})
+        # Get the quote first to retrieve accept_token and quote_id
+        resp = self.client.post("/quote/calculate", json={
+            "customer_name": "Test",
+            "customer_phone": "555-0101",
+            "job_address": "Somewhere",
+            "description": "desc",
+            "service_type": "haul_away",
+            "estimated_hours": 1.0,
+            "crew_size": 1,
+        })
+        quote_id = resp.json()["quote_id"]
+        accept_token = resp.json()["accept_token"]
+        # Now use the token for decision
+        resp = self.client.post(f"/quote/{quote_id}/decision", json={"action": "decline", "accept_token": accept_token})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["status"], "customer_declined")
 
@@ -193,6 +219,60 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertIsInstance(payload["detail"], str)
         self.assertIn(payload["from"], payload["detail"])
         self.assertIn(payload["to"], payload["detail"])
+
+    def test_submit_booking_success(self) -> None:
+        # Get the quote first to retrieve accept_token and quote_id
+        resp = self.client.post("/quote/calculate", json={
+            "customer_name": "Test",
+            "customer_phone": "555-0101",
+            "job_address": "Somewhere",
+            "description": "desc",
+            "service_type": "haul_away",
+            "estimated_hours": 1.0,
+            "crew_size": 1,
+        })
+        quote_id = resp.json()["quote_id"]
+        accept_token = resp.json()["accept_token"]
+        # accept first
+        resp = self.client.post(f"/quote/{quote_id}/decision", json={"action": "accept", "accept_token": accept_token})
+        self.assertEqual(resp.status_code, 200)
+        request_id = resp.json()["request_id"]
+        booking_token = resp.json()["booking_token"]
+        # now submit booking
+        resp = self.client.post(f"/quote/{quote_id}/booking", json={
+            "booking_token": booking_token,
+            "requested_job_date": "2026-03-10",
+            "requested_time_window": "morning",
+            "notes": "test notes",
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["request_id"], request_id)
+        # check updated
+        req = storage.get_quote_request(request_id)
+        self.assertEqual(req["requested_job_date"], "2026-03-10")
+        self.assertEqual(req["requested_time_window"], "morning")
+        self.assertEqual(req["notes"], "test notes")
+
+    def test_submit_booking_no_request(self) -> None:
+        resp = self.client.post("/quote/nonexistent/booking", json={
+            "booking_token": "invalid_token",
+            "requested_job_date": "2026-03-10",
+            "requested_time_window": "morning",
+        })
+        self.assertEqual(resp.status_code, 404)
+
+    def test_submit_booking_wrong_status(self) -> None:
+        request_id = "req_pending"
+        quote_id = "q_pending"
+        self._seed_request(request_id, quote_id, "customer_pending", accept_token="test_token")
+        resp = self.client.post(f"/quote/{quote_id}/booking", json={
+            "booking_token": "any_token",
+            "requested_job_date": "2026-03-10",
+            "requested_time_window": "morning",
+        })
+        self.assertEqual(resp.status_code, 400)
 
 
 if __name__ == "__main__":

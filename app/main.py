@@ -7,7 +7,7 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
@@ -38,6 +38,7 @@ from app.storage import (
     get_quote_request_by_quote_id,
     import_db_from_json,
     init_db,
+    is_token_expired,
     list_attachments,
     list_jobs,
     list_quote_requests,
@@ -102,20 +103,15 @@ DB_IMPORT_SIZE_CAP_BYTES = 20 * 1024 * 1024
 SIZE_LIMIT_RULES = [
     SizeLimitRule(method="POST", exact_path="/quote/upload-photos", max_bytes=12 * 1024 * 1024),
     SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
-    SizeLimitRule(method="POST", path_regex=re.compile(r"^/quote/[^/]+/decision$"), max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", exact_path="/admin/api/db/import", max_bytes=DB_IMPORT_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", prefix_path="/quote/", max_bytes=JSON_SIZE_CAP_BYTES),
 ]
 
 RATE_LIMIT_RULES = [
     RateLimitRule(rule_id="quote_calculate", method="POST", exact_path="/quote/calculate", limit=10),
     RateLimitRule(rule_id="quote_upload_photos", method="POST", exact_path="/quote/upload-photos", limit=6),
-    RateLimitRule(
-        rule_id="quote_decision",
-        method="POST",
-        path_regex=re.compile(r"^/quote/[^/]+/decision$"),
-        limit=12,
-    ),
+    RateLimitRule(rule_id="quote_quote", method="POST", prefix_path="/quote/", limit=20),
     RateLimitRule(rule_id="admin_api", prefix_path="/admin/api/", limit=120),
 ]
 
@@ -492,22 +488,90 @@ async def quote_calculate(request: Request, payload: QuoteRequestPayload):
             "response": quote["response"],
         }
     )
-    return quote
+
+    # Generate accept_token for this quote
+    accept_token = str(uuid4())
+
+    return {
+        **quote,
+        "accept_token": accept_token,
+    }
 
 
 class CustomerDecision(BaseModel):
-    action: str = Field(..., description="accept|decline|approve|reject")
-    requested_job_date: Optional[str] = Field(None, max_length=50)
-    requested_time_window: Optional[str] = Field(None, max_length=50)
-    notes: Optional[str] = Field(None, max_length=1000)
+    action: str = Field(..., description="accept|decline")
+    accept_token: str = Field(..., description="Token from quote response")
+    notes: Optional[str] = Field(None, max_length=500)
 
-    @field_validator("action", "requested_job_date", "requested_time_window", "notes", mode="before")
+    @field_validator("action", "accept_token", "notes", mode="before")
     @classmethod
     def strip(cls, v):
         if v is None:
             return None
         if isinstance(v, str):
             return v.strip()
+        return v
+
+
+class AdminDecision(BaseModel):
+    action: str = Field(..., description="approve|reject")
+    notes: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("action", "notes", mode="before")
+    @classmethod
+    def strip(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
+class BookingDetails(BaseModel):
+    booking_token: str = Field(..., description="Token from accept decision response")
+    requested_job_date: str = Field(..., max_length=10, description="YYYY-MM-DD format")
+    requested_time_window: str = Field(..., max_length=20, description="morning|afternoon|evening|flexible")
+    notes: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("booking_token", "requested_job_date", "requested_time_window", "notes", mode="before")
+    @classmethod
+    def strip(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @field_validator("requested_job_date")
+    @classmethod
+    def validate_date(cls, v):
+        try:
+            date_obj = datetime.strptime(v, "%Y-%m-%d").date()
+            today = datetime.now().date()
+            if date_obj < today:
+                raise ValueError("Booking date cannot be in the past")
+            return v
+        except ValueError as e:
+            if "does not match format" in str(e):
+                raise ValueError("Date must be in YYYY-MM-DD format")
+            raise
+
+    @field_validator("requested_time_window")
+    @classmethod
+    def validate_window(cls, v):
+        valid_windows = {"morning", "afternoon", "evening", "flexible"}
+        if v not in valid_windows:
+            raise ValueError(f"Time window must be one of: {', '.join(sorted(valid_windows))}")
+        return v
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, v):
+        if v:
+            # Reject if contains potentially dangerous HTML/script patterns
+            dangerous_patterns = ["<script", "<iframe", "<svg", "onerror", "onload", "onclick"]
+            if any(pattern in v.lower() for pattern in dangerous_patterns):
+                raise ValueError("Notes contain invalid characters")
         return v
 
 
@@ -525,6 +589,7 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
         raise HTTPException(status_code=400, detail="Invalid action (use accept|decline).")
 
     if not existing:
+        # New request: validate token from quote response
         initial_status = "customer_pending"
         if action == "accept":
             initial_status = "customer_accepted"
@@ -557,6 +622,9 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
                 "requested_time_window": None,
                 "customer_accepted_at": None,
                 "admin_approved_at": None,
+                "accept_token": body.accept_token,
+                "booking_token": None,
+                "booking_token_created_at": None,
             }
         )
         existing = get_quote_request_by_quote_id(quote_id)
@@ -564,13 +632,21 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
     if existing is None:
         raise HTTPException(status_code=500, detail="Failed to load quote request")
 
+    # Validate accept_token for existing request
+    if existing.get("accept_token") != body.accept_token:
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+
     if action == "accept":
+        # Generate booking_token for the booking step
+        booking_token = str(uuid4())
         update_kwargs: dict[str, Any] = {
             "status": "customer_accepted",
             "customer_accepted_at": now,
             "admin_approved_at": None,
+            "booking_token": booking_token,
+            "booking_token_created_at": now,
         }
-        include_optional_update_fields(body, update_kwargs, ("notes", "requested_job_date", "requested_time_window"))
+        include_optional_update_fields(body, update_kwargs, ("notes",))
 
         try:
             updated = update_quote_request(existing["request_id"], **update_kwargs)
@@ -579,11 +655,16 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update quote request")
         _maybe_auto_snapshot(background_tasks)
-        return {"ok": True, "request_id": updated["request_id"], "status": updated["status"]}
+        return {
+            "ok": True,
+            "request_id": updated["request_id"],
+            "status": updated["status"],
+            "booking_token": booking_token,
+        }
 
     # decline
     update_kwargs = {"status": "customer_declined", "customer_accepted_at": None, "admin_approved_at": None}
-    include_optional_update_fields(body, update_kwargs, ("notes", "requested_job_date", "requested_time_window"))
+    include_optional_update_fields(body, update_kwargs, ("notes",))
     try:
         updated = update_quote_request(existing["request_id"], **update_kwargs)
     except InvalidQuoteRequestTransition as e:
@@ -592,6 +673,37 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
         raise HTTPException(status_code=500, detail="Failed to update quote request")
     _maybe_auto_snapshot(background_tasks)
     return {"ok": True, "request_id": updated["request_id"], "status": updated["status"]}
+
+
+@app.post("/quote/{quote_id}/booking")
+async def submit_booking(quote_id: str, body: BookingDetails):
+    existing = get_quote_request_by_quote_id(quote_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Quote request not found. Accept the quote first.")
+
+    if existing["status"] != "customer_accepted":
+        raise HTTPException(status_code=400, detail="Booking can only be submitted for accepted quotes.")
+
+    # Validate booking_token
+    if existing.get("booking_token") != body.booking_token:
+        raise HTTPException(status_code=401, detail="Invalid or expired booking token.")
+
+    # Check token has not expired (30 days)
+    if is_token_expired(existing.get("booking_token_created_at")):
+        raise HTTPException(status_code=401, detail="Booking token has expired. Please accept the quote again.")
+
+    now = _now_local_iso()
+    update_kwargs = {
+        "requested_job_date": body.requested_job_date,
+        "requested_time_window": body.requested_time_window,
+        "notes": body.notes,
+    }
+
+    updated = update_quote_request(existing["request_id"], **update_kwargs)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update booking")
+
+    return {"ok": True, "request_id": updated["request_id"]}
 
 
 @app.post("/quote/upload-photos")
@@ -733,7 +845,7 @@ def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: 
 def admin_decide_quote_request(
     request: Request,
     request_id: str,
-    body: CustomerDecision,
+    body: AdminDecision,
     background_tasks: BackgroundTasks,
 ):
     _require_admin(request)
