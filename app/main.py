@@ -541,10 +541,9 @@ class BookingDetails(BaseModel):
     @classmethod
     def validate_notes(cls, v):
         if v:
-            # Reject if contains potentially dangerous HTML/script patterns
-            dangerous_patterns = ["<script", "<iframe", "<svg", "onerror", "onload", "onclick"]
-            if any(pattern in v.lower() for pattern in dangerous_patterns):
-                raise ValueError("Notes contain invalid characters")
+            # Reject all HTML tags for defense-in-depth (frontend uses textContent)
+            if '<' in v or '>' in v:
+                raise ValueError("Notes cannot contain HTML tags")
         return v
 
 
