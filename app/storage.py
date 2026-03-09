@@ -5,7 +5,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NotRequired, Optional, Tuple, TypedDict
 
 from app.update_fields import validate_quote_request_transition
 
@@ -15,6 +15,62 @@ UNSET = object()
 
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
+
+
+class Job(TypedDict):
+    job_id: str
+    created_at: str
+    status: str
+    quote_id: str
+    request_id: str
+    customer_name: Optional[str]
+    customer_phone: Optional[str]
+    job_address: Optional[str]
+    job_description_customer: Optional[str]
+    job_description_internal: Optional[str]
+    service_type: str
+    cash_total_cad: float
+    emt_total_cad: float
+    request_json: Any
+    notes: Optional[str]
+    scheduled_start: Optional[str]
+    scheduled_end: Optional[str]
+    google_calendar_event_id: Optional[str]
+    calendar_sync_status: Optional[str]
+    calendar_last_error: Optional[str]
+
+
+class QuoteRecord(TypedDict):
+    quote_id: str
+    created_at: str
+    request: Any
+    response: Any
+    job_type: NotRequired[str]
+    total_cad: NotRequired[float]
+
+
+class QuoteRequest(TypedDict):
+    request_id: str
+    created_at: str
+    status: str
+    quote_id: str
+    customer_name: Optional[str]
+    customer_phone: Optional[str]
+    job_address: Optional[str]
+    job_description_customer: Optional[str]
+    job_description_internal: Optional[str]
+    service_type: str
+    cash_total_cad: float
+    emt_total_cad: float
+    request_json: Any
+    notes: Optional[str]
+    requested_job_date: Optional[str]
+    requested_time_window: Optional[str]
+    customer_accepted_at: Optional[str]
+    admin_approved_at: Optional[str]
+    accept_token: Optional[str]
+    booking_token: Optional[str]
+    booking_token_created_at: Optional[str]
 
 
 def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY_DAYS) -> bool:
@@ -393,7 +449,7 @@ def save_quote(record: Dict[str, Any]) -> None:
         conn.close()
 
 
-def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
+def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
     conn = _connect()
     try:
         row = conn.execute("SELECT * FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
@@ -403,32 +459,34 @@ def get_quote_record(quote_id: str) -> Optional[Dict[str, Any]]:
     if not row:
         return None
 
-    try:
-        request_obj = json.loads(row["request_json"])
-    except Exception:
-        request_obj = row["request_json"]
+    row_dict = dict(row)
 
     try:
-        response_obj = json.loads(row["response_json"])
+        request_obj = json.loads(row_dict["request_json"])
     except Exception:
-        response_obj = row["response_json"]
+        request_obj = row_dict["request_json"]
 
-    out: Dict[str, Any] = {
-        "quote_id": row["quote_id"],
-        "created_at": row["created_at"],
+    try:
+        response_obj = json.loads(row_dict["response_json"])
+    except Exception:
+        response_obj = row_dict["response_json"]
+
+    out: QuoteRecord = {
+        "quote_id": row_dict["quote_id"],
+        "created_at": row_dict["created_at"],
         "request": request_obj,
         "response": response_obj,
     }
 
-    if "job_type" in row.keys():
-        out["job_type"] = row["job_type"]
-    if "total_cad" in row.keys():
-        out["total_cad"] = row["total_cad"]
+    if "job_type" in row_dict:
+        out["job_type"] = row_dict["job_type"]
+    if "total_cad" in row_dict:
+        out["total_cad"] = row_dict["total_cad"]
 
     return out
 
 
-def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
+def list_quotes(limit: int = 50) -> List[QuoteRecord]:
     conn = _connect()
     try:
         rows = conn.execute(
@@ -443,7 +501,7 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
     finally:
         conn.close()
 
-    out: List[Dict[str, Any]] = []
+    out: List[QuoteRecord] = []
     for r in rows:
         try:
             req = json.loads(r["request_json"])
@@ -454,7 +512,7 @@ def list_quotes(limit: int = 50) -> List[Dict[str, Any]]:
         except Exception:
             resp = r["response_json"]
 
-        item: Dict[str, Any] = {
+        item: QuoteRecord = {
             "quote_id": r["quote_id"],
             "created_at": r["created_at"],
             "request": req,
@@ -516,7 +574,7 @@ def save_quote_request(record: Dict[str, Any]) -> None:
         conn.close()
 
 
-def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
+def get_quote_request(request_id: str) -> Optional[QuoteRequest]:
     conn = _connect()
     try:
         row = conn.execute("SELECT * FROM quote_requests WHERE request_id = ?", (request_id,)).fetchone()
@@ -526,37 +584,39 @@ def get_quote_request(request_id: str) -> Optional[Dict[str, Any]]:
     if not row:
         return None
 
+    row_dict = dict(row)
+
     try:
-        req = json.loads(row["request_json"])
+        req = json.loads(row_dict["request_json"])
     except Exception:
-        req = row["request_json"]
+        req = row_dict["request_json"]
 
     return {
-        "request_id": row["request_id"],
-        "created_at": row["created_at"],
-        "status": row["status"],
-        "quote_id": row["quote_id"],
-        "customer_name": row["customer_name"],
-        "customer_phone": row["customer_phone"],
-        "job_address": row["job_address"],
-        "job_description_customer": row["job_description_customer"],
-        "job_description_internal": row["job_description_internal"],
-        "service_type": row["service_type"],
-        "cash_total_cad": row["cash_total_cad"],
-        "emt_total_cad": row["emt_total_cad"],
+        "request_id": row_dict["request_id"],
+        "created_at": row_dict["created_at"],
+        "status": row_dict["status"],
+        "quote_id": row_dict["quote_id"],
+        "customer_name": row_dict["customer_name"],
+        "customer_phone": row_dict["customer_phone"],
+        "job_address": row_dict["job_address"],
+        "job_description_customer": row_dict["job_description_customer"],
+        "job_description_internal": row_dict["job_description_internal"],
+        "service_type": row_dict["service_type"],
+        "cash_total_cad": row_dict["cash_total_cad"],
+        "emt_total_cad": row_dict["emt_total_cad"],
         "request_json": req,
-        "notes": row["notes"],
-        "requested_job_date": row["requested_job_date"],
-        "requested_time_window": row["requested_time_window"],
-        "customer_accepted_at": row["customer_accepted_at"],
-        "admin_approved_at": row["admin_approved_at"],
-        "accept_token": row["accept_token"],
-        "booking_token": row["booking_token"],
-        "booking_token_created_at": row["booking_token_created_at"],
+        "notes": row_dict["notes"],
+        "requested_job_date": row_dict["requested_job_date"],
+        "requested_time_window": row_dict["requested_time_window"],
+        "customer_accepted_at": row_dict["customer_accepted_at"],
+        "admin_approved_at": row_dict["admin_approved_at"],
+        "accept_token": row_dict["accept_token"],
+        "booking_token": row_dict["booking_token"],
+        "booking_token_created_at": row_dict["booking_token_created_at"],
     }
 
 
-def get_quote_request_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
+def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
     conn = _connect()
     try:
         row = conn.execute("SELECT request_id FROM quote_requests WHERE quote_id = ?", (quote_id,)).fetchone()
@@ -568,7 +628,7 @@ def get_quote_request_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
     return get_quote_request(row["request_id"])
 
 
-def list_quote_requests(limit: int = 50) -> List[Dict[str, Any]]:
+def list_quote_requests(limit: int = 50) -> List[QuoteRequest]:
     conn = _connect()
     try:
         rows = conn.execute(
@@ -583,7 +643,7 @@ def list_quote_requests(limit: int = 50) -> List[Dict[str, Any]]:
     finally:
         conn.close()
 
-    out: List[Dict[str, Any]] = []
+    out: List[QuoteRequest] = []
     for r in rows:
         item = get_quote_request(r["request_id"])
         if item is not None:
@@ -602,7 +662,7 @@ def update_quote_request(
     admin_approved_at: Any = UNSET,
     booking_token: Any = UNSET,
     booking_token_created_at: Any = UNSET,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[QuoteRequest]:
     existing = get_quote_request(request_id)
     if not existing:
         return None
@@ -697,7 +757,7 @@ def save_job(job: Dict[str, Any]) -> None:
         conn.close()
 
 
-def get_job(job_id: str) -> Optional[Dict[str, Any]]:
+def get_job(job_id: str) -> Optional[Job]:
     conn = _connect()
     try:
         row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
@@ -707,36 +767,45 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
     if not row:
         return None
 
+    row_dict = dict(row)
+
     try:
-        req = json.loads(row["request_json"])
+        req = json.loads(row_dict["request_json"])
     except Exception:
-        req = row["request_json"]
+        req = row_dict["request_json"]
 
     return {
-        "job_id": row["job_id"],
-        "created_at": row["created_at"],
-        "status": row["status"],
-        "quote_id": row["quote_id"],
-        "request_id": row["request_id"],
-        "customer_name": row["customer_name"],
-        "customer_phone": row["customer_phone"],
-        "job_address": row["job_address"],
-        "job_description_customer": row["job_description_customer"],
-        "job_description_internal": row["job_description_internal"],
-        "service_type": row["service_type"],
-        "cash_total_cad": row["cash_total_cad"],
-        "emt_total_cad": row["emt_total_cad"],
+        "job_id": row_dict["job_id"],
+        "created_at": row_dict["created_at"],
+        "status": row_dict["status"],
+        "quote_id": row_dict["quote_id"],
+        "request_id": row_dict["request_id"],
+        "customer_name": row_dict["customer_name"],
+        "customer_phone": row_dict["customer_phone"],
+        "job_address": row_dict["job_address"],
+        "job_description_customer": row_dict["job_description_customer"],
+        "job_description_internal": row_dict["job_description_internal"],
+        "service_type": row_dict["service_type"],
+        "cash_total_cad": row_dict["cash_total_cad"],
+        "emt_total_cad": row_dict["emt_total_cad"],
         "request_json": req,
-        "notes": row["notes"],
-        "scheduled_start": row["scheduled_start"] if "scheduled_start" in row.keys() else None,
-        "scheduled_end": row["scheduled_end"] if "scheduled_end" in row.keys() else None,
-        "google_calendar_event_id": row["google_calendar_event_id"] if "google_calendar_event_id" in row.keys() else None,
-        "calendar_sync_status": row["calendar_sync_status"] if "calendar_sync_status" in row.keys() else None,
-        "calendar_last_error": row["calendar_last_error"] if "calendar_last_error" in row.keys() else None,
+        "notes": row_dict["notes"],
+        "scheduled_start": row_dict["scheduled_start"] if "scheduled_start" in row_dict else None,
+        "scheduled_end": row_dict["scheduled_end"] if "scheduled_end" in row_dict else None,
+        "google_calendar_event_id": row_dict["google_calendar_event_id"] if "google_calendar_event_id" in row_dict else None,
+        "calendar_sync_status": row_dict["calendar_sync_status"] if "calendar_sync_status" in row_dict else None,
+        "calendar_last_error": row_dict["calendar_last_error"] if "calendar_last_error" in row_dict else None,
     }
 
 
-def get_job_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
+def require_job(job_id: str) -> Job:
+    job = get_job(job_id)
+    if job is None:
+        raise KeyError(f"Job not found: {job_id}")
+    return job
+
+
+def get_job_by_quote_id(quote_id: str) -> Optional[Job]:
     conn = _connect()
     try:
         row = conn.execute("SELECT job_id FROM jobs WHERE quote_id = ?", (quote_id,)).fetchone()
@@ -748,7 +817,7 @@ def get_job_by_quote_id(quote_id: str) -> Optional[Dict[str, Any]]:
     return get_job(row["job_id"])
 
 
-def list_jobs(limit: int = 50) -> List[Dict[str, Any]]:
+def list_jobs(limit: int = 50) -> List[Job]:
     conn = _connect()
     try:
         rows = conn.execute(
@@ -763,7 +832,7 @@ def list_jobs(limit: int = 50) -> List[Dict[str, Any]]:
     finally:
         conn.close()
 
-    out: List[Dict[str, Any]] = []
+    out: List[Job] = []
     for r in rows:
         item = get_job(r["job_id"])
         if item is not None:
@@ -793,7 +862,7 @@ def update_job(
     google_calendar_event_id: Any = UNSET,
     calendar_sync_status: Any = UNSET,
     calendar_last_error: Any = UNSET,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[Job]:
     existing = get_job(job_id)
     if not existing:
         return None

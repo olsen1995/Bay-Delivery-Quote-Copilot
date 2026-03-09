@@ -35,7 +35,7 @@ class CalendarIntegrationTests(unittest.TestCase):
         storage.save_job({
             "job_id": job_id,
             "created_at": "2026-02-26T10:00:00",
-            "status": "in_progress",
+            "status": "approved",
             "quote_id": "q123",
             "request_id": "r123",
             "customer_name": "Test Customer",
@@ -58,7 +58,7 @@ class CalendarIntegrationTests(unittest.TestCase):
              patch('app.gcalendar.create_event', return_value='event123') as mock_create:
             resp = self.client.post("/admin/api/jobs/j123/schedule", json=payload, headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
-            job = storage.get_job("j123")
+            job = storage.require_job("j123")
             self.assertEqual(job["calendar_sync_status"], "synced")
             self.assertEqual(job["google_calendar_event_id"], "event123")
             mock_create.assert_called_once()
@@ -99,7 +99,7 @@ class CalendarIntegrationTests(unittest.TestCase):
              patch('app.gcalendar.create_event', side_effect=Exception("API error")):
             resp = self.client.post("/admin/api/jobs/j123/schedule", json=payload, headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
-            job = storage.get_job("j123")
+            job = storage.require_job("j123")
             self.assertEqual(job["calendar_sync_status"], "failed")
             self.assertIn("API error", job["calendar_last_error"])
 
@@ -112,7 +112,7 @@ class CalendarIntegrationTests(unittest.TestCase):
              patch('app.gcalendar.update_event') as mock_update:
             resp = self.client.post("/admin/api/jobs/j123/reschedule", json=payload, headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
-            job = storage.get_job("j123")
+            job = storage.require_job("j123")
             self.assertEqual(job["calendar_sync_status"], "synced")
             mock_update.assert_called_once()
 
@@ -131,7 +131,7 @@ class CalendarIntegrationTests(unittest.TestCase):
              patch('app.gcalendar.delete_event') as mock_delete:
             resp = self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
-            job = storage.get_job("j123")
+            job = storage.require_job("j123")
             self.assertEqual(job["status"], "cancelled")
             self.assertEqual(job["calendar_sync_status"], "cancelled")
             self.assertIsNone(job["google_calendar_event_id"])
@@ -145,7 +145,7 @@ class CalendarIntegrationTests(unittest.TestCase):
              patch('app.gcalendar.delete_event', side_effect=Exception("Delete failed")):
             resp = self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
-            job = storage.get_job("j123")
+            job = storage.require_job("j123")
             self.assertEqual(job["status"], "cancelled")
             self.assertEqual(job["calendar_sync_status"], "failed")
             self.assertEqual(job["google_calendar_event_id"], "event123")  # Preserved

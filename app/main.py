@@ -119,6 +119,14 @@ def _local_iso_to_utc_iso(local_iso: str) -> str:
     return utc_dt.isoformat()
 
 
+def ensure_schedulable(job: dict[str, Any]) -> None:
+    if job.get("status") not in {"approved", "scheduled"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Job must be approved or scheduled before scheduling operations.",
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
@@ -975,6 +983,7 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    ensure_schedulable(job)
 
     # Convert local to UTC
     try:
@@ -1019,6 +1028,7 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    ensure_schedulable(job)
 
     if not job.get("google_calendar_event_id"):
         raise HTTPException(status_code=400, detail="Job not scheduled")

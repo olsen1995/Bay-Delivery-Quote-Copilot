@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     # Only for type-checkers; won't execute at runtime.
     from googleapiclient.discovery import Resource  # pragma: no cover
+    from app.storage import Job
 
 
 GCALENDAR_CALENDAR_ID_ENV = "GCALENDAR_CALENDAR_ID"
@@ -80,7 +81,7 @@ def _calendar_id() -> str:
     return calendar_id
 
 
-def create_event(job: Dict[str, Any], start_utc: str, end_utc: str) -> str:
+def create_event(job: "Job", start_utc: str, end_utc: str) -> str:
     """
     Create a Calendar event for the job.
     Title: {service_type} - Job {job_id} - {short_customer_name}
