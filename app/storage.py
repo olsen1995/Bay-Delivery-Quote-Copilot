@@ -45,6 +45,7 @@ class QuoteRecord(TypedDict):
     created_at: str
     request: Any
     response: Any
+    accept_token: Optional[str]
     job_type: NotRequired[str]
     total_cad: NotRequired[float]
 
@@ -216,7 +217,8 @@ def init_db() -> None:
                 quote_id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
                 request_json TEXT NOT NULL,
-                response_json TEXT NOT NULL
+                response_json TEXT NOT NULL,
+                accept_token TEXT
             )
             """
         )
@@ -289,6 +291,7 @@ def init_db() -> None:
         )
 
         # Backfill: add missing columns if older DB is present
+        _try_add_column(conn, "quotes", "accept_token TEXT")
         _try_add_column(conn, "quote_requests", "notes TEXT")
         _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
         _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
@@ -414,6 +417,10 @@ def save_quote(record: Dict[str, Any]) -> None:
             "response_json": json.dumps(record["response"], ensure_ascii=False),
         }
 
+        # Accept token (server-generated, passed in from caller)
+        if "accept_token" in cols:
+            insert_fields["accept_token"] = record.get("accept_token")
+
         # Forward-compat derived columns
         if "job_type" in cols:
             insert_fields["job_type"] = _derive_quote_job_type(record)
@@ -476,6 +483,7 @@ def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
         "created_at": row_dict["created_at"],
         "request": request_obj,
         "response": response_obj,
+        "accept_token": row_dict.get("accept_token"),
     }
 
     if "job_type" in row_dict:
