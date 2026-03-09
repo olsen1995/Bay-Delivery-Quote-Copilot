@@ -7,10 +7,15 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None  # Fallback if not available
 
 from fastapi import (
     BackgroundTasks,
@@ -28,10 +33,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
-from app import gdrive
+from app import gcalendar, gdrive
 from app.quote_engine import calculate_quote
 from app.storage import (
     export_db_to_json,
+    get_job,
     get_job_by_quote_id,
     get_quote_record,
     get_quote_request,
@@ -47,6 +53,7 @@ from app.storage import (
     save_job,
     save_quote,
     save_quote_request,
+    update_job,
     update_quote_request,
 )
 from app.update_fields import InvalidQuoteRequestTransition, include_optional_update_fields, validate_quote_request_transition
@@ -82,6 +89,34 @@ def _reset_admin_attempts(client_ip: str) -> None:
     """Reset failed admin attempts after successful login."""
     if client_ip in _admin_failed_attempts:
         del _admin_failed_attempts[client_ip]
+
+
+def _local_iso_to_utc_iso(local_iso: str) -> str:
+    """Convert local ISO datetime string to UTC ISO string.
+
+    Assumes input is naive local time. Converts to UTC for storage.
+    Uses LOCAL_TIMEZONE env var or defaults to UTC if not set.
+    """
+    local_dt = datetime.fromisoformat(local_iso)
+    if local_dt.tzinfo is not None:
+        raise ValueError("Datetime should be naive (local time)")
+
+    # Get timezone from environment or default to UTC
+    tz_name = os.getenv("LOCAL_TIMEZONE", "UTC")
+
+    try:
+        if ZoneInfo:
+            local_tz = ZoneInfo(tz_name)
+        else:
+            # Fallback if zoneinfo not available
+            local_tz = timezone.utc
+    except Exception:
+        # If invalid timezone name, fall back to UTC
+        local_tz = timezone.utc
+
+    local_dt = local_dt.replace(tzinfo=local_tz)
+    utc_dt = local_dt.astimezone(timezone.utc)
+    return utc_dt.isoformat()
 
 
 @asynccontextmanager
@@ -575,6 +610,27 @@ class BookingDetails(BaseModel):
         return v
 
 
+class ScheduleJobPayload(BaseModel):
+    scheduled_start: str = Field(..., description="Local ISO datetime (YYYY-MM-DDTHH:MM:SS)")
+    scheduled_end: str = Field(..., description="Local ISO datetime (YYYY-MM-DDTHH:MM:SS)")
+
+    @field_validator("scheduled_start", "scheduled_end", mode="before")
+    @classmethod
+    def strip(cls, v):
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @field_validator("scheduled_start", "scheduled_end")
+    @classmethod
+    def validate_datetime(cls, v):
+        try:
+            datetime.fromisoformat(v)
+            return v
+        except ValueError:
+            raise ValueError("Datetime must be in ISO format (YYYY-MM-DDTHH:MM:SS)")
+
+
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
     quote = get_quote_record(quote_id)
@@ -910,6 +966,132 @@ def admin_decide_quote_request(
         raise HTTPException(status_code=500, detail="Failed to update request")
     _maybe_auto_snapshot(background_tasks)
     return {"ok": True, "request": updated}
+
+
+@app.post("/admin/api/jobs/{job_id}/schedule")
+def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
+    _require_admin(request)
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Convert local to UTC
+    try:
+        start_utc = _local_iso_to_utc_iso(body.scheduled_start)
+        end_utc = _local_iso_to_utc_iso(body.scheduled_end)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime: {e}")
+
+    # Validate end > start
+    start_dt = datetime.fromisoformat(start_utc)
+    end_dt = datetime.fromisoformat(end_utc)
+    if end_dt <= start_dt:
+        raise HTTPException(status_code=400, detail="scheduled_end must be after scheduled_start")
+
+    # DB first: update job
+    updated = update_job(
+        job_id,
+        scheduled_start=start_utc,
+        scheduled_end=end_utc,
+        calendar_sync_status="pending",
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update job")
+
+    # Calendar second: attempt sync
+    try:
+        if gcalendar.is_configured():
+            event_id = gcalendar.create_event(job, start_utc, end_utc)
+            update_job(job_id, google_calendar_event_id=event_id, calendar_sync_status="synced")
+        else:
+            update_job(job_id, calendar_sync_status="not_configured")
+    except Exception as e:
+        update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
+
+    return {"ok": True, "job": get_job(job_id)}
+
+
+@app.post("/admin/api/jobs/{job_id}/reschedule")
+def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
+    _require_admin(request)
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.get("google_calendar_event_id"):
+        raise HTTPException(status_code=400, detail="Job not scheduled")
+
+    # Convert local to UTC
+    try:
+        start_utc = _local_iso_to_utc_iso(body.scheduled_start)
+        end_utc = _local_iso_to_utc_iso(body.scheduled_end)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime: {e}")
+
+    # Validate end > start
+    start_dt = datetime.fromisoformat(start_utc)
+    end_dt = datetime.fromisoformat(end_utc)
+    if end_dt <= start_dt:
+        raise HTTPException(status_code=400, detail="scheduled_end must be after scheduled_start")
+
+    # DB first
+    updated = update_job(
+        job_id,
+        scheduled_start=start_utc,
+        scheduled_end=end_utc,
+        calendar_sync_status="pending",
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update job")
+
+    # Calendar second
+    try:
+        if gcalendar.is_configured() and job.get("google_calendar_event_id"):
+            gcalendar.update_event(job["google_calendar_event_id"], start_utc, end_utc)
+            update_job(job_id, calendar_sync_status="synced")
+        else:
+            update_job(job_id, calendar_sync_status="not_configured")
+    except Exception as e:
+        update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
+
+    return {"ok": True, "job": get_job(job_id)}
+
+
+@app.post("/admin/api/jobs/{job_id}/cancel")
+def admin_cancel_job(request: Request, job_id: str):
+    _require_admin(request)
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # DB first: preserve scheduled_start/end, set status cancelled, sync_status cancelled
+    updated = update_job(
+        job_id,
+        status="cancelled",
+        calendar_sync_status="cancelled",
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update job")
+
+    # Calendar second: attempt delete
+    event_id = job.get("google_calendar_event_id")
+    if event_id:
+        try:
+            if gcalendar.is_configured():
+                gcalendar.delete_event(event_id)
+                # Clear event_id only on success
+                update_job(job_id, google_calendar_event_id=None)
+            else:
+                # Not configured, keep event_id
+                pass
+        except Exception as e:
+            # Delete failed, keep event_id and mark failed
+            update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
+
+    return {"ok": True, "job": get_job(job_id)}
 
 
 # =========================

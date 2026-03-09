@@ -242,6 +242,13 @@ def init_db() -> None:
         _try_add_column(conn, "quote_requests", "booking_token TEXT")
         _try_add_column(conn, "quote_requests", "booking_token_created_at TEXT")
 
+        # Add scheduling columns to jobs table
+        _try_add_column(conn, "jobs", "scheduled_start TEXT")
+        _try_add_column(conn, "jobs", "scheduled_end TEXT")
+        _try_add_column(conn, "jobs", "google_calendar_event_id TEXT")
+        _try_add_column(conn, "jobs", "calendar_sync_status TEXT")
+        _try_add_column(conn, "jobs", "calendar_last_error TEXT")
+
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
         try:
             _dedupe_quote_requests_by_quote_id(conn)
@@ -721,6 +728,11 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
         "emt_total_cad": row["emt_total_cad"],
         "request_json": req,
         "notes": row["notes"],
+        "scheduled_start": row["scheduled_start"] if "scheduled_start" in row.keys() else None,
+        "scheduled_end": row["scheduled_end"] if "scheduled_end" in row.keys() else None,
+        "google_calendar_event_id": row["google_calendar_event_id"] if "google_calendar_event_id" in row.keys() else None,
+        "calendar_sync_status": row["calendar_sync_status"] if "calendar_sync_status" in row.keys() else None,
+        "calendar_last_error": row["calendar_last_error"] if "calendar_last_error" in row.keys() else None,
     }
 
 
@@ -757,6 +769,93 @@ def list_jobs(limit: int = 50) -> List[Dict[str, Any]]:
         if item is not None:
             out.append(item)
     return out
+
+
+# Explicit allowlist of fields that can be updated via update_job()
+# This prevents potential SQL injection if the function is refactored in the future
+_ALLOWED_JOB_UPDATE_FIELDS = {
+    "status",
+    "notes",
+    "scheduled_start",
+    "scheduled_end",
+    "google_calendar_event_id",
+    "calendar_sync_status",
+    "calendar_last_error",
+}
+
+
+def update_job(
+    job_id: str,
+    *,
+    status: Any = UNSET,
+    scheduled_start: Any = UNSET,
+    scheduled_end: Any = UNSET,
+    google_calendar_event_id: Any = UNSET,
+    calendar_sync_status: Any = UNSET,
+    calendar_last_error: Any = UNSET,
+) -> Optional[Dict[str, Any]]:
+    existing = get_job(job_id)
+    if not existing:
+        return None
+
+    # Build partial UPDATE query with explicit field validation
+    updates: List[str] = []
+    params: List[Any] = []
+
+    if status is not UNSET:
+        field_name = "status"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(status)
+    if scheduled_start is not UNSET:
+        field_name = "scheduled_start"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(scheduled_start)
+    if scheduled_end is not UNSET:
+        field_name = "scheduled_end"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(scheduled_end)
+    if google_calendar_event_id is not UNSET:
+        field_name = "google_calendar_event_id"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(google_calendar_event_id)
+    if calendar_sync_status is not UNSET:
+        field_name = "calendar_sync_status"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(calendar_sync_status)
+    if calendar_last_error is not UNSET:
+        field_name = "calendar_last_error"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        # Truncate to reasonable length (e.g., 500 chars)
+        error_str = str(calendar_last_error)[:500] if calendar_last_error else None
+        updates.append(f"{field_name} = ?")
+        params.append(error_str)
+
+    if not updates:
+        return existing  # No changes
+
+    query = f"UPDATE jobs SET {', '.join(updates)} WHERE job_id = ?"
+    params.append(job_id)
+
+    conn = _connect()
+    try:
+        conn.execute(query, params)
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Return updated job
+    return get_job(job_id)
 
 
 # =========================

@@ -312,7 +312,7 @@
     if (!items || items.length === 0) return addEmptyState(box, "No jobs yet.");
     clearNode(box);
 
-    const { table, tbody } = createTable(["Job", "Quote", "Status", "Customer", "Address", "Cash Total", "Notes"]);
+    const { table, tbody } = createTable(["Job", "Quote", "Status", "Customer", "Address", "Cash Total", "Scheduled", "Calendar Sync", "Actions"]);
 
     items.forEach((j) => {
       const tr = document.createElement("tr");
@@ -353,15 +353,130 @@
       const tdTotal = document.createElement("td");
       tdTotal.textContent = money(j.cash_total_cad);
 
-      const tdNotes = document.createElement("td");
-      tdNotes.className = "small";
-      tdNotes.textContent = j.notes || "";
+      const tdScheduled = document.createElement("td");
+      tdScheduled.className = "small";
+      if (j.scheduled_start && j.scheduled_end) {
+        const start = new Date(j.scheduled_start).toLocaleString();
+        const end = new Date(j.scheduled_end).toLocaleString();
+        tdScheduled.textContent = `${start} - ${end}`;
+      } else {
+        tdScheduled.textContent = "Not scheduled";
+      }
 
-      tr.append(tdJob, tdQuote, tdStatus, tdCustomer, tdAddress, tdTotal, tdNotes);
+      const tdSync = document.createElement("td");
+      const syncStatus = j.calendar_sync_status || "not_configured";
+      const syncPill = document.createElement("span");
+      syncPill.className = "pill";
+      syncPill.textContent = syncStatus;
+      tdSync.appendChild(syncPill);
+      if (j.calendar_last_error) {
+        const errorDiv = document.createElement("div");
+        errorDiv.className = "small muted";
+        errorDiv.textContent = j.calendar_last_error;
+        tdSync.appendChild(errorDiv);
+      }
+
+      const tdActions = document.createElement("td");
+      if (j.status !== "cancelled") {
+        if (!j.scheduled_start) {
+          // Schedule button
+          const scheduleBtn = document.createElement("button");
+          scheduleBtn.textContent = "Schedule";
+          scheduleBtn.onclick = () => showScheduleModal(j.job_id, false);
+          tdActions.appendChild(scheduleBtn);
+        } else {
+          // Reschedule and Cancel buttons
+          const rescheduleBtn = document.createElement("button");
+          rescheduleBtn.textContent = "Reschedule";
+          rescheduleBtn.onclick = () => showScheduleModal(j.job_id, true);
+          tdActions.appendChild(rescheduleBtn);
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.className = "danger";
+          cancelBtn.onclick = () => cancelJob(j.job_id);
+          tdActions.appendChild(cancelBtn);
+        }
+      }
+
+      tr.append(tdJob, tdQuote, tdStatus, tdCustomer, tdAddress, tdTotal, tdScheduled, tdSync, tdActions);
       tbody.appendChild(tr);
     });
 
     box.appendChild(table);
+  }
+
+  function showScheduleModal(jobId, isReschedule) {
+    document.getElementById("scheduleTitle").textContent = isReschedule ? "Reschedule Job" : "Schedule Job";
+    document.getElementById("scheduleModal").style.display = "block";
+    document.getElementById("scheduleForm").onsubmit = (e) => {
+      e.preventDefault();
+      const start = document.getElementById("scheduledStart").value;
+      const end = document.getElementById("scheduledEnd").value;
+      if (isReschedule) {
+        rescheduleJob(jobId, start, end);
+      } else {
+        scheduleJob(jobId, start, end);
+      }
+    };
+  }
+
+  function closeScheduleModal() {
+    document.getElementById("scheduleModal").style.display = "none";
+    document.getElementById("scheduleForm").reset();
+  }
+
+  async function scheduleJob(jobId, start, end) {
+    try {
+      const resp = await fetch(`/admin/api/jobs/${jobId}/schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Basic ${btoa(`${document.getElementById("adminUsername").value}:${document.getElementById("adminPassword").value}`)}` },
+        body: JSON.stringify({ scheduled_start: start, scheduled_end: end })
+      });
+      if (resp.ok) {
+        closeScheduleModal();
+        refreshAll();
+      } else {
+        alert("Error scheduling job: " + await resp.text());
+      }
+    } catch (err) {
+      alert("Error: " + err);
+    }
+  }
+
+  async function rescheduleJob(jobId, start, end) {
+    try {
+      const resp = await fetch(`/admin/api/jobs/${jobId}/reschedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Basic ${btoa(`${document.getElementById("adminUsername").value}:${document.getElementById("adminPassword").value}`)}` },
+        body: JSON.stringify({ scheduled_start: start, scheduled_end: end })
+      });
+      if (resp.ok) {
+        closeScheduleModal();
+        refreshAll();
+      } else {
+        alert("Error rescheduling job: " + await resp.text());
+      }
+    } catch (err) {
+      alert("Error: " + err);
+    }
+  }
+
+  async function cancelJob(jobId) {
+    if (!confirm("Are you sure you want to cancel this job?")) return;
+    try {
+      const resp = await fetch(`/admin/api/jobs/${jobId}/cancel`, {
+        method: "POST",
+        headers: { "Authorization": `Basic ${btoa(`${document.getElementById("adminUsername").value}:${document.getElementById("adminPassword").value}`)}` }
+      });
+      if (resp.ok) {
+        refreshAll();
+      } else {
+        alert("Error cancelling job: " + await resp.text());
+      }
+    } catch (err) {
+      alert("Error: " + err);
+    }
   }
 
   async function refreshAll() {
@@ -389,6 +504,21 @@
   // On first load, we *don't* auto-refresh with empty creds — it will just 401 and look “broken”.
   setLine(statusLine, "bad", "Enter admin username/password, then click Refresh.");
 </script>
+
+<!-- Schedule Modal -->
+<div id="scheduleModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <span class="close" onclick="closeScheduleModal()">&times;</span>
+    <h3 id="scheduleTitle">Schedule Job</h3>
+    <form id="scheduleForm">
+      <label for="scheduledStart">Start Date/Time (Local):</label>
+      <input type="datetime-local" id="scheduledStart" required />
+      <label for="scheduledEnd">End Date/Time (Local):</label>
+      <input type="datetime-local" id="scheduledEnd" required />
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+</div>
 
 </body>
 </html>
