@@ -46,6 +46,7 @@ from app.storage import (
     import_db_from_json,
     init_db,
     is_token_expired,
+    Job,
     list_attachments,
     list_jobs,
     list_quote_requests,
@@ -120,7 +121,7 @@ def _local_iso_to_utc_iso(local_iso: str) -> str:
     return utc_dt.isoformat()
 
 
-def ensure_schedulable(job: dict[str, Any]) -> None:
+def ensure_schedulable(job: Job) -> None:
     if job.get("status") not in {"approved", "scheduled"}:
         raise HTTPException(
             status_code=400,
@@ -513,6 +514,9 @@ async def quote_calculate(request: Request, payload: QuoteRequestPayload):
         "travel_zone": request_payload.get("travel_zone", "in_town"),
     }
 
+    # Generate accept_token for this quote (before saving)
+    accept_token = str(uuid4())
+
     quote = {
         "quote_id": str(uuid4()),
         "created_at": _now_local_iso(),
@@ -530,11 +534,9 @@ async def quote_calculate(request: Request, payload: QuoteRequestPayload):
             "created_at": quote["created_at"],
             "request": quote["request"],
             "response": quote["response"],
+            "accept_token": accept_token,
         }
     )
-
-    # Generate accept_token for this quote
-    accept_token = str(uuid4())
 
     return {
         **quote,
@@ -653,8 +655,13 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
     if action not in {"accept", "decline"}:
         raise HTTPException(status_code=400, detail="Invalid action (use accept|decline).")
 
+    # Validate accept_token against server-persisted token
+    server_token = quote.get("accept_token")
+    if not server_token or body.accept_token != server_token:
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+
     if not existing:
-        # New request: validate token from quote response
+        # New request: create the quote_request with the validated token
         initial_status = "customer_pending"
         if action == "accept":
             initial_status = "customer_accepted"
@@ -687,7 +694,7 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
                 "requested_time_window": None,
                 "customer_accepted_at": None,
                 "admin_approved_at": None,
-                "accept_token": body.accept_token,
+                "accept_token": server_token,
                 "booking_token": None,
                 "booking_token_created_at": None,
             }
@@ -696,10 +703,6 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
 
     if existing is None:
         raise HTTPException(status_code=500, detail="Failed to load quote request")
-
-    # Validate accept_token for existing request
-    if existing.get("accept_token") != body.accept_token:
-        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
     if action == "accept":
         # Generate booking_token for the booking step
@@ -1029,6 +1032,16 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
         if "not scheduled" in error_msg.lower():
             raise HTTPException(status_code=400, detail=error_msg)
         raise HTTPException(status_code=400, detail=error_msg)
+        event_id = job.get("google_calendar_event_id")
+        if gcalendar.is_configured() and event_id:
+            gcalendar.update_event(event_id, start_utc, end_utc)
+            update_job(job_id, calendar_sync_status="synced")
+        else:
+            update_job(job_id, calendar_sync_status="not_configured")
+    except Exception as e:
+        update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
+
+    return {"ok": True, "job": get_job(job_id)}
 
 
 @app.post("/admin/api/jobs/{job_id}/cancel")
