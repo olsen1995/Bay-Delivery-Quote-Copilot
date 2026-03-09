@@ -34,31 +34,22 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
 from app import gcalendar, gdrive
-from app.quote_engine import calculate_quote
-from app.services import job_scheduling_service
+from app.services import booking_service, job_scheduling_service, quote_service
 from app.storage import (
     export_db_to_json,
     get_job,
-    get_job_by_quote_id,
     get_quote_record,
-    get_quote_request,
-    get_quote_request_by_quote_id,
     import_db_from_json,
     init_db,
-    is_token_expired,
     Job,
     list_attachments,
     list_jobs,
     list_quote_requests,
     list_quotes,
     save_attachment,
-    save_job,
-    save_quote,
-    save_quote_request,
     update_job,
-    update_quote_request,
 )
-from app.update_fields import InvalidQuoteRequestTransition, include_optional_update_fields, validate_quote_request_transition
+from app.update_fields import InvalidQuoteRequestTransition
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 logger = logging.getLogger(__name__)
@@ -477,71 +468,7 @@ async def quote_calculate(request: Request, payload: QuoteRequestPayload):
             # TODO: Flip QuoteRequestPayload to extra="forbid" after unknown-field logs stay clean.
 
     request_payload = payload.model_dump()
-    requested_service_type = str(request_payload.get("service_type", "")).strip()
-
-    engine_quote = calculate_quote(
-        service_type=requested_service_type,
-        hours=float(request_payload.get("estimated_hours", 0.0)),
-        crew_size=int(request_payload.get("crew_size", 1)),
-        garbage_bag_count=int(request_payload.get("garbage_bag_count", 0)),
-        mattresses_count=int(request_payload.get("mattresses_count", 0)),
-        box_springs_count=int(request_payload.get("box_springs_count", 0)),
-        scrap_pickup_location=str(request_payload.get("scrap_pickup_location", "curbside")),
-        travel_zone=str(request_payload.get("travel_zone", "in_town")),
-    )
-
-    # Validate required route fields using *normalized* service type returned by the engine.
-    engine_service_type = str(engine_quote.get("service_type", "")).strip().lower()
-    if engine_service_type in {"small_move", "item_delivery"}:
-        if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
-            raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
-
-    normalized_request = {
-        "customer_name": request_payload.get("customer_name"),
-        "customer_phone": request_payload.get("customer_phone"),
-        "job_address": request_payload.get("job_address"),
-        "job_description_customer": request_payload.get("job_description_customer") or request_payload.get("description"),
-        "service_type": engine_quote["service_type"],
-        "payment_method": request_payload.get("payment_method"),
-        "pickup_address": request_payload.get("pickup_address"),
-        "dropoff_address": request_payload.get("dropoff_address"),
-        "estimated_hours": float(request_payload.get("estimated_hours", 0.0)),
-        "crew_size": int(request_payload.get("crew_size", 1)),
-        "garbage_bag_count": int(request_payload.get("garbage_bag_count", 0)),
-        "mattresses_count": int(request_payload.get("mattresses_count", 0)),
-        "box_springs_count": int(request_payload.get("box_springs_count", 0)),
-        "scrap_pickup_location": request_payload.get("scrap_pickup_location", "curbside"),
-        "travel_zone": request_payload.get("travel_zone", "in_town"),
-    }
-
-    # Generate accept_token for this quote (before saving)
-    accept_token = str(uuid4())
-
-    quote = {
-        "quote_id": str(uuid4()),
-        "created_at": _now_local_iso(),
-        "request": normalized_request,
-        "response": {
-            "cash_total_cad": float(engine_quote["total_cash_cad"]),
-            "emt_total_cad": float(engine_quote["total_emt_cad"]),
-            "disclaimer": str(engine_quote["disclaimer"]),
-        },
-    }
-
-    save_quote(
-        {
-            "quote_id": quote["quote_id"],
-            "created_at": quote["created_at"],
-            "request": quote["request"],
-            "response": quote["response"],
-            "accept_token": accept_token,
-        }
-    )
-
-    return {
-        **quote,
-        "accept_token": accept_token,
-    }
+    return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
 
 
 class CustomerDecision(BaseModel):
@@ -644,134 +571,35 @@ class ScheduleJobPayload(BaseModel):
 
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
-    quote = get_quote_record(quote_id)
-    if not quote:
-        raise HTTPException(status_code=404, detail="Quote not found.")
-
-    existing = get_quote_request_by_quote_id(quote_id)
-    now = _now_local_iso()
-    action = (body.action or "").lower()
-
-    if action not in {"accept", "decline"}:
-        raise HTTPException(status_code=400, detail="Invalid action (use accept|decline).")
-
-    # Validate accept_token against server-persisted token
-    server_token = quote.get("accept_token")
-    if not server_token or body.accept_token != server_token:
-        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
-
-    if not existing:
-        # New request: create the quote_request with the validated token
-        initial_status = "customer_pending"
-        if action == "accept":
-            initial_status = "customer_accepted"
-        elif action == "decline":
-            initial_status = "customer_declined"
-
-        try:
-            validate_quote_request_transition("__new__", initial_status)
-        except InvalidQuoteRequestTransition as e:
-            return _invalid_status_transition_response(e)
-
-        request_id = str(uuid4())
-        save_quote_request(
-            {
-                "request_id": request_id,
-                "created_at": now,
-                "status": initial_status,
-                "quote_id": quote_id,
-                "customer_name": quote["request"].get("customer_name"),
-                "customer_phone": quote["request"].get("customer_phone"),
-                "job_address": quote["request"].get("job_address"),
-                "job_description_customer": quote["request"].get("job_description_customer"),
-                "job_description_internal": quote["response"].get("job_description_internal"),
-                "service_type": quote["request"].get("service_type"),
-                "cash_total_cad": quote["response"].get("cash_total_cad"),
-                "emt_total_cad": quote["response"].get("emt_total_cad"),
-                "request_json": quote["request"],
-                "notes": None,
-                "requested_job_date": None,
-                "requested_time_window": None,
-                "customer_accepted_at": None,
-                "admin_approved_at": None,
-                "accept_token": server_token,
-                "booking_token": None,
-                "booking_token_created_at": None,
-            }
-        )
-        existing = get_quote_request_by_quote_id(quote_id)
-
-    if existing is None:
-        raise HTTPException(status_code=500, detail="Failed to load quote request")
-
-    if action == "accept":
-        # Generate booking_token for the booking step
-        booking_token = str(uuid4())
-        update_kwargs: dict[str, Any] = {
-            "status": "customer_accepted",
-            "customer_accepted_at": now,
-            "admin_approved_at": None,
-            "booking_token": booking_token,
-            "booking_token_created_at": now,
-        }
-        include_optional_update_fields(body, update_kwargs, ("notes",))
-
-        try:
-            updated = update_quote_request(existing["request_id"], **update_kwargs)
-        except InvalidQuoteRequestTransition as e:
-            return _invalid_status_transition_response(e)
-        if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update quote request")
-        _maybe_auto_snapshot(background_tasks)
-        return {
-            "ok": True,
-            "request_id": updated["request_id"],
-            "status": updated["status"],
-            "booking_token": booking_token,
-        }
-
-    # decline
-    update_kwargs = {"status": "customer_declined", "customer_accepted_at": None, "admin_approved_at": None}
-    include_optional_update_fields(body, update_kwargs, ("notes",))
+    provided_fields = getattr(body, "model_fields_set", None)
+    if provided_fields is None:
+        provided_fields = getattr(body, "__fields_set__", set())
+    notes_provided = "notes" in provided_fields
     try:
-        updated = update_quote_request(existing["request_id"], **update_kwargs)
+        result = booking_service.process_customer_decision(
+            quote_id,
+            action=body.action,
+            accept_token=body.accept_token,
+            notes=body.notes,
+            notes_provided=notes_provided,
+            now_iso=_now_local_iso(),
+        )
     except InvalidQuoteRequestTransition as e:
         return _invalid_status_transition_response(e)
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update quote request")
+
     _maybe_auto_snapshot(background_tasks)
-    return {"ok": True, "request_id": updated["request_id"], "status": updated["status"]}
+    return result
 
 
 @app.post("/quote/{quote_id}/booking")
 async def submit_booking(quote_id: str, body: BookingDetails):
-    existing = get_quote_request_by_quote_id(quote_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Quote request not found. Accept the quote first.")
-
-    if existing["status"] != "customer_accepted":
-        raise HTTPException(status_code=400, detail="Booking can only be submitted for accepted quotes.")
-
-    # Validate booking_token
-    if existing.get("booking_token") != body.booking_token:
-        raise HTTPException(status_code=401, detail="Invalid or expired booking token.")
-
-    # Check token has not expired (30 days)
-    if is_token_expired(existing.get("booking_token_created_at")):
-        raise HTTPException(status_code=401, detail="Booking token has expired. Please accept the quote again.")
-
-    now = _now_local_iso()
-    update_kwargs = {
-        "requested_job_date": body.requested_job_date,
-        "requested_time_window": body.requested_time_window,
-        "notes": body.notes,
-    }
-
-    updated = update_quote_request(existing["request_id"], **update_kwargs)
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update booking")
-
-    return {"ok": True, "request_id": updated["request_id"]}
+    return booking_service.submit_booking_details(
+        quote_id,
+        booking_token=body.booking_token,
+        requested_job_date=body.requested_job_date,
+        requested_time_window=body.requested_time_window,
+        notes=body.notes,
+    )
 
 
 @app.post("/quote/upload-photos")
@@ -918,66 +746,23 @@ def admin_decide_quote_request(
 ):
     _require_admin(request)
 
-    existing = get_quote_request(request_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Request not found")
-
-    now = _now_local_iso()
-    action = (body.action or "").lower()
-
-    if action not in {"approve", "reject"}:
-        raise HTTPException(status_code=400, detail="Invalid action (use approve|reject)")
-
-    if action == "approve":
-        update_kwargs: dict[str, Any] = {
-            "status": "admin_approved",
-            "admin_approved_at": now,
-        }
-        include_optional_update_fields(body, update_kwargs, ("notes",))
-
-        try:
-            updated = update_quote_request(request_id, **update_kwargs)
-        except InvalidQuoteRequestTransition as e:
-            return _invalid_status_transition_response(e)
-        if not updated:
-            raise HTTPException(status_code=500, detail="Failed to update request")
-
-        created_job: Optional[dict[str, Any]] = None
-        if not get_job_by_quote_id(updated["quote_id"]):
-            job = {
-                "job_id": str(uuid4()),
-                "created_at": now,
-                "status": "in_progress",
-                "quote_id": updated["quote_id"],
-                "request_id": updated["request_id"],
-                "customer_name": updated.get("customer_name"),
-                "customer_phone": updated.get("customer_phone"),
-                "job_address": updated.get("job_address"),
-                "job_description_customer": updated.get("job_description_customer"),
-                "job_description_internal": updated.get("job_description_internal"),
-                "service_type": updated["service_type"],
-                "cash_total_cad": float(updated["cash_total_cad"]),
-                "emt_total_cad": float(updated["emt_total_cad"]),
-                "request_json": updated["request_json"],
-                "notes": updated.get("notes"),
-            }
-            save_job(job)
-            created_job = job
-
-        _maybe_auto_snapshot(background_tasks)
-        return {"ok": True, "request": updated, "job": created_job}
-
-    # reject
-    reject_kwargs: dict[str, Any] = {"status": "rejected", "admin_approved_at": None}
-    include_optional_update_fields(body, reject_kwargs, ("notes",))
+    provided_fields = getattr(body, "model_fields_set", None)
+    if provided_fields is None:
+        provided_fields = getattr(body, "__fields_set__", set())
+    notes_provided = "notes" in provided_fields
     try:
-        updated = update_quote_request(request_id, **reject_kwargs)
+        result = booking_service.process_admin_decision(
+            request_id,
+            action=body.action,
+            notes=body.notes,
+            notes_provided=notes_provided,
+            now_iso=_now_local_iso(),
+        )
     except InvalidQuoteRequestTransition as e:
         return _invalid_status_transition_response(e)
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update request")
+
     _maybe_auto_snapshot(background_tasks)
-    return {"ok": True, "request": updated}
+    return result
 
 
 @app.post("/admin/api/jobs/{job_id}/schedule")
