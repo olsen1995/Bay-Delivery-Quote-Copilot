@@ -817,16 +817,6 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
         if "not scheduled" in error_msg.lower():
             raise HTTPException(status_code=400, detail=error_msg)
         raise HTTPException(status_code=400, detail=error_msg)
-        event_id = job.get("google_calendar_event_id")
-        if gcalendar.is_configured() and event_id:
-            gcalendar.update_event(event_id, start_utc, end_utc)
-            update_job(job_id, calendar_sync_status="synced")
-        else:
-            update_job(job_id, calendar_sync_status="not_configured")
-    except Exception as e:
-        update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
-
-    return {"ok": True, "job": get_job(job_id)}
 
 
 @app.post("/admin/api/jobs/{job_id}/cancel")
