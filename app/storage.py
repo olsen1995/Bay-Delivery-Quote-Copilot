@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 from datetime import datetime, timedelta
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List, NotRequired, Optional, Tuple, TypedDict
 
 from app.update_fields import validate_quote_request_transition
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
 DB_PATH = DEFAULT_DB_PATH  # overridable by tests
@@ -92,6 +95,13 @@ KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
 
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
+
+
+def _validate_table_name(table_name: str) -> str:
+    """Validate table name is in known allowlist. Defense-in-depth against future refactors."""
+    if table_name not in KNOWN_TABLES:
+        raise ValueError(f"Invalid table name: {table_name}")
+    return table_name
 
 
 def _connect() -> sqlite3.Connection:
@@ -914,7 +924,10 @@ def update_job(
         if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
             raise ValueError(f"Field '{field_name}' is not allowed for update")
         # Truncate to reasonable length (e.g., 500 chars)
-        error_str = str(calendar_last_error)[:500] if calendar_last_error else None
+        error_str = str(calendar_last_error) if calendar_last_error else None
+        if error_str and len(error_str) > 500:
+            logger.warning(f"Calendar sync error for job {job_id} (full): {error_str}")
+            error_str = error_str[:500] + "... (truncated)"
         updates.append(f"{field_name} = ?")
         params.append(error_str)
 
@@ -1068,38 +1081,40 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
         conn.execute("BEGIN")
 
         for table in KNOWN_TABLES:
+            safe_table = _validate_table_name(table)
             try:
-                conn.execute(f"DELETE FROM {table}")
+                conn.execute(f"DELETE FROM {safe_table}")
             except sqlite3.OperationalError:
                 continue
 
         for table in KNOWN_TABLES:
-            rows_in = tables.get(table, [])
+            safe_table = _validate_table_name(table)
+            rows_in = tables.get(safe_table, [])
             if not rows_in:
-                restored_counts[table] = 0
+                restored_counts[safe_table] = 0
                 continue
             if not isinstance(rows_in, list):
-                raise ValueError(f"Table '{table}' must be a list of rows")
+                raise ValueError(f"Table '{safe_table}' must be a list of rows")
 
             try:
-                col_rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+                col_rows = conn.execute(f"PRAGMA table_info({safe_table})").fetchall()
             except sqlite3.OperationalError:
-                restored_counts[table] = 0
+                restored_counts[safe_table] = 0
                 continue
 
             cols = [c["name"] for c in col_rows]
             if not cols:
-                restored_counts[table] = 0
+                restored_counts[safe_table] = 0
                 continue
 
             placeholders = ",".join(["?"] * len(cols))
             col_sql = ",".join(cols)
-            sql = f"INSERT OR REPLACE INTO {table} ({col_sql}) VALUES ({placeholders})"
+            sql = f"INSERT OR REPLACE INTO {safe_table} ({col_sql}) VALUES ({placeholders})"
 
             values_to_insert: List[List[Any]] = []
             for raw in rows_in:
                 if not isinstance(raw, dict):
-                    raise ValueError(f"Row in '{table}' must be an object")
+                    raise ValueError(f"Row in '{safe_table}' must be an object")
 
                 row_vals: List[Any] = []
                 for col in cols:
@@ -1117,7 +1132,7 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                 values_to_insert.append(row_vals)
 
             conn.executemany(sql, values_to_insert)
-            restored_counts[table] = len(values_to_insert)
+            restored_counts[safe_table] = len(values_to_insert)
 
         conn.execute("COMMIT")
         conn.execute("PRAGMA foreign_keys = ON")
