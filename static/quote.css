@@ -25,3 +25,35 @@
   font-size: 0.9em;
   margin-bottom: 1em;
 }
+
+.formSection {
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fafafa;
+}
+
+.formSectionTitle {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.helperText {
+  margin-top: 8px;
+  font-size: 0.9em;
+  color: #555;
+  line-height: 1.35;
+}
+
+.quoteSummaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .quoteSummaryGrid {
+    grid-template-columns: 1fr;
+  }
+}

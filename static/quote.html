@@ -34,6 +34,8 @@
       <h2>Job Details</h2>
 
       <form id="quoteForm" class="formWrap">
+        <div class="formSection">
+          <h3 class="formSectionTitle">1) Contact & Job Location</h3>
         <div class="row">
           <div>
             <label for="customer_name">Customer name</label>
@@ -47,6 +49,10 @@
 
         <label for="job_address">Job address</label>
         <input id="job_address" name="job_address" placeholder="North Bay, ON" required />
+        </div>
+
+        <div class="formSection">
+          <h3 class="formSectionTitle">2) Service Details</h3>
 
         <div class="row">
           <div>
@@ -58,22 +64,23 @@
               <option value="item_delivery">Item delivery</option>
               <option value="demolition">Demolition</option>
             </select>
+            <div class="helperText" id="serviceHelp">Select a service to show only the fields needed for that job type.</div>
           </div>
-          <div>
+          <div id="estimatedHoursGroup">
             <label for="estimated_hours">Estimated hours</label>
             <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
           </div>
         </div>
 
         <div class="row">
-          <div>
+          <div id="crewSizeGroup">
             <label for="crew_size">Crew size</label>
             <select id="crew_size" name="crew_size">
               <option value="1">1 worker</option>
               <option value="2">2 workers</option>
             </select>
           </div>
-          <div>
+          <div id="scrapLocationGroup">
             <label for="scrap_pickup_location">Scrap pickup location</label>
             <select id="scrap_pickup_location" name="scrap_pickup_location">
               <option value="curbside">Curbside (free)</option>
@@ -93,7 +100,7 @@
           </div>
         </div>
 
-        <div class="row">
+        <div class="row" id="loadCountRow">
           <div>
             <label for="garbage_bag_count">Garbage bag count (bag-equivalent)</label>
             <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
@@ -115,10 +122,17 @@
           </div>
         </div>
 
+        <div class="helperText" id="disclosureHelp">Booking options appear after quote acceptance. Photo upload appears after quote generation.</div>
+        </div>
+
+        <div class="formSection">
+          <h3 class="formSectionTitle">3) Job Notes</h3>
+
         <label for="description">Description</label>
         <textarea id="description" name="description" rows="4"
           placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
           required></textarea>
+        </div>
 
         <div class="btnRow">
           <button class="btn" id="btnCalc" type="submit">Calculate Quote</button>
@@ -128,6 +142,14 @@
     </div>
 
     <div class="card resultBox hidden" id="resultBox"></div>
+    <div class="card hidden" id="quoteSummaryCard">
+      <h2>Quote Summary</h2>
+      <div class="quoteSummaryGrid">
+        <div><strong>Service:</strong> <span id="summaryService"></span></div>
+        <div><strong>Customer:</strong> <span id="summaryCustomer"></span></div>
+        <div><strong>Location:</strong> <span id="summaryLocation"></span></div>
+      </div>
+    </div>
 
     <div class="card hidden" id="decisionCard">
       <h2>Quote Decision</h2>
@@ -145,6 +167,8 @@
         <div class="statusBox hidden" id="decisionStatus"></div>
       </div>
     </div>
+
+    <div class="card statusBox hidden" id="flowStatus"></div>
 
     <div class="card hidden" id="bookingCard">
       <h2>Submit Booking Details</h2>
@@ -227,13 +251,16 @@
   function clearForm() {
     el("quoteForm").reset();
     syncRouteFields();
+    syncServiceFields();
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
     hideBox("bookingStatus");
+    hideBox("flowStatus");
     el("uploadCard").classList.add("hidden");
     el("decisionCard").classList.add("hidden");
     el("bookingCard").classList.add("hidden");
+    el("quoteSummaryCard").classList.add("hidden");
     lastQuoteId = null;
     lastAcceptToken = null;
     lastBookingToken = null;
@@ -242,6 +269,52 @@
     el("bookingDate").value = "";
     el("bookingWindow").value = "";
     el("bookingNotes").value = "";
+  }
+
+  function resetInapplicableServiceFields(serviceType) {
+    const isScrap = serviceType === "scrap_pickup";
+    const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+
+    if (isScrap) {
+      el("estimated_hours").value = "0";
+      el("crew_size").value = "1";
+    }
+
+    if (!isScrap) {
+      el("scrap_pickup_location").value = "curbside";
+    }
+
+    if (!usesLoadCounts) {
+      el("garbage_bag_count").value = "0";
+      el("mattresses_count").value = "0";
+      el("box_springs_count").value = "0";
+    }
+  }
+
+  function syncServiceFields() {
+    const serviceType = el("service_type").value;
+    const showRoute = serviceType === "small_move" || serviceType === "item_delivery";
+    const showScrap = serviceType === "scrap_pickup";
+    const showLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+    const showLabor = !showScrap;
+
+    resetInapplicableServiceFields(serviceType);
+
+    el("estimatedHoursGroup").classList.toggle("hidden", !showLabor);
+    el("crewSizeGroup").classList.toggle("hidden", !showLabor);
+    el("scrapLocationGroup").classList.toggle("hidden", !showScrap);
+    el("loadCountRow").classList.toggle("hidden", !showLoadCounts);
+
+    const help = el("serviceHelp");
+    if (showScrap) {
+      help.textContent = "Scrap pickup uses location-based pricing. Labor and bulk-item fields are hidden.";
+    } else if (showRoute) {
+      help.textContent = "Route details are required for this service. Pickup/dropoff fields are now visible.";
+    } else if (showLoadCounts) {
+      help.textContent = "Tell us your item counts and estimated labor for best pricing accuracy.";
+    } else {
+      help.textContent = "Select a service to show only the fields needed for that job type.";
+    }
   }
 
   function requiresRouteFields(serviceType) {
@@ -301,6 +374,7 @@
 
   async function submitDecision(action) {
     hideBox("decisionStatus");
+    hideBox("flowStatus");
 
     if (!lastQuoteId || !lastAcceptToken) {
       showBox("decisionStatus", "No quote or token available. Calculate quote first.");
@@ -334,7 +408,7 @@
 
       if (action === "accept") {
         lastBookingToken = data.booking_token;
-        showBox("decisionStatus", confirmation + "\n\nPlease provide your booking details below.");
+        showBox("flowStatus", confirmation + "\n\nPlease provide your booking details below.");
         el("decisionCard").classList.add("hidden");
         el("bookingCard").classList.remove("hidden");
         // Display confirmed contact details
@@ -356,18 +430,27 @@
   el("btnAccept").addEventListener("click", () => submitDecision("accept"));
   el("btnDecline").addEventListener("click", () => submitDecision("decline"));
   el("btnSubmitBooking").addEventListener("click", submitBooking);
-  el("service_type").addEventListener("change", syncRouteFields);
+  el("service_type").addEventListener("change", () => {
+    syncRouteFields();
+    syncServiceFields();
+  });
 
   el("quoteForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
+    hideBox("flowStatus");
     el("uploadCard").classList.add("hidden");
     el("decisionCard").classList.add("hidden");
+    el("bookingCard").classList.add("hidden");
+    el("quoteSummaryCard").classList.add("hidden");
     lastQuoteId = null;
 
     const serviceType = el("service_type").value;
+    const isScrap = serviceType === "scrap_pickup";
+    const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+    const usesLabor = !isScrap;
     const pickupAddress = (el("pickup_address").value || "").trim();
     const dropoffAddress = (el("dropoff_address").value || "").trim();
 
@@ -384,12 +467,12 @@
       pickup_address: pickupAddress || null,
       dropoff_address: dropoffAddress || null,
       description: (el("description").value || "").trim(),
-      estimated_hours: parseFloat(el("estimated_hours").value || "0"),
-      crew_size: parseInt(el("crew_size").value || "1", 10),
-      garbage_bag_count: parseInt(el("garbage_bag_count").value || "0", 10),
-      mattresses_count: parseInt(el("mattresses_count").value || "0", 10),
-      box_springs_count: parseInt(el("box_springs_count").value || "0", 10),
-      scrap_pickup_location: el("scrap_pickup_location").value
+      estimated_hours: usesLabor ? parseFloat(el("estimated_hours").value || "0") : 0,
+      crew_size: usesLabor ? parseInt(el("crew_size").value || "1", 10) : 1,
+      garbage_bag_count: usesLoadCounts ? parseInt(el("garbage_bag_count").value || "0", 10) : 0,
+      mattresses_count: usesLoadCounts ? parseInt(el("mattresses_count").value || "0", 10) : 0,
+      box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
+      scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
     };
 
     try {
@@ -409,6 +492,10 @@
       lastAcceptToken = data.accept_token;
       el("uploadCard").classList.remove("hidden");
       el("decisionCard").classList.remove("hidden");
+      el("quoteSummaryCard").classList.remove("hidden");
+      el("summaryService").textContent = el("service_type").selectedOptions[0].textContent;
+      el("summaryCustomer").textContent = (el("customer_name").value || "").trim() + " • " + (el("customer_phone").value || "").trim();
+      el("summaryLocation").textContent = (el("job_address").value || "").trim();
 
       showBox(
         "resultBox",
@@ -461,6 +548,7 @@
   });
 
   syncRouteFields();
+  syncServiceFields();
 </script>
 </body>
 </html>
