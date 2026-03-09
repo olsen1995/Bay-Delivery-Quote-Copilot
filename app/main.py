@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
 from app import gcalendar, gdrive
 from app.quote_engine import calculate_quote
+from app.services import job_scheduling_service
 from app.storage import (
     export_db_to_json,
     get_job,
@@ -983,11 +984,6 @@ def admin_decide_quote_request(
 def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     _require_admin(request)
 
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    ensure_schedulable(job)
-
     # Convert local to UTC
     try:
         start_utc = _local_iso_to_utc_iso(body.scheduled_start)
@@ -995,47 +991,25 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid datetime: {e}")
 
-    # Validate end > start
-    start_dt = datetime.fromisoformat(start_utc)
-    end_dt = datetime.fromisoformat(end_utc)
-    if end_dt <= start_dt:
-        raise HTTPException(status_code=400, detail="scheduled_end must be after scheduled_start")
-
-    # DB first: update job
-    updated = update_job(
-        job_id,
-        scheduled_start=start_utc,
-        scheduled_end=end_utc,
-        calendar_sync_status="pending",
-    )
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update job")
-
-    # Calendar second: attempt sync
+    # Delegate to service layer
     try:
-        if gcalendar.is_configured():
-            event_id = gcalendar.create_event(job, start_utc, end_utc)
-            update_job(job_id, google_calendar_event_id=event_id, calendar_sync_status="synced")
-        else:
-            update_job(job_id, calendar_sync_status="not_configured")
-    except Exception as e:
-        update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
-
-    return {"ok": True, "job": get_job(job_id)}
+        job = job_scheduling_service.schedule_job(job_id, start_utc, end_utc)
+        return {"ok": True, "job": job}
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        if "must be after" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        if "not schedulable" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
 
 
 @app.post("/admin/api/jobs/{job_id}/reschedule")
 def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     _require_admin(request)
 
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    ensure_schedulable(job)
-
-    if not job.get("google_calendar_event_id"):
-        raise HTTPException(status_code=400, detail="Job not scheduled")
-
     # Convert local to UTC
     try:
         start_utc = _local_iso_to_utc_iso(body.scheduled_start)
@@ -1043,24 +1017,21 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid datetime: {e}")
 
-    # Validate end > start
-    start_dt = datetime.fromisoformat(start_utc)
-    end_dt = datetime.fromisoformat(end_utc)
-    if end_dt <= start_dt:
-        raise HTTPException(status_code=400, detail="scheduled_end must be after scheduled_start")
-
-    # DB first
-    updated = update_job(
-        job_id,
-        scheduled_start=start_utc,
-        scheduled_end=end_utc,
-        calendar_sync_status="pending",
-    )
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update job")
-
-    # Calendar second
+    # Delegate to service layer
     try:
+        job = job_scheduling_service.reschedule_job(job_id, start_utc, end_utc)
+        return {"ok": True, "job": job}
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        if "must be after" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        if "not schedulable" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        if "not scheduled" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
         event_id = job.get("google_calendar_event_id")
         if gcalendar.is_configured() and event_id:
             gcalendar.update_event(event_id, start_utc, end_utc)
@@ -1077,35 +1048,15 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
 def admin_cancel_job(request: Request, job_id: str):
     _require_admin(request)
 
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    # DB first: preserve scheduled_start/end, set status cancelled, sync_status cancelled
-    updated = update_job(
-        job_id,
-        status="cancelled",
-        calendar_sync_status="cancelled",
-    )
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update job")
-
-    # Calendar second: attempt delete
-    event_id = job.get("google_calendar_event_id")
-    if event_id:
-        try:
-            if gcalendar.is_configured():
-                gcalendar.delete_event(event_id)
-                # Clear event_id only on success
-                update_job(job_id, google_calendar_event_id=None)
-            else:
-                # Not configured, keep event_id
-                pass
-        except Exception as e:
-            # Delete failed, keep event_id and mark failed
-            update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
-
-    return {"ok": True, "job": get_job(job_id)}
+    # Delegate to service layer
+    try:
+        job = job_scheduling_service.cancel_job(job_id)
+        return {"ok": True, "job": job}
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
 
 
 # =========================
