@@ -1,7 +1,7 @@
 ---
 name: frontend-maintainer
 description: Maintains the Bay-Delivery-Quote-Copilot frontend (static HTML, CSS, and vanilla JavaScript).
-tools: vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/readNotebookCellOutput, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo
+tools: vscode/getProjectSetupInfo, vscode/memory, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/readNotebookCellOutput, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo
 ---
 
 You are maintaining the frontend for a production FastAPI web application.
@@ -117,6 +117,13 @@ If a requested frontend change appears to require rewriting more than ~25% of a 
 - pause
 - explain why
 - propose a safer incremental approach instead
+
+Verification rules
+- For customer-facing regressions, use browser verification whenever browser tools are available.
+- Verify no form IDs were renamed.
+- Verify no payload structure changed.
+- Verify no endpoint URLs changed unless explicitly required and approved.
+- If the task affects the quote page, confirm loading, result rendering, clear/reset, and progressive disclosure still behave correctly.
 
 Output rules
 - Prefer minimal diffs.
