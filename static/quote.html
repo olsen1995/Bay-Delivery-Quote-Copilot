@@ -37,6 +37,9 @@
         <div class="formSection firstStepSection">
           <h3 class="formSectionTitle">1) Contact & Job Location</h3>
           <p class="firstStepHint">Start here • Your information is secure</p>
+        <div class="formSection startSection">
+          <h3 class="formSectionTitle">1) Start Here</h3>
+          <p class="startIntro">Complete these four fields to begin your quote.</p>
         <div class="row">
           <div>
             <label for="customer_name">Customer name</label>
@@ -61,7 +64,7 @@
         <div class="formSection">
           <h3 class="formSectionTitle">2) Service Details</h3>
 
-        <div class="row">
+        <div class="startGrid">
           <div>
             <label for="service_type">Service type</label>
             <select id="service_type" name="service_type">
@@ -73,6 +76,16 @@
             </select>
             <div class="helperText" id="serviceHelp">Select a service to show only the fields needed for that job type.</div>
           </div>
+        </div>
+          <p class="startTrust">Fast response &bull; No obligation &bull; Local delivery experts</p>
+        </div>
+
+        <div class="formSection secondarySection">
+          <h3 class="formSectionTitle">2) More Job Details</h3>
+          <details id="serviceDetailsPanel" class="detailPanel">
+            <summary>Step 2: Add service-specific details (optional for some services)</summary>
+
+        <div class="row">
           <div id="estimatedHoursGroup">
             <label for="estimated_hours">Estimated hours</label>
             <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
@@ -130,6 +143,7 @@
         </div>
 
         <div class="helperText" id="disclosureHelp">Booking options appear after quote acceptance. Photo upload appears after quote generation.</div>
+          </details>
         </div>
 
         <div class="formSection">
@@ -261,6 +275,8 @@
 
   function clearForm() {
     el("quoteForm").reset();
+    const servicePanel = el("serviceDetailsPanel");
+    if (servicePanel) servicePanel.open = false;
     syncRouteFields();
     syncServiceFields();
     hideBox("resultBox");
@@ -338,6 +354,11 @@
     const routeRow = el("routeRow");
     const pickup = el("pickup_address");
     const dropoff = el("dropoff_address");
+    const servicePanel = el("serviceDetailsPanel");
+
+    if (servicePanel && needRoutes) {
+      servicePanel.open = true;
+    }
 
     routeRow.classList.toggle("hidden", !needRoutes);
     pickup.required = needRoutes;
@@ -469,6 +490,8 @@
 
     if (requiresRouteFields(serviceType) && (!pickupAddress || !dropoffAddress)) {
       el("loadingState").classList.add("hidden");
+      const servicePanel = el("serviceDetailsPanel");
+      if (servicePanel) servicePanel.open = true;
       showBox("resultBox", "Error:\nPickup and dropoff addresses are required for small moves and item delivery.");
       return;
     }
@@ -488,6 +511,8 @@
       box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
       scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
     };
+
+    showBox("resultBox", "Calculating your estimate...");
 
     try {
       const res = await fetch("/quote/calculate", {
