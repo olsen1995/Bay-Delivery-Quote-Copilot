@@ -64,6 +64,7 @@
             <div class="helperText" id="serviceHelp">Select a service to show only the fields needed for that job type.</div>
           </div>
         </div>
+          <p class="startTrust">Fast response &bull; No obligation &bull; Local delivery experts</p>
         </div>
 
         <div class="formSection secondarySection">
@@ -142,7 +143,7 @@
         </div>
 
         <div class="btnRow">
-          <button class="btn" id="btnCalc" type="submit">Calculate Quote</button>
+          <button class="btn" id="btnCalc" type="submit">Get My Estimate</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
       </form>
@@ -490,6 +491,8 @@
       box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
       scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
     };
+
+    showBox("resultBox", "Calculating your estimate...");
 
     try {
       const res = await fetch("/quote/calculate", {
