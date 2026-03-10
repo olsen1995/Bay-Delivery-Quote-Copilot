@@ -289,6 +289,7 @@
     el("bookingCard").classList.add("hidden");
     el("quoteSummaryCard").classList.add("hidden");
     el("loadingState").classList.add("hidden");
+    el("btnCalc").disabled = false;
     lastQuoteId = null;
     lastAcceptToken = null;
     lastBookingToken = null;
@@ -490,6 +491,7 @@
 
     if (requiresRouteFields(serviceType) && (!pickupAddress || !dropoffAddress)) {
       el("loadingState").classList.add("hidden");
+      el("btnCalc").disabled = false;
       const servicePanel = el("serviceDetailsPanel");
       if (servicePanel) servicePanel.open = true;
       showBox("resultBox", "Error:\nPickup and dropoff addresses are required for small moves and item delivery.");
@@ -513,6 +515,7 @@
     };
 
     showBox("resultBox", "Calculating your estimate...");
+    el("btnCalc").disabled = true;
 
     try {
       const res = await fetch("/quote/calculate", {
@@ -522,6 +525,7 @@
       });
 
       el("loadingState").classList.add("hidden");
+      el("btnCalc").disabled = false;
       const data = await res.json();
       if (!res.ok) {
         showBox("resultBox", "Error:\n" + (data.detail || "Unknown error"));
@@ -547,6 +551,7 @@
       );
     } catch (err) {
       el("loadingState").classList.add("hidden");
+      el("btnCalc").disabled = false;
       showBox("resultBox", "Error:\nFailed to contact server.");
     }
   });
