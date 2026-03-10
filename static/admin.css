@@ -75,7 +75,7 @@ input { padding:8px; width:100%; box-sizing:border-box; }
 .importBox { display: grid; grid-template-columns: 1fr 220px; gap: 10px; align-items: center; }
 @media (max-width: 720px) { .importBox { grid-template-columns: 1fr; } }
 
-.modal { position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+.modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
 .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; }
 .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 .close:hover { color: black; }

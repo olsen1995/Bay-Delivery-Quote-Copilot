@@ -55,6 +55,7 @@
 
 <script>
   const statusLine = document.getElementById("statusLine");
+  let adminSessionReady = false;
 
   function authHeaders() {
     const headers = {};
@@ -179,11 +180,6 @@
       const tdId = document.createElement("td");
       const code = document.createElement("code");
       code.textContent = q.quote_id || "";
-      tdId.appendChild(code);
-
-      const tdId = document.createElement("td");
-      tdCreated.textContent = q.created_at || "";
-
       const created = document.createElement("div");
       created.className = "small";
       created.textContent = q.created_at || "";
@@ -210,8 +206,11 @@
       const tdTotal = document.createElement("td");
       const estimate = safeGet(q, "response.cash_total_cad", null);
       tdTotal.textContent = estimate === null || estimate === undefined || estimate === "" ? "-" : money(estimate);
-      const tdSvc = document.createElement("td");
       tr.append(tdId, tdStatus, tdCustomer, tdSvc, tdAddress, tdTotal);
+      tbody.appendChild(tr);
+    });
+
+    box.appendChild(table);
   }
 
   async function decide(requestId, action) {
@@ -443,6 +442,11 @@
   }
 
   function showScheduleModal(jobId, isReschedule) {
+    if (!adminSessionReady) {
+      closeScheduleModal();
+      setLine(statusLine, "bad", "Authenticate and click Refresh before scheduling jobs.");
+      return;
+    }
     document.getElementById("scheduleTitle").textContent = isReschedule ? "Reschedule Job" : "Schedule Job";
     document.getElementById("scheduleModal").style.display = "block";
     const form = document.getElementById("scheduleForm");
@@ -461,6 +465,7 @@
   function closeScheduleModal() {
     const modal = document.getElementById("scheduleModal");
     const form = document.getElementById("scheduleForm");
+    if (!modal || !form) return;
     modal.style.display = "none";
     form.reset();
     form.onsubmit = null;
@@ -532,6 +537,8 @@
 
   async function refreshAll() {
     try {
+      adminSessionReady = false;
+      closeScheduleModal();
       statusLine.textContent = "Loading...";
 
       const quotes = await fetchJSON("/admin/api/quotes");
@@ -543,14 +550,19 @@
       const jobs = await fetchJSON("/admin/api/jobs");
       renderJobs((jobs.items || []));
 
+      adminSessionReady = true;
       setLine(statusLine, "ok", "Loaded.");
     } catch (err) {
+      adminSessionReady = false;
+      closeScheduleModal();
       setLine(statusLine, "bad", "Admin API error:");
       statusLine.appendChild(document.createTextNode(" " + String(err)));
     }
   }
 
   document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+
+  closeScheduleModal();
 
   // On first load, we *don't* auto-refresh with empty creds — it will just 401 and look “broken”.
   setLine(statusLine, "bad", "Enter admin username/password, then click Refresh.");
