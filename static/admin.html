@@ -381,20 +381,23 @@
         if (!j.scheduled_start) {
           // Schedule button
           const scheduleBtn = document.createElement("button");
+          scheduleBtn.type = "button";
           scheduleBtn.textContent = "Schedule";
-          scheduleBtn.onclick = () => showScheduleModal(j.job_id, false);
+          scheduleBtn.addEventListener("click", () => showScheduleModal(j.job_id, false));
           tdActions.appendChild(scheduleBtn);
         } else {
           // Reschedule and Cancel buttons
           const rescheduleBtn = document.createElement("button");
+          rescheduleBtn.type = "button";
           rescheduleBtn.textContent = "Reschedule";
-          rescheduleBtn.onclick = () => showScheduleModal(j.job_id, true);
+          rescheduleBtn.addEventListener("click", () => showScheduleModal(j.job_id, true));
           tdActions.appendChild(rescheduleBtn);
 
           const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
           cancelBtn.textContent = "Cancel";
           cancelBtn.className = "danger";
-          cancelBtn.onclick = () => cancelJob(j.job_id);
+          cancelBtn.addEventListener("click", () => cancelJob(j.job_id));
           tdActions.appendChild(cancelBtn);
         }
       }
@@ -409,7 +412,8 @@
   function showScheduleModal(jobId, isReschedule) {
     document.getElementById("scheduleTitle").textContent = isReschedule ? "Reschedule Job" : "Schedule Job";
     document.getElementById("scheduleModal").style.display = "block";
-    document.getElementById("scheduleForm").onsubmit = (e) => {
+    const form = document.getElementById("scheduleForm");
+    form.onsubmit = (e) => {
       e.preventDefault();
       const start = document.getElementById("scheduledStart").value;
       const end = document.getElementById("scheduledEnd").value;
@@ -422,9 +426,23 @@
   }
 
   function closeScheduleModal() {
-    document.getElementById("scheduleModal").style.display = "none";
-    document.getElementById("scheduleForm").reset();
+    const modal = document.getElementById("scheduleModal");
+    const form = document.getElementById("scheduleForm");
+    modal.style.display = "none";
+    form.reset();
+    form.onsubmit = null;
   }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const modal = document.getElementById("scheduleModal");
+    if (modal && modal.style.display === "block") closeScheduleModal();
+  });
+
+  document.addEventListener("click", (e) => {
+    const modal = document.getElementById("scheduleModal");
+    if (modal && e.target === modal) closeScheduleModal();
+  });
 
   async function scheduleJob(jobId, start, end) {
     try {
@@ -508,13 +526,14 @@
 <!-- Schedule Modal -->
 <div id="scheduleModal" class="modal" style="display: none;">
   <div class="modal-content">
-    <span class="close" onclick="closeScheduleModal()">&times;</span>
+    <button type="button" class="close" onclick="closeScheduleModal()" aria-label="Close schedule modal">&times;</button>
     <h3 id="scheduleTitle">Schedule Job</h3>
     <form id="scheduleForm">
       <label for="scheduledStart">Start Date/Time (Local):</label>
       <input type="datetime-local" id="scheduledStart" required />
       <label for="scheduledEnd">End Date/Time (Local):</label>
       <input type="datetime-local" id="scheduledEnd" required />
+      <button type="button" onclick="closeScheduleModal()">Cancel</button>
       <button type="submit">Submit</button>
     </form>
   </div>
