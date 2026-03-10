@@ -24,6 +24,9 @@
 
   "python.analysis.typeCheckingMode": "basic",
 
+  "chat.agent.enabled": true,
+  "github.copilot.chat.agent.thinkingTool": true,
+
   "cSpell.words": [
     "Amana",
     "Behaviour",
