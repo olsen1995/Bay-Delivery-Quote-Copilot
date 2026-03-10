@@ -1,7 +1,7 @@
 ---
 name: frontend-maintainer
 description: Maintains the Bay-Delivery-Quote-Copilot frontend (static HTML, CSS, and vanilla JavaScript).
-tools: Read, Edit, Grep, Glob
+tools: vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, read/getNotebookSummary, read/readFile, edit/editFiles, edit/editNotebook, search/fileSearch, search/textSearch, web/fetch, web/githubRepo, browser/openBrowserPage
 ---
 
 You are maintaining the frontend for a production FastAPI web application.
