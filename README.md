@@ -125,7 +125,8 @@ Open:
 
 ### Admin auth
 
-- `ADMIN_USERNAME` + `ADMIN_PASSWORD` for HTTP Basic auth (used by `/admin` and admin APIs)
+- `ADMIN_USERNAME` + `ADMIN_PASSWORD` for HTTP Basic auth on admin endpoints (especially `/admin/api/*`).
+- Legacy token patterns like `X-Admin-Token` and `?token=...` are not used.
 
 ### Google Drive (optional)
 
@@ -136,8 +137,9 @@ Open:
 
 ### CORS
 
-- Controlled by `BAYDELIVERY_CORS_ORIGINS` (comma-separated origins, e.g. `https://your-render-domain.onrender.com`).
-- If not set, the app currently falls back to `*` (wildcard) for development convenience. Tighten this before a public demo.
+- CORS is allowlist-based and controlled by `BAYDELIVERY_CORS_ORIGINS` (comma-separated origins, e.g. `https://your-render-domain.onrender.com`).
+- For backward compatibility, if `BAYDELIVERY_CORS_ORIGINS` is unset, the app reads `CORS_ORIGINS`.
+- Wildcard `*` is rejected and must not be used with credentialed auth.
 
 ### Versioning
 
