@@ -15,6 +15,12 @@ h2 { margin-bottom: 6px; }
 
 .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; }
 
+#quotesBox,
+#requestsBox,
+#jobsBox {
+	overflow-x: auto;
+}
+
 .mt14 { margin-top: 14px; }
 .mt10 { margin-top: 10px; }
 
@@ -26,6 +32,38 @@ button { padding: 8px 10px; cursor:pointer; font-weight:700; }
 .btnSpacer { margin-left: 6px; }
 
 .pill { display:inline-block; padding:3px 8px; border-radius:999px; background:#f2f2f2; font-size:0.88em; }
+
+.statusBadge {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: 999px;
+	border: 1px solid transparent;
+	font-size: 0.86em;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.status-pending {
+	background: #fff4ce;
+	border-color: #f8d88f;
+	color: #7a4b00;
+}
+
+.status-customer_accepted,
+.status-admin_approved,
+.status-scheduled {
+	background: #dcfce7;
+	border-color: #86efac;
+	color: #166534;
+}
+
+.status-cancelled,
+.status-customer_declined,
+.status-rejected {
+	background: #fee2e2;
+	border-color: #fca5a5;
+	color: #991b1b;
+}
 
 .ok { color: #0b6b0b; font-weight: 700; }
 .bad { color: #b00020; font-weight: 700; }
