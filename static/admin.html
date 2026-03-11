@@ -27,10 +27,10 @@
 
   <div class="rowToken mt10">
     <div></div>
-    <button id="refreshBtn">Refresh</button>
+    <button id="refreshBtn" type="button">Log In &amp; Load Data</button>
   </div>
 
-  <div class="muted" id="statusLine"></div>
+  <div class="muted" id="statusLine" role="status" aria-live="polite"></div>
 </div>
 
 <div class="row">
@@ -55,16 +55,36 @@
 
 <script>
   const statusLine = document.getElementById("statusLine");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const adminUsernameInput = document.getElementById("adminUsername");
+  const adminPasswordInput = document.getElementById("adminPassword");
+  const refreshButtonLabel = "Log In & Load Data";
   let adminSessionReady = false;
+
+  function getAdminCreds() {
+    return {
+      username: (adminUsernameInput.value || "").trim(),
+      password: (adminPasswordInput.value || "").trim()
+    };
+  }
+
+  function setLoading(isLoading) {
+    refreshBtn.disabled = isLoading;
+    refreshBtn.textContent = isLoading ? "Loading..." : refreshButtonLabel;
+  }
 
   function authHeaders() {
     const headers = {};
-    const u = (document.getElementById("adminUsername").value || "").trim();
-    const p = (document.getElementById("adminPassword").value || "").trim();
+    const { username: u, password: p } = getAdminCreds();
     if (u && p) {
       headers["Authorization"] = "Basic " + btoa(u + ":" + p);
     }
     return headers;
+  }
+
+  function parseApiError(err) {
+    if (err && typeof err === "object" && err.status) return err;
+    return { status: null, data: {}, raw: String(err) };
   }
 
   function setLine(el, level, msg, suffixCode) {
@@ -120,8 +140,7 @@
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
 
     if (!res.ok) {
-      // keep the backend message intact
-      throw new Error(JSON.stringify(data));
+      throw { status: res.status, data, raw: text };
     }
     return data;
   }
@@ -536,10 +555,17 @@
   }
 
   async function refreshAll() {
+    const { username, password } = getAdminCreds();
+    if (!username || !password) {
+      setLine(statusLine, "bad", "Enter both admin username and password, then press Enter or click Log In & Load Data.");
+      return;
+    }
+
     try {
       adminSessionReady = false;
       closeScheduleModal();
-      statusLine.textContent = "Loading...";
+      setLoading(true);
+      statusLine.textContent = "Authenticating and loading admin data...";
 
       const quotes = await fetchJSON("/admin/api/quotes");
       renderQuotes((quotes.items || []));
@@ -551,21 +577,44 @@
       renderJobs((jobs.items || []));
 
       adminSessionReady = true;
-      setLine(statusLine, "ok", "Loaded.");
+      setLine(statusLine, "ok", "Admin data loaded successfully.");
     } catch (err) {
       adminSessionReady = false;
       closeScheduleModal();
-      setLine(statusLine, "bad", "Admin API error:");
-      statusLine.appendChild(document.createTextNode(" " + String(err)));
+      const parsed = parseApiError(err);
+      const detail = safeGet(parsed, "data.detail", "");
+
+      if (parsed.status === 401 && String(detail).toLowerCase().includes("not configured")) {
+        setLine(statusLine, "bad", "Admin login is not configured on the server. Set ADMIN_USERNAME and ADMIN_PASSWORD.", "HTTP 401");
+      } else if (parsed.status === 401) {
+        setLine(statusLine, "bad", "Login failed. Check admin username/password and try again.", "HTTP 401");
+      } else if (parsed.status === 429) {
+        setLine(statusLine, "bad", "Too many failed login attempts. Wait a few minutes, then try again.", "HTTP 429");
+      } else if (parsed.status) {
+        setLine(statusLine, "bad", "Admin API error. " + (detail || "Please try again."), "HTTP " + parsed.status);
+      } else {
+        setLine(statusLine, "bad", "Admin API error. " + parsed.raw);
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
-  document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+  function handleCredsKeydown(e) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    refreshAll();
+  }
+
+  refreshBtn.addEventListener("click", refreshAll);
+  adminUsernameInput.addEventListener("keydown", handleCredsKeydown);
+  adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 
   closeScheduleModal();
+  setLoading(false);
 
-  // On first load, we *don't* auto-refresh with empty creds — it will just 401 and look “broken”.
-  setLine(statusLine, "bad", "Enter admin username/password, then click Refresh.");
+  // On first load, we don't auto-refresh with empty creds.
+  setLine(statusLine, "bad", "Enter admin username/password, then press Enter or click Log In & Load Data.");
 </script>
 
 <!-- Schedule Modal -->
