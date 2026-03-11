@@ -160,6 +160,10 @@
   font-size: 0.95em;
 }
 
+.loadingState.hidden {
+  display: none;
+}
+
 .spinner {
   width: 16px;
   height: 16px;
