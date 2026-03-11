@@ -143,6 +143,7 @@ def _resolve_db_path() -> Path:
 
 def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
     """SQLite doesn't support ADD COLUMN IF NOT EXISTS reliably in all builds."""
+    table = _validate_table_name(table)
     try:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
     except sqlite3.OperationalError as e:
@@ -154,6 +155,7 @@ def _try_add_column(conn: sqlite3.Connection, table: str, col_def: str) -> None:
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> Tuple[str, ...]:
     """Return current columns for a table, cached per process."""
+    table = _validate_table_name(table)
     cached = _TABLE_COL_CACHE.get(table)
     if cached is not None:
         return cached
@@ -171,6 +173,7 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> Tuple[str, ...]:
 
 def _table_info(conn: sqlite3.Connection, table: str) -> List[sqlite3.Row]:
     """Return PRAGMA table_info rows (uncached; used for NOT NULL detection)."""
+    table = _validate_table_name(table)
     try:
         return conn.execute(f"PRAGMA table_info({table})").fetchall()
     except sqlite3.OperationalError:

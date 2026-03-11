@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hmac
 import json
 import logging
 import os
@@ -58,6 +59,7 @@ logger = logging.getLogger(__name__)
 _admin_failed_attempts: dict[str, list[float]] = {}
 _admin_lockout_threshold = 5
 _admin_lockout_window = 300  # seconds
+_admin_list_limit_cap = 500
 
 
 def _check_admin_lockout(client_ip: str) -> bool:
@@ -82,6 +84,10 @@ def _reset_admin_attempts(client_ip: str) -> None:
     """Reset failed admin attempts after successful login."""
     if client_ip in _admin_failed_attempts:
         del _admin_failed_attempts[client_ip]
+
+
+def _cap_admin_list_limit(limit: int) -> int:
+    return min(int(limit), _admin_list_limit_cap)
 
 
 def _local_iso_to_utc_iso(local_iso: str) -> str:
@@ -248,7 +254,9 @@ def _require_admin(request: Request) -> None:
         _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid Basic auth header.")
 
-    if user != expected_user or pw != expected_pass:
+    user_ok = hmac.compare_digest(user, expected_user)
+    pass_ok = hmac.compare_digest(pw, expected_pass)
+    if not user_ok or not pass_ok:
         _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
@@ -712,25 +720,25 @@ def admin_smoke_uploads(request: Request):
 @app.get("/admin/api/quotes")
 def admin_list_quotes(request: Request, limit: int = 50):
     _require_admin(request)
-    return {"items": list_quotes(limit=int(limit))}
+    return {"items": list_quotes(limit=_cap_admin_list_limit(limit))}
 
 
 @app.get("/admin/api/quote-requests")
 def admin_list_quote_requests(request: Request, limit: int = 50):
     _require_admin(request)
-    return {"items": list_quote_requests(limit=int(limit))}
+    return {"items": list_quote_requests(limit=_cap_admin_list_limit(limit))}
 
 
 @app.get("/admin/api/jobs")
 def admin_list_jobs(request: Request, limit: int = 50):
     _require_admin(request)
-    return {"items": list_jobs(limit=int(limit))}
+    return {"items": list_jobs(limit=_cap_admin_list_limit(limit))}
 
 
 @app.get("/admin/api/uploads")
 def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: int = 50):
     _require_admin(request)
-    return {"items": list_attachments(quote_id=quote_id, limit=int(limit))}
+    return {"items": list_attachments(quote_id=quote_id, limit=_cap_admin_list_limit(limit))}
 
 
 @app.post("/admin/api/quote-requests/{request_id}/decision")
@@ -865,7 +873,10 @@ class DriveRestorePayload(BaseModel):
         value = v.strip() if isinstance(v, str) else ""
         if not value:
             raise ValueError("file_id is required")
-        return value
+        try:
+            return gdrive.validate_drive_file_id(value)
+        except ValueError as exc:
+            raise ValueError(str(exc))
 
 
 @app.post("/admin/api/db/import")
@@ -901,7 +912,7 @@ def admin_drive_backups(request: Request, limit: int = 20):
         raise HTTPException(status_code=501, detail="Google Drive not configured.")
 
     vault = _drive_call("vault setup", lambda: gdrive.ensure_vault_subfolders())
-    backups = _drive_call("list backups", lambda: gdrive.list_files(vault["db_backups"], limit=int(limit)))
+    backups = _drive_call("list backups", lambda: gdrive.list_files(vault["db_backups"], limit=_cap_admin_list_limit(limit)))
 
     items = []
     for f in backups:
