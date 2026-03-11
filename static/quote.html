@@ -100,7 +100,7 @@
               <option value="2">2 workers</option>
             </select>
           </div>
-          <div id="scrapLocationGroup">
+          <div id="scrapLocationGroup" class="hidden">
             <label for="scrap_pickup_location">Scrap pickup location</label>
             <select id="scrap_pickup_location" name="scrap_pickup_location">
               <option value="curbside">Curbside (free)</option>
@@ -468,7 +468,8 @@
     syncServiceFields();
   });
 
-  el("btnCalc").addEventListener("click", async () => {
+  async function calculateQuote(e) {
+    if (e) e.preventDefault();
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
@@ -567,7 +568,10 @@
         showBox("resultBox", "Error:\nFailed to contact server.");
       }
     }
-  });
+  }
+
+  el("quoteForm").addEventListener("submit", calculateQuote);
+  el("btnCalc").addEventListener("click", calculateQuote);
 
   el("btnUpload").addEventListener("click", async () => {
     hideBox("uploadStatus");
