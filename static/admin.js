@@ -55,6 +55,7 @@ function clearNode(node) {
 
 function createTable(headers) {
   const table = document.createElement("table");
+  table.className = "dataTable";
   const thead = document.createElement("thead");
   const tr = document.createElement("tr");
   headers.forEach((h) => {
@@ -72,7 +73,7 @@ function createTable(headers) {
 function addEmptyState(container, text) {
   clearNode(container);
   const div = document.createElement("div");
-  div.className = "muted";
+  div.className = "emptyState";
   div.textContent = text;
   container.appendChild(div);
 }
@@ -221,12 +222,13 @@ function actionCell(item) {
 
   const approveBtn = document.createElement("button");
   approveBtn.type = "button";
+  approveBtn.className = "actionBtn";
   approveBtn.textContent = "Approve";
   approveBtn.addEventListener("click", () => decide(item.request_id || "", "approve"));
 
   const rejectBtn = document.createElement("button");
   rejectBtn.type = "button";
-  rejectBtn.className = "btnSpacer";
+  rejectBtn.className = "btnSpacer actionBtn danger";
   rejectBtn.textContent = "Reject";
   rejectBtn.addEventListener("click", () => decide(item.request_id || "", "reject"));
 
@@ -379,6 +381,7 @@ function renderJobs(items) {
         // Schedule button
         const scheduleBtn = document.createElement("button");
         scheduleBtn.type = "button";
+        scheduleBtn.className = "actionBtn";
         scheduleBtn.textContent = "Schedule";
         scheduleBtn.addEventListener("click", () => showScheduleModal(j.job_id, false));
         tdActions.appendChild(scheduleBtn);
@@ -386,6 +389,7 @@ function renderJobs(items) {
         // Reschedule and Cancel buttons
         const rescheduleBtn = document.createElement("button");
         rescheduleBtn.type = "button";
+        rescheduleBtn.className = "actionBtn";
         rescheduleBtn.textContent = "Reschedule";
         rescheduleBtn.addEventListener("click", () => showScheduleModal(j.job_id, true));
         tdActions.appendChild(rescheduleBtn);
@@ -393,7 +397,7 @@ function renderJobs(items) {
         const cancelBtn = document.createElement("button");
         cancelBtn.type = "button";
         cancelBtn.textContent = "Cancel";
-        cancelBtn.className = "danger";
+        cancelBtn.className = "danger btnSpacer actionBtn";
         cancelBtn.addEventListener("click", () => cancelJob(j.job_id));
         tdActions.appendChild(cancelBtn);
       }

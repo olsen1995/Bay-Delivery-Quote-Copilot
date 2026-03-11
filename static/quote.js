@@ -3,15 +3,99 @@ let lastQuoteId = null;
 let lastAcceptToken = null;
 let lastBookingToken = null;
 
-function showBox(id, text) {
+function setBoxState(box, state) {
+  box.classList.remove("boxInfo", "boxSuccess", "boxError");
+  if (state === "error") box.classList.add("boxError");
+  else if (state === "success") box.classList.add("boxSuccess");
+  else if (state === "info") box.classList.add("boxInfo");
+}
+
+function inferBoxState(text) {
+  if ((text || "").startsWith("Error:")) return "error";
+  if (/successfully|saved|submitted/i.test(text || "")) return "success";
+  return "info";
+}
+
+function showBox(id, text, state) {
   const box = el(id);
   box.classList.remove("hidden");
+  setBoxState(box, state || inferBoxState(text));
   box.textContent = text;
 }
 function hideBox(id) {
   const box = el(id);
   box.classList.add("hidden");
+  setBoxState(box, null);
   box.textContent = "";
+}
+
+function createInfoBlock(label, value, extraClass) {
+  const block = document.createElement("div");
+  if (extraClass) block.className = extraClass;
+
+  const heading = document.createElement("span");
+  heading.textContent = label;
+
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+
+  block.append(heading, strong);
+  return block;
+}
+
+function renderQuoteResult(data, quoteResponse) {
+  const box = el("resultBox");
+  box.classList.remove("hidden");
+  setBoxState(box, "success");
+  box.replaceChildren();
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "quoteResult";
+
+  const header = document.createElement("div");
+  header.className = "quoteResultHeader";
+
+  const titleWrap = document.createElement("div");
+  const title = document.createElement("h2");
+  title.textContent = "Your Estimate";
+  const subtitle = document.createElement("p");
+  subtitle.className = "muted";
+  subtitle.textContent = "Review the totals below, then accept the quote to continue with booking.";
+  titleWrap.append(title, subtitle);
+
+  const meta = document.createElement("div");
+  meta.className = "quoteResultMeta";
+  const quoteId = document.createElement("div");
+  quoteId.textContent = "Quote ID: " + (data.quote_id || "");
+  const created = document.createElement("div");
+  created.textContent = "Created: " + (data.created_at || "");
+  meta.append(quoteId, created);
+
+  header.append(titleWrap, meta);
+
+  const breakdown = document.createElement("div");
+  breakdown.className = "quoteResultBreakdown";
+  const breakdownTitle = document.createElement("h3");
+  breakdownTitle.textContent = "Pricing Breakdown";
+  const amountGrid = document.createElement("div");
+  amountGrid.className = "quoteAmountGrid";
+  amountGrid.append(
+    createInfoBlock("Cash total (no HST)", "$" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD", "quoteAmountCard"),
+    createInfoBlock("EMT total (+13% HST)", "$" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD", "quoteAmountCard highlight")
+  );
+  breakdown.append(breakdownTitle, amountGrid);
+
+  const note = document.createElement("div");
+  note.className = "quoteResultNote";
+  const noteTitle = document.createElement("h3");
+  noteTitle.textContent = "Important Note";
+  const noteBody = document.createElement("p");
+  noteBody.className = "muted";
+  noteBody.textContent = quoteResponse.disclaimer || "";
+  note.append(noteTitle, noteBody);
+
+  wrapper.append(header, breakdown, note);
+  box.appendChild(wrapper);
 }
 
 function clearForm() {
@@ -310,14 +394,7 @@ el("btnCalc").addEventListener("click", async () => {
     el("summaryCustomer").textContent = customerName + " • " + customerPhone;
     el("summaryLocation").textContent = jobAddress;
 
-    showBox(
-      "resultBox",
-      "Quote ID: " + data.quote_id + "\n" +
-      "Created: " + data.created_at + "\n\n" +
-      "Cash total (no HST): $" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD\n" +
-      "EMT total (+13% HST): $" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD\n\n" +
-      "Note:\n" + (quoteResponse.disclaimer || "")
-    );
+    renderQuoteResult(data, quoteResponse);
   } catch (err) {
     if (err.name === "AbortError") {
       showBox("resultBox", "Error:\nRequest timed out. Please try again in a moment.");

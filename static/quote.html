@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/quote.css" />
 </head>
 
-<body>
+<body class="quotePage">
   <div class="container">
     <div class="topbar">
       <div class="brand">
@@ -26,133 +26,162 @@
     </div>
 
     <div class="heroCard card">
+      <p class="eyebrow">Bay Delivery</p>
       <h1>Get a Quote</h1>
-      <p class="muted">Fill this out and we’ll calculate your quote instantly (cash vs EMT).</p>
+      <p class="muted heroCopy">Fill this out and we’ll calculate your quote instantly with a clear cash vs EMT breakdown.</p>
+      <div class="heroHighlights" aria-hidden="true">
+        <span class="heroHighlight">Fast response</span>
+        <span class="heroHighlight">No obligation</span>
+        <span class="heroHighlight">North Bay local</span>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>Job Details</h2>
+    <div class="card formCard">
+      <div class="sectionHeader">
+        <div>
+          <p class="sectionEyebrow">Customer Quote</p>
+          <h2>Tell us about the job</h2>
+        </div>
+        <p class="muted sectionLead">We only ask for the details needed to generate an accurate estimate and the next steps after approval.</p>
+      </div>
 
       <form id="quoteForm" class="formWrap" novalidate>
         <div class="formSection firstStepSection">
-          <h3 class="formSectionTitle">1) Contact & Job Location</h3>
-          <p class="firstStepHint">Start here • Your information is secure</p>
-        <div class="formSection startSection">
-          <h3 class="formSectionTitle">1) Start Here</h3>
-          <p class="startIntro">Complete these four fields to begin your quote.</p>
-        <div class="row">
-          <div>
-            <label for="customer_name">Customer name</label>
-            <input id="customer_name" name="customer_name" placeholder="Full name" required />
+          <div class="sectionHeader compact">
+            <div>
+              <h3 class="formSectionTitle">1) Contact &amp; Job Location</h3>
+              <p class="firstStepHint">Start here. Your contact details stay attached to the quote and booking flow.</p>
+            </div>
           </div>
-          <div>
-            <label for="customer_phone">Customer phone</label>
-            <input id="customer_phone" name="customer_phone" placeholder="705-___-____" required />
+
+          <div class="row">
+            <div>
+              <label for="customer_name">Customer name</label>
+              <input id="customer_name" name="customer_name" placeholder="Full name" required />
+            </div>
+            <div>
+              <label for="customer_phone">Customer phone</label>
+              <input id="customer_phone" name="customer_phone" placeholder="705-___-____" required />
+            </div>
           </div>
-        </div>
 
-        <label for="job_address">Job address</label>
-        <input id="job_address" name="job_address" placeholder="North Bay, ON" required />
-        </div>
+          <label for="job_address">Job address</label>
+          <input id="job_address" name="job_address" placeholder="North Bay, ON" required />
 
-        <div class="reassuranceText">
-          <span class="reassuranceItem">✓ Fast response</span>
-          <span class="reassuranceItem">✓ No obligation</span>
-          <span class="reassuranceItem">✓ Local delivery experts</span>
+          <div class="reassuranceText">
+            <span class="reassuranceItem">Fast response</span>
+            <span class="reassuranceItem">No obligation</span>
+            <span class="reassuranceItem">Local delivery experts</span>
+          </div>
         </div>
 
         <div class="formSection">
-          <h3 class="formSectionTitle">2) Service Details</h3>
-
-        <div class="startGrid">
-          <div>
-            <label for="service_type">Service type</label>
-            <select id="service_type" name="service_type">
-              <option value="haul_away">Dump run / Junk removal</option>
-              <option value="scrap_pickup">Scrap pickup</option>
-              <option value="small_move">Small move</option>
-              <option value="item_delivery">Item delivery</option>
-              <option value="demolition">Demolition</option>
-            </select>
-            <div class="helperText" id="serviceHelp">Select a service to show only the fields needed for that job type.</div>
+          <div class="sectionHeader compact">
+            <div>
+              <h3 class="formSectionTitle">2) Service Details</h3>
+              <p class="startIntro">Choose the job type first so we can show only the fields needed for your estimate.</p>
+            </div>
           </div>
-        </div>
-          <p class="startTrust">Fast response &bull; No obligation &bull; Local delivery experts</p>
+
+          <div class="startGrid">
+            <div>
+              <label for="service_type">Service type</label>
+              <select id="service_type" name="service_type">
+                <option value="haul_away">Dump run / Junk removal</option>
+                <option value="scrap_pickup">Scrap pickup</option>
+                <option value="small_move">Small move</option>
+                <option value="item_delivery">Item delivery</option>
+                <option value="demolition">Demolition</option>
+              </select>
+              <div class="helperText" id="serviceHelp">Select a service to show only the fields needed for that job type.</div>
+            </div>
+          </div>
         </div>
 
         <div class="formSection secondarySection">
-          <h3 class="formSectionTitle">2) More Job Details</h3>
+          <div class="sectionHeader compact">
+            <div>
+              <h3 class="formSectionTitle">3) Service-Specific Details</h3>
+              <p class="muted sectionLead">Add the job details that affect pricing. Route fields only appear when required.</p>
+            </div>
+          </div>
+
           <details id="serviceDetailsPanel" class="detailPanel">
-            <summary>Step 2: Add service-specific details (optional for some services)</summary>
+            <summary>Open detailed pricing fields</summary>
 
-        <div class="row">
-          <div id="estimatedHoursGroup">
-            <label for="estimated_hours">Estimated hours</label>
-            <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
-          </div>
-        </div>
+            <div class="row">
+              <div id="estimatedHoursGroup">
+                <label for="estimated_hours">Estimated hours</label>
+                <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
+              </div>
+            </div>
 
-        <div class="row">
-          <div id="crewSizeGroup">
-            <label for="crew_size">Crew size</label>
-            <select id="crew_size" name="crew_size">
-              <option value="1">1 worker</option>
-              <option value="2">2 workers</option>
-            </select>
-          </div>
-          <div id="scrapLocationGroup" class="hidden">
-            <label for="scrap_pickup_location">Scrap pickup location</label>
-            <select id="scrap_pickup_location" name="scrap_pickup_location">
-              <option value="curbside">Curbside (free)</option>
-              <option value="inside">Inside removal ($30)</option>
-            </select>
-          </div>
-        </div>
+            <div class="row">
+              <div id="crewSizeGroup">
+                <label for="crew_size">Crew size</label>
+                <select id="crew_size" name="crew_size">
+                  <option value="1">1 worker</option>
+                  <option value="2">2 workers</option>
+                </select>
+              </div>
+              <div id="scrapLocationGroup" class="hidden">
+                <label for="scrap_pickup_location">Scrap pickup location</label>
+                <select id="scrap_pickup_location" name="scrap_pickup_location">
+                  <option value="curbside">Curbside (free)</option>
+                  <option value="inside">Inside removal ($30)</option>
+                </select>
+              </div>
+            </div>
 
-        <div class="row hidden" id="routeRow">
-          <div>
-            <label for="pickup_address">Pickup address</label>
-            <input id="pickup_address" name="pickup_address" placeholder="Pickup location" />
-          </div>
-          <div>
-            <label for="dropoff_address">Dropoff address</label>
-            <input id="dropoff_address" name="dropoff_address" placeholder="Dropoff location" />
-          </div>
-        </div>
+            <div class="row hidden" id="routeRow">
+              <div>
+                <label for="pickup_address">Pickup address</label>
+                <input id="pickup_address" name="pickup_address" placeholder="Pickup location" />
+              </div>
+              <div>
+                <label for="dropoff_address">Dropoff address</label>
+                <input id="dropoff_address" name="dropoff_address" placeholder="Dropoff location" />
+              </div>
+            </div>
 
-        <div class="row" id="loadCountRow">
-          <div>
-            <label for="garbage_bag_count">Garbage bag count (bag-equivalent)</label>
-            <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
-          </div>
-          <div>
-            <label for="mattresses_count">Mattresses</label>
-            <input id="mattresses_count" name="mattresses_count" type="number" min="0" step="1" value="0" />
-          </div>
-        </div>
+            <div class="row" id="loadCountRow">
+              <div>
+                <label for="garbage_bag_count">Garbage bag count (bag-equivalent)</label>
+                <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
+              </div>
+              <div>
+                <label for="mattresses_count">Mattresses</label>
+                <input id="mattresses_count" name="mattresses_count" type="number" min="0" step="1" value="0" />
+              </div>
+            </div>
 
-        <div class="row">
-          <div>
-            <label for="box_springs_count">Box springs</label>
-            <input id="box_springs_count" name="box_springs_count" type="number" min="0" step="1" value="0" />
-          </div>
-          <div>
-            <label class="muted">Tip</label>
-            <div class="hint">You can upload photos after the quote is generated.</div>
-          </div>
-        </div>
+            <div class="row">
+              <div>
+                <label for="box_springs_count">Box springs</label>
+                <input id="box_springs_count" name="box_springs_count" type="number" min="0" step="1" value="0" />
+              </div>
+              <div>
+                <label class="muted">Photo tip</label>
+                <div class="hint">You can upload photos after the quote is generated.</div>
+              </div>
+            </div>
 
-        <div class="helperText" id="disclosureHelp">Booking options appear after quote acceptance. Photo upload appears after quote generation.</div>
+            <div class="helperText" id="disclosureHelp">Booking options appear after quote acceptance. Photo upload appears after quote generation.</div>
           </details>
         </div>
 
         <div class="formSection">
-          <h3 class="formSectionTitle">3) Job Notes</h3>
+          <div class="sectionHeader compact">
+            <div>
+              <h3 class="formSectionTitle">4) Job Description</h3>
+              <p class="muted sectionLead">Give us the job context that a driver or crew needs before confirming the work.</p>
+            </div>
+          </div>
 
-        <label for="description">Description</label>
-        <textarea id="description" name="description" rows="4"
-          placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
-          required></textarea>
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4"
+            placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
+            required></textarea>
         </div>
 
         <div class="btnRow">
@@ -166,8 +195,8 @@
       </form>
     </div>
 
-    <div class="card resultBox hidden" id="resultBox"></div>
-    <div class="card hidden" id="quoteSummaryCard">
+    <div class="card resultBox hidden" id="resultBox" aria-live="polite"></div>
+    <div class="card hidden stageCard" id="quoteSummaryCard">
       <h2>Quote Summary</h2>
       <div class="quoteSummaryGrid">
         <div><strong>Service:</strong> <span id="summaryService"></span></div>
@@ -176,9 +205,9 @@
       </div>
     </div>
 
-    <div class="card hidden" id="decisionCard">
+    <div class="card hidden stageCard" id="decisionCard">
       <h2>Quote Decision</h2>
-      <p class="muted">If this works for you, accept and we’ll send it for admin confirmation.</p>
+      <p class="muted sectionLead">If this works for you, accept and we’ll send it for admin confirmation.</p>
 
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
@@ -193,11 +222,11 @@
       </div>
     </div>
 
-    <div class="card statusBox hidden" id="flowStatus"></div>
+    <div class="card statusBox hidden stageCard" id="flowStatus"></div>
 
-    <div class="card hidden" id="bookingCard">
+    <div class="card hidden stageCard" id="bookingCard">
       <h2>Submit Booking Details</h2>
-      <p class="muted">Provide your preferred scheduling for your accepted quote.</p>
+      <p class="muted sectionLead">Provide your preferred scheduling for your accepted quote.</p>
 
       <div class="formWrap">
         <p class="muted bookingContactInfo">
@@ -234,9 +263,9 @@
       </div>
     </div>
 
-    <div class="card hidden" id="uploadCard">
+    <div class="card hidden stageCard" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
-      <p class="muted">These photos are saved for admin review.</p>
+      <p class="muted sectionLead">These photos are saved for admin review.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>

@@ -6,51 +6,85 @@
   <title>Bay Delivery – Admin</title>
   <link rel="stylesheet" href="/static/admin.css" />
 </head>
-<body>
+<body class="adminPage">
 
-<h2>Bay Delivery – Admin Dashboard</h2>
-<div class="muted">
-  View recent estimates, booking requests, and jobs. Approvals create a job record automatically.
-</div>
-
-<div class="card mt14">
-  <div class="small">
-    Admin access uses <strong>Basic Auth</strong> with your Render environment variables:
-    <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
-
+<div class="adminShell">
+  <div class="card adminHero">
+    <div>
+      <p class="eyebrow">Bay Delivery</p>
+      <h1>Admin Dashboard</h1>
+      <p class="muted adminIntro">View recent estimates, booking requests, and jobs. Approvals create a job record automatically.</p>
+    </div>
+    <div class="heroBadgeGroup" aria-hidden="true">
+      <span class="heroBadge">Quotes</span>
+      <span class="heroBadge">Bookings</span>
+      <span class="heroBadge">Scheduling</span>
+    </div>
   </div>
 
-  <div class="rowCreds mt10">
-    <input id="adminUsername" type="text" placeholder="Admin username" autocomplete="username" />
-    <input id="adminPassword" type="password" placeholder="Admin password" autocomplete="current-password" />
+  <div class="card loginCard mt18">
+    <div class="sectionHeader compact">
+      <div>
+        <h2>Admin Access</h2>
+        <p class="muted sectionLead">Use your Basic Auth credentials to load the live admin data.</p>
+      </div>
+    </div>
+
+    <div class="small loginHint">
+      Admin access uses <strong>Basic Auth</strong> with your Render environment variables:
+      <code>ADMIN_USERNAME</code> + <code>ADMIN_PASSWORD</code>.
+    </div>
+
+    <div class="rowCreds mt10">
+      <div class="credentialField">
+        <label class="fieldLabel" for="adminUsername">Username</label>
+        <input id="adminUsername" type="text" placeholder="Admin username" autocomplete="username" />
+      </div>
+      <div class="credentialField">
+        <label class="fieldLabel" for="adminPassword">Password</label>
+        <input id="adminPassword" type="password" placeholder="Admin password" autocomplete="current-password" />
+      </div>
+    </div>
+
+    <div class="rowToken mt10">
+      <div></div>
+      <button id="refreshBtn" class="primaryAction" type="button">Log In &amp; Load Data</button>
+    </div>
+
+    <div class="statusNotice muted" id="statusLine" role="status" aria-live="polite"></div>
   </div>
 
-  <div class="rowToken mt10">
-    <div></div>
-    <button id="refreshBtn" type="button">Log In &amp; Load Data</button>
+  <div class="dashboardGrid">
+    <div class="card dataCard">
+      <div class="sectionHeader compact">
+        <div>
+          <h3>Recent Estimates</h3>
+          <div class="muted">Latest stored quotes for operations review.</div>
+        </div>
+      </div>
+      <div id="quotesBox"></div>
+    </div>
+
+    <div class="card dataCard">
+      <div class="sectionHeader compact">
+        <div>
+          <h3>Booking Requests</h3>
+          <div class="muted">Approve to create a job entry. Reject to close the request.</div>
+        </div>
+      </div>
+      <div id="requestsBox"></div>
+    </div>
   </div>
 
-  <div class="muted" id="statusLine" role="status" aria-live="polite"></div>
-</div>
-
-<div class="row">
-  <div class="card">
-    <h3>Recent Estimates</h3>
-    <div class="muted">Latest stored quotes (for ops review).</div>
-    <div id="quotesBox"></div>
+  <div class="card dataCard mt18">
+    <div class="sectionHeader compact">
+      <div>
+        <h3>Jobs</h3>
+        <div class="muted">Jobs created after admin approval, including scheduling and calendar sync state.</div>
+      </div>
+    </div>
+    <div id="jobsBox"></div>
   </div>
-
-  <div class="card">
-    <h3>Booking Requests</h3>
-    <div class="muted">Approve → creates a job entry. Reject → closes the request.</div>
-    <div id="requestsBox"></div>
-  </div>
-</div>
-
-<div class="card mt14">
-  <h3>Jobs</h3>
-  <div class="muted">Jobs created after admin approval.</div>
-  <div id="jobsBox"></div>
 </div>
 
 <script src="/static/admin.js" defer></script>
