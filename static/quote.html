@@ -33,7 +33,7 @@
     <div class="card">
       <h2>Job Details</h2>
 
-      <form id="quoteForm" class="formWrap">
+      <form id="quoteForm" class="formWrap" novalidate>
         <div class="formSection firstStepSection">
           <h3 class="formSectionTitle">1) Contact & Job Location</h3>
           <p class="firstStepHint">Start here • Your information is secure</p>
@@ -156,7 +156,7 @@
         </div>
 
         <div class="btnRow">
-          <button class="btn" id="btnCalc" type="submit">Get My Estimate</button>
+          <button class="btn" id="btnCalc" type="button">Get My Estimate</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
         <div class="loadingState hidden" id="loadingState">
@@ -468,8 +468,7 @@
     syncServiceFields();
   });
 
-  el("quoteForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+  el("btnCalc").addEventListener("click", async () => {
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
@@ -480,6 +479,17 @@
     el("quoteSummaryCard").classList.add("hidden");
     el("loadingState").classList.remove("hidden");
     lastQuoteId = null;
+
+    const customerName = (el("customer_name").value || "").trim();
+    const customerPhone = (el("customer_phone").value || "").trim();
+    const jobAddress = (el("job_address").value || "").trim();
+    const description = (el("description").value || "").trim();
+
+    if (!customerName || !customerPhone || !jobAddress || !description) {
+      el("loadingState").classList.add("hidden");
+      showBox("resultBox", "Please fill in all required fields (name, phone, address, and description).");
+      return;
+    }
 
     const serviceType = el("service_type").value;
     const isScrap = serviceType === "scrap_pickup";
@@ -498,12 +508,12 @@
 
     const payload = {
       service_type: serviceType,
-      customer_name: (el("customer_name").value || "").trim(),
-      customer_phone: (el("customer_phone").value || "").trim(),
-      job_address: (el("job_address").value || "").trim(),
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      job_address: jobAddress,
       pickup_address: pickupAddress || null,
       dropoff_address: dropoffAddress || null,
-      description: (el("description").value || "").trim(),
+      description,
       estimated_hours: usesLabor ? parseFloat(el("estimated_hours").value || "0") : 0,
       crew_size: usesLabor ? parseInt(el("crew_size").value || "1", 10) : 1,
       garbage_bag_count: usesLoadCounts ? parseInt(el("garbage_bag_count").value || "0", 10) : 0,
@@ -512,14 +522,17 @@
       scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
     };
 
-    showBox("resultBox", "Calculating your estimate...");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const res = await fetch("/quote/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       el("loadingState").classList.add("hidden");
       const data = await res.json();
@@ -534,8 +547,8 @@
       el("decisionCard").classList.remove("hidden");
       el("quoteSummaryCard").classList.remove("hidden");
       el("summaryService").textContent = el("service_type").selectedOptions[0].textContent;
-      el("summaryCustomer").textContent = (el("customer_name").value || "").trim() + " • " + (el("customer_phone").value || "").trim();
-      el("summaryLocation").textContent = (el("job_address").value || "").trim();
+      el("summaryCustomer").textContent = customerName + " • " + customerPhone;
+      el("summaryLocation").textContent = jobAddress;
 
       showBox(
         "resultBox",
@@ -546,8 +559,13 @@
         "Note:\n" + data.response.disclaimer
       );
     } catch (err) {
+      clearTimeout(timeoutId);
       el("loadingState").classList.add("hidden");
-      showBox("resultBox", "Error:\nFailed to contact server.");
+      if (err.name === "AbortError") {
+        showBox("resultBox", "Error:\nRequest timed out. Please try again in a moment.");
+      } else {
+        showBox("resultBox", "Error:\nFailed to contact server.");
+      }
     }
   });
 
