@@ -21,3 +21,13 @@ def test_quote_page_uses_external_script_for_csp():
 
     assert '<script src="/static/quote.js" defer></script>' in quote_html
     assert "<script>" not in quote_html
+
+
+def test_admin_uploads_page_uses_external_script_for_csp():
+    """Ensure admin uploads JS executes under CSP by avoiding inline script blocks."""
+    uploads_html = Path("static/admin_uploads.html").read_text(encoding="utf-8")
+
+    assert '<script src="/static/admin_uploads.js" defer></script>' in uploads_html
+    assert "<script>" not in uploads_html
+    assert "onclick=" not in uploads_html
+    assert "onload=" not in uploads_html
