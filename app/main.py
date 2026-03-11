@@ -66,10 +66,12 @@ def _check_admin_lockout(client_ip: str) -> bool:
     """Check if client IP is locked out from too many failed attempts."""
     now = time.time()
     if client_ip in _admin_failed_attempts:
-        _admin_failed_attempts[client_ip] = [
-            t for t in _admin_failed_attempts[client_ip] if now - t < _admin_lockout_window
-        ]
-        return len(_admin_failed_attempts[client_ip]) >= _admin_lockout_threshold
+        recent_attempts = [t for t in _admin_failed_attempts[client_ip] if now - t < _admin_lockout_window]
+        if not recent_attempts:
+            del _admin_failed_attempts[client_ip]
+            return False
+        _admin_failed_attempts[client_ip] = recent_attempts
+        return len(recent_attempts) >= _admin_lockout_threshold
     return False
 
 

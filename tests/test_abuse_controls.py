@@ -1,8 +1,10 @@
+from collections import deque
 import os
 
 from fastapi.testclient import TestClient
 
 from app.abuse_controls import RateLimitMiddleware
+from app import main as main_module
 from app.main import app
 
 
@@ -27,12 +29,17 @@ BASE_PAYLOAD = {
 
 
 def _clear_rate_limit_buckets(test_client: TestClient) -> None:
+    middleware = _get_rate_limit_middleware(test_client)
+    middleware.clear_buckets()
+
+
+def _get_rate_limit_middleware(test_client: TestClient) -> RateLimitMiddleware:
     current = test_client.app.middleware_stack
     while hasattr(current, "app"):
         if isinstance(current, RateLimitMiddleware):
-            current.clear_buckets()
-            return
+            return current
         current = current.app
+    raise AssertionError("RateLimitMiddleware not found")
 
 
 class TestRateLimits:
@@ -72,3 +79,33 @@ class TestRateLimits:
 
         allowed = self.client.post("/quote/calculate", headers=other_ip_headers, json=BASE_PAYLOAD)
         assert allowed.status_code == 200
+
+    def test_empty_stale_rate_limit_bucket_is_evicted_and_recreated(self, monkeypatch):
+        headers = {"x-forwarded-for": "203.0.113.44"}
+        middleware = _get_rate_limit_middleware(self.client)
+        now = 10_000.0
+        key = (headers["x-forwarded-for"], "quote_calculate")
+        stale_bucket = deque([now - 120.0])
+        middleware._buckets[key] = stale_bucket
+
+        monkeypatch.setattr("app.abuse_controls.time.time", lambda: now)
+
+        response = self.client.post("/quote/calculate", headers=headers, json=BASE_PAYLOAD)
+
+        assert response.status_code == 200
+        assert key in middleware._buckets
+        assert middleware._buckets[key] is not stale_bucket
+        assert list(middleware._buckets[key]) == [now]
+
+
+def test_admin_failed_attempt_bucket_removed_when_all_attempts_expire(monkeypatch):
+    now = 10_000.0
+    client_ip = "198.51.100.44"
+
+    monkeypatch.setattr("app.main.time.time", lambda: now)
+
+    main_module._admin_failed_attempts.clear()
+    main_module._admin_failed_attempts[client_ip] = [now - (main_module._admin_lockout_window + 1)]
+
+    assert main_module._check_admin_lockout(client_ip) is False
+    assert client_ip not in main_module._admin_failed_attempts
