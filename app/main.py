@@ -519,10 +519,7 @@ class BookingDetails(BaseModel):
     @classmethod
     def validate_date(cls, v):
         try:
-            date_obj = datetime.strptime(v, "%Y-%m-%d").date()
-            today = datetime.now().date()
-            if date_obj < today:
-                raise ValueError("Booking date cannot be in the past")
+            datetime.strptime(v, "%Y-%m-%d")
             return v
         except ValueError as e:
             if "does not match format" in str(e):
