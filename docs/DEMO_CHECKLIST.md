@@ -22,8 +22,6 @@ Use this quick list to run a lean end-to-end demo in staging/production.
 - If calling API directly, try `POST /quote/{quote_id}/decision` with:
   - `{"action":"accept"}` (primary demo)
   - `{"action":"decline"}` (optional alternate)
-- Note: `POST /quote/{quote_id}/decision` may not be enabled on some deployments.
-  - If it returns `404`, skip API decision and continue with UI-only flow.
 
 ## 5) Admin approve
 - Open `/admin` and sign in.
