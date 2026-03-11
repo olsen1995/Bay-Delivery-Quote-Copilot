@@ -2,6 +2,8 @@
 
 Local quote/estimate tool for Bay Delivery (North Bay, Ontario).
 
+Current stable milestone: `0.10.0`.
+
 This project provides:
 
 - Customer-facing quote UI (served at `/`)
@@ -101,6 +103,15 @@ Note: the HTML pages are intentionally viewable without admin auth so refresh/di
 
 ---
 
+## Security behavior (current)
+
+- Security headers are always set in API responses, including CSP (`default-src 'self'; frame-ancestors 'none'; base-uri 'self'`).
+- Admin API endpoints require HTTP Basic auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`).
+- Brute-force protection is enabled for admin auth attempts (lockout after repeated failures).
+- Request size limits and rate limits are enabled for quote/admin POST paths.
+
+---
+
 ## Running locally (Windows PowerShell)
 
 ### Create/activate venv (recommended: Python 3.11)
@@ -144,8 +155,15 @@ Open:
 ### Versioning
 
 - `VERSION` is the source of truth for app version metadata (`/health` uses this).
-- Releases are Python-first (no Node tooling): run the **Release** GitHub Action and choose a bump type (`patch`/`minor`/`major`).
-- The release workflow updates `VERSION`, creates a `vX.Y.Z` tag, and publishes a GitHub Release.
+- `VERSION` is stored as plain `X.Y.Z` (tags/releases use the `vX.Y.Z` form).
+- Releases are Python-first (no Node tooling): run the manual **Release** GitHub Action (`workflow_dispatch`) and choose a bump type (`patch`/`minor`/`major`).
+- The release workflow updates `VERSION`, commits to `main`, creates a `vX.Y.Z` tag, and publishes a GitHub Release.
+
+### Render deployment notes
+
+- Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` on the Render service before exposing admin APIs publicly.
+- Set `BAYDELIVERY_CORS_ORIGINS` to explicit origin(s) for your deployed frontend.
+- Optional Drive env vars (`GDRIVE_*`) should only be set when Drive backup/snapshot features are needed.
 
 ---
 
