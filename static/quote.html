@@ -332,6 +332,7 @@
     el("crewSizeGroup").classList.toggle("hidden", !showLabor);
     el("scrapLocationGroup").classList.toggle("hidden", !showScrap);
     el("loadCountRow").classList.toggle("hidden", !showLoadCounts);
+    el("scrap_pickup_location").disabled = !showScrap;
 
     const help = el("serviceHelp");
     if (showScrap) {
@@ -347,6 +348,16 @@
 
   function requiresRouteFields(serviceType) {
     return serviceType === "small_move" || serviceType === "item_delivery";
+  }
+
+  function extractQuoteResponse(data) {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+    if (data.response && typeof data.response === "object") {
+      return data.response;
+    }
+    return data;
   }
 
   function syncRouteFields() {
@@ -468,8 +479,7 @@
     syncServiceFields();
   });
 
-  async function calculateQuote(e) {
-    if (e) e.preventDefault();
+  el("btnCalc").addEventListener("click", async () => {
     hideBox("resultBox");
     hideBox("uploadStatus");
     hideBox("decisionStatus");
@@ -480,65 +490,74 @@
     el("quoteSummaryCard").classList.add("hidden");
     el("loadingState").classList.remove("hidden");
     lastQuoteId = null;
-
-    const customerName = (el("customer_name").value || "").trim();
-    const customerPhone = (el("customer_phone").value || "").trim();
-    const jobAddress = (el("job_address").value || "").trim();
-    const description = (el("description").value || "").trim();
-
-    if (!customerName || !customerPhone || !jobAddress || !description) {
-      el("loadingState").classList.add("hidden");
-      showBox("resultBox", "Please fill in all required fields (name, phone, address, and description).");
-      return;
-    }
-
-    const serviceType = el("service_type").value;
-    const isScrap = serviceType === "scrap_pickup";
-    const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
-    const usesLabor = !isScrap;
-    const pickupAddress = (el("pickup_address").value || "").trim();
-    const dropoffAddress = (el("dropoff_address").value || "").trim();
-
-    if (requiresRouteFields(serviceType) && (!pickupAddress || !dropoffAddress)) {
-      el("loadingState").classList.add("hidden");
-      const servicePanel = el("serviceDetailsPanel");
-      if (servicePanel) servicePanel.open = true;
-      showBox("resultBox", "Error:\nPickup and dropoff addresses are required for small moves and item delivery.");
-      return;
-    }
-
-    const payload = {
-      service_type: serviceType,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      job_address: jobAddress,
-      pickup_address: pickupAddress || null,
-      dropoff_address: dropoffAddress || null,
-      description,
-      estimated_hours: usesLabor ? parseFloat(el("estimated_hours").value || "0") : 0,
-      crew_size: usesLabor ? parseInt(el("crew_size").value || "1", 10) : 1,
-      garbage_bag_count: usesLoadCounts ? parseInt(el("garbage_bag_count").value || "0", 10) : 0,
-      mattresses_count: usesLoadCounts ? parseInt(el("mattresses_count").value || "0", 10) : 0,
-      box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
-      scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
-    };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    let timeoutId = null;
 
     try {
+      const customerName = (el("customer_name").value || "").trim();
+      const customerPhone = (el("customer_phone").value || "").trim();
+      const jobAddress = (el("job_address").value || "").trim();
+      const description = (el("description").value || "").trim();
+
+      if (!customerName || !customerPhone || !jobAddress || !description) {
+        showBox("resultBox", "Please fill in all required fields (name, phone, address, and description).");
+        return;
+      }
+
+      const serviceType = el("service_type").value;
+      const isScrap = serviceType === "scrap_pickup";
+      const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+      const usesLabor = !isScrap;
+      const pickupAddress = (el("pickup_address").value || "").trim();
+      const dropoffAddress = (el("dropoff_address").value || "").trim();
+
+      if (requiresRouteFields(serviceType) && (!pickupAddress || !dropoffAddress)) {
+        const servicePanel = el("serviceDetailsPanel");
+        if (servicePanel) servicePanel.open = true;
+        showBox("resultBox", "Error:\nPickup and dropoff addresses are required for small moves and item delivery.");
+        return;
+      }
+
+      const payload = {
+        service_type: serviceType,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        job_address: jobAddress,
+        pickup_address: pickupAddress || null,
+        dropoff_address: dropoffAddress || null,
+        description,
+        estimated_hours: usesLabor ? parseFloat(el("estimated_hours").value || "0") : 0,
+        crew_size: usesLabor ? parseInt(el("crew_size").value || "1", 10) : 1,
+        garbage_bag_count: usesLoadCounts ? parseInt(el("garbage_bag_count").value || "0", 10) : 0,
+        mattresses_count: usesLoadCounts ? parseInt(el("mattresses_count").value || "0", 10) : 0,
+        box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
+        scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
+      };
+
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const res = await fetch("/quote/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         signal: controller.signal
       });
-      clearTimeout(timeoutId);
 
-      el("loadingState").classList.add("hidden");
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (_jsonErr) {
+        data = {};
+      }
+
       if (!res.ok) {
         showBox("resultBox", "Error:\n" + (data.detail || "Unknown error"));
+        return;
+      }
+
+      const quoteResponse = extractQuoteResponse(data);
+      if (!quoteResponse) {
+        showBox("resultBox", "Error:\nQuote response was empty.");
         return;
       }
 
@@ -555,23 +574,23 @@
         "resultBox",
         "Quote ID: " + data.quote_id + "\n" +
         "Created: " + data.created_at + "\n\n" +
-        "Cash total (no HST): $" + Number(data.response.cash_total_cad).toFixed(2) + " CAD\n" +
-        "EMT total (+13% HST): $" + Number(data.response.emt_total_cad).toFixed(2) + " CAD\n\n" +
-        "Note:\n" + data.response.disclaimer
+        "Cash total (no HST): $" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD\n" +
+        "EMT total (+13% HST): $" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD\n\n" +
+        "Note:\n" + (quoteResponse.disclaimer || "")
       );
     } catch (err) {
-      clearTimeout(timeoutId);
-      el("loadingState").classList.add("hidden");
       if (err.name === "AbortError") {
         showBox("resultBox", "Error:\nRequest timed out. Please try again in a moment.");
       } else {
         showBox("resultBox", "Error:\nFailed to contact server.");
       }
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      el("loadingState").classList.add("hidden");
     }
-  }
-
-  el("quoteForm").addEventListener("submit", calculateQuote);
-  el("btnCalc").addEventListener("click", calculateQuote);
+  });
 
   el("btnUpload").addEventListener("click", async () => {
     hideBox("uploadStatus");
