@@ -143,7 +143,9 @@ def main() -> int:
     status, quote = api("POST", "/quote/calculate", payload=quote_payload)
     require(status == 200, f"POST /quote/calculate expected 200, got {status}")
     require(isinstance(quote, dict) and bool(quote.get("quote_id")), "POST /quote/calculate expected quote_id")
+    require(isinstance(quote, dict) and bool(quote.get("accept_token")), "POST /quote/calculate expected accept_token")
     quote_id = str(quote["quote_id"])
+    accept_token = str(quote["accept_token"])
     print(f"[ok] /quote/calculate -> {quote_id}")
 
     status, missing_routes = api(
@@ -191,7 +193,11 @@ def main() -> int:
     print("[ok] /quote/calculate item_delivery with routes")
 
     # Optional route: customer decision (some deployments may not have it yet)
-    status, decision = api("POST", f"/quote/{quote_id}/decision", payload={"action": "accept"})
+    status, decision = api(
+        "POST",
+        f"/quote/{quote_id}/decision",
+        payload={"action": "accept", "accept_token": accept_token},
+    )
     if status == 404:
         detail = error_detail(decision)
         if "Not Found" in detail:
