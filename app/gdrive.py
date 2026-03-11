@@ -115,13 +115,22 @@ def _validate_drive_parent_id(parent_id: str) -> str:
     Validate parent folder ID format.
     Google Drive file IDs are typically 28-33 alphanumeric characters.
     """
-    if not parent_id or not isinstance(parent_id, str):
-        raise ValueError("Drive parent ID must be a non-empty string")
-    if len(parent_id) < 20 or len(parent_id) > 50:  # Conservative range
-        raise ValueError("Drive parent ID has invalid length")
-    if not parent_id.replace("-", "").replace("_", "").isalnum():
-        raise ValueError("Drive parent ID contains invalid characters")
-    return parent_id
+    return _validate_drive_id(parent_id, label="parent ID")
+
+
+def _validate_drive_id(value: str, *, label: str) -> str:
+    if not value or not isinstance(value, str):
+        raise ValueError(f"Drive {label} must be a non-empty string")
+    if len(value) < 20 or len(value) > 50:  # Conservative range
+        raise ValueError(f"Drive {label} has invalid length")
+    if not value.replace("-", "").replace("_", "").isalnum():
+        raise ValueError(f"Drive {label} contains invalid characters")
+    return value
+
+
+def validate_drive_file_id(file_id: str) -> str:
+    """Validate file ID format for external payloads."""
+    return _validate_drive_id(file_id, label="file ID")
 
 
 def ensure_folder(name: str, parent_id: str) -> DriveFile:
