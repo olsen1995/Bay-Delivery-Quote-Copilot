@@ -133,6 +133,28 @@
               </div>
             </div>
 
+            <div class="row">
+              <div>
+                <label for="access_difficulty">Access difficulty</label>
+                <select id="access_difficulty" name="access_difficulty">
+                  <option value="normal" selected>Normal access (main floor, easy parking)</option>
+                  <option value="difficult">Difficult access (stairs, basement carry-out, long walk)</option>
+                  <option value="extreme">Extreme access (multiple flights, tight access, difficult parking)</option>
+                </select>
+                <div class="helperText">Choose the option that best matches site access. This helps us estimate labor and timing accurately.</div>
+              </div>
+            </div>
+
+            <div class="row" id="denseMaterialsGroup">
+              <div class="checkboxWrap">
+                <label class="checkboxLabel" for="has_dense_materials">
+                  <input id="has_dense_materials" name="has_dense_materials" type="checkbox" />
+                  <span>This job includes heavy or dense materials (drywall, concrete, tile, shingles, soil, wet debris, or similar).</span>
+                </label>
+                <div class="helperText">Heavy materials can increase labor time and may affect final estimate assumptions.</div>
+              </div>
+            </div>
+
             <div class="row hidden" id="routeRow">
               <div>
                 <label for="pickup_address">Pickup address</label>
