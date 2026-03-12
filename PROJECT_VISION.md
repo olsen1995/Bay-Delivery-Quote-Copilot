@@ -13,6 +13,16 @@ This project is intentionally practical: **quotes + booking requests + job track
 
 ---
 
+## Current state (March 2026)
+
+- The project is in **stable cleanup / refinement mode** (no longer rescue mode).
+- Core customer quote flow and admin review/approval flow are stable and in regular use.
+- Security hardening baselines are in place, including CSP fixes for quote/admin/admin-uploads, request protections, and abuse-control cleanup.
+- Admin UX and frontend polish passes are complete.
+- Smoke test contract alignment, version/docs/release alignment, and dependency cleanup are complete.
+
+---
+
 ## Current Stack
 
 - **Backend:** FastAPI (Python)
@@ -63,68 +73,36 @@ This project is intentionally practical: **quotes + booking requests + job track
 
 ---
 
-## What “Done / Completed” looks like (end state)
+## What is already done (stable baseline)
 
-### 1) Quote contract is stable
+- Quote contract behavior is stable across UI, API, smoke test, and regression tests.
+- Booking lifecycle status transitions are enforced and tested (`customer_pending` → `customer_accepted/customer_declined` → `admin_approved/rejected`).
+- Admin dashboard and backend route behavior are aligned with Basic Auth protection for admin APIs.
+- Backup/recovery workflow is practical for Render reality (DB JSON export/import plus optional Drive snapshot/restore when configured).
+- Undercharge protection invariants are covered by tests for core pricing rules.
+- Reliability baseline is in place: health/version reporting, clean JSON errors, and practical operational logging.
 
-- `/quote/calculate` accepts the exact fields the UI sends
-- Returns a single consistent JSON contract used by the UI, tests, and docs
-- Aliases and normalization **cannot bypass validation** (ex: “moving” must still require pickup/dropoff)
+## Done enough for now
 
-### 2) Booking lifecycle is a strict state machine
+The product is "done enough" when it reliably protects margin, supports real booking operations, and remains understandable to operate and maintain without overengineering.
 
-Quote request statuses are consistent and enforced:
+Today that means:
 
-- `customer_pending`
-- `customer_accepted`
-- `customer_declined`
-- `admin_approved`
-- `rejected`
-
-No silent drift. Every transition is validated, and timestamps clear correctly.
-
-### 3) Admin dashboard matches backend routes
-
-Admin UI only calls endpoints that exist.
-No “token-only” ghost auth references in UI/docs/scripts if backend is Basic-only.
-
-### 4) Render recovery is real
-
-Because Render free tier resets DB:
-
-- Admin can export DB to JSON
-- Admin can import DB JSON backup
-- Optional: Drive Vault snapshot/list/restore when Drive configured
-
-### 5) Undercharge protection (tests)
-
-We have a small suite of pricing invariant tests that:
-
-- Catch accidental removal of gas/wear minimums
-- Catch HST rule regressions
-- Catch scrap pickup rule regressions
-- Catch moving 4-hour minimum + 2-worker minimum regressions
-
-### 6) Demo-ready reliability
-
-- Health endpoint indicates:
-  - version
-  - whether Drive is configured
-- Errors return clean JSON, not raw stack traces
-- Minimal logging that helps debug production failures quickly
+- Customer quotes and decisions work end-to-end.
+- Admin review/approval workflow works end-to-end.
+- Core security/hardening controls are active.
+- Recovery paths exist for ephemeral hosting.
+- Key pricing and workflow regressions are covered by tests.
 
 ---
 
-## Roadmap (execution order)
+## Remaining non-urgent improvements
 
-1. **Contract correctness** (quote calculate + UI wiring + alias validation)
-2. **Admin UI ↔ backend parity** (remove non-existent routes or implement them)
-3. **Auth consistency** (Basic-only or token-only; pick one and purge leftovers)
-4. **Backup/restore completeness** (DB export/import + Drive snapshot/list)
-5. **State machine enforcement** (request/job transitions locked)
-6. **Pricing invariant tests** (undercharge protection)
-7. **Security hardening** (CORS tightening, import validation, upload sanitization)
-8. **Release checklist + runbook** (how to deploy, how to recover)
+1. Expand runbook depth for operations (restore drills, failure playbooks, release cadence notes).
+2. Keep tightening edge-case validation and abuse controls as real usage data accumulates.
+3. Continue small UX refinements in quote/admin surfaces without changing API contracts.
+4. Add focused regression tests only where new bugs are discovered.
+5. Keep docs/version/release artifacts aligned as part of normal maintenance.
 
 ---
 
