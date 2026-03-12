@@ -2,6 +2,7 @@ const statusLine = document.getElementById("statusLine");
 const refreshBtn = document.getElementById("refreshBtn");
 const adminUsernameInput = document.getElementById("adminUsername");
 const adminPasswordInput = document.getElementById("adminPassword");
+const adminProtectedDashboard = document.getElementById("adminProtectedDashboard");
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
 const refreshButtonLabel = "Log In & Load Data";
@@ -51,6 +52,26 @@ function setLine(el, level, msg, suffixCode) {
 
 function clearNode(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+function setProtectedDashboardVisible(isVisible) {
+  if (!adminProtectedDashboard) return;
+  if (isVisible) {
+    adminProtectedDashboard.removeAttribute("hidden");
+    adminProtectedDashboard.setAttribute("aria-hidden", "false");
+    return;
+  }
+  adminProtectedDashboard.setAttribute("hidden", "");
+  adminProtectedDashboard.setAttribute("aria-hidden", "true");
+}
+
+function resetProtectedDashboard() {
+  setProtectedDashboardVisible(false);
+  const boxIds = ["quotesBox", "requestsBox", "jobsBox"];
+  boxIds.forEach((id) => {
+    const box = document.getElementById(id);
+    if (box) clearNode(box);
+  });
 }
 
 function createTable(headers) {
@@ -507,6 +528,7 @@ async function cancelJob(jobId) {
 async function refreshAll() {
   const { username, password } = getAdminCreds();
   if (!username || !password) {
+    resetProtectedDashboard();
     setLine(statusLine, "bad", "Enter both admin username and password, then press Enter or click Log In & Load Data.");
     return;
   }
@@ -514,6 +536,7 @@ async function refreshAll() {
   try {
     adminSessionReady = false;
     closeScheduleModal();
+    setProtectedDashboardVisible(false);
     setLoading(true);
     statusLine.textContent = "Authenticating and loading admin data...";
 
@@ -527,10 +550,12 @@ async function refreshAll() {
     renderJobs((jobs.items || []));
 
     adminSessionReady = true;
+    setProtectedDashboardVisible(true);
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
     adminSessionReady = false;
     closeScheduleModal();
+    resetProtectedDashboard();
     const parsed = parseApiError(err);
     const detail = safeGet(parsed, "data.detail", "");
 
@@ -562,6 +587,7 @@ adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 if (scheduleCloseBtn) scheduleCloseBtn.addEventListener("click", closeScheduleModal);
 if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeScheduleModal);
 
+resetProtectedDashboard();
 closeScheduleModal();
 setLoading(false);
 

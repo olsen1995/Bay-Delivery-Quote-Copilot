@@ -31,3 +31,14 @@ def test_admin_uploads_page_uses_external_script_for_csp():
     assert "<script>" not in uploads_html
     assert "onclick=" not in uploads_html
     assert "onload=" not in uploads_html
+
+
+def test_admin_page_gates_protected_dashboard_until_auth_load():
+    """Ensure protected admin dashboard shells are hidden by default until JS reveals them."""
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+
+    assert 'id="adminProtectedDashboard"' in admin_html
+    assert 'hidden aria-hidden="true"' in admin_html
+    assert "setProtectedDashboardVisible(true);" in admin_js
+    assert "setProtectedDashboardVisible(false);" in admin_js

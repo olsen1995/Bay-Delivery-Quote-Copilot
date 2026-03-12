@@ -9,19 +9,6 @@
 <body class="adminPage">
 
 <div class="adminShell">
-  <div class="card adminHero">
-    <div>
-      <p class="eyebrow">Bay Delivery</p>
-      <h1>Admin Dashboard</h1>
-      <p class="muted adminIntro">View recent estimates, booking requests, and jobs. Approvals create a job record automatically.</p>
-    </div>
-    <div class="heroBadgeGroup" aria-hidden="true">
-      <span class="heroBadge">Quotes</span>
-      <span class="heroBadge">Bookings</span>
-      <span class="heroBadge">Scheduling</span>
-    </div>
-  </div>
-
   <div class="card loginCard mt18">
     <div class="sectionHeader compact">
       <div>
@@ -54,36 +41,51 @@
     <div class="statusNotice muted" id="statusLine" role="status" aria-live="polite"></div>
   </div>
 
-  <div class="dashboardGrid">
-    <div class="card dataCard">
-      <div class="sectionHeader compact">
-        <div>
-          <h3>Recent Estimates</h3>
-          <div class="muted">Latest stored quotes for operations review.</div>
-        </div>
-      </div>
-      <div id="quotesBox"></div>
-    </div>
-
-    <div class="card dataCard">
-      <div class="sectionHeader compact">
-        <div>
-          <h3>Booking Requests</h3>
-          <div class="muted">Approve to create a job entry. Reject to close the request.</div>
-        </div>
-      </div>
-      <div id="requestsBox"></div>
-    </div>
-  </div>
-
-  <div class="card dataCard mt18">
-    <div class="sectionHeader compact">
+  <div id="adminProtectedDashboard" class="protectedDashboard" hidden aria-hidden="true">
+    <div class="card adminHero">
       <div>
-        <h3>Jobs</h3>
-        <div class="muted">Jobs created after admin approval, including scheduling and calendar sync state.</div>
+        <p class="eyebrow">Bay Delivery</p>
+        <h1>Admin Dashboard</h1>
+        <p class="muted adminIntro">View recent estimates, booking requests, and jobs. Approvals create a job record automatically.</p>
+      </div>
+      <div class="heroBadgeGroup" aria-hidden="true">
+        <span class="heroBadge">Quotes</span>
+        <span class="heroBadge">Bookings</span>
+        <span class="heroBadge">Scheduling</span>
       </div>
     </div>
-    <div id="jobsBox"></div>
+
+    <div class="dashboardGrid">
+      <div class="card dataCard">
+        <div class="sectionHeader compact">
+          <div>
+            <h3>Recent Estimates</h3>
+            <div class="muted">Latest stored quotes for operations review.</div>
+          </div>
+        </div>
+        <div id="quotesBox"></div>
+      </div>
+
+      <div class="card dataCard">
+        <div class="sectionHeader compact">
+          <div>
+            <h3>Booking Requests</h3>
+            <div class="muted">Approve to create a job entry. Reject to close the request.</div>
+          </div>
+        </div>
+        <div id="requestsBox"></div>
+      </div>
+    </div>
+
+    <div class="card dataCard mt18">
+      <div class="sectionHeader compact">
+        <div>
+          <h3>Jobs</h3>
+          <div class="muted">Jobs created after admin approval, including scheduling and calendar sync state.</div>
+        </div>
+      </div>
+      <div id="jobsBox"></div>
+    </div>
   </div>
 </div>
 
