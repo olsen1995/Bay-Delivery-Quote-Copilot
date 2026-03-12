@@ -50,6 +50,13 @@ DENSE_MATERIAL_LABOUR_MULTIPLIER = 1.35
 # unrealistic above this threshold).
 HAUL_AWAY_HELPER_BAG_THRESHOLD = 10
 
+# Small-load protection: for haul_away with 1–SMALL_LOAD_MAX_BAGS light (non-dense)
+# bags, the disposal allowance is computed per-bag instead of the flat tier amount.
+# This prevents a 1–3 bag job from receiving the same disposal cost as a 5-bag job.
+# Dense materials always bypass this protection so margin is preserved.
+SMALL_LOAD_MAX_BAGS = 3
+SMALL_LOAD_DISPOSAL_PER_BAG = 15.0  # $15 per bag for 1–3 light bags
+
 
 def load_config() -> Dict[str, Any]:
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -279,8 +286,16 @@ def calculate_quote(
         labor = labor * DENSE_MATERIAL_LABOUR_MULTIPLIER
 
     disposal_allowance = 0.0
+    small_load_protected = False
     if normalized == "haul_away":
-        disposal_allowance = _haul_away_disposal_allowance(svc, int(garbage_bag_count))
+        _bag_count = int(garbage_bag_count)
+        if 1 <= _bag_count <= SMALL_LOAD_MAX_BAGS and not bool(has_dense_materials):
+            # Small-load protection: scale disposal proportionally for tiny light loads.
+            # Dense materials always fall through to the full tier (margin preserved).
+            disposal_allowance = float(_bag_count) * SMALL_LOAD_DISPOSAL_PER_BAG
+            small_load_protected = True
+        else:
+            disposal_allowance = _haul_away_disposal_allowance(svc, _bag_count)
 
     mattress_boxspring = 0.0
     if normalized == "haul_away" and (int(mattresses_count) > 0 or int(box_springs_count) > 0):
@@ -326,6 +341,7 @@ def calculate_quote(
             "travel_total_cad": round(float(travel), 2),
             "labor_cad": round(float(labor), 2),
             "dense_materials": bool(has_dense_materials),
+            "small_load_protected": small_load_protected,
             "disposal_allowance_cad": round(float(disposal_allowance), 2),
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
             "access_difficulty": _ad,
