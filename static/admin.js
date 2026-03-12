@@ -81,15 +81,6 @@ function setProtectedDashboardVisible(isVisible) {
     section.setAttribute("hidden", "");
     section.setAttribute("aria-hidden", "true");
   });
-function setProtectedDashboardVisible(isVisible) {
-  if (!adminProtectedDashboard) return;
-  if (isVisible) {
-    adminProtectedDashboard.removeAttribute("hidden");
-    adminProtectedDashboard.setAttribute("aria-hidden", "false");
-    return;
-  }
-  adminProtectedDashboard.setAttribute("hidden", "");
-  adminProtectedDashboard.setAttribute("aria-hidden", "true");
 }
 
 function resetProtectedDashboard() {
