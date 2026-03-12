@@ -37,8 +37,24 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     """Ensure protected admin dashboard shells are hidden by default until JS reveals them."""
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
 
     assert 'id="adminProtectedDashboard"' in admin_html
     assert 'hidden aria-hidden="true"' in admin_html
     assert "setProtectedDashboardVisible(true);" in admin_js
     assert "setProtectedDashboardVisible(false);" in admin_js
+    assert "admin-authenticated" in admin_js
+    assert ".adminPage.admin-authenticated .protectedDashboard" in admin_css
+
+    protected_match = re.search(
+        r'(<div id="adminProtectedDashboard" class="protectedDashboard" hidden aria-hidden="true">.*?</div>\s*</div>\s*<script src="/static/admin.js" defer></script>)',
+        admin_html,
+        re.DOTALL,
+    )
+    assert protected_match is not None
+
+    protected_block = protected_match.group(1)
+    remainder = admin_html.replace(protected_block, "", 1)
+    for heading in ["Recent Estimates", "Booking Requests", "Jobs"]:
+        assert f"<h3>{heading}</h3>" in protected_block
+        assert f"<h3>{heading}</h3>" not in remainder

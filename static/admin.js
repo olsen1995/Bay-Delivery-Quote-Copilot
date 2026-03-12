@@ -3,6 +3,7 @@ const refreshBtn = document.getElementById("refreshBtn");
 const adminUsernameInput = document.getElementById("adminUsername");
 const adminPasswordInput = document.getElementById("adminPassword");
 const adminProtectedDashboard = document.getElementById("adminProtectedDashboard");
+const adminPageRoot = document.body;
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
 const refreshButtonLabel = "Log In & Load Data";
@@ -54,7 +55,13 @@ function clearNode(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
+function setAdminAuthenticated(isAuthenticated) {
+  if (!adminPageRoot) return;
+  adminPageRoot.classList.toggle("admin-authenticated", Boolean(isAuthenticated));
+}
+
 function setProtectedDashboardVisible(isVisible) {
+  setAdminAuthenticated(isVisible);
   if (!adminProtectedDashboard) return;
   if (isVisible) {
     adminProtectedDashboard.removeAttribute("hidden");
