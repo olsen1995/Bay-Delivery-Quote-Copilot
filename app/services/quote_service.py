@@ -21,6 +21,8 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
         box_springs_count=int(request_payload.get("box_springs_count", 0)),
         scrap_pickup_location=str(request_payload.get("scrap_pickup_location", "curbside")),
         travel_zone=str(request_payload.get("travel_zone", "in_town")),
+        access_difficulty=str(request_payload.get("access_difficulty", "normal")),
+        has_dense_materials=bool(request_payload.get("has_dense_materials", False)),
     )
 
     # Validate required route fields using normalized service type returned by the engine.
@@ -45,6 +47,8 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
         "box_springs_count": int(request_payload.get("box_springs_count", 0)),
         "scrap_pickup_location": request_payload.get("scrap_pickup_location", "curbside"),
         "travel_zone": request_payload.get("travel_zone", "in_town"),
+        "access_difficulty": request_payload.get("access_difficulty", "normal"),
+        "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
     }
 
     # Generate accept_token for this quote (before saving)

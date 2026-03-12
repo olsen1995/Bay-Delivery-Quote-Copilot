@@ -33,6 +33,23 @@ TRAVEL_ZONE_ADDERS = {
     "out_of_town": 40.0,
 }
 
+# Access difficulty surcharges — applied after labour/disposal, before minimum check.
+# Designed to protect margins on stairs, basements, long carry, tight access.
+ACCESS_DIFFICULTY_ADDERS = {
+    "normal": 0.0,
+    "difficult": 25.0,   # e.g. one flight of stairs, basement, tight parking
+    "extreme": 60.0,    # e.g. multiple flights, steep stairs, very narrow doorway
+}
+
+# Dense/heavy material labour load multiplier (applied to haul_away labour only).
+# Dense materials (drywall, concrete, shingles, tile, wet debris) load much
+# slower per bag than typical household junk — protect against undercharging.
+DENSE_MATERIAL_LABOUR_MULTIPLIER = 1.35
+
+# Minimum bag count that requires a helper for haul_away (single worker is
+# unrealistic above this threshold).
+HAUL_AWAY_HELPER_BAG_THRESHOLD = 10
+
 
 def load_config() -> Dict[str, Any]:
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -170,6 +187,8 @@ def calculate_quote(
     box_springs_count: int = 0,
     scrap_pickup_location: str = "curbside",
     travel_zone: str = "in_town",
+    access_difficulty: str = "normal",
+    has_dense_materials: bool = False,
 ) -> Dict[str, Any]:
     """
     Customer-safe output:
@@ -220,6 +239,12 @@ def calculate_quote(
 
     billable_hours = max(float(hours), _get_min_hours(svc))
 
+    # Resolve and clamp access difficulty
+    _ad = (access_difficulty or "normal").strip().lower()
+    if _ad not in ACCESS_DIFFICULTY_ADDERS:
+        _ad = "normal"
+    access_adder = float(ACCESS_DIFFICULTY_ADDERS[_ad])
+
     # Moving minimum 4 hours (your rule)
     if normalized in ("small_move", "moving"):
         billable_hours = max(billable_hours, 4.0)
@@ -228,6 +253,15 @@ def calculate_quote(
         crew_size = max(int(crew_size), 2)
     else:
         crew_size = max(int(crew_size), 1)
+
+    # haul_away helper escalation rules
+    # 1) Large load (>= HAUL_AWAY_HELPER_BAG_THRESHOLD bags) needs a helper.
+    # 2) Dense/heavy materials need a helper regardless of bag count.
+    haul_away_crew_escalated = False
+    if normalized == "haul_away" and crew_size < 2:
+        if int(garbage_bag_count) >= HAUL_AWAY_HELPER_BAG_THRESHOLD or bool(has_dense_materials):
+            crew_size = 2
+            haul_away_crew_escalated = True
 
     base_travel = _travel_min(config)
 
@@ -239,6 +273,11 @@ def calculate_quote(
 
     labor = _labor(billable_hours, crew_size, rates["primary"], rates["helper"])
 
+    # Dense material labour surcharge: loading drywall/concrete/etc. takes longer.
+    # Applied to haul_away labour only; does not affect travel or disposal allowance.
+    if normalized == "haul_away" and bool(has_dense_materials):
+        labor = labor * DENSE_MATERIAL_LABOUR_MULTIPLIER
+
     disposal_allowance = 0.0
     if normalized == "haul_away":
         disposal_allowance = _haul_away_disposal_allowance(svc, int(garbage_bag_count))
@@ -247,7 +286,7 @@ def calculate_quote(
     if normalized == "haul_away" and (int(mattresses_count) > 0 or int(box_springs_count) > 0):
         mattress_boxspring = _mattress_boxspring_fee(svc, int(mattresses_count), int(box_springs_count))
 
-    raw_cash = travel + labor + disposal_allowance + mattress_boxspring
+    raw_cash = travel + labor + disposal_allowance + mattress_boxspring + access_adder
 
     min_total = _get_min_total(svc)
     cash_before_round = max(raw_cash, min_total)
@@ -277,6 +316,7 @@ def calculate_quote(
         "disclaimer": disclaimer,
         "_internal": {
             "crew_size": int(crew_size),
+            "crew_escalated": haul_away_crew_escalated,
             "billable_hours": round(float(billable_hours), 2),
             "primary_rate_cad": round(float(rates["primary"]), 2),
             "helper_rate_cad": round(float(rates["helper"]), 2),
@@ -285,7 +325,10 @@ def calculate_quote(
             "travel_zone_adder_cad": round(float(travel_adder), 2),
             "travel_total_cad": round(float(travel), 2),
             "labor_cad": round(float(labor), 2),
+            "dense_materials": bool(has_dense_materials),
             "disposal_allowance_cad": round(float(disposal_allowance), 2),
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
+            "access_difficulty": _ad,
+            "access_difficulty_adder_cad": round(float(access_adder), 2),
         },
     }

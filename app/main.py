@@ -432,6 +432,8 @@ class QuoteRequestPayload(BaseModel):
     box_springs_count: int = Field(0, ge=0)
     scrap_pickup_location: str = Field("curbside", max_length=50)
     travel_zone: str = Field("in_town", max_length=50)
+    access_difficulty: str = Field("normal", max_length=50)
+    has_dense_materials: bool = Field(False)
 
     @field_validator(
         "customer_name",
@@ -445,6 +447,7 @@ class QuoteRequestPayload(BaseModel):
         "dropoff_address",
         "scrap_pickup_location",
         "travel_zone",
+        "access_difficulty",
         mode="before",
     )
     @classmethod

@@ -80,6 +80,7 @@ def calculate_quote(analysis: dict) -> dict:
         "easy": 1.0,
         "moderate": 1.2,
         "hard": 1.5,
+        "extreme": 2.0,
     }.get(difficulty, 1.0)
 
     # -----------------------
@@ -92,7 +93,7 @@ def calculate_quote(analysis: dict) -> dict:
     else:
         gas_fee = 60.0
 
-    if difficulty == "hard":
+    if difficulty == "hard" or difficulty == "extreme":
         gas_fee += 20.0
 
     # -----------------------
@@ -119,7 +120,24 @@ def calculate_quote(analysis: dict) -> dict:
         base_rate_per_yard = 90.0
         heavy_item_fee = 35.0
 
-        base_cost = volume * base_rate_per_yard
+        # Dense/heavy material detection: concrete, drywall, shingles, tile,
+        # wet debris etc. are far heavier per cubic yard than typical junk.
+        # Applying a density surcharge protects against undercharging small-
+        # looking but very heavy loads.
+        DENSE_KEYWORDS = (
+            "drywall", "concrete", "shingle", "tile", "cement",
+            "brick", "plaster", "gravel", "dirt", "soil", "wet",
+            "sod", "asphalt", "slate",
+        )
+        heavy_items_lower = [str(item).lower() for item in heavy_items]
+        has_dense = any(
+            keyword in item
+            for item in heavy_items_lower
+            for keyword in DENSE_KEYWORDS
+        )
+        density_multiplier = 1.35 if has_dense else 1.0
+
+        base_cost = volume * base_rate_per_yard * density_multiplier
 
         # Mattress/Box Spring rule (ONLY special callout we keep)
         mattress_count = sum(
@@ -163,6 +181,8 @@ def calculate_quote(analysis: dict) -> dict:
                 "heavy_item_cost": round(heavy_cost, 2),
                 "mattress_fee_included": round(mattress_fee, 2),
                 "difficulty_multiplier": difficulty_multiplier,
+                "dense_material_detected": has_dense,
+                "density_multiplier": density_multiplier,
                 "gas_fee": round(gas_fee, 2),
                 "wear_and_tear": round(wear_and_tear, 2),
                 "disposal_included": True,
