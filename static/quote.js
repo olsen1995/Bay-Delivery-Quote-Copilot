@@ -201,7 +201,7 @@ function renderQuoteResult(data, quoteResponse) {
 
   const estimateDetailsReassurance = document.createElement("p");
   estimateDetailsReassurance.className = "muted estimateDetailsReassurance";
-  estimateDetailsReassurance.textContent = "This estimate is based on the details you provided and may adjust if job conditions differ on arrival.";
+  estimateDetailsReassurance.textContent = "No obligation estimate. Final price is confirmed before work begins if conditions differ from the details provided.";
 
   estimateDetails.append(estimateDetailsTitle, estimateDetailsList, estimateDetailsReassurance);
 
