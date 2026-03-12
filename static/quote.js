@@ -74,6 +74,72 @@ function createInfoBlock(label, value, extraClass) {
   return block;
 }
 
+function getLoadSizeLabel(bagCount) {
+  if (bagCount <= 0) return "Estimated";
+  if (bagCount <= 5) return "Small";
+  if (bagCount <= 12) return "Medium";
+  if (bagCount <= 20) return "Large";
+  return "Extra-large";
+}
+
+function pluralize(count, singular, plural) {
+  return count === 1 ? singular : plural;
+}
+
+function buildEstimateDetails() {
+  const serviceType = el("service_type").value;
+  const serviceLabel = el("service_type").selectedOptions[0].textContent;
+  const access = el("access_difficulty").value;
+  const hasDenseMaterials = el("has_dense_materials").checked;
+  const bagCount = parseInt(el("garbage_bag_count").value || "0", 10);
+  const mattresses = parseInt(el("mattresses_count").value || "0", 10);
+  const boxSprings = parseInt(el("box_springs_count").value || "0", 10);
+  const details = [];
+
+  if (serviceType === "haul_away" || serviceType === "demolition") {
+    const loadType = serviceType === "demolition" ? "demolition debris load" : "junk load";
+    const loadSize = getLoadSizeLabel(bagCount);
+    details.push(loadSize + " " + loadType + " (" + bagCount + " " + pluralize(bagCount, "bag", "bags") + ")");
+
+    if (mattresses > 0 || boxSprings > 0) {
+      const pieces = [];
+      if (mattresses > 0) {
+        pieces.push(mattresses + " " + pluralize(mattresses, "mattress", "mattresses"));
+      }
+      if (boxSprings > 0) {
+        pieces.push(boxSprings + " " + pluralize(boxSprings, "box spring", "box springs"));
+      }
+      details.push("Bulk items included: " + pieces.join(" and "));
+    }
+  }
+
+  details.push("Service selected: " + serviceLabel);
+
+  if (access === "normal") {
+    details.push("Easy access");
+  } else if (access === "difficult") {
+    details.push("Difficult access (stairs, basement, or long carry)");
+  } else {
+    details.push("Extreme access conditions");
+  }
+
+  if (hasDenseMaterials) {
+    details.push("Heavy or dense materials included");
+  }
+
+  if (serviceType === "haul_away" || serviceType === "demolition" || serviceType === "scrap_pickup") {
+    details.push("Disposal included");
+  }
+
+  if (requiresRouteFields(serviceType)) {
+    details.push("Travel included based on your local pickup and dropoff details");
+  } else {
+    details.push("Local service area");
+  }
+
+  return details;
+}
+
 function renderQuoteResult(data, quoteResponse) {
   const box = el("resultBox");
   box.classList.remove("hidden");
@@ -119,13 +185,25 @@ function renderQuoteResult(data, quoteResponse) {
   );
   breakdown.append(breakdownTitle, amountGrid);
 
-  const estimateSummary = document.createElement("div");
-  estimateSummary.className = "estimateSummary";
-  estimateSummary.append(
-    createInfoBlock("Service type", el("service_type").selectedOptions[0].textContent, "estimateSummaryItem"),
-    createInfoBlock("Access", el("access_difficulty").selectedOptions[0].textContent, "estimateSummaryItem"),
-    createInfoBlock("Dense materials", el("has_dense_materials").checked ? "Included" : "Not included", "estimateSummaryItem")
-  );
+  const estimateDetails = document.createElement("div");
+  estimateDetails.className = "estimateDetails";
+
+  const estimateDetailsTitle = document.createElement("h3");
+  estimateDetailsTitle.textContent = "Estimate Details";
+
+  const estimateDetailsList = document.createElement("ul");
+  estimateDetailsList.className = "estimateDetailsList";
+  buildEstimateDetails().forEach((detail) => {
+    const item = document.createElement("li");
+    item.textContent = detail;
+    estimateDetailsList.appendChild(item);
+  });
+
+  const estimateDetailsReassurance = document.createElement("p");
+  estimateDetailsReassurance.className = "muted estimateDetailsReassurance";
+  estimateDetailsReassurance.textContent = "This estimate is based on the details you provided and may adjust if job conditions differ on arrival.";
+
+  estimateDetails.append(estimateDetailsTitle, estimateDetailsList, estimateDetailsReassurance);
 
   const note = document.createElement("div");
   note.className = "quoteResultNote";
@@ -136,7 +214,7 @@ function renderQuoteResult(data, quoteResponse) {
   noteBody.textContent = quoteResponse.disclaimer || "";
   note.append(noteTitle, noteBody);
 
-  wrapper.append(header, breakdown, estimateSummary, note);
+  wrapper.append(header, breakdown, estimateDetails, note);
   box.appendChild(wrapper);
 }
 
