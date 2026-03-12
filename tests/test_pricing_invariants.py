@@ -120,9 +120,13 @@ def test_crew_size_monotonic_non_decreasing(client: TestClient, service_type: st
 
 
 def test_haul_away_garbage_bag_count_monotonic_non_decreasing(client: TestClient) -> None:
+    # Sequence starts at 1: the small-load protection produces per-bag disposal
+    # for 1–3 bags, so price correctly increases as bag count grows from 1 onward.
+    # bag_count=0 (unknown/unspecified load) is a special conservative case that
+    # does not participate in this monotone contract.
     payload = _base_payload(service_type="haul_away")
 
-    bag_sequence = [0, 1, 5, 6, 15, 16, 30]
+    bag_sequence = [1, 2, 3, 4, 5, 6, 15, 16, 30]
     seen_cash = []
     seen_emt = []
 
@@ -422,3 +426,125 @@ def test_combining_difficult_access_and_dense_materials_is_additive(client: Test
     assert cash_both >= cash_diff, "difficult+dense should cost >= difficult alone"
     assert cash_both >= cash_dense, "difficult+dense should cost >= dense alone"
     assert cash_both >= cash_base, "difficult+dense should cost >= base"
+
+
+# =============================================================================
+# Small-load protection tier tests
+# =============================================================================
+
+def test_small_load_1_bag_cheaper_than_5_bags(client: TestClient) -> None:
+    """1 light bag must cost less than 5 bags (same zone/access) — protection is active."""
+    payload = _base_payload(service_type="haul_away")
+    payload["has_dense_materials"] = False
+
+    resp_1 = _post_quote(client, {**payload, "garbage_bag_count": 1})
+    resp_5 = _post_quote(client, {**payload, "garbage_bag_count": 5})
+
+    assert resp_1.status_code == 200
+    assert resp_5.status_code == 200
+
+    cash_1, _ = _assert_success_schema_and_totals(resp_1.json())
+    cash_5, _ = _assert_success_schema_and_totals(resp_5.json())
+
+    assert cash_1 < cash_5, (
+        f"1-bag light job should cost less than 5-bag job; got 1-bag={cash_1}, 5-bag={cash_5}"
+    )
+
+
+def test_small_load_2_bags_cheaper_than_5_bags(client: TestClient) -> None:
+    """2 light bags must cost less than 5 bags — protection still active at 2 bags."""
+    payload = _base_payload(service_type="haul_away")
+    payload["has_dense_materials"] = False
+
+    resp_2 = _post_quote(client, {**payload, "garbage_bag_count": 2})
+    resp_5 = _post_quote(client, {**payload, "garbage_bag_count": 5})
+
+    assert resp_2.status_code == 200
+    assert resp_5.status_code == 200
+
+    cash_2, _ = _assert_success_schema_and_totals(resp_2.json())
+    cash_5, _ = _assert_success_schema_and_totals(resp_5.json())
+
+    assert cash_2 < cash_5, (
+        f"2-bag light job should cost less than 5-bag job; got 2-bag={cash_2}, 5-bag={cash_5}"
+    )
+
+
+def test_small_load_3_bags_cheaper_than_5_bags(client: TestClient) -> None:
+    """3 light bags must cost less than 5 bags — SMALL_LOAD_MAX_BAGS boundary."""
+    payload = _base_payload(service_type="haul_away")
+    payload["has_dense_materials"] = False
+
+    resp_3 = _post_quote(client, {**payload, "garbage_bag_count": 3})
+    resp_5 = _post_quote(client, {**payload, "garbage_bag_count": 5})
+
+    assert resp_3.status_code == 200
+    assert resp_5.status_code == 200
+
+    cash_3, _ = _assert_success_schema_and_totals(resp_3.json())
+    cash_5, _ = _assert_success_schema_and_totals(resp_5.json())
+
+    assert cash_3 < cash_5, (
+        f"3-bag light job should cost less than 5-bag job; got 3-bag={cash_3}, 5-bag={cash_5}"
+    )
+
+
+@pytest.mark.parametrize("bag_count", [1, 2, 3])
+def test_small_load_above_minimum_total(client: TestClient, bag_count: int) -> None:
+    """Small-load protected quotes must still meet the service minimum."""
+    payload = _base_payload(service_type="haul_away")
+    payload["garbage_bag_count"] = bag_count
+    payload["has_dense_materials"] = False
+
+    response = _post_quote(client, payload)
+    assert response.status_code == 200
+    cash, _ = _assert_success_schema_and_totals(response.json())
+    assert cash >= 50, f"Small-load quote must be >= minimum $50; got {cash}"
+
+
+def test_small_load_dense_escapes_protection(client: TestClient) -> None:
+    """Dense materials on a 1–3 bag job must escape the small-load tier and cost more."""
+    payload = _base_payload(service_type="haul_away")
+    payload["garbage_bag_count"] = 2
+    payload["estimated_hours"] = 1.0
+    payload["crew_size"] = 1
+
+    resp_light = _post_quote(client, {**payload, "has_dense_materials": False})
+    resp_dense = _post_quote(client, {**payload, "has_dense_materials": True})
+
+    assert resp_light.status_code == 200
+    assert resp_dense.status_code == 200
+
+    cash_light, _ = _assert_success_schema_and_totals(resp_light.json())
+    cash_dense, _ = _assert_success_schema_and_totals(resp_dense.json())
+
+    assert cash_dense > cash_light, (
+        f"Dense 2-bag job should cost more than light 2-bag (protection escaped); "
+        f"light={cash_light}, dense={cash_dense}"
+    )
+
+
+def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> None:
+    """4 bags (just above threshold) must not receive the per-bag protection rate."""
+    payload = _base_payload(service_type="haul_away")
+    payload["has_dense_materials"] = False
+
+    resp_3 = _post_quote(client, {**payload, "garbage_bag_count": 3})
+    resp_4 = _post_quote(client, {**payload, "garbage_bag_count": 4})
+    resp_5 = _post_quote(client, {**payload, "garbage_bag_count": 5})
+
+    for r in (resp_3, resp_4, resp_5):
+        assert r.status_code == 200
+
+    cash_3, _ = _assert_success_schema_and_totals(resp_3.json())
+    cash_4, _ = _assert_success_schema_and_totals(resp_4.json())
+    cash_5, _ = _assert_success_schema_and_totals(resp_5.json())
+
+    # 4+ bags leave the protection and hit the flat disposal tier;
+    # price must not drop back below the 3-bag protected price.
+    assert cash_4 >= cash_3, (
+        f"4-bag job should cost >= 3-bag job (no protection dip); got 3={cash_3}, 4={cash_4}"
+    )
+    assert cash_5 >= cash_4, (
+        f"5-bag job should cost >= 4-bag job; got 4={cash_4}, 5={cash_5}"
+    )
