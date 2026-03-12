@@ -36,6 +36,23 @@
       </div>
     </div>
 
+    <div class="card progressCard" id="flowProgressCard">
+      <div class="sectionHeader compact">
+        <div>
+          <p class="sectionEyebrow">Quote Flow</p>
+          <h2>What happens next</h2>
+        </div>
+        <p class="muted sectionLead">You stay in control at every step. No booking is created unless you accept the estimate.</p>
+      </div>
+      <ol class="flowProgress" id="flowProgress" aria-label="Quote progress">
+        <li class="flowStep is-active" data-step="1"><span class="flowStepBadge">1</span><span class="flowStepLabel">Job details</span></li>
+        <li class="flowStep" data-step="2"><span class="flowStepBadge">2</span><span class="flowStepLabel">Estimate</span></li>
+        <li class="flowStep" data-step="3"><span class="flowStepBadge">3</span><span class="flowStepLabel">Accept or decline</span></li>
+        <li class="flowStep" data-step="4"><span class="flowStepBadge">4</span><span class="flowStepLabel">Booking details</span></li>
+        <li class="flowStep" data-step="5"><span class="flowStepBadge">5</span><span class="flowStepLabel">Upload photos</span></li>
+      </ol>
+    </div>
+
     <div class="card formCard">
       <div class="sectionHeader">
         <div>
@@ -141,7 +158,7 @@
                   <option value="difficult">Difficult access (stairs, basement carry-out, long walk)</option>
                   <option value="extreme">Extreme access (multiple flights, tight access, difficult parking)</option>
                 </select>
-                <div class="helperText">Choose the option that best matches site access. This helps us estimate labor and timing accurately.</div>
+                <div class="helperText">Pick the option that best matches the site. Accurate access details help us quote labor fairly up front.</div>
               </div>
             </div>
 
@@ -151,7 +168,7 @@
                   <input id="has_dense_materials" name="has_dense_materials" type="checkbox" />
                   <span>This job includes heavy or dense materials (drywall, concrete, tile, shingles, soil, wet debris, or similar).</span>
                 </label>
-                <div class="helperText">Heavy materials can increase labor time and may affect final estimate assumptions.</div>
+                <div class="helperText">Dense materials usually take more loading time. Telling us now keeps the estimate realistic.</div>
               </div>
             </div>
 
@@ -184,7 +201,7 @@
               </div>
               <div>
                 <label class="muted">Photo tip</label>
-                <div class="hint">You can upload photos after the quote is generated.</div>
+                <div class="hint">After your estimate, you can upload photos to improve final job accuracy before scheduling.</div>
               </div>
             </div>
 
@@ -220,6 +237,7 @@
     <div class="card resultBox hidden" id="resultBox" aria-live="polite"></div>
     <div class="card hidden stageCard" id="quoteSummaryCard">
       <h2>Quote Summary</h2>
+      <p class="muted sectionLead">Your estimate is generated from the job details you provided and follows our standard North Bay pricing structure.</p>
       <div class="quoteSummaryGrid">
         <div><strong>Service:</strong> <span id="summaryService"></span></div>
         <div><strong>Customer:</strong> <span id="summaryCustomer"></span></div>
@@ -229,7 +247,7 @@
 
     <div class="card hidden stageCard" id="decisionCard">
       <h2>Quote Decision</h2>
-      <p class="muted sectionLead">If this works for you, accept and we’ll send it for admin confirmation.</p>
+      <p class="muted sectionLead">If this estimate looks good, accept and we’ll move to booking preferences. If not, you can decline with no pressure.</p>
 
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
@@ -248,7 +266,7 @@
 
     <div class="card hidden stageCard" id="bookingCard">
       <h2>Submit Booking Details</h2>
-      <p class="muted sectionLead">Provide your preferred scheduling for your accepted quote.</p>
+      <p class="muted sectionLead">Share your preferred timing and we’ll follow up to confirm the best available slot.</p>
 
       <div class="formWrap">
         <p class="muted bookingContactInfo">
@@ -286,12 +304,13 @@
     </div>
 
     <div class="card hidden stageCard" id="uploadCard">
-      <h2>Optional: Upload Photos</h2>
-      <p class="muted sectionLead">These photos are saved for admin review.</p>
+      <h2>Optional: Upload Photos for Better Accuracy</h2>
+      <p class="muted sectionLead">Photos help us confirm access, volume, and materials so your final on-site workflow is smoother.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>
         <input id="photos" name="photos" type="file" accept="image/*" multiple />
+        <p class="helperText">Tip: wide-angle photos from multiple corners are most useful. Maximum 5 images.</p>
 
         <div class="btnRow">
           <button class="btn secondary" id="btnUpload" type="button">Upload Photos</button>
