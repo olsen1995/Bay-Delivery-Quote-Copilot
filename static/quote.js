@@ -149,6 +149,7 @@ function syncServiceFields() {
   const showRoute = serviceType === "small_move" || serviceType === "item_delivery";
   const showScrap = serviceType === "scrap_pickup";
   const showLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+  const showDenseMaterials = showLoadCounts;
   const showLabor = !showScrap;
 
   resetInapplicableServiceFields(serviceType);
@@ -157,7 +158,12 @@ function syncServiceFields() {
   el("crewSizeGroup").classList.toggle("hidden", !showLabor);
   el("scrapLocationGroup").classList.toggle("hidden", !showScrap);
   el("loadCountRow").classList.toggle("hidden", !showLoadCounts);
+  el("denseMaterialsGroup").classList.toggle("hidden", !showDenseMaterials);
   el("scrap_pickup_location").disabled = !showScrap;
+  el("has_dense_materials").disabled = !showDenseMaterials;
+  if (!showDenseMaterials) {
+    el("has_dense_materials").checked = false;
+  }
 
   const help = el("serviceHelp");
   if (showScrap) {
@@ -351,6 +357,8 @@ el("btnCalc").addEventListener("click", async () => {
       description,
       estimated_hours: usesLabor ? parseFloat(el("estimated_hours").value || "0") : 0,
       crew_size: usesLabor ? parseInt(el("crew_size").value || "1", 10) : 1,
+      access_difficulty: el("access_difficulty").value || "normal",
+      has_dense_materials: usesLoadCounts ? el("has_dense_materials").checked : false,
       garbage_bag_count: usesLoadCounts ? parseInt(el("garbage_bag_count").value || "0", 10) : 0,
       mattresses_count: usesLoadCounts ? parseInt(el("mattresses_count").value || "0", 10) : 0,
       box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
