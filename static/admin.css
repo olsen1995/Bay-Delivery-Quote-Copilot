@@ -132,12 +132,22 @@ label {
 }
 
 .protectedDashboard {
+	display: none;
+	gap: 18px;
+}
+
+.adminPage.admin-authenticated .protectedDashboard {
+	display: grid;
 	display: grid;
 	gap: 18px;
 }
 
 .protectedDashboard[hidden] {
 	display: none;
+}
+
+.adminProtectedSection[hidden] {
+	display: none !important;
 }
 
 .adminHero {

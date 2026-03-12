@@ -3,6 +3,8 @@ const refreshBtn = document.getElementById("refreshBtn");
 const adminUsernameInput = document.getElementById("adminUsername");
 const adminPasswordInput = document.getElementById("adminPassword");
 const adminProtectedDashboard = document.getElementById("adminProtectedDashboard");
+const adminProtectedSections = Array.from(document.querySelectorAll("[data-admin-protected='true']"));
+const adminPageRoot = document.body;
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
 const refreshButtonLabel = "Log In & Load Data";
@@ -54,6 +56,31 @@ function clearNode(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
+function setAdminAuthenticated(isAuthenticated) {
+  if (!adminPageRoot) return;
+  adminPageRoot.classList.toggle("admin-authenticated", Boolean(isAuthenticated));
+}
+
+function setProtectedDashboardVisible(isVisible) {
+  setAdminAuthenticated(isVisible);
+  if (adminProtectedDashboard) {
+    if (isVisible) {
+      adminProtectedDashboard.removeAttribute("hidden");
+      adminProtectedDashboard.setAttribute("aria-hidden", "false");
+    } else {
+      adminProtectedDashboard.setAttribute("hidden", "");
+      adminProtectedDashboard.setAttribute("aria-hidden", "true");
+    }
+  }
+  adminProtectedSections.forEach((section) => {
+    if (isVisible) {
+      section.removeAttribute("hidden");
+      section.setAttribute("aria-hidden", "false");
+      return;
+    }
+    section.setAttribute("hidden", "");
+    section.setAttribute("aria-hidden", "true");
+  });
 function setProtectedDashboardVisible(isVisible) {
   if (!adminProtectedDashboard) return;
   if (isVisible) {
