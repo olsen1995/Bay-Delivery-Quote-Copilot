@@ -131,6 +131,15 @@ label {
 	gap: 18px;
 }
 
+.protectedDashboard {
+	display: grid;
+	gap: 18px;
+}
+
+.protectedDashboard[hidden] {
+	display: none;
+}
+
 .adminHero {
 	display: flex;
 	justify-content: space-between;
