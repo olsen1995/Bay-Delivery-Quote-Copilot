@@ -144,6 +144,10 @@ label {
 	display: none;
 }
 
+.adminProtectedSection[hidden] {
+	display: none !important;
+}
+
 .adminHero {
 	display: flex;
 	justify-content: space-between;

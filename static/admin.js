@@ -3,6 +3,7 @@ const refreshBtn = document.getElementById("refreshBtn");
 const adminUsernameInput = document.getElementById("adminUsername");
 const adminPasswordInput = document.getElementById("adminPassword");
 const adminProtectedDashboard = document.getElementById("adminProtectedDashboard");
+const adminProtectedSections = Array.from(document.querySelectorAll("[data-admin-protected='true']"));
 const adminPageRoot = document.body;
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
@@ -62,14 +63,24 @@ function setAdminAuthenticated(isAuthenticated) {
 
 function setProtectedDashboardVisible(isVisible) {
   setAdminAuthenticated(isVisible);
-  if (!adminProtectedDashboard) return;
-  if (isVisible) {
-    adminProtectedDashboard.removeAttribute("hidden");
-    adminProtectedDashboard.setAttribute("aria-hidden", "false");
-    return;
+  if (adminProtectedDashboard) {
+    if (isVisible) {
+      adminProtectedDashboard.removeAttribute("hidden");
+      adminProtectedDashboard.setAttribute("aria-hidden", "false");
+    } else {
+      adminProtectedDashboard.setAttribute("hidden", "");
+      adminProtectedDashboard.setAttribute("aria-hidden", "true");
+    }
   }
-  adminProtectedDashboard.setAttribute("hidden", "");
-  adminProtectedDashboard.setAttribute("aria-hidden", "true");
+  adminProtectedSections.forEach((section) => {
+    if (isVisible) {
+      section.removeAttribute("hidden");
+      section.setAttribute("aria-hidden", "false");
+      return;
+    }
+    section.setAttribute("hidden", "");
+    section.setAttribute("aria-hidden", "true");
+  });
 }
 
 function resetProtectedDashboard() {
