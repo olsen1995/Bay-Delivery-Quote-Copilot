@@ -64,3 +64,8 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     for heading in ["Recent Estimates", "Booking Requests", "Jobs"]:
         assert f"<h3>{heading}</h3>" in protected_block
         assert f"<h3>{heading}</h3>" not in remainder
+
+    assert 'id="adminProtectedDashboard"' in admin_html
+    assert 'hidden aria-hidden="true"' in admin_html
+    assert "setProtectedDashboardVisible(true);" in admin_js
+    assert "setProtectedDashboardVisible(false);" in admin_js

@@ -138,6 +138,8 @@ label {
 
 .adminPage.admin-authenticated .protectedDashboard {
 	display: grid;
+	display: grid;
+	gap: 18px;
 }
 
 .protectedDashboard[hidden] {
