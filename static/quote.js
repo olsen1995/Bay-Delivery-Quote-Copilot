@@ -2,6 +2,7 @@ const el = (id) => document.getElementById(id);
 let lastQuoteId = null;
 let lastAcceptToken = null;
 let lastBookingToken = null;
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function setBoxState(box, state) {
   box.classList.remove("boxInfo", "boxSuccess", "boxError");
@@ -29,6 +30,36 @@ function hideBox(id) {
   box.textContent = "";
 }
 
+function scrollToElement(id) {
+  const node = el(id);
+  if (!node) return;
+  node.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+}
+
+function revealCard(id, shouldScroll) {
+  const card = el(id);
+  if (!card) return;
+  const wasHidden = card.classList.contains("hidden");
+  card.classList.remove("hidden");
+  if (wasHidden) {
+    card.classList.remove("stageReveal");
+    void card.offsetWidth;
+    card.classList.add("stageReveal");
+  }
+  if (shouldScroll) {
+    scrollToElement(id);
+  }
+}
+
+function setFlowStage(stage) {
+  const steps = document.querySelectorAll("#flowProgress .flowStep");
+  steps.forEach((stepEl, idx) => {
+    const stepNumber = idx + 1;
+    stepEl.classList.toggle("is-complete", stepNumber < stage);
+    stepEl.classList.toggle("is-active", stepNumber === stage);
+  });
+}
+
 function createInfoBlock(label, value, extraClass) {
   const block = document.createElement("div");
   if (extraClass) block.className = extraClass;
@@ -47,6 +78,9 @@ function renderQuoteResult(data, quoteResponse) {
   const box = el("resultBox");
   box.classList.remove("hidden");
   setBoxState(box, "success");
+  box.classList.remove("stageReveal");
+  void box.offsetWidth;
+  box.classList.add("stageReveal");
   box.replaceChildren();
 
   const wrapper = document.createElement("div");
@@ -85,6 +119,14 @@ function renderQuoteResult(data, quoteResponse) {
   );
   breakdown.append(breakdownTitle, amountGrid);
 
+  const estimateSummary = document.createElement("div");
+  estimateSummary.className = "estimateSummary";
+  estimateSummary.append(
+    createInfoBlock("Service type", el("service_type").selectedOptions[0].textContent, "estimateSummaryItem"),
+    createInfoBlock("Access", el("access_difficulty").selectedOptions[0].textContent, "estimateSummaryItem"),
+    createInfoBlock("Dense materials", el("has_dense_materials").checked ? "Included" : "Not included", "estimateSummaryItem")
+  );
+
   const note = document.createElement("div");
   note.className = "quoteResultNote";
   const noteTitle = document.createElement("h3");
@@ -94,7 +136,7 @@ function renderQuoteResult(data, quoteResponse) {
   noteBody.textContent = quoteResponse.disclaimer || "";
   note.append(noteTitle, noteBody);
 
-  wrapper.append(header, breakdown, note);
+  wrapper.append(header, breakdown, estimateSummary, note);
   box.appendChild(wrapper);
 }
 
@@ -114,6 +156,7 @@ function clearForm() {
   el("bookingCard").classList.add("hidden");
   el("quoteSummaryCard").classList.add("hidden");
   el("loadingState").classList.add("hidden");
+  setFlowStage(1);
   lastQuoteId = null;
   lastAcceptToken = null;
   lastBookingToken = null;
@@ -242,6 +285,8 @@ async function submitBooking() {
     }
 
     showBox("bookingStatus", "Booking submitted successfully.\nRequest ID: " + data.request_id + "\n\nWe will follow up to confirm scheduling.");
+    setFlowStage(5);
+    revealCard("uploadCard", true);
   } catch (err) {
     showBox("bookingStatus", "Error:\nFailed to contact server.");
   }
@@ -285,7 +330,8 @@ async function submitDecision(action) {
       lastBookingToken = data.booking_token;
       showBox("flowStatus", confirmation + "\n\nPlease provide your booking details below.");
       el("decisionCard").classList.add("hidden");
-      el("bookingCard").classList.remove("hidden");
+      revealCard("bookingCard", true);
+      setFlowStage(4);
       el("bookingNameDisplay").textContent = el("customer_name").value;
       el("bookingPhoneDisplay").textContent = el("customer_phone").value;
     } else {
@@ -319,6 +365,7 @@ el("btnCalc").addEventListener("click", async () => {
   el("bookingCard").classList.add("hidden");
   el("quoteSummaryCard").classList.add("hidden");
   el("loadingState").classList.remove("hidden");
+  setFlowStage(1);
   lastQuoteId = null;
   let timeoutId = null;
 
@@ -395,14 +442,16 @@ el("btnCalc").addEventListener("click", async () => {
 
     lastQuoteId = data.quote_id;
     lastAcceptToken = data.accept_token;
-    el("uploadCard").classList.remove("hidden");
-    el("decisionCard").classList.remove("hidden");
-    el("quoteSummaryCard").classList.remove("hidden");
+    revealCard("uploadCard");
+    revealCard("decisionCard");
+    revealCard("quoteSummaryCard");
+    setFlowStage(3);
     el("summaryService").textContent = el("service_type").selectedOptions[0].textContent;
     el("summaryCustomer").textContent = customerName + " • " + customerPhone;
     el("summaryLocation").textContent = jobAddress;
 
     renderQuoteResult(data, quoteResponse);
+    scrollToElement("resultBox");
   } catch (err) {
     if (err.name === "AbortError") {
       showBox("resultBox", "Error:\nRequest timed out. Please try again in a moment.");
@@ -449,6 +498,7 @@ el("btnUpload").addEventListener("click", async () => {
       return;
     }
     showBox("uploadStatus", "Uploaded successfully. Admin will review your photos.");
+    setFlowStage(5);
   } catch (err) {
     showBox("uploadStatus", "Error:\nFailed to contact server.");
   }
@@ -456,3 +506,4 @@ el("btnUpload").addEventListener("click", async () => {
 
 syncRouteFields();
 syncServiceFields();
+setFlowStage(1);
