@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Optional
 
 from fastapi.testclient import TestClient
 
@@ -50,7 +51,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             }
         )
 
-    def _seed_request(self, request_id: str, quote_id: str, status: str, accept_token: str = "test_token", booking_token: str = None) -> None:
+    def _seed_request(self, request_id: str, quote_id: str, status: str, accept_token: str = "test_token", booking_token: Optional[str] = None) -> None:
         storage.save_quote_request(
             {
                 "request_id": request_id,
@@ -273,12 +274,14 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         first_job = resp.json()["job"]
         self.assertIsNotNone(first_job)
+        assert first_job is not None
 
         # Verify the guard: get_job_by_quote_id returns the existing job,
         # so a subsequent approval call would skip creating a second one.
         from app.storage import get_job_by_quote_id
         existing_job = get_job_by_quote_id(quote_id)
         self.assertIsNotNone(existing_job)
+        assert existing_job is not None
         self.assertEqual(existing_job["job_id"], first_job["job_id"])
 
     def test_submit_booking_success(self) -> None:
@@ -312,6 +315,8 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(data["request_id"], request_id)
         # check updated
         req = storage.get_quote_request(request_id)
+        self.assertIsNotNone(req)
+        assert req is not None
         self.assertEqual(req["requested_job_date"], "2026-03-10")
         self.assertEqual(req["requested_time_window"], "morning")
         self.assertEqual(req["notes"], "test notes")
