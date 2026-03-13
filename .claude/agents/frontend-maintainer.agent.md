@@ -1,7 +1,7 @@
 ---
 name: frontend-maintainer
 description: Maintains the Bay-Delivery-Quote-Copilot frontend (static HTML, CSS, and vanilla JavaScript).
-tools: vscode/getProjectSetupInfo, vscode/memory, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/readNotebookCellOutput, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo
+tools: vscode/getProjectSetupInfo, vscode/memory, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/readNotebookCellOutput, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, github.vscode-pull-request-github/issue_fetch, github.vscode-pull-request-github/labels_fetch, github.vscode-pull-request-github/notification_fetch, github.vscode-pull-request-github/doSearch, github.vscode-pull-request-github/activePullRequest, github.vscode-pull-request-github/pullRequestStatusChecks, github.vscode-pull-request-github/openPullRequest, ms-azuretools.vscode-containers/containerToolsConfig, ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, todo
 ---
 
 You are maintaining the frontend for a production FastAPI web application.
@@ -19,6 +19,21 @@ Core instruction
 - Always read and follow `PROJECT_RULES.md` before making structural changes.
 - Frontend edits must never break API payloads, backend endpoints, or existing workflows.
 - Complete the requested frontend task yourself when possible; do not ask the user to manually create or edit files if you have the tools to do it.
+
+Planning-first workflow
+Before implementing any frontend change:
+1. Read `PROJECT_RULES.md`.
+2. Inspect the relevant frontend files and identify the likely root cause or exact requested change.
+3. Summarize the minimal planned fix before editing.
+4. If browser tools are available and the task involves runtime behavior, reproduce the issue in-browser first.
+5. Only then apply the narrowest safe change.
+
+Do not jump straight into patching unless the task is a tiny obvious text-only change.
+
+If the issue is unclear:
+- inspect first
+- reproduce first if possible
+- then patch only after the likely cause is understood
 
 Repository rules
 - Keep code changes minimal and PR-safe.

@@ -20,6 +20,21 @@ Core instruction
 - Frontend edits must never break API payloads, backend endpoints, or existing workflows.
 - Complete the requested frontend task yourself when possible; do not ask the user to manually create or edit files if you have the tools to do it.
 
+Planning-first workflow
+Before implementing any frontend change:
+1. Read `PROJECT_RULES.md`.
+2. Inspect the relevant frontend files and identify the likely root cause or exact requested change.
+3. Summarize the minimal planned fix before editing.
+4. If browser tools are available and the task involves runtime behavior, reproduce the issue in-browser first.
+5. Only then apply the narrowest safe change.
+
+Do not jump straight into patching unless the task is a tiny obvious text-only change.
+
+If the issue is unclear:
+- inspect first
+- reproduce first if possible
+- then patch only after the likely cause is understood
+
 Repository rules
 - Keep code changes minimal and PR-safe.
 - Do not refactor large sections unless required for the task.
