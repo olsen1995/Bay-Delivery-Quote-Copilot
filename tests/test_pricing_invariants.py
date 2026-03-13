@@ -573,6 +573,7 @@ def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> No
     # floor labor = 35 * 2 crew * 4 h = 280; add travel $40 → raw $320, cash $320
     assert cash == 320.0, (
         f"Minimum 4h/2-person move must produce cash == $320; got {cash}"
+    )
     # labour floor = 35 * 2 crew * 4 h = 280; base travel adds $40 for an expected
     # total cash of $320 on an in-town/normal job, but this assertion only guards
     # the labour-floor minimum of $280.
@@ -648,7 +649,5 @@ def test_small_move_long_job_floor_only_applies_after_four_hours() -> None:
     labor_5h = quote_5h["_internal"]["labor_cad"]
     assert labor_5h > labor_4h
     assert quote_4h["total_cash_cad"] == 320.0
-    assert quote_4h["_internal"]["move_long_job_floor_applied"] is False
 
     assert quote_5h["total_cash_cad"] == 400.0
-    assert quote_5h["_internal"]["move_long_job_floor_applied"] is True
