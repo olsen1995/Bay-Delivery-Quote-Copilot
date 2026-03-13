@@ -42,6 +42,14 @@ For `small_move` and `item_delivery`, also required:
   - Disposal may be included in the **total**
   - Disposal is **NOT itemized** as a customer fee line/toggle
   - Mattress/box spring is **note-only**
+  - Optional haul-away inputs currently supported:
+    - `bag_type` (`light`, `heavy_mixed`, `construction_debris`) applies a per-bag floor
+    - `trailer_fill_estimate` (`under_quarter`, `quarter`, `half`, `three_quarter`, `full`) applies a trailer-fill floor
+    - `trailer_class` (`single_axle_open_aluminum`, `double_axle_open_aluminum`, `older_enclosed`, `newer_enclosed`) selects lane-specific fill anchors when configured
+  - Current trailer-class behavior:
+    - `single_axle_open_aluminum` has a class-specific `quarter` floor
+    - `double_axle_open_aluminum` currently falls back to default fill anchors
+    - enclosed classes are accepted but currently use default fill anchors (no additional enclosed-class pricing impact yet)
 
 - **Scrap Pickup**
   - Curbside/outside: **$0**
@@ -122,3 +130,37 @@ py -3.11 -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+---
+
+## Smoke test usage
+
+Smoke script: `scripts/smoke_test.py`
+
+- `live-safe` mode (default): read-only validation for health/admin/auth surfaces; no quote workflow records are intentionally created.
+- `stateful` mode: exercises quote workflow routes and creates quote records (`POST /quote/calculate`), and may create quote-request state when decision routes are available.
+
+Examples:
+
+```powershell
+python scripts/smoke_test.py --mode live-safe
+python scripts/smoke_test.py --mode stateful
+```
+
+Common deploy target env var:
+
+```powershell
+$env:BASE_URL = "https://your-render-service.onrender.com"
+python scripts/smoke_test.py --mode live-safe
+```
+
+---
+
+## Maintainer manual Render verification checklist
+
+- Homepage loads at `/`
+- Quote page loads at `/quote`
+- Haul-away detail fields (`bag_type`, `trailer_fill_estimate`) appear only when `service_type=haul_away`
+- Haul-away quote request payload includes `bag_type` and `trailer_fill_estimate`
+- Admin page loads normally at `/admin`

@@ -11,11 +11,41 @@ Anyone proposing a pricing change should read both files before opening a PR.
 
 ## Calibration Priorities (Current Order)
 
-1. **small_move pricing** — highest priority; most underquoted; least favourite lane
-2. **high-volume haul-away scaling** — larger cleanouts still flatten too early
-3. **small-to-mid junk scoping** — some 5–8 bag non-dense jobs may still overshoot slightly
+1. **haul-away optional-input floor calibration by trailer lane** — the foundation is shipped; verify floor anchors by lane before broader re-tuning
+2. **small_move pricing** — remains high-importance selective work and must stay worth doing
+3. **high-volume haul-away scaling and fringe cleanup** — keep 16+ progression healthy while refining 5–8 bag edge cases
 
 Do not mix multiple priority areas in a single PR.
+
+---
+
+## Current Haul-Away Floor Mechanics (Shipped)
+
+For `haul_away`, optional inputs currently affect pricing through floors (not additive surcharges):
+
+- `bag_type` applies a per-bag floor using `bag_type_anchors_cad_per_bag`
+- `trailer_fill_estimate` applies a fill floor using `trailer_fill_floor_anchors_cad`
+- `trailer_class` can select class-specific fill anchors via `trailer_class_fill_floor_anchors_cad`
+
+Current precedence/order in the quote engine:
+
+1. Compute base haul-away cash from travel + labour + disposal + mattress/boxspring + access
+2. Apply service minimum total floor
+3. Compute `bag_type` floor
+4. Compute trailer-fill floor by trailer lane
+5. Use the highest floor/base value before rounding
+
+In engine terms, this behaves as `max(raw_cash, minimum_total, bag_type_floor, trailer_fill_floor)` before cash rounding.
+
+Current trailer lane behavior:
+
+- `single_axle_open_aluminum`: class-specific trailer-fill table is active where configured
+- `double_axle_open_aluminum`: accepted and currently falls back to default trailer-fill anchors unless class rows are added
+- `older_enclosed` and `newer_enclosed`: accepted but intentionally use default trailer-fill anchors right now
+
+Current scope limit:
+
+- enclosed trailer classes are accepted inputs but have no additional enclosed-class pricing impact yet
 
 ---
 
