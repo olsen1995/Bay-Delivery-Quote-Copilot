@@ -556,7 +556,8 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
 # =============================================================================
 
 def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> None:
-    """The minimum 4h/2-person move must include a labour-floor component of at least
+    """
+    The minimum 4h/2-person move must include a labour-floor component of at least
     $280 cash (floor = 35 * 2 * 4 = 280), before adding travel and other surcharges.
 
     This ensures the move labour rate is priced above the raw haul-away labour rate,
