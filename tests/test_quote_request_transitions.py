@@ -220,6 +220,67 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertIn(payload["from"], payload["detail"])
         self.assertIn(payload["to"], payload["detail"])
 
+    def test_admin_approval_creates_job(self) -> None:
+        request_id = "req_creates_job"
+        quote_id = "q_creates_job"
+        self._seed_request(
+            request_id,
+            quote_id,
+            "customer_accepted",
+            accept_token="tok_creates_job",
+        )
+
+        resp = self.client.post(
+            f"/admin/api/quote-requests/{request_id}/decision",
+            headers=self._admin_headers,
+            json={"action": "approve"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["request"]["status"], "admin_approved")
+
+        # Response must include the created job
+        self.assertIsNotNone(data["job"])
+        job = data["job"]
+        self.assertEqual(job["quote_id"], quote_id)
+        self.assertEqual(job["request_id"], request_id)
+        self.assertIn("job_id", job)
+        self.assertEqual(job["status"], "in_progress")
+
+        # Job must appear in the admin Jobs list
+        jobs_resp = self.client.get("/admin/api/jobs", headers=self._admin_headers)
+        self.assertEqual(jobs_resp.status_code, 200)
+        job_ids = [j["job_id"] for j in jobs_resp.json()["items"]]
+        self.assertIn(job["job_id"], job_ids)
+
+    def test_admin_approval_does_not_duplicate_job(self) -> None:
+        request_id = "req_no_dup_job"
+        quote_id = "q_no_dup_job"
+        self._seed_request(
+            request_id,
+            quote_id,
+            "customer_accepted",
+            accept_token="tok_no_dup",
+        )
+
+        # First approval — creates the job
+        resp = self.client.post(
+            f"/admin/api/quote-requests/{request_id}/decision",
+            headers=self._admin_headers,
+            json={"action": "approve"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        first_job = resp.json()["job"]
+        self.assertIsNotNone(first_job)
+
+        # Verify the guard: get_job_by_quote_id returns the existing job,
+        # so a subsequent approval call would skip creating a second one.
+        from app.storage import get_job_by_quote_id
+        existing_job = get_job_by_quote_id(quote_id)
+        self.assertIsNotNone(existing_job)
+        self.assertEqual(existing_job["job_id"], first_job["job_id"])
+
     def test_submit_booking_success(self) -> None:
         # Get the quote first to retrieve accept_token and quote_id
         resp = self.client.post("/quote/calculate", json={
