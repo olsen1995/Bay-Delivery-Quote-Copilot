@@ -218,12 +218,34 @@ def _mattress_boxspring_fee(service_conf: Dict[str, Any], m: int, b: int) -> flo
     return float(m * mattress_each + b * box_each)
 
 
+def _haul_away_bag_type_floor(service_conf: Dict[str, Any], bag_type: str | None, bag_count: int) -> float:
+    if bag_count <= 0:
+        return 0.0
+    anchors = service_conf.get("bag_type_anchors_cad_per_bag") or {}
+    bag_type_key = str(bag_type or "").strip().lower()
+    anchor = anchors.get(bag_type_key)
+    if anchor is None:
+        return 0.0
+    return float(bag_count) * float(anchor)
+
+
+def _haul_away_trailer_fill_floor(service_conf: Dict[str, Any], trailer_fill_estimate: str | None) -> float:
+    anchors = service_conf.get("trailer_fill_floor_anchors_cad") or {}
+    trailer_fill_key = str(trailer_fill_estimate or "").strip().lower()
+    anchor = anchors.get(trailer_fill_key)
+    if anchor is None:
+        return 0.0
+    return float(anchor)
+
+
 def calculate_quote(
     service_type: str,
     hours: float,
     *,
     crew_size: int = 1,
     garbage_bag_count: int = 0,
+    bag_type: str | None = None,
+    trailer_fill_estimate: str | None = None,
     mattresses_count: int = 0,
     box_springs_count: int = 0,
     scrap_pickup_location: str = "curbside",
@@ -373,6 +395,13 @@ def calculate_quote(
     min_total = _get_min_total(svc)
     cash_before_round = max(raw_cash, min_total)
 
+    bag_type_floor = 0.0
+    trailer_fill_floor = 0.0
+    if normalized == "haul_away":
+        bag_type_floor = _haul_away_bag_type_floor(svc, bag_type, int(garbage_bag_count))
+        trailer_fill_floor = _haul_away_trailer_fill_floor(svc, trailer_fill_estimate)
+        cash_before_round = max(cash_before_round, bag_type_floor, trailer_fill_floor)
+
     cash_total = _round_cash_to_nearest_5(cash_before_round)
     emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
 
@@ -413,6 +442,10 @@ def calculate_quote(
             "small_load_protected": small_load_protected,
             "disposal_allowance_cad": round(float(disposal_allowance), 2),
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
+            "bag_type": bag_type,
+            "bag_type_floor_cad": round(float(bag_type_floor), 2),
+            "trailer_fill_estimate": trailer_fill_estimate,
+            "trailer_fill_floor_cad": round(float(trailer_fill_floor), 2),
             "access_difficulty": _ad,
             "access_difficulty_adder_cad": round(float(access_adder), 2),
         },

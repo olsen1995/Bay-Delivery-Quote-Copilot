@@ -10,7 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import uuid4
 
 try:
@@ -428,6 +428,8 @@ class QuoteRequestPayload(BaseModel):
     estimated_hours: float = Field(0.0, ge=0)
     crew_size: int = Field(1, ge=1)
     garbage_bag_count: int = Field(0, ge=0)
+    bag_type: Optional[Literal["light", "heavy_mixed", "construction_debris"]] = Field(None)
+    trailer_fill_estimate: Optional[Literal["under_quarter", "quarter", "half", "three_quarter", "full"]] = Field(None)
     mattresses_count: int = Field(0, ge=0)
     box_springs_count: int = Field(0, ge=0)
     scrap_pickup_location: str = Field("curbside", max_length=50)
@@ -445,6 +447,8 @@ class QuoteRequestPayload(BaseModel):
         "payment_method",
         "pickup_address",
         "dropoff_address",
+        "bag_type",
+        "trailer_fill_estimate",
         "scrap_pickup_location",
         "travel_zone",
         "access_difficulty",

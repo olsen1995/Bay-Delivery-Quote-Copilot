@@ -676,6 +676,238 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
 
 
 # =============================================================================
+# Haul-away bag-type and trailer-fill floor tests
+# =============================================================================
+
+@pytest.mark.parametrize(
+    ("bag_count", "bag_type", "expected_cash"),
+    [
+        (32, "light", 290.0),
+        (27, "heavy_mixed", 295.0),
+        (20, "construction_debris", 300.0),
+    ],
+)
+def test_haul_away_bag_type_floor_raises_quote(
+    bag_count: int,
+    bag_type: str,
+    expected_cash: float,
+) -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=bag_count,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    floored = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=bag_count,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        bag_type=bag_type,
+    )
+
+    assert float(floored["total_cash_cad"]) == expected_cash
+    assert float(floored["total_cash_cad"]) > float(baseline["total_cash_cad"])
+
+
+@pytest.mark.parametrize(
+    ("trailer_fill_estimate", "expected_cash"),
+    [
+        ("quarter", 175.0),
+        ("half", 275.0),
+        ("three_quarter", 400.0),
+        ("full", 500.0),
+    ],
+)
+def test_haul_away_trailer_fill_floor_raises_quote(
+    trailer_fill_estimate: str,
+    expected_cash: float,
+) -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    floored = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate=trailer_fill_estimate,
+    )
+
+    assert float(floored["total_cash_cad"]) == expected_cash
+    assert float(floored["total_cash_cad"]) > float(baseline["total_cash_cad"])
+
+
+def test_haul_away_trailer_fill_under_quarter_is_noop() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    floored = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="under_quarter",
+    )
+
+    assert float(floored["total_cash_cad"]) == float(baseline["total_cash_cad"])
+
+
+def test_haul_away_bag_type_floor_requires_positive_bag_count() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=0,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    floored = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=0,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        bag_type="construction_debris",
+    )
+
+    assert float(floored["total_cash_cad"]) == float(baseline["total_cash_cad"])
+
+
+def test_haul_away_floor_only_raises_never_lowers_existing_quote() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=16,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    floored = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=16,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        bag_type="heavy_mixed",
+        trailer_fill_estimate="quarter",
+    )
+
+    assert float(floored["total_cash_cad"]) == float(baseline["total_cash_cad"])
+
+
+def test_non_haul_away_services_ignore_new_floor_inputs() -> None:
+    baseline = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+    )
+    with_optional_fields = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        bag_type="construction_debris",
+        trailer_fill_estimate="full",
+    )
+
+    assert float(with_optional_fields["total_cash_cad"]) == float(baseline["total_cash_cad"])
+    assert float(with_optional_fields["total_emt_cad"]) == float(baseline["total_emt_cad"])
+
+
+def test_haul_away_omitted_new_fields_preserve_existing_anchor_values() -> None:
+    expected_cash = {
+        1: 75.0,
+        5: 110.0,
+        9: 140.0,
+        15: 155.0,
+        16: 240.0,
+        20: 250.0,
+        24: 260.0,
+        30: 285.0,
+    }
+
+    for bags, expected in expected_cash.items():
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        assert float(result["total_cash_cad"]) == expected
+
+
+def test_quote_api_accepts_valid_haul_away_floor_fields(client: TestClient) -> None:
+    payload = _base_payload(service_type="haul_away")
+    payload["garbage_bag_count"] = 20
+    payload["bag_type"] = "construction_debris"
+    payload["trailer_fill_estimate"] = "half"
+
+    response = _post_quote(client, payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["request"]["bag_type"] == "construction_debris"
+    assert body["request"]["trailer_fill_estimate"] == "half"
+    assert isinstance(body.get("accept_token"), str)
+    assert body["accept_token"]
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("bag_type", "invalid_bag_type"),
+        ("trailer_fill_estimate", "almost_full"),
+    ],
+)
+def test_quote_api_rejects_invalid_haul_away_floor_fields(
+    client: TestClient,
+    field_name: str,
+    value: str,
+) -> None:
+    payload = _base_payload(service_type="haul_away")
+    payload[field_name] = value
+
+    response = _post_quote(client, payload)
+    assert response.status_code == 422
+
+
+# =============================================================================
 # Small-move labour floor tests
 # =============================================================================
 
