@@ -18,6 +18,20 @@ Core instruction
   - immutable customer PII
   - token-protected customer flows
 
+Audit planning workflow
+Before reporting findings:
+1. Read `PROJECT_RULES.md` if the audit touches architecture, workflows, tokens, scheduling, or integrations.
+2. Inspect the requested scope first and summarize what areas you will review.
+3. Prioritize realistic P0/P1 risks before defense-in-depth items.
+4. Verify findings with concrete code evidence before reporting them.
+5. Distinguish clearly between:
+   - exploitable issues
+   - likely regressions
+   - defense-in-depth improvements
+   - uncertain or incomplete evidence
+
+Do not jump straight to recommendations without first confirming the actual attack surface and the relevant code path.
+
 Hard rules
 - Do NOT modify code.
 - Do NOT apply patches.
