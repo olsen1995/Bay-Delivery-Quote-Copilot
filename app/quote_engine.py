@@ -122,6 +122,20 @@ def _get_min_total(service_conf: Dict[str, Any]) -> float:
     return 0.0
 
 
+def _get_min_labor_per_crew_hour(service_conf: Dict[str, Any]) -> float:
+    """Minimum effective labour rate per crew member per hour.
+
+    Used for small_move calibration: moving crews command a higher effective
+    rate than haul-away. When the computed labour falls below this floor the
+    floor value is used instead.  Returns 0 (no floor) when the field is absent
+    from the service config, so haul_away and other services are unaffected.
+    """
+    val = service_conf.get("min_labor_per_crew_hour")
+    if val is None:
+        return 0.0
+    return float(val)
+
+
 def _rates(service_conf: Dict[str, Any]) -> Dict[str, float]:
     """
     Supports:
@@ -285,6 +299,18 @@ def calculate_quote(
     if normalized == "haul_away" and bool(has_dense_materials):
         labor = labor * DENSE_MATERIAL_LABOUR_MULTIPLIER
 
+    # Small-move labour floor: moving crews command a higher effective rate than
+    # haul-away.  Configured via min_labor_per_crew_hour in the small_move service
+    # settings.  Has no effect when actual labour already meets or exceeds the floor.
+    move_labor_floor_applied = False
+    if normalized == "small_move":
+        _min_rate = _get_min_labor_per_crew_hour(svc)
+        if _min_rate > 0:
+            _labor_floor = _min_rate * float(crew_size) * float(billable_hours)
+            if labor < _labor_floor:
+                labor = _labor_floor
+                move_labor_floor_applied = True
+
     disposal_allowance = 0.0
     small_load_protected = False
     if normalized == "haul_away":
@@ -332,6 +358,7 @@ def calculate_quote(
         "_internal": {
             "crew_size": int(crew_size),
             "crew_escalated": haul_away_crew_escalated,
+            "move_labor_floor_applied": move_labor_floor_applied,
             "billable_hours": round(float(billable_hours), 2),
             "primary_rate_cad": round(float(rates["primary"]), 2),
             "helper_rate_cad": round(float(rates["helper"]), 2),

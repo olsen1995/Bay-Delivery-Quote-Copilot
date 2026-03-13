@@ -53,7 +53,8 @@
       "minimum_hours": 4,
       "minimum_crew": 2,
       "default_crew": 3,
-      "minimum_total": 60
+      "minimum_total": 60,
+      "min_labor_per_crew_hour": 35
     },
     "item_delivery": {
       "label": "Item Delivery",
