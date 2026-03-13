@@ -16,7 +16,8 @@ except Exception:  # pragma: no cover
 
 
 def base_url() -> str:
-    return os.getenv("SMOKE_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    # Prefer BASE_URL for deploy smoke usage; keep SMOKE_BASE_URL for backwards compatibility.
+    return (os.getenv("BASE_URL") or os.getenv("SMOKE_BASE_URL", "http://127.0.0.1:8000")).rstrip("/")
 
 
 def admin_headers() -> Dict[str, str]:
@@ -37,6 +38,11 @@ def admin_headers() -> Dict[str, str]:
         headers["Authorization"] = "Basic " + base64.b64encode(raw).decode("ascii")
 
     return headers
+
+
+def basic_auth_header(username: str, password: str) -> Dict[str, str]:
+    raw = f"{username}:{password}".encode("utf-8")
+    return {"Authorization": "Basic " + base64.b64encode(raw).decode("ascii")}
 
 
 def _req_requests(
@@ -116,6 +122,10 @@ def clone_payload(base: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
 
 def _admin_creds_configured() -> bool:
     return bool(os.getenv("ADMIN_USERNAME", "").strip() and os.getenv("ADMIN_PASSWORD", "").strip())
+
+
+def _admin_credentials() -> Tuple[str, str]:
+    return os.getenv("ADMIN_USERNAME", "").strip(), os.getenv("ADMIN_PASSWORD", "").strip()
 
 
 def main() -> int:
@@ -214,9 +224,45 @@ def main() -> int:
             f"POST /quote/{{quote_id}}/decision expected 200/201, 401/403, or route-missing 404; got {status} with body: {decision}"
         )
 
-    # --- Admin endpoint auth behavior ---
+    # --- Admin page and auth behavior ---
     creds_configured = _admin_creds_configured()
     headers = admin_headers()
+    admin_user, admin_password = _admin_credentials()
+
+    status, admin_page = api("GET", "/admin")
+    require(status == 200, f"GET /admin expected 200, got {status}")
+    require(isinstance(admin_page, str), "GET /admin expected HTML response")
+    require("Admin Access" in admin_page, "GET /admin missing Admin Access marker")
+    require("id=\"refreshBtn\"" in admin_page, "GET /admin missing refresh button marker")
+    print("[ok] /admin page marker checks")
+
+    status, admin_uploads_page = api("GET", "/admin/uploads")
+    require(status == 200, f"GET /admin/uploads expected 200, got {status}")
+    require(isinstance(admin_uploads_page, str), "GET /admin/uploads expected HTML response")
+    require("Customer Uploads" in admin_uploads_page, "GET /admin/uploads missing title marker")
+    require("id=\"btnSearch\"" in admin_uploads_page, "GET /admin/uploads missing search button marker")
+    print("[ok] /admin/uploads page marker checks")
+
+    if creds_configured:
+        bad_headers = basic_auth_header(admin_user + "__bad", admin_password)
+        status, bad_auth = api("GET", "/admin/api/smoke_uploads", headers=bad_headers)
+        require(
+            status in (401, 403),
+            f"GET /admin/api/smoke_uploads bad auth expected 401/403, got {status} ({bad_auth})",
+        )
+        print("[ok] /admin/api/smoke_uploads rejects bad credentials")
+
+        status, smoke_ok = api("GET", "/admin/api/smoke_uploads", headers=headers)
+        require(status == 200, f"GET /admin/api/smoke_uploads with auth expected 200, got {status} ({smoke_ok})")
+        require(isinstance(smoke_ok, dict) and smoke_ok.get("ok") is True, "smoke auth check expected {'ok': true}")
+        print("[ok] /admin/api/smoke_uploads accepts correct credentials")
+
+        status, authed_quotes = api("GET", "/admin/api/quotes?limit=1", headers=headers)
+        require(status == 200, f"GET /admin/api/quotes?limit=1 with auth expected 200, got {status} ({authed_quotes})")
+        require(isinstance(authed_quotes, dict) and isinstance(authed_quotes.get("items"), list), "admin quotes expected items list")
+        print("[ok] /admin/api/quotes authed read-only fetch")
+    else:
+        print("[skip] admin auth pass/fail checks (ADMIN_USERNAME/ADMIN_PASSWORD not configured)")
 
     status, unauth_uploads = api("GET", "/admin/api/uploads?limit=1")
 
