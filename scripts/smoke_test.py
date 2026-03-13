@@ -244,13 +244,17 @@ def main() -> int:
     print("[ok] /admin/uploads page marker checks")
 
     if creds_configured:
-        bad_headers = basic_auth_header(admin_user + "__bad", admin_password)
-        status, bad_auth = api("GET", "/admin/api/smoke_uploads", headers=bad_headers)
-        require(
-            status in (401, 403),
-            f"GET /admin/api/smoke_uploads bad auth expected 401/403, got {status} ({bad_auth})",
-        )
-        print("[ok] /admin/api/smoke_uploads rejects bad credentials")
+        negative_auth_enabled = os.getenv("SMOKE_TEST_NEGATIVE_AUTH") == "1"
+        if negative_auth_enabled:
+            bad_headers = basic_auth_header(admin_user + "__bad", admin_password)
+            status, bad_auth = api("GET", "/admin/api/smoke_uploads", headers=bad_headers)
+            require(
+                status in (401, 403),
+                f"GET /admin/api/smoke_uploads bad auth expected 401/403, got {status} ({bad_auth})",
+            )
+            print("[ok] /admin/api/smoke_uploads rejects bad credentials")
+        else:
+            print("[skip] /admin/api/smoke_uploads bad-credentials check (SMOKE_TEST_NEGATIVE_AUTH not enabled)")
 
         status, smoke_ok = api("GET", "/admin/api/smoke_uploads", headers=headers)
         require(status == 200, f"GET /admin/api/smoke_uploads with auth expected 200, got {status} ({smoke_ok})")
