@@ -120,7 +120,7 @@ def test_crew_size_monotonic_non_decreasing(client: TestClient, service_type: st
     assert all(next_emt >= prev_emt for prev_emt, next_emt in zip(seen_emt, seen_emt[1:]))
 
 
-def test_haul_away_garbage_bag_count_monotonic_non_decreasing(client: TestClient) -> None:
+def test_haul_away_garbage_bag_count_monotonic_non_decreasing() -> None:
     # Sequence starts at 1: the small-load protection produces per-bag disposal
     # for 1–3 bags, so price correctly increases as bag count grows from 1 onward.
     # bag_count=0 (unknown/unspecified load) is a special conservative case that
@@ -146,7 +146,7 @@ def test_haul_away_garbage_bag_count_monotonic_non_decreasing(client: TestClient
     assert all(next_emt >= prev_emt for prev_emt, next_emt in zip(seen_emt, seen_emt[1:]))
 
 
-def test_haul_away_large_volume_bag_steps_progressive(client: TestClient) -> None:
+def test_haul_away_large_volume_bag_steps_progressive() -> None:
     """High-volume haul-away tiers must progress at each step to avoid 16+ flattening."""
     bag_sequence = [15, 16, 20, 24, 30]
     seen_cash = []
