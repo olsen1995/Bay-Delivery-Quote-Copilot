@@ -22,9 +22,15 @@ DEFAULT_BOXSPRING_FEE_EACH = 50.0
 # Haul-away disposal allowance tiers (included in total; NOT itemized)
 DEFAULT_BAG_TIER_SMALL_MAX = 5
 DEFAULT_BAG_TIER_MEDIUM_MAX = 15
+DEFAULT_BAG_TIER_LARGE_MAX = 16
+DEFAULT_BAG_TIER_XL_MAX = 20
+DEFAULT_BAG_TIER_XXL_MAX = 24
 DEFAULT_BAG_TIER_SMALL_PRICE = 50.0
 DEFAULT_BAG_TIER_MEDIUM_PRICE = 80.0
-DEFAULT_BAG_TIER_LARGE_PRICE = 120.0
+DEFAULT_BAG_TIER_LARGE_PRICE = 165.0
+DEFAULT_BAG_TIER_XL_PRICE = 175.0
+DEFAULT_BAG_TIER_XXL_PRICE = 185.0
+DEFAULT_BAG_TIER_XXXL_PRICE = 210.0
 
 # Admin-only travel zone adders (profit protection)
 TRAVEL_ZONE_ADDERS = {
@@ -194,7 +200,13 @@ def _haul_away_disposal_allowance(service_conf: Dict[str, Any], bag_count: int) 
         return DEFAULT_BAG_TIER_SMALL_PRICE
     if bag_count <= DEFAULT_BAG_TIER_MEDIUM_MAX:
         return DEFAULT_BAG_TIER_MEDIUM_PRICE
-    return DEFAULT_BAG_TIER_LARGE_PRICE
+    if bag_count <= DEFAULT_BAG_TIER_LARGE_MAX:
+        return DEFAULT_BAG_TIER_LARGE_PRICE
+    if bag_count <= DEFAULT_BAG_TIER_XL_MAX:
+        return DEFAULT_BAG_TIER_XL_PRICE
+    if bag_count <= DEFAULT_BAG_TIER_XXL_MAX:
+        return DEFAULT_BAG_TIER_XXL_PRICE
+    return DEFAULT_BAG_TIER_XXXL_PRICE
 
 
 def _mattress_boxspring_fee(service_conf: Dict[str, Any], m: int, b: int) -> float:

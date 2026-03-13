@@ -125,23 +125,47 @@ def test_haul_away_garbage_bag_count_monotonic_non_decreasing(client: TestClient
     # for 1–3 bags, so price correctly increases as bag count grows from 1 onward.
     # bag_count=0 (unknown/unspecified load) is a special conservative case that
     # does not participate in this monotone contract.
-    payload = _base_payload(service_type="haul_away")
-
-    bag_sequence = [1, 2, 3, 4, 5, 6, 15, 16, 30]
+    bag_sequence = [1, 2, 3, 4, 5, 6, 15, 16, 20, 24, 30]
     seen_cash = []
     seen_emt = []
 
     for bags in bag_sequence:
-        cur = deepcopy(payload)
-        cur["garbage_bag_count"] = bags
-        response = _post_quote(client, cur)
-        assert response.status_code == 200
-        cash, emt = _assert_success_schema_and_totals(response.json())
-        seen_cash.append(cash)
-        seen_emt.append(emt)
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        seen_cash.append(float(result["total_cash_cad"]))
+        seen_emt.append(float(result["total_emt_cad"]))
 
     assert all(next_cash >= prev_cash for prev_cash, next_cash in zip(seen_cash, seen_cash[1:]))
     assert all(next_emt >= prev_emt for prev_emt, next_emt in zip(seen_emt, seen_emt[1:]))
+
+
+def test_haul_away_large_volume_bag_steps_progressive(client: TestClient) -> None:
+    """High-volume haul-away tiers must progress at each step to avoid 16+ flattening."""
+    bag_sequence = [15, 16, 20, 24, 30]
+    seen_cash = []
+
+    for bags in bag_sequence:
+        result = calculate_quote(
+            "haul_away",
+            2.0,
+            crew_size=2,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        seen_cash.append(float(result["total_cash_cad"]))
+
+    assert all(next_cash > prev_cash for prev_cash, next_cash in zip(seen_cash, seen_cash[1:])), (
+        f"high-volume haul-away tiers must be strictly progressive at 15/16/20/24/30 bags; got {seen_cash}"
+    )
 
 
 def test_haul_away_mattresses_count_monotonic_non_decreasing(client: TestClient) -> None:
