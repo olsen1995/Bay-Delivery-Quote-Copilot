@@ -555,10 +555,11 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
 # =============================================================================
 
 def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> None:
-    """The minimum 4h/2-person move must cost at least $280 cash (floor = 35 * 2 * 4 = 280).
+    """The minimum 4h/2-person move must include at least $280 of labour (floor = 35 * 2 * 4 = 280),
+    excluding any travel charges.
 
-    This ensures moves are priced above the raw haul-away labour rate, which is
-    too low for the moving market.
+    This ensures the labour component for moves is priced above the raw haul-away
+    labour rate, which is too low for the moving market.
     """
     payload = _base_payload(service_type="small_move")
     payload["estimated_hours"] = 4.0
@@ -567,9 +568,10 @@ def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> No
     response = _post_quote(client, payload)
     assert response.status_code == 200
     cash, _ = _assert_success_schema_and_totals(response.json())
-    # floor labor = 35 * 2 crew * 4 h = 280; add travel $40 → raw $320, cash $320
+    # floor labour = 35 * 2 crew * 4 h = 280; with current travel minimum ($40) the total cash
+    # for this job should be at least $320, but this test specifically guards the $280 labour floor.
     assert cash >= 280, (
-        f"Minimum 4h/2-person move must produce cash >= $280 (labour floor); got {cash}"
+        f"Minimum 4h/2-person move must honour a $280 labour floor; got cash={cash}"
     )
 
 
