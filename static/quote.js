@@ -248,6 +248,7 @@ function clearForm() {
 function resetInapplicableServiceFields(serviceType) {
   const isScrap = serviceType === "scrap_pickup";
   const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+  const isHaulAway = serviceType === "haul_away";
 
   if (isScrap) {
     el("estimated_hours").value = "0";
@@ -263,10 +264,16 @@ function resetInapplicableServiceFields(serviceType) {
     el("mattresses_count").value = "0";
     el("box_springs_count").value = "0";
   }
+
+  if (!isHaulAway) {
+    el("bag_type").value = "light";
+    el("trailer_fill_estimate").value = "under_quarter";
+  }
 }
 
 function syncServiceFields() {
   const serviceType = el("service_type").value;
+  const showHaulAwayDetails = serviceType === "haul_away";
   const showRoute = serviceType === "small_move" || serviceType === "item_delivery";
   const showScrap = serviceType === "scrap_pickup";
   const showLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
@@ -279,8 +286,11 @@ function syncServiceFields() {
   el("crewSizeGroup").classList.toggle("hidden", !showLabor);
   el("scrapLocationGroup").classList.toggle("hidden", !showScrap);
   el("loadCountRow").classList.toggle("hidden", !showLoadCounts);
+  el("haulAwayDetailsRow").classList.toggle("hidden", !showHaulAwayDetails);
   el("denseMaterialsGroup").classList.toggle("hidden", !showDenseMaterials);
   el("scrap_pickup_location").disabled = !showScrap;
+  el("bag_type").disabled = !showHaulAwayDetails;
+  el("trailer_fill_estimate").disabled = !showHaulAwayDetails;
   el("has_dense_materials").disabled = !showDenseMaterials;
   if (!showDenseMaterials) {
     el("has_dense_materials").checked = false;
@@ -459,6 +469,7 @@ el("btnCalc").addEventListener("click", async () => {
     }
 
     const serviceType = el("service_type").value;
+    const isHaulAway = serviceType === "haul_away";
     const isScrap = serviceType === "scrap_pickup";
     const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
     const usesLabor = !isScrap;
@@ -489,6 +500,11 @@ el("btnCalc").addEventListener("click", async () => {
       box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
       scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
     };
+
+    if (isHaulAway) {
+      payload.bag_type = el("bag_type").value;
+      payload.trailer_fill_estimate = el("trailer_fill_estimate").value;
+    }
 
     const controller = new AbortController();
     timeoutId = setTimeout(() => controller.abort(), 30000);
