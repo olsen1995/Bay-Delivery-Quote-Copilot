@@ -146,6 +146,101 @@ def test_haul_away_garbage_bag_count_monotonic_non_decreasing() -> None:
     assert all(next_emt >= prev_emt for prev_emt, next_emt in zip(seen_emt, seen_emt[1:]))
 
 
+def test_haul_away_5_to_9_light_non_dense_strict_progression() -> None:
+    """5 < 6 < 7 < 8 < 9 for light/non-dense normal-access jobs."""
+    bag_sequence = [5, 6, 7, 8, 9]
+    seen_cash = []
+
+    for bags in bag_sequence:
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        seen_cash.append(float(result["total_cash_cad"]))
+
+    assert all(next_cash > prev_cash for prev_cash, next_cash in zip(seen_cash, seen_cash[1:])), (
+        f"expected strict progression for 5-9 light/non-dense jobs; got {seen_cash}"
+    )
+    assert seen_cash[-1] == 140.0, f"9-bag anchor should remain unchanged; got {seen_cash[-1]}"
+
+
+def test_haul_away_1_to_5_light_non_dense_unchanged_contract() -> None:
+    """1-5 light/non-dense jobs should preserve current business-minimum behavior."""
+    expected_cash = {1: 75.0, 2: 90.0, 3: 105.0, 4: 110.0, 5: 110.0}
+
+    for bags, expected in expected_cash.items():
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        assert float(result["total_cash_cad"]) == expected
+
+
+@pytest.mark.parametrize("access_difficulty", ["difficult", "extreme"])
+def test_haul_away_6_to_8_harder_access_unchanged(access_difficulty: str) -> None:
+    """Difficult/extreme 6-8 bag jobs stay anchored to unchanged 9-bag pricing."""
+    anchor = float(
+        calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=9,
+            travel_zone="in_town",
+            access_difficulty=access_difficulty,
+            has_dense_materials=False,
+        )["total_cash_cad"]
+    )
+
+    for bags in (6, 7, 8):
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty=access_difficulty,
+            has_dense_materials=False,
+        )
+        assert float(result["total_cash_cad"]) == anchor
+
+
+def test_haul_away_6_to_8_dense_unchanged() -> None:
+    """Dense 6-8 bag jobs stay anchored to unchanged 9-bag dense pricing."""
+    anchor = float(
+        calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=9,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=True,
+        )["total_cash_cad"]
+    )
+
+    for bags in (6, 7, 8):
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=True,
+        )
+        assert float(result["total_cash_cad"]) == anchor
+
+
 def test_haul_away_large_volume_bag_steps_progressive() -> None:
     """High-volume haul-away tiers must progress at each step to avoid 16+ flattening."""
     bag_sequence = [15, 16, 20, 24, 30]
