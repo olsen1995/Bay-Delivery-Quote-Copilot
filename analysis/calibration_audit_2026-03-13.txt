@@ -1,7 +1,10 @@
 
 ====================================================================================================
-QUOTE CALIBRATION ANALYSIS
+QUOTE CALIBRATION ANALYSIS – PRE-CHANGE BASELINE
 ====================================================================================================
+NOTE: This report captures pre-change (pre-PR) baseline calibration results and is retained
+      for historical comparison only. Refer to the latest calibration artifact for current
+      post-change behavior.
 
 Loaded 20 scenarios from quote_calibration_dataset.json
 
