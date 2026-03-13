@@ -561,6 +561,11 @@ def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> No
     This corresponds to a labour floor of 35 * 2 crew * 4 h = $280 plus $40 travel,
     ensuring moves are priced above the raw haul-away labour rate, which is too low
     for the moving market.
+    """The minimum 4h/2-person move must include a labour-floor component of at least
+    $280 cash (floor = 35 * 2 * 4 = 280), before adding travel and other surcharges.
+
+    This ensures the move labour rate is priced above the raw haul-away labour rate,
+    which is too low for the moving market.
     """
     payload = _base_payload(service_type="small_move")
     payload["estimated_hours"] = 4.0
@@ -572,6 +577,11 @@ def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> No
     # floor labor = 35 * 2 crew * 4 h = 280; add travel $40 → raw $320, cash $320
     assert cash == 320.0, (
         f"Minimum 4h/2-person move must produce cash == $320; got {cash}"
+    # labour floor = 35 * 2 crew * 4 h = 280; base travel adds $40 for an expected
+    # total cash of $320 on an in-town/normal job, but this assertion only guards
+    # the labour-floor minimum of $280.
+    assert cash >= 280, (
+        f"Minimum 4h/2-person move must produce cash >= $280 (labour floor bound); got {cash}"
     )
 
 
@@ -641,3 +651,8 @@ def test_small_move_long_job_floor_only_applies_after_four_hours() -> None:
     labor_4h = quote_4h["_internal"]["labor_cad"]
     labor_5h = quote_5h["_internal"]["labor_cad"]
     assert labor_5h > labor_4h
+    assert quote_4h["total_cash_cad"] == 320.0
+    assert quote_4h["_internal"]["move_long_job_floor_applied"] is False
+
+    assert quote_5h["total_cash_cad"] == 400.0
+    assert quote_5h["_internal"]["move_long_job_floor_applied"] is True

@@ -1,10 +1,10 @@
 
 ====================================================================================================
 QUOTE CALIBRATION ANALYSIS – PRE-CHANGE BASELINE
-====================================================================================================
 NOTE: This report captures pre-change (pre-PR) baseline calibration results and is retained
       for historical comparison only. Refer to the latest calibration artifact for current
       post-change behavior.
+QUOTE CALIBRATION ANALYSIS
 
 Loaded 20 scenarios from quote_calibration_dataset.json
 
@@ -41,6 +41,7 @@ Average Difference: $-21.68 (-3.5%)
 Scenarios with Underquotes (>$5): 10
 Scenarios with Overquotes (>$5): 8
 Scenarios Outside ▒15%: 8
+Scenarios Outside ±15%: 8
 
 Largest Underquote:
   commercial-move-01: Expected $450.00, System $248.60, Difference $-201.40 (-44.8%)
@@ -49,6 +50,7 @@ Largest Overquote:
   junk-basement-01: Expected $140.00, System $186.45, Difference $+46.45 (+33.2%)
 
 Outliers (Outside ▒15%):
+Outliers (Outside ±15%):
   junk-easy-01: +46.2%
   commercial-move-01: -44.8%
   small-move-01: -34.7%
