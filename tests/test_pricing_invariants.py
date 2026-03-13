@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.quote_engine import calculate_quote
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
@@ -610,3 +611,26 @@ def test_small_move_access_adder_is_additive_with_labor_floor(client: TestClient
         f"Difficult access must cost more than normal even when labour floor is active; "
         f"normal={cash_normal}, difficult={cash_difficult}"
     )
+
+
+def test_small_move_long_job_floor_only_applies_after_four_hours() -> None:
+    quote_4h = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        access_difficulty="normal",
+        travel_zone="in_town",
+    )
+    quote_5h = calculate_quote(
+        "small_move",
+        5.0,
+        crew_size=2,
+        access_difficulty="normal",
+        travel_zone="in_town",
+    )
+
+    assert quote_4h["total_cash_cad"] == 320.0
+    assert quote_4h["_internal"]["move_long_job_floor_applied"] is False
+
+    assert quote_5h["total_cash_cad"] == 400.0
+    assert quote_5h["_internal"]["move_long_job_floor_applied"] is True
