@@ -279,33 +279,57 @@ Difficult access, dense materials, ugly handling, and mixed labour should not be
 
 ## Current Strategy Implications for the Quote System
 
+### Current haul-away implementation state (post rollout)
+
+Haul-away pricing now supports optional inputs that act as floors:
+
+- `bag_type` (`light`, `heavy_mixed`, `construction_debris`) applies a per-bag floor
+- `trailer_fill_estimate` (`under_quarter`, `quarter`, `half`, `three_quarter`, `full`) applies a fill floor
+- `trailer_class` (`single_axle_open_aluminum`, `double_axle_open_aluminum`, `older_enclosed`, `newer_enclosed`) selects which class-specific fill anchors are used when a `trailer_fill_estimate` is provided; on its own it does not apply a separate floor
+
+Current quote-engine ordering for haul-away:
+
+1. Build base cash from travel + labour + disposal + mattress/boxspring + access
+2. Apply service minimum floor
+3. Apply optional haul-away floors and keep the highest value before rounding
+
+Current trailer-lane behavior:
+
+- `single_axle_open_aluminum` has class-specific fill anchors configured
+- `double_axle_open_aluminum` is accepted and currently uses default fill anchors
+- enclosed classes are accepted and currently use default fill anchors
+
+Current scope limit:
+
+- enclosed trailer classes are supported inputs, but there is no additional enclosed-class pricing impact yet
+
 ### Highest current pricing priority
+
+**haul-away optional-input lane calibration**
+
+Reason:
+
+- foundation is now in place (`bag_type`, `trailer_fill_estimate`, `trailer_class`)
+- lane-specific anchors now need evidence-based refinement, not structural rewrites
+- this can be tuned with narrow config-level changes
+
+### Likely next priority after that
 
 **small_move calibration**
 
 Reason:
 
-- largest current underquotes
-- least favourite service lane
-- should be priced more conservatively, not more cheaply
-
-### Likely next priority after that
-
-**high-volume haul-away scaling**
-
-Reason:
-
-- current larger cleanout scenarios flatten too much
-- estate / garage / 16+ bag style jobs still show underpricing risk
+- remains selective, higher-hassle work
+- quotes should continue filtering bad-fit move jobs and preserving margin
 
 ### Lower priority than those
 
-**small-to-mid junk overpricing cleanup**
+**high-volume haul-away scaling + 5-8 bag cleanup**
 
 Reason:
 
-- some 5–8 bag non-dense jobs may still overshoot
-- this matters, but not more than major move underquotes
+- 16+ progression and 5-8 bag edge handling still matter
+- but both now sit behind lane-floor validation and small_move protection
 
 ---
 
