@@ -430,6 +430,7 @@ class QuoteRequestPayload(BaseModel):
     garbage_bag_count: int = Field(0, ge=0)
     bag_type: Optional[Literal["light", "heavy_mixed", "construction_debris"]] = Field(None)
     trailer_fill_estimate: Optional[Literal["under_quarter", "quarter", "half", "three_quarter", "full"]] = Field(None)
+    trailer_class: Optional[Literal["single_axle_open_aluminum", "double_axle_open_aluminum", "older_enclosed", "newer_enclosed"]] = Field(None)
     mattresses_count: int = Field(0, ge=0)
     box_springs_count: int = Field(0, ge=0)
     scrap_pickup_location: str = Field("curbside", max_length=50)
@@ -449,6 +450,7 @@ class QuoteRequestPayload(BaseModel):
         "dropoff_address",
         "bag_type",
         "trailer_fill_estimate",
+        "trailer_class",
         "scrap_pickup_location",
         "travel_zone",
         "access_difficulty",

@@ -246,6 +246,37 @@ def _haul_away_trailer_fill_floor(service_conf: Dict[str, Any], trailer_fill_est
     return float(anchor)
 
 
+_ENCLOSED_TRAILER_CLASSES: frozenset[str] = frozenset({"older_enclosed", "newer_enclosed"})
+
+
+def _haul_away_trailer_class_fill_floor(
+    service_conf: Dict[str, Any],
+    trailer_class: str | None,
+    trailer_fill_estimate: str | None,
+) -> float:
+    """Resolve haul-away trailer-fill floor by trailer class.
+
+    When trailer_class is omitted, empty, unrecognized, or an enclosed class,
+    fall back to the default trailer-fill anchors so existing behavior is preserved.
+    """
+    tc_key = str(trailer_class or "").strip().lower()
+    fill_key = str(trailer_fill_estimate or "").strip().lower()
+
+    if not fill_key:
+        return 0.0
+
+    if tc_key and tc_key not in _ENCLOSED_TRAILER_CLASSES:
+        class_tables = service_conf.get("trailer_class_fill_floor_anchors_cad")
+        if isinstance(class_tables, dict):
+            anchors = class_tables.get(tc_key)
+            if isinstance(anchors, dict):
+                anchor = anchors.get(fill_key)
+                if anchor is not None:
+                    return float(anchor)
+
+    return _haul_away_trailer_fill_floor(service_conf, trailer_fill_estimate)
+
+
 def calculate_quote(
     service_type: str,
     hours: float,
@@ -254,6 +285,7 @@ def calculate_quote(
     garbage_bag_count: int = 0,
     bag_type: str | None = None,
     trailer_fill_estimate: str | None = None,
+    trailer_class: str | None = None,
     mattresses_count: int = 0,
     box_springs_count: int = 0,
     scrap_pickup_location: str = "curbside",
@@ -407,7 +439,7 @@ def calculate_quote(
     trailer_fill_floor = 0.0
     if normalized == "haul_away":
         bag_type_floor = _haul_away_bag_type_floor(svc, bag_type, int(garbage_bag_count))
-        trailer_fill_floor = _haul_away_trailer_fill_floor(svc, trailer_fill_estimate)
+        trailer_fill_floor = _haul_away_trailer_class_fill_floor(svc, trailer_class, trailer_fill_estimate)
         cash_before_round = max(cash_before_round, bag_type_floor, trailer_fill_floor)
 
     cash_total = _round_cash_to_nearest_5(cash_before_round)
@@ -453,6 +485,7 @@ def calculate_quote(
             "bag_type": bag_type,
             "bag_type_floor_cad": round(float(bag_type_floor), 2),
             "trailer_fill_estimate": trailer_fill_estimate,
+            "trailer_class": trailer_class,
             "trailer_fill_floor_cad": round(float(trailer_fill_floor), 2),
             "access_difficulty": _ad,
             "access_difficulty_adder_cad": round(float(access_adder), 2),
