@@ -150,6 +150,7 @@ def test_haul_away_large_volume_bag_steps_progressive() -> None:
     """High-volume haul-away tiers must progress at each step to avoid 16+ flattening."""
     bag_sequence = [15, 16, 20, 24, 30]
     seen_cash = []
+    seen_emt = []
 
     for bags in bag_sequence:
         result = calculate_quote(
@@ -162,9 +163,13 @@ def test_haul_away_large_volume_bag_steps_progressive() -> None:
             has_dense_materials=False,
         )
         seen_cash.append(float(result["total_cash_cad"]))
+        seen_emt.append(float(result["total_emt_cad"]))
 
     assert all(next_cash > prev_cash for prev_cash, next_cash in zip(seen_cash, seen_cash[1:])), (
         f"high-volume haul-away tiers must be strictly progressive at 15/16/20/24/30 bags; got {seen_cash}"
+    )
+    assert all(next_emt > prev_emt for prev_emt, next_emt in zip(seen_emt, seen_emt[1:])), (
+        f"high-volume haul-away EMT tiers must be strictly progressive at 15/16/20/24/30 bags; got {seen_emt}"
     )
 
 
