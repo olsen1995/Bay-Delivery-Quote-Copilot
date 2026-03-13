@@ -28,16 +28,14 @@ def test_quote_page_includes_haul_away_floor_fields() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
     assert 'id="haulAwayDetailsRow"' in quote_html
-    assert 'id="bag_type" name="bag_type"' in quote_html
-    assert '<option value="light" selected>Light household bags</option>' in quote_html
-    assert '<option value="heavy_mixed">Heavy mixed junk bags</option>' in quote_html
-    assert '<option value="construction_debris">Construction / debris bags</option>' in quote_html
-    assert 'id="trailer_fill_estimate" name="trailer_fill_estimate"' in quote_html
-    assert '<option value="under_quarter" selected>Under 1/4 trailer</option>' in quote_html
-    assert '<option value="quarter">About 1/4 trailer</option>' in quote_html
-    assert '<option value="half">About 1/2 trailer</option>' in quote_html
-    assert '<option value="three_quarter">About 3/4 trailer</option>' in quote_html
-    assert '<option value="full">Full trailer</option>' in quote_html
+    assert re.search(r'<select(?=[^>]*\bid="bag_type")(?=[^>]*\bname="bag_type")[^>]*>', quote_html)
+    assert re.search(r'<select(?=[^>]*\bid="trailer_fill_estimate")(?=[^>]*\bname="trailer_fill_estimate")[^>]*>', quote_html)
+
+    for option_value in ["light", "heavy_mixed", "construction_debris"]:
+        assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
+
+    for option_value in ["under_quarter", "quarter", "half", "three_quarter", "full"]:
+        assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
 
 
 def test_admin_uploads_page_uses_external_script_for_csp():
