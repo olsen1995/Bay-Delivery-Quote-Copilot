@@ -285,7 +285,7 @@ Haul-away pricing now supports optional inputs that act as floors:
 
 - `bag_type` (`light`, `heavy_mixed`, `construction_debris`) applies a per-bag floor
 - `trailer_fill_estimate` (`under_quarter`, `quarter`, `half`, `three_quarter`, `full`) applies a fill floor
-- `trailer_class` (`single_axle_open_aluminum`, `double_axle_open_aluminum`, `older_enclosed`, `newer_enclosed`) selects class-specific fill anchors when configured
+- `trailer_class` (`single_axle_open_aluminum`, `double_axle_open_aluminum`, `older_enclosed`, `newer_enclosed`) selects which class-specific fill anchors are used when a `trailer_fill_estimate` is provided; on its own it does not apply a separate floor
 
 Current quote-engine ordering for haul-away:
 
