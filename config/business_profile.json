@@ -23,6 +23,18 @@
       "minimum_hours": 1,
       "minimum_total": 50,
       "includes_text": "We load, haul, and dispose — removal & disposal included (if required).",
+      "bag_type_anchors_cad_per_bag": {
+        "light": 9,
+        "heavy_mixed": 11,
+        "construction_debris": 15
+      },
+      "trailer_fill_floor_anchors_cad": {
+        "under_quarter": 0,
+        "quarter": 175,
+        "half": 275,
+        "three_quarter": 400,
+        "full": 500
+      },
       "disposal_allowance_by_bags": {
         "tiers": [
           { "max_bags": 5, "allowance": 50 },
