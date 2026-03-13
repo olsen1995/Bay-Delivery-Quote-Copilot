@@ -548,3 +548,67 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
     assert cash_5 >= cash_4, (
         f"5-bag job should cost >= 4-bag job; got 4={cash_4}, 5={cash_5}"
     )
+
+
+# =============================================================================
+# Small-move labour floor tests
+# =============================================================================
+
+def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> None:
+    """The minimum 4h/2-person move must include at least $280 of labour (floor = 35 * 2 * 4 = 280),
+    excluding any travel charges.
+
+    This ensures the labour component for moves is priced above the raw haul-away
+    labour rate, which is too low for the moving market.
+    """
+    payload = _base_payload(service_type="small_move")
+    payload["estimated_hours"] = 4.0
+    payload["access_difficulty"] = "normal"
+
+    response = _post_quote(client, payload)
+    assert response.status_code == 200
+    cash, _ = _assert_success_schema_and_totals(response.json())
+    # floor labour = 35 * 2 crew * 4 h = 280; with current travel minimum ($40) the total cash
+    # for this job should be at least $320, but this test specifically guards the $280 labour floor.
+    assert cash >= 280, (
+        f"Minimum 4h/2-person move must honour a $280 labour floor; got cash={cash}"
+    )
+
+
+def test_small_move_labor_floor_5h_exceeds_4h(client: TestClient) -> None:
+    """A 5-hour move must cost more than a 4-hour move (floor scales with hours)."""
+    payload = _base_payload(service_type="small_move")
+    payload["access_difficulty"] = "normal"
+
+    resp_4 = _post_quote(client, {**payload, "estimated_hours": 4.0})
+    resp_5 = _post_quote(client, {**payload, "estimated_hours": 5.0})
+
+    assert resp_4.status_code == 200
+    assert resp_5.status_code == 200
+
+    cash_4, _ = _assert_success_schema_and_totals(resp_4.json())
+    cash_5, _ = _assert_success_schema_and_totals(resp_5.json())
+
+    assert cash_5 > cash_4, (
+        f"5h move must cost more than 4h move with labour floor; got 4h={cash_4}, 5h={cash_5}"
+    )
+
+
+def test_small_move_access_adder_is_additive_with_labor_floor(client: TestClient) -> None:
+    """Difficult access must still produce a higher total than normal when the floor is active."""
+    payload = _base_payload(service_type="small_move")
+    payload["estimated_hours"] = 4.0
+
+    resp_normal = _post_quote(client, {**payload, "access_difficulty": "normal"})
+    resp_difficult = _post_quote(client, {**payload, "access_difficulty": "difficult"})
+
+    assert resp_normal.status_code == 200
+    assert resp_difficult.status_code == 200
+
+    cash_normal, _ = _assert_success_schema_and_totals(resp_normal.json())
+    cash_difficult, _ = _assert_success_schema_and_totals(resp_difficult.json())
+
+    assert cash_difficult > cash_normal, (
+        f"Difficult access must cost more than normal even when labour floor is active; "
+        f"normal={cash_normal}, difficult={cash_difficult}"
+    )
