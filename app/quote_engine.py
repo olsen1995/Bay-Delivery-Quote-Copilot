@@ -355,6 +355,14 @@ def calculate_quote(
             small_load_protected = True
         else:
             disposal_allowance = _haul_away_disposal_allowance(svc, _bag_count)
+            if (
+                not bool(has_dense_materials)
+                and _ad == "normal"
+                and 6 <= _bag_count <= 8
+            ):
+                # Narrow calibration band for light 6-8 bag jobs only.
+                # Keeps 9+ tier anchor unchanged and avoids affecting hard/dense work.
+                disposal_allowance = max(0.0, disposal_allowance - float(9 - _bag_count) * 5.0)
 
     mattress_boxspring = 0.0
     if normalized == "haul_away" and (int(mattresses_count) > 0 or int(box_springs_count) > 0):
