@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import os
@@ -128,13 +129,111 @@ def _admin_credentials() -> Tuple[str, str]:
     return os.getenv("ADMIN_USERNAME", "").strip(), os.getenv("ADMIN_PASSWORD", "").strip()
 
 
-def main() -> int:
-    print(f"Smoke test target: {base_url()}")
-
+def _run_health_check() -> Dict[str, Any]:
     status, health = api("GET", "/health")
     require(status == 200, f"GET /health expected 200, got {status}")
     require(isinstance(health, dict) and health.get("ok") is True, "GET /health expected {'ok': true}")
     print("[ok] /health")
+    return health
+
+
+def _run_admin_read_checks(health: Dict[str, Any]) -> None:
+    # --- Admin page and auth behavior ---
+    creds_configured = _admin_creds_configured()
+    headers = admin_headers()
+    admin_user, admin_password = _admin_credentials()
+
+    status, admin_page = api("GET", "/admin")
+    require(status == 200, f"GET /admin expected 200, got {status}")
+    require(isinstance(admin_page, str), "GET /admin expected HTML response")
+    require("Admin Access" in admin_page, "GET /admin missing Admin Access marker")
+    require("id=\"refreshBtn\"" in admin_page, "GET /admin missing refresh button marker")
+    print("[ok] /admin page marker checks")
+
+    status, admin_uploads_page = api("GET", "/admin/uploads")
+    require(status == 200, f"GET /admin/uploads expected 200, got {status}")
+    require(isinstance(admin_uploads_page, str), "GET /admin/uploads expected HTML response")
+    require("Customer Uploads" in admin_uploads_page, "GET /admin/uploads missing title marker")
+    require("id=\"btnSearch\"" in admin_uploads_page, "GET /admin/uploads missing search button marker")
+    print("[ok] /admin/uploads page marker checks")
+
+    if creds_configured:
+        negative_auth_enabled = os.getenv("SMOKE_TEST_NEGATIVE_AUTH") == "1"
+        if negative_auth_enabled:
+            bad_headers = basic_auth_header(admin_user + "__bad", admin_password)
+            status, bad_auth = api("GET", "/admin/api/smoke_uploads", headers=bad_headers)
+            require(
+                status in (401, 403),
+                f"GET /admin/api/smoke_uploads bad auth expected 401/403, got {status} ({bad_auth})",
+            )
+            print("[ok] /admin/api/smoke_uploads rejects bad credentials")
+        else:
+            print("[skip] /admin/api/smoke_uploads bad-credentials check (SMOKE_TEST_NEGATIVE_AUTH not enabled)")
+
+        status, smoke_ok = api("GET", "/admin/api/smoke_uploads", headers=headers)
+        require(status == 200, f"GET /admin/api/smoke_uploads with auth expected 200, got {status} ({smoke_ok})")
+        require(isinstance(smoke_ok, dict) and smoke_ok.get("ok") is True, "smoke auth check expected {'ok': true}")
+        print("[ok] /admin/api/smoke_uploads accepts correct credentials")
+
+        status, authed_quotes = api("GET", "/admin/api/quotes?limit=1", headers=headers)
+        require(status == 200, f"GET /admin/api/quotes?limit=1 with auth expected 200, got {status} ({authed_quotes})")
+        require(isinstance(authed_quotes, dict) and isinstance(authed_quotes.get("items"), list), "admin quotes expected items list")
+        print("[ok] /admin/api/quotes authed read-only fetch")
+    else:
+        print("[skip] admin auth pass/fail checks (ADMIN_USERNAME/ADMIN_PASSWORD not configured)")
+
+    status, unauth_uploads = api("GET", "/admin/api/uploads?limit=1")
+
+    # If admin creds are configured, unauth MUST be denied (401/403)
+    if creds_configured:
+        require(
+            status in (401, 403),
+            f"GET /admin/api/uploads unauth expected 401/403 when creds configured; got {status} ({unauth_uploads})",
+        )
+        print("[ok] /admin/api/uploads unauth denied (creds configured)")
+    else:
+        # If creds are NOT configured, fail-closed is acceptable (503),
+        # and some older deployments might allow 200 (warn only).
+        require(
+            status in (200, 401, 403, 503),
+            f"GET /admin/api/uploads unauth expected 200/401/403/503 when creds NOT configured; got {status} ({unauth_uploads})",
+        )
+        if status == 503:
+            print("[ok] /admin/api/uploads locked (503, creds not configured)")
+        elif status in (401, 403):
+            print("[ok] /admin/api/uploads denied (401/403, creds not configured)")
+        else:
+            print("[warn] /admin/api/uploads unauth allowed (admin auth not configured)")
+
+    # If we have Basic auth headers, confirm authed access works
+    if "Authorization" in headers:
+        status, authed_uploads = api("GET", "/admin/api/uploads?limit=1", headers=headers)
+        require(status == 200, f"GET /admin/api/uploads with auth expected 200, got {status} ({authed_uploads})")
+        print("[ok] /admin/api/uploads authed")
+
+    # Drive check (optional)
+    if health.get("drive_configured") is True:
+        require("Authorization" in headers, "Drive is configured but admin auth env vars are missing for backup check")
+        status, backups = api("GET", "/admin/api/drive/backups", headers=headers)
+        require(status == 200, f"GET /admin/api/drive/backups expected 200, got {status} ({backups})")
+        require(isinstance(backups, dict), "Drive backups response expected JSON object")
+        print("[ok] /admin/api/drive/backups")
+    else:
+        print("[skip] drive backup check (drive_configured=false or not reported)")
+
+
+def _run_live_safe_smoke() -> int:
+    print(f"Smoke test target: {base_url()} (mode=live-safe)")
+    health = _run_health_check()
+    _run_admin_read_checks(health)
+    print("Live-safe smoke test passed.")
+    return 0
+
+
+def _run_stateful_workflow_smoke() -> int:
+    print(f"Smoke test target: {base_url()} (mode=stateful)")
+
+    health = _run_health_check()
 
     quote_payload = {
         "service_type": "haul_away",
@@ -224,91 +323,24 @@ def main() -> int:
             f"POST /quote/{{quote_id}}/decision expected 200/201, 401/403, or route-missing 404; got {status} with body: {decision}"
         )
 
-    # --- Admin page and auth behavior ---
-    creds_configured = _admin_creds_configured()
-    headers = admin_headers()
-    admin_user, admin_password = _admin_credentials()
-
-    status, admin_page = api("GET", "/admin")
-    require(status == 200, f"GET /admin expected 200, got {status}")
-    require(isinstance(admin_page, str), "GET /admin expected HTML response")
-    require("Admin Access" in admin_page, "GET /admin missing Admin Access marker")
-    require("id=\"refreshBtn\"" in admin_page, "GET /admin missing refresh button marker")
-    print("[ok] /admin page marker checks")
-
-    status, admin_uploads_page = api("GET", "/admin/uploads")
-    require(status == 200, f"GET /admin/uploads expected 200, got {status}")
-    require(isinstance(admin_uploads_page, str), "GET /admin/uploads expected HTML response")
-    require("Customer Uploads" in admin_uploads_page, "GET /admin/uploads missing title marker")
-    require("id=\"btnSearch\"" in admin_uploads_page, "GET /admin/uploads missing search button marker")
-    print("[ok] /admin/uploads page marker checks")
-
-    if creds_configured:
-        negative_auth_enabled = os.getenv("SMOKE_TEST_NEGATIVE_AUTH") == "1"
-        if negative_auth_enabled:
-            bad_headers = basic_auth_header(admin_user + "__bad", admin_password)
-            status, bad_auth = api("GET", "/admin/api/smoke_uploads", headers=bad_headers)
-            require(
-                status in (401, 403),
-                f"GET /admin/api/smoke_uploads bad auth expected 401/403, got {status} ({bad_auth})",
-            )
-            print("[ok] /admin/api/smoke_uploads rejects bad credentials")
-        else:
-            print("[skip] /admin/api/smoke_uploads bad-credentials check (SMOKE_TEST_NEGATIVE_AUTH not enabled)")
-
-        status, smoke_ok = api("GET", "/admin/api/smoke_uploads", headers=headers)
-        require(status == 200, f"GET /admin/api/smoke_uploads with auth expected 200, got {status} ({smoke_ok})")
-        require(isinstance(smoke_ok, dict) and smoke_ok.get("ok") is True, "smoke auth check expected {'ok': true}")
-        print("[ok] /admin/api/smoke_uploads accepts correct credentials")
-
-        status, authed_quotes = api("GET", "/admin/api/quotes?limit=1", headers=headers)
-        require(status == 200, f"GET /admin/api/quotes?limit=1 with auth expected 200, got {status} ({authed_quotes})")
-        require(isinstance(authed_quotes, dict) and isinstance(authed_quotes.get("items"), list), "admin quotes expected items list")
-        print("[ok] /admin/api/quotes authed read-only fetch")
-    else:
-        print("[skip] admin auth pass/fail checks (ADMIN_USERNAME/ADMIN_PASSWORD not configured)")
-
-    status, unauth_uploads = api("GET", "/admin/api/uploads?limit=1")
-
-    # If admin creds are configured, unauth MUST be denied (401/403)
-    if creds_configured:
-        require(
-            status in (401, 403),
-            f"GET /admin/api/uploads unauth expected 401/403 when creds configured; got {status} ({unauth_uploads})",
-        )
-        print("[ok] /admin/api/uploads unauth denied (creds configured)")
-    else:
-        # If creds are NOT configured, fail-closed is acceptable (503),
-        # and some older deployments might allow 200 (warn only).
-        require(
-            status in (200, 401, 403, 503),
-            f"GET /admin/api/uploads unauth expected 200/401/403/503 when creds NOT configured; got {status} ({unauth_uploads})",
-        )
-        if status == 503:
-            print("[ok] /admin/api/uploads locked (503, creds not configured)")
-        elif status in (401, 403):
-            print("[ok] /admin/api/uploads denied (401/403, creds not configured)")
-        else:
-            print("[warn] /admin/api/uploads unauth allowed (admin auth not configured)")
-
-    # If we have Basic auth headers, confirm authed access works
-    if "Authorization" in headers:
-        status, authed_uploads = api("GET", "/admin/api/uploads?limit=1", headers=headers)
-        require(status == 200, f"GET /admin/api/uploads with auth expected 200, got {status} ({authed_uploads})")
-        print("[ok] /admin/api/uploads authed")
-
-    # Drive check (optional)
-    if isinstance(health, dict) and health.get("drive_configured") is True:
-        require("Authorization" in headers, "Drive is configured but admin auth env vars are missing for backup check")
-        status, backups = api("GET", "/admin/api/drive/backups", headers=headers)
-        require(status == 200, f"GET /admin/api/drive/backups expected 200, got {status} ({backups})")
-        require(isinstance(backups, dict), "Drive backups response expected JSON object")
-        print("[ok] /admin/api/drive/backups")
-    else:
-        print("[skip] drive backup check (drive_configured=false or not reported)")
-
-    print("Smoke test passed.")
+    _run_admin_read_checks(health)
+    print("Stateful workflow smoke test passed.")
     return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run smoke checks in live-safe or stateful mode.")
+    parser.add_argument(
+        "--mode",
+        choices=("live-safe", "stateful"),
+        default="live-safe",
+        help="Smoke mode: live-safe (read-only) or stateful (creates quote workflow records).",
+    )
+    args = parser.parse_args()
+
+    if args.mode == "stateful":
+        return _run_stateful_workflow_smoke()
+    return _run_live_safe_smoke()
 
 
 if __name__ == "__main__":
