@@ -23,6 +23,21 @@ def test_quote_page_uses_external_script_for_csp():
     assert "<script>" not in quote_html
 
 
+def test_quote_page_includes_haul_away_floor_fields() -> None:
+    """Ensure haul-away-only floor-detail fields are present with backend-compatible values."""
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert 'id="haulAwayDetailsRow"' in quote_html
+    assert re.search(r'<select(?=[^>]*\bid="bag_type")(?=[^>]*\bname="bag_type")[^>]*>', quote_html)
+    assert re.search(r'<select(?=[^>]*\bid="trailer_fill_estimate")(?=[^>]*\bname="trailer_fill_estimate")[^>]*>', quote_html)
+
+    for option_value in ["light", "heavy_mixed", "construction_debris"]:
+        assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
+
+    for option_value in ["under_quarter", "quarter", "half", "three_quarter", "full"]:
+        assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
+
+
 def test_admin_uploads_page_uses_external_script_for_csp():
     """Ensure admin uploads JS executes under CSP by avoiding inline script blocks."""
     uploads_html = Path("static/admin_uploads.html").read_text(encoding="utf-8")
