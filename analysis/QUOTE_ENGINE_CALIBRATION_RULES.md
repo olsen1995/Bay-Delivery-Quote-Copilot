@@ -24,8 +24,8 @@ Do not mix multiple priority areas in a single PR.
 For `haul_away`, optional inputs currently affect pricing through floors (not additive surcharges):
 
 - `bag_type` applies a per-bag floor using `bag_type_anchors_cad_per_bag`
-- `trailer_fill_estimate` applies a fill floor using `trailer_fill_floor_anchors_cad`
-- `trailer_class` can select class-specific fill anchors via `trailer_class_fill_floor_anchors_cad`
+- `trailer_fill_estimate` applies a trailer-fill floor using `trailer_fill_floor_anchors_cad` (if omitted, the engine returns a 0 trailer-fill floor)
+- `trailer_class` selects which trailer-fill anchor table (`trailer_fill_floor_anchors_cad` vs any class-specific rows in `trailer_class_fill_floor_anchors_cad`) is used for a given `trailer_fill_estimate` but has no effect by itself when `trailer_fill_estimate` is absent
 
 Current precedence/order in the quote engine:
 
