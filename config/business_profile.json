@@ -27,7 +27,10 @@
         "tiers": [
           { "max_bags": 5, "allowance": 50 },
           { "max_bags": 15, "allowance": 80 },
-          { "max_bags": 9999, "allowance": 120 }
+          { "max_bags": 16, "allowance": 165 },
+          { "max_bags": 20, "allowance": 175 },
+          { "max_bags": 24, "allowance": 185 },
+          { "max_bags": 9999, "allowance": 210 }
         ],
         "note": "Included in estimate total only (not itemized)."
       },
