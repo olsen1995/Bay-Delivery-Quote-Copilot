@@ -221,8 +221,12 @@ def _mattress_boxspring_fee(service_conf: Dict[str, Any], m: int, b: int) -> flo
 def _haul_away_bag_type_floor(service_conf: Dict[str, Any], bag_type: str | None, bag_count: int) -> float:
     if bag_count <= 0:
         return 0.0
-    anchors = service_conf.get("bag_type_anchors_cad_per_bag") or {}
     bag_type_key = str(bag_type or "").strip().lower()
+    if not bag_type_key:
+        return 0.0
+    anchors = service_conf.get("bag_type_anchors_cad_per_bag") or {}
+    if not isinstance(anchors, dict):
+        return 0.0
     anchor = anchors.get(bag_type_key)
     if anchor is None:
         return 0.0
@@ -230,8 +234,12 @@ def _haul_away_bag_type_floor(service_conf: Dict[str, Any], bag_type: str | None
 
 
 def _haul_away_trailer_fill_floor(service_conf: Dict[str, Any], trailer_fill_estimate: str | None) -> float:
-    anchors = service_conf.get("trailer_fill_floor_anchors_cad") or {}
     trailer_fill_key = str(trailer_fill_estimate or "").strip().lower()
+    if not trailer_fill_key:
+        return 0.0
+    anchors = service_conf.get("trailer_fill_floor_anchors_cad") or {}
+    if not isinstance(anchors, dict):
+        return 0.0
     anchor = anchors.get(trailer_fill_key)
     if anchor is None:
         return 0.0
