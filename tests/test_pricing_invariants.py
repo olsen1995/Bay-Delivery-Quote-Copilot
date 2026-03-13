@@ -1007,3 +1007,145 @@ def test_small_move_long_job_floor_only_applies_after_four_hours() -> None:
     assert quote_4h["total_cash_cad"] == 320.0
 
     assert quote_5h["total_cash_cad"] == 400.0
+
+
+# =============================================================================
+# Trailer-class aware pricing tests
+# =============================================================================
+
+def test_haul_away_trailer_class_omitted_matches_baseline() -> None:
+    """Omitting trailer_class must produce identical results to not passing it at all."""
+    base = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="quarter",
+    )
+    with_none = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="quarter",
+        trailer_class=None,
+    )
+    assert float(with_none["total_cash_cad"]) == float(base["total_cash_cad"])
+
+
+def test_haul_away_double_axle_uses_default_anchors() -> None:
+    """double_axle_open_aluminum has no class-specific table so falls through to default anchors."""
+    default = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="quarter",
+    )
+    double_axle = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="quarter",
+        trailer_class="double_axle_open_aluminum",
+    )
+    assert float(double_axle["total_cash_cad"]) == float(default["total_cash_cad"])
+
+
+def test_haul_away_single_axle_quarter_uses_lower_floor() -> None:
+    """single_axle_open_aluminum at quarter fill uses $150 floor, less than default $175."""
+    default_quarter = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="quarter",
+    )
+    single_axle_quarter = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate="quarter",
+        trailer_class="single_axle_open_aluminum",
+    )
+    assert float(default_quarter["total_cash_cad"]) == 175.0
+    assert float(single_axle_quarter["total_cash_cad"]) == 150.0
+    assert float(single_axle_quarter["total_cash_cad"]) < float(default_quarter["total_cash_cad"])
+
+
+@pytest.mark.parametrize("trailer_fill_estimate", ["half", "three_quarter", "full"])
+def test_haul_away_single_axle_higher_fills_match_default(trailer_fill_estimate: str) -> None:
+    """single_axle_open_aluminum at half/three_quarter/full anchors match the default lane."""
+    default = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate=trailer_fill_estimate,
+    )
+    single_axle = calculate_quote(
+        "haul_away", 0.0,
+        crew_size=1, garbage_bag_count=5,
+        travel_zone="in_town", access_difficulty="normal",
+        has_dense_materials=False,
+        trailer_fill_estimate=trailer_fill_estimate,
+        trailer_class="single_axle_open_aluminum",
+    )
+    assert float(single_axle["total_cash_cad"]) == float(default["total_cash_cad"])
+
+
+def test_small_move_older_enclosed_total_unchanged() -> None:
+    """small_move with older_enclosed trailer class must have zero pricing impact."""
+    base = calculate_quote(
+        "small_move", 4.0,
+        crew_size=2,
+        travel_zone="in_town", access_difficulty="normal",
+    )
+    with_tc = calculate_quote(
+        "small_move", 4.0,
+        crew_size=2,
+        travel_zone="in_town", access_difficulty="normal",
+        trailer_class="older_enclosed",
+    )
+    assert float(with_tc["total_cash_cad"]) == float(base["total_cash_cad"])
+
+
+def test_item_delivery_newer_enclosed_total_unchanged() -> None:
+    """item_delivery with newer_enclosed trailer class must have zero pricing impact."""
+    base = calculate_quote(
+        "item_delivery", 0.0,
+        crew_size=1,
+        travel_zone="in_town", access_difficulty="normal",
+    )
+    with_tc = calculate_quote(
+        "item_delivery", 0.0,
+        crew_size=1,
+        travel_zone="in_town", access_difficulty="normal",
+        trailer_class="newer_enclosed",
+    )
+    assert float(with_tc["total_cash_cad"]) == float(base["total_cash_cad"])
+
+
+def test_invalid_trailer_class_rejected(client: TestClient) -> None:
+    """An unrecognized trailer_class value must be rejected with HTTP 422."""
+    payload = _base_payload(service_type="haul_away")
+    payload["trailer_class"] = "giant_trailer"
+    response = _post_quote(client, payload)
+    assert response.status_code == 422
+
+
+def test_valid_trailer_class_accepted_and_persisted(client: TestClient) -> None:
+    """A valid trailer_class is accepted and saved in the request shape."""
+    payload = _base_payload(service_type="haul_away")
+    payload["garbage_bag_count"] = 5
+    payload["trailer_fill_estimate"] = "quarter"
+    payload["trailer_class"] = "single_axle_open_aluminum"
+
+    response = _post_quote(client, payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["request"]["trailer_class"] == "single_axle_open_aluminum"
+    assert isinstance(body.get("accept_token"), str)
+    assert body["accept_token"]

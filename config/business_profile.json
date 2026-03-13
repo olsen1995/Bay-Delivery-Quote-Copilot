@@ -35,6 +35,15 @@
         "three_quarter": 400,
         "full": 500
       },
+      "trailer_class_fill_floor_anchors_cad": {
+        "single_axle_open_aluminum": {
+          "under_quarter": 0,
+          "quarter": 150,
+          "half": 275,
+          "three_quarter": 400,
+          "full": 500
+        }
+      },
       "disposal_allowance_by_bags": {
         "tiers": [
           { "max_bags": 5, "allowance": 50 },
