@@ -136,6 +136,14 @@ def _get_min_labor_per_crew_hour(service_conf: Dict[str, Any]) -> float:
     return float(val)
 
 
+def _get_long_job_min_labor_per_crew_hour(service_conf: Dict[str, Any]) -> float:
+    """Raised small-move labour floor for billable hours beyond the 4h baseline."""
+    val = service_conf.get("long_job_min_labor_per_crew_hour")
+    if val is None:
+        return 0.0
+    return float(val)
+
+
 def _rates(service_conf: Dict[str, Any]) -> Dict[str, float]:
     """
     Supports:
@@ -301,15 +309,28 @@ def calculate_quote(
 
     # Small-move labour floor: moving crews command a higher effective rate than
     # haul-away.  Configured via min_labor_per_crew_hour in the small_move service
-    # settings.  Has no effect when actual labour already meets or exceeds the floor.
+    # settings.  Longer jobs can also use a slightly higher floor rate on hours
+    # beyond the 4h move baseline. Has no effect when actual labour already meets
+    # or exceeds the floor.
     move_labor_floor_applied = False
+    move_long_job_floor_applied = False
     if normalized == "small_move":
         _min_rate = _get_min_labor_per_crew_hour(svc)
+        _long_job_min_rate = _get_long_job_min_labor_per_crew_hour(svc)
         if _min_rate > 0:
-            _labor_floor = _min_rate * float(crew_size) * float(billable_hours)
+            _base_move_hours = min(float(billable_hours), 4.0)
+            _long_move_hours = max(float(billable_hours) - 4.0, 0.0)
+            _effective_long_job_rate = _min_rate
+            if _long_move_hours > 0 and _long_job_min_rate > _min_rate:
+                _effective_long_job_rate = _long_job_min_rate
+            _labor_floor = (
+                _min_rate * float(crew_size) * _base_move_hours
+                + _effective_long_job_rate * float(crew_size) * _long_move_hours
+            )
             if labor < _labor_floor:
                 labor = _labor_floor
                 move_labor_floor_applied = True
+                move_long_job_floor_applied = _long_move_hours > 0 and _effective_long_job_rate > _min_rate
 
     disposal_allowance = 0.0
     small_load_protected = False
@@ -359,6 +380,7 @@ def calculate_quote(
             "crew_size": int(crew_size),
             "crew_escalated": haul_away_crew_escalated,
             "move_labor_floor_applied": move_labor_floor_applied,
+            "move_long_job_floor_applied": move_long_job_floor_applied,
             "billable_hours": round(float(billable_hours), 2),
             "primary_rate_cad": round(float(rates["primary"]), 2),
             "helper_rate_cad": round(float(rates["helper"]), 2),
