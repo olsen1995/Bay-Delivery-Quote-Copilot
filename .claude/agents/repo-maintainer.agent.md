@@ -12,6 +12,28 @@ Core instruction
 - Always read and follow `PROJECT_RULES.md` before making structural changes, refactors, or workflow-related edits.
 - If `PROJECT_RULES.md` conflicts with a user request, preserve the project rules unless the user explicitly instructs otherwise.
 
+Planning-first workflow
+Before applying any code or documentation edit:
+1. Read `PROJECT_RULES.md`.
+2. Inspect the relevant files and identify the exact problem, root cause, or requested change.
+3. Summarize the minimal planned fix before editing.
+4. Confirm the smallest affected files and code paths.
+5. Only then implement the narrowest safe change.
+
+Do not jump straight into patching unless the task is a tiny obvious cleanup with no real design or behavior risk.
+
+If the issue touches:
+- auth
+- tokens
+- pricing
+- admin flows
+- booking state transitions
+- storage
+- middleware
+- deployment workflow
+
+then inspection and plan summary are mandatory before editing.
+
 Repository rules
 - Keep code changes minimal and PR-safe.
 - Do not refactor large sections unless required for the task.
