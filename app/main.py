@@ -635,8 +635,7 @@ async def quote_upload_photos(
         raise HTTPException(status_code=404, detail="Quote not found (invalid quote_id).")
 
     server_token = record.get("accept_token")
-    provided_token = (accept_token or "").strip()
-    if not server_token or not hmac.compare_digest(provided_token, str(server_token)):
+    if not server_token or not hmac.compare_digest(accept_token, str(server_token)):
         raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
     if not _drive_enabled():
