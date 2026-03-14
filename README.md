@@ -57,6 +57,10 @@ For `small_move` and `item_delivery`, also required:
   - Inside removal: **$30 flat**
   - Scrap bypasses labour/travel/disposal logic completely
 
+- **Item Delivery**
+  - A protected base floor of **$100 CAD** applies before any access-based adjustments
+  - Normal-access in-town deliveries can still quote at the protected base floor when the estimated labour input is lower than that minimum
+
 ---
 
 ## Booking decision workflow (customer → admin approval)
@@ -141,6 +145,8 @@ Smoke script: `scripts/smoke_test.py`
 
 - `live-safe` mode (default): read-only validation for health/admin/auth surfaces; no quote workflow records are intentionally created.
 - `stateful` mode: exercises quote workflow routes and creates quote records (`POST /quote/calculate`), and may create quote-request state when decision routes are available.
+
+If `/health` reports `"drive_configured": true`, set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in the smoke-test environment so `live-safe` mode can verify the admin backup route. Without those env vars, the script still proves the public and unauthenticated denial surfaces, but it will stop before the Drive backup check.
 
 Examples:
 
