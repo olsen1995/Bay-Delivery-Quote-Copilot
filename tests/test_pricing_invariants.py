@@ -1051,7 +1051,7 @@ def test_quote_api_rejects_invalid_haul_away_floor_fields(
 def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> None:
     """
     The minimum 4h/2-person move must include a labour-floor component of at least
-    $288 pre-rounding cash (floor = 36 * 2 * 4 = 288), before adding travel and other surcharges.
+    $288 pre-round labour (labour floor = 36 * 2 * 4 = 288), before adding travel and other surcharges.
 
     This ensures the move labour rate is priced above the raw haul-away labour rate,
     which is too low for the moving market.
@@ -1189,8 +1189,9 @@ def test_small_move_long_job_floor_only_applies_after_four_hours() -> None:
     # At 5 hours, the long-job floor should be applied.
     assert quote_5h["_internal"]["move_long_job_floor_applied"] is True
 
-    # The internal labor component for 5h should exceed that for 4h; this checks
-    # the floor-driven behavior without relying on exact total cash amounts.
+    # The internal labor component for 5h should exceed that for 4h, confirming
+    # the floor-driven behavior; we also assert exact total cash amounts here to
+    # lock in the current pricing for this scenario.
     labor_4h = quote_4h["_internal"]["labor_cad"]
     labor_5h = quote_5h["_internal"]["labor_cad"]
     assert labor_5h > labor_4h
