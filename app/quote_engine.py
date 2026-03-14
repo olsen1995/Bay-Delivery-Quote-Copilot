@@ -159,6 +159,14 @@ def _get_item_delivery_protected_base_floor(service_conf: Dict[str, Any]) -> flo
     return float(val)
 
 
+def _get_small_move_enclosed_trailer_adder(service_conf: Dict[str, Any]) -> float:
+    """Flat pre-access adder for enclosed-trailer small moves."""
+    val = service_conf.get("enclosed_trailer_adder_cad")
+    if val is None:
+        return 0.0
+    return float(val)
+
+
 def _rates(service_conf: Dict[str, Any]) -> Dict[str, float]:
     """
     Supports:
@@ -454,6 +462,12 @@ def calculate_quote(
                 move_labor_floor_applied = True
                 move_long_job_floor_applied = _long_move_hours > 0 and _effective_long_job_rate > _min_rate
 
+    small_move_enclosed_trailer_adder = 0.0
+    if normalized == "small_move":
+        trailer_class_key = str(trailer_class or "").strip().lower()
+        if trailer_class_key in _ENCLOSED_TRAILER_CLASSES:
+            small_move_enclosed_trailer_adder = _get_small_move_enclosed_trailer_adder(svc)
+
     disposal_allowance = 0.0
     small_load_protected = False
     if normalized == "haul_away":
@@ -480,7 +494,7 @@ def calculate_quote(
     if normalized == "haul_away" and (int(mattresses_count) > 0 or int(box_springs_count) > 0):
         mattress_boxspring = _mattress_boxspring_fee(svc, int(mattresses_count), int(box_springs_count))
 
-    pre_access_subtotal = travel + labor + disposal_allowance + mattress_boxspring
+    pre_access_subtotal = travel + labor + disposal_allowance + mattress_boxspring + small_move_enclosed_trailer_adder
 
     item_delivery_protected_base_floor = 0.0
     if normalized == "item_delivery":
@@ -541,6 +555,7 @@ def calculate_quote(
             "small_load_protected": small_load_protected,
             "disposal_allowance_cad": round(float(disposal_allowance), 2),
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
+            "small_move_enclosed_trailer_adder_cad": round(float(small_move_enclosed_trailer_adder), 2),
             "item_delivery_protected_base_floor_cad": round(float(item_delivery_protected_base_floor), 2),
             "bag_type": bag_type,
             "bag_type_floor_cad": round(float(bag_type_floor), 2),
