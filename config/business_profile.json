@@ -55,6 +55,11 @@
         ],
         "note": "Included in estimate total only (not itemized)."
       },
+      "access_difficulty_small_load_floor_cad": {
+        "difficult": 115,
+        "extreme": 145,
+        "note": "Minimum quote for 1-3 light-bag haul-away jobs with difficult/extreme access. Protects against underpricing tiny awkward jobs."
+      },
       "mattress_boxspring": {
         "enabled": true,
         "fee_each": 50,
