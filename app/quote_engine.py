@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict
 
@@ -207,6 +208,21 @@ def _haul_away_disposal_allowance(service_conf: Dict[str, Any], bag_count: int) 
     if bag_count <= DEFAULT_BAG_TIER_XXL_MAX:
         return DEFAULT_BAG_TIER_XXL_PRICE
     return DEFAULT_BAG_TIER_XXXL_PRICE
+
+
+def _get_haul_away_dense_disposal_multiplier(service_conf: Dict[str, Any]) -> float:
+    """Return a safe dense-material disposal multiplier for haul-away jobs.
+
+    Fallback is 1.0 when config is missing, non-numeric, non-finite, or <= 0.
+    """
+    raw = service_conf.get("dense_material_disposal_multiplier", 1.0)
+    try:
+        mult = float(raw)
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(mult) or mult <= 0.0:
+        return 1.0
+    return mult
 
 
 def _mattress_boxspring_fee(service_conf: Dict[str, Any], m: int, b: int) -> float:
@@ -448,6 +464,8 @@ def calculate_quote(
                 # Narrow calibration band for light 6-8 bag jobs only.
                 # Keeps 9+ tier anchor unchanged and avoids affecting hard/dense work.
                 disposal_allowance = max(0.0, disposal_allowance - float(9 - _bag_count) * 5.0)
+        if bool(has_dense_materials) and _bag_count > 24:
+            disposal_allowance = disposal_allowance * _get_haul_away_dense_disposal_multiplier(svc)
 
     mattress_boxspring = 0.0
     if normalized == "haul_away" and (int(mattresses_count) > 0 or int(box_springs_count) > 0):

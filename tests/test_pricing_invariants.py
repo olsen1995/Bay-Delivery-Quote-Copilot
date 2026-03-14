@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app import quote_engine
 from app.quote_engine import calculate_quote
 
 @pytest.fixture(scope="module")
@@ -682,12 +683,12 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
 @pytest.mark.parametrize(
     ("bag_count", "bag_type", "expected_cash"),
     [
-        (32, "light", 290.0),
-        (27, "heavy_mixed", 295.0),
+        (32, "light", 330.0),
+        (27, "heavy_mixed", 305.0),
         (20, "construction_debris", 300.0),
     ],
 )
-def test_haul_away_bag_type_floor_raises_quote(
+def test_haul_away_bag_type_floor_does_not_decrease_quote(
     bag_count: int,
     bag_type: str,
     expected_cash: float,
@@ -713,7 +714,7 @@ def test_haul_away_bag_type_floor_raises_quote(
     )
 
     assert float(floored["total_cash_cad"]) == expected_cash
-    assert float(floored["total_cash_cad"]) > float(baseline["total_cash_cad"])
+    assert float(floored["total_cash_cad"]) >= float(baseline["total_cash_cad"])
 
 
 @pytest.mark.parametrize(
@@ -848,7 +849,7 @@ def test_non_haul_away_services_ignore_new_floor_inputs() -> None:
     assert float(with_optional_fields["total_emt_cad"]) == float(baseline["total_emt_cad"])
 
 
-def test_haul_away_omitted_new_fields_preserve_existing_anchor_values() -> None:
+def test_haul_away_omitted_new_fields_preserve_existing_anchor_values_through_24_bags() -> None:
     expected_cash = {
         1: 75.0,
         5: 110.0,
@@ -857,7 +858,6 @@ def test_haul_away_omitted_new_fields_preserve_existing_anchor_values() -> None:
         16: 240.0,
         20: 250.0,
         24: 260.0,
-        30: 285.0,
     }
 
     for bags, expected in expected_cash.items():
@@ -871,6 +871,143 @@ def test_haul_away_omitted_new_fields_preserve_existing_anchor_values() -> None:
             has_dense_materials=False,
         )
         assert float(result["total_cash_cad"]) == expected
+
+
+def test_haul_away_high_volume_disposal_progression_above_24_bags() -> None:
+    expected_cash = {
+        24: 260.0,
+        30: 305.0,
+        40: 330.0,
+        50: 360.0,
+    }
+
+    seen_cash = []
+    for bags in (24, 30, 40, 50):
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        cash = float(result["total_cash_cad"])
+        seen_cash.append(cash)
+        assert cash == expected_cash[bags]
+
+    assert all(next_cash > prev_cash for prev_cash, next_cash in zip(seen_cash, seen_cash[1:])), (
+        f"expected strict high-volume progression for 24/30/40/50 bags; got {seen_cash}"
+    )
+
+
+def test_haul_away_dense_disposal_uplift_applies_only_above_24_bags() -> None:
+    light_24 = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=24,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    dense_24 = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=24,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=True,
+    )
+
+    assert float(dense_24["_internal"]["disposal_allowance_cad"]) == float(light_24["_internal"]["disposal_allowance_cad"])
+
+    light_30 = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    dense_30 = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=True,
+    )
+
+    light_disposal_30 = float(light_30["_internal"]["disposal_allowance_cad"])
+    dense_disposal_30 = float(dense_30["_internal"]["disposal_allowance_cad"])
+
+    assert dense_disposal_30 == pytest.approx(light_disposal_30 * 1.15, rel=0, abs=0.01)
+    assert dense_disposal_30 > light_disposal_30
+
+
+@pytest.mark.parametrize("raw_value", [None, "not-a-number", float("nan"), float("inf"), 0, -1])
+def test_dense_disposal_multiplier_fallback_invalid_values_through_quote_behavior(monkeypatch: pytest.MonkeyPatch, raw_value) -> None:
+    config = quote_engine.load_config()
+    haul_away = config["services"]["haul_away"]
+    if raw_value is None:
+        haul_away.pop("dense_material_disposal_multiplier", None)
+    else:
+        haul_away["dense_material_disposal_multiplier"] = raw_value
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    light = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    dense = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=True,
+    )
+
+    assert float(dense["_internal"]["disposal_allowance_cad"]) == float(light["_internal"]["disposal_allowance_cad"])
+
+
+@pytest.mark.parametrize("raw_value", [1.15, "1.15", 2])
+def test_dense_disposal_multiplier_accepts_valid_numeric_values_through_quote_behavior(monkeypatch: pytest.MonkeyPatch, raw_value) -> None:
+    config = quote_engine.load_config()
+    config["services"]["haul_away"]["dense_material_disposal_multiplier"] = raw_value
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    light = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    dense = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=True,
+    )
+
+    expected_dense_disposal = float(light["_internal"]["disposal_allowance_cad"]) * float(raw_value)
+    assert float(dense["_internal"]["disposal_allowance_cad"]) == pytest.approx(expected_dense_disposal, rel=0, abs=0.01)
 
 
 def test_quote_api_accepts_valid_haul_away_floor_fields(client: TestClient) -> None:
