@@ -6,7 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.quote_engine import calculate_quote, _get_haul_away_dense_disposal_multiplier
+from app import quote_engine
+from app.quote_engine import calculate_quote
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
@@ -687,7 +688,7 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
         (20, "construction_debris", 300.0),
     ],
 )
-def test_haul_away_bag_type_floor_raises_quote(
+def test_haul_away_bag_type_floor_does_not_decrease_quote(
     bag_count: int,
     bag_type: str,
     expected_cash: float,
@@ -949,18 +950,64 @@ def test_haul_away_dense_disposal_uplift_applies_only_above_24_bags() -> None:
 
 
 @pytest.mark.parametrize("raw_value", [None, "not-a-number", float("nan"), float("inf"), 0, -1])
-def test_dense_disposal_multiplier_fallback_invalid_values(raw_value) -> None:
-    service_conf = {}
-    if raw_value is not None:
-        service_conf["dense_material_disposal_multiplier"] = raw_value
+def test_dense_disposal_multiplier_fallback_invalid_values_through_quote_behavior(monkeypatch: pytest.MonkeyPatch, raw_value) -> None:
+    config = quote_engine.load_config()
+    haul_away = config["services"]["haul_away"]
+    if raw_value is None:
+        haul_away.pop("dense_material_disposal_multiplier", None)
+    else:
+        haul_away["dense_material_disposal_multiplier"] = raw_value
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
 
-    assert _get_haul_away_dense_disposal_multiplier(service_conf) == 1.0
+    light = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    dense = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=True,
+    )
+
+    assert float(dense["_internal"]["disposal_allowance_cad"]) == float(light["_internal"]["disposal_allowance_cad"])
 
 
 @pytest.mark.parametrize("raw_value", [1.15, "1.15", 2])
-def test_dense_disposal_multiplier_accepts_valid_numeric_values(raw_value) -> None:
-    service_conf = {"dense_material_disposal_multiplier": raw_value}
-    assert _get_haul_away_dense_disposal_multiplier(service_conf) == pytest.approx(float(raw_value))
+def test_dense_disposal_multiplier_accepts_valid_numeric_values_through_quote_behavior(monkeypatch: pytest.MonkeyPatch, raw_value) -> None:
+    config = quote_engine.load_config()
+    config["services"]["haul_away"]["dense_material_disposal_multiplier"] = raw_value
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    light = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    dense = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=30,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=True,
+    )
+
+    expected_dense_disposal = float(light["_internal"]["disposal_allowance_cad"]) * float(raw_value)
+    assert float(dense["_internal"]["disposal_allowance_cad"]) == pytest.approx(expected_dense_disposal, rel=0, abs=0.01)
 
 
 def test_quote_api_accepts_valid_haul_away_floor_fields(client: TestClient) -> None:
