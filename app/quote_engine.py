@@ -159,16 +159,8 @@ def _get_item_delivery_protected_base_floor(service_conf: Dict[str, Any]) -> flo
     return float(val)
 
 
-def _get_item_delivery_enclosed_trailer_adder(service_conf: Dict[str, Any]) -> float:
-    """Flat pre-access adder for enclosed-trailer item deliveries."""
-    val = service_conf.get("enclosed_trailer_adder_cad")
-    if val is None:
-        return 0.0
-    return float(val)
-
-
-def _get_small_move_enclosed_trailer_adder(service_conf: Dict[str, Any]) -> float:
-    """Flat pre-access adder for enclosed-trailer small moves."""
+def _get_enclosed_trailer_adder(service_conf: Dict[str, Any]) -> float:
+    """Return the config-backed enclosed trailer adder for the active service."""
     val = service_conf.get("enclosed_trailer_adder_cad")
     if val is None:
         return 0.0
@@ -474,7 +466,7 @@ def calculate_quote(
     if normalized == "small_move":
         trailer_class_key = str(trailer_class or "").strip().lower()
         if trailer_class_key in _ENCLOSED_TRAILER_CLASSES:
-            small_move_enclosed_trailer_adder = _get_small_move_enclosed_trailer_adder(svc)
+            small_move_enclosed_trailer_adder = _get_enclosed_trailer_adder(svc)
 
     disposal_allowance = 0.0
     small_load_protected = False
@@ -509,7 +501,7 @@ def calculate_quote(
     if normalized == "item_delivery":
         trailer_class_key = str(trailer_class or "").strip().lower()
         if trailer_class_key in _ENCLOSED_TRAILER_CLASSES:
-            item_delivery_enclosed_trailer_adder = _get_item_delivery_enclosed_trailer_adder(svc)
+            item_delivery_enclosed_trailer_adder = _get_enclosed_trailer_adder(svc)
         item_delivery_protected_base_floor = _get_item_delivery_protected_base_floor(svc)
         pre_access_subtotal = max(pre_access_subtotal, item_delivery_protected_base_floor)
         pre_access_subtotal += item_delivery_enclosed_trailer_adder
