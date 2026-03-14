@@ -88,7 +88,8 @@
       "default_crew": 3,
       "minimum_total": 60,
       "min_labor_per_crew_hour": 36,
-      "long_job_min_labor_per_crew_hour": 50
+      "long_job_min_labor_per_crew_hour": 50,
+      "enclosed_trailer_adder_cad": 40
     },
     "item_delivery": {
       "label": "Item Delivery",
