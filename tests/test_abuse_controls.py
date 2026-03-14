@@ -141,6 +141,11 @@ async def _echo_body_size(request: Request) -> JSONResponse:
     return JSONResponse({"size": len(body)})
 
 
+async def _echo_body_bytes(request: Request) -> JSONResponse:
+    body = await request.body()
+    return JSONResponse({"body": body.decode("utf-8")})
+
+
 def test_request_size_limit_blocks_missing_content_length_when_body_exceeds_cap():
     middleware = RequestSizeLimitMiddleware(
         app=lambda scope, receive, send: None,
@@ -175,3 +180,24 @@ def test_request_size_limit_blocks_malformed_content_length_when_body_exceeds_ca
 
     assert response.status_code == 413
     assert response.body == b'{"detail":"payload too large"}'
+
+
+def test_request_size_limit_restores_exact_body_when_malformed_content_length_under_cap():
+    middleware = RequestSizeLimitMiddleware(
+        app=lambda scope, receive, send: None,
+        rules=[SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=32)],
+    )
+    request = _build_request(
+        "/quote/calculate",
+        headers=[(b"content-length", b"not-a-number")],
+        messages=[
+            {"type": "http.request", "body": b"abc", "more_body": True},
+            {"type": "http.request", "body": b"123", "more_body": False},
+        ],
+    )
+
+    response = middleware.dispatch(request, _echo_body_bytes)
+    response = __import__("asyncio").run(response)
+
+    assert response.status_code == 200
+    assert response.body == b'{"body":"abc123"}'

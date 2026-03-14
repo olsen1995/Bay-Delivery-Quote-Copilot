@@ -74,7 +74,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 
     async def _read_body_with_limit(self, request: Request, max_bytes: int) -> bytes | None:
         total_bytes = 0
-        chunks: list[bytes] = []
+        body_buffer = bytearray()
 
         while True:
             message = await request.receive()
@@ -88,12 +88,12 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                 total_bytes += len(body)
                 if total_bytes > max_bytes:
                     return None
-                chunks.append(body)
+                body_buffer.extend(body)
 
             if not message.get("more_body", False):
                 break
 
-        return b"".join(chunks)
+        return bytes(body_buffer)
 
     @staticmethod
     def _restore_request_body(request: Request, body: bytes) -> None:
