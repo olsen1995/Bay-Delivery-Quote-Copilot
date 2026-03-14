@@ -4,6 +4,13 @@ Local quote/estimate tool for Bay Delivery (North Bay, Ontario).
 
 Current stable milestone: `0.10.0`.
 
+## Render Parity and Release Signals (2026-03-14)
+
+- Live Render behavior was audited against current `main` before further pricing work.
+- For current `item_delivery` protected-floor behavior, see [Pricing rules](#pricing-rules-canonical).
+- For smoke-test `/health` `"drive_configured"` semantics, see [Smoke test usage](#smoke-test-usage).
+- Release markers are aligned to the current public version: `VERSION` = `0.10.0` and `canon_versions.txt` = `0.10.0`.
+
 This project provides:
 
 - Customer-facing quote UI (served at `/`)
