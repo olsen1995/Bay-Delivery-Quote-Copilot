@@ -72,6 +72,43 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.rules = rules
 
+    async def _read_body_with_limit(self, request: Request, max_bytes: int) -> bytes | None:
+        total_bytes = 0
+        chunks: list[bytes] = []
+
+        while True:
+            message = await request.receive()
+            if message["type"] == "http.disconnect":
+                break
+            if message["type"] != "http.request":
+                continue
+
+            body = message.get("body", b"")
+            if body:
+                total_bytes += len(body)
+                if total_bytes > max_bytes:
+                    return None
+                chunks.append(body)
+
+            if not message.get("more_body", False):
+                break
+
+        return b"".join(chunks)
+
+    @staticmethod
+    def _restore_request_body(request: Request, body: bytes) -> None:
+        consumed = False
+
+        async def receive() -> dict[str, object]:
+            nonlocal consumed
+            if consumed:
+                return {"type": "http.request", "body": b"", "more_body": False}
+            consumed = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        request._receive = receive
+        request._body = body
+
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
         path = request.url.path
@@ -79,16 +116,28 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         for rule in self.rules:
             if not _match_rule(method, path, rule):
                 continue
+
             content_length_header = request.headers.get("content-length")
-            if not content_length_header:
-                break
-            try:
-                content_length = int(content_length_header)
-            except ValueError:
-                break
-            if content_length > rule.max_bytes:
+
+            if content_length_header:
+                try:
+                    content_length = int(content_length_header)
+                except ValueError:
+                    content_length = None
+                else:
+                    if content_length > rule.max_bytes:
+                        return JSONResponse(status_code=413, content={"detail": "payload too large"})
+
+                if content_length is not None:
+                    return await call_next(request)
+
+            # Fall back to actual body measurement when Content-Length is missing or malformed.
+            body = await self._read_body_with_limit(request, rule.max_bytes)
+            if body is None:
                 return JSONResponse(status_code=413, content={"detail": "payload too large"})
-            break
+
+            self._restore_request_body(request, body)
+            return await call_next(request)
 
         return await call_next(request)
 
