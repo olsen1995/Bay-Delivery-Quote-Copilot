@@ -33,7 +33,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field, field_validator
 
-from app.abuse_controls import RateLimitMiddleware, RateLimitRule, RequestSizeLimitMiddleware, SizeLimitRule
+from app.abuse_controls import (
+    RateLimitMiddleware,
+    RateLimitRule,
+    RequestSizeLimitMiddleware,
+    SizeLimitRule,
+    extract_client_ip,
+)
 from app import gcalendar, gdrive
 from app.services import booking_service, job_scheduling_service, quote_service
 from app.storage import (
@@ -232,7 +238,7 @@ def _require_admin(request: Request) -> None:
       Smoke tests expect 200/401/403.
     - Therefore: missing creds => 401.
     """
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = extract_client_ip(request)
 
     # Check if client is locked out
     if _check_admin_lockout(client_ip):
