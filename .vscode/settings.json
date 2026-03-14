@@ -70,7 +70,8 @@
   ],
   "python-envs.defaultEnvManager": "ms-python.python:system",
   "chat.tools.terminal.autoApprove": {
-    
+  
+
     "cd": true,
     "echo": true,
     "ls": true,
@@ -193,5 +194,8 @@
     "eval": false,
     "Invoke-Expression": false,
     "iex": false
-  }
+  },
+  "chat.checkpoints.showFileChanges": true,
+  "chat.editing.explainChanges.enabled": true,
+  "chat.viewProgressBadge.enabled": true
 }
