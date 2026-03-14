@@ -1075,6 +1075,60 @@ def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> No
     )
 
 
+def test_item_delivery_floor_0h_1h_2h_non_decreasing_and_protected() -> None:
+    """item_delivery should keep a protected floor for 0h-1h and remain non-decreasing."""
+    seen_cash = []
+    for hours in (0.0, 1.0, 2.0):
+        quote = calculate_quote(
+            "item_delivery",
+            hours,
+            crew_size=1,
+            travel_zone="in_town",
+            access_difficulty="normal",
+        )
+        seen_cash.append(float(quote["total_cash_cad"]))
+
+    assert all(next_cash >= prev_cash for prev_cash, next_cash in zip(seen_cash, seen_cash[1:])), (
+        f"item_delivery 0h/1h/2h should be non-decreasing; got {seen_cash}"
+    )
+    assert all(cash >= 100.0 for cash in seen_cash), (
+        f"item_delivery 0h/1h/2h should each be >= $100 cash; got {seen_cash}"
+    )
+
+
+def test_item_delivery_access_adders_stack_on_top_of_protected_floor() -> None:
+    """item_delivery access adders should stack over the protected base floor."""
+    normal = calculate_quote(
+        "item_delivery",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+    )
+    difficult = calculate_quote(
+        "item_delivery",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+    )
+    extreme = calculate_quote(
+        "item_delivery",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="extreme",
+    )
+
+    normal_cash = float(normal["total_cash_cad"])
+    difficult_cash = float(difficult["total_cash_cad"])
+    extreme_cash = float(extreme["total_cash_cad"])
+
+    assert normal_cash < difficult_cash < extreme_cash
+    assert difficult_cash == normal_cash + 25.0
+    assert extreme_cash == normal_cash + 60.0
+
+
 def test_small_move_labor_floor_5h_exceeds_4h(client: TestClient) -> None:
     """A 5-hour move must cost more than a 4-hour move (floor scales with hours)."""
     payload = _base_payload(service_type="small_move")
