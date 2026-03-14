@@ -51,10 +51,14 @@
           { "max_bags": 16, "allowance": 165 },
           { "max_bags": 20, "allowance": 175 },
           { "max_bags": 24, "allowance": 185 },
-          { "max_bags": 9999, "allowance": 210 }
+          { "max_bags": 30, "allowance": 230 },
+          { "max_bags": 40, "allowance": 255 },
+          { "max_bags": 50, "allowance": 285 },
+          { "max_bags": 9999, "allowance": 315 }
         ],
         "note": "Included in estimate total only (not itemized)."
       },
+      "dense_material_disposal_multiplier": 1.15,
       "mattress_boxspring": {
         "enabled": true,
         "fee_each": 50,
