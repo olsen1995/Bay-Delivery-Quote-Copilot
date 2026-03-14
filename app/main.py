@@ -627,11 +627,16 @@ async def submit_booking(quote_id: str, body: BookingDetails):
 async def quote_upload_photos(
     background_tasks: BackgroundTasks,
     quote_id: str = Form(...),
+    accept_token: str = Form(...),
     files: list[UploadFile] = File(...),
 ):
     record = get_quote_record(quote_id)
     if not record:
         raise HTTPException(status_code=404, detail="Quote not found (invalid quote_id).")
+
+    server_token = record.get("accept_token")
+    if not server_token or not hmac.compare_digest(accept_token, str(server_token)):
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
     if not _drive_enabled():
         raise HTTPException(status_code=501, detail="Photo upload is not configured (Google Drive not set).")

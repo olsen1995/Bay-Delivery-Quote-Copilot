@@ -563,8 +563,8 @@ el("btnCalc").addEventListener("click", async () => {
 el("btnUpload").addEventListener("click", async () => {
   hideBox("uploadStatus");
 
-  if (!lastQuoteId) {
-    showBox("uploadStatus", "No quote_id available yet. Calculate quote first.");
+  if (!lastQuoteId || !lastAcceptToken) {
+    showBox("uploadStatus", "No upload authorization available yet. Calculate quote first.");
     return;
   }
 
@@ -580,6 +580,7 @@ el("btnUpload").addEventListener("click", async () => {
 
   const formData = new FormData();
   formData.append("quote_id", lastQuoteId);
+  formData.append("accept_token", lastAcceptToken);
   for (const f of input.files) formData.append("files", f);
 
   showBox("uploadStatus", "Uploading photos...");
