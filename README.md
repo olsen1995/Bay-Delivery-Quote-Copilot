@@ -7,8 +7,8 @@ Current stable milestone: `0.10.0`.
 ## Render Parity and Release Signals (2026-03-14)
 
 - Live Render behavior was audited against current `main` before further pricing work.
-- `item_delivery` already includes the intentional protected floor in code, and that floor is enforced against the full pre-access subtotal before access-based adjustments.
-- When `/health` reports `"drive_configured": true`, `live-safe` still verifies public and unauthenticated denial surfaces; if `ADMIN_USERNAME` / `ADMIN_PASSWORD` are unset, it fails at the Drive backup check with a non-zero exit.
+- For current `item_delivery` protected-floor behavior, see [Pricing rules](#pricing-rules-canonical).
+- For smoke-test `/health` `"drive_configured"` semantics, see [Smoke test usage](#smoke-test-usage).
 - Release markers are aligned to the current public version: `VERSION` = `0.10.0` and `canon_versions.txt` = `0.10.0`.
 
 This project provides:
