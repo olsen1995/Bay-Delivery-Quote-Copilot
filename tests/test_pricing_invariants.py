@@ -1286,3 +1286,102 @@ def test_valid_trailer_class_accepted_and_persisted(client: TestClient) -> None:
     assert body["request"]["trailer_class"] == "single_axle_open_aluminum"
     assert isinstance(body.get("accept_token"), str)
     assert body["accept_token"]
+
+
+# =============================================================================
+# Awkward small-load floor tests
+# (haul_away, difficult/extreme access, 1–3 light bags only)
+# =============================================================================
+
+@pytest.mark.parametrize("bags,access_difficulty,expected_cash", [
+    (1, "difficult", 115.0),
+    (2, "difficult", 115.0),
+    (3, "difficult", 130.0),  # raw $130 already exceeds floor
+    (1, "extreme",  145.0),
+    (2, "extreme",  150.0),  # raw total is $150 here; $145 floor does not bind
+    (3, "extreme",  165.0),  # raw $165 already exceeds floor
+])
+def test_haul_away_awkward_small_load_floor_exact_values(
+    bags: int, access_difficulty: str, expected_cash: float
+) -> None:
+    """Verify exact totals for tiny awkward haul-away jobs (1h, in_town, light bags)."""
+    result = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=bags,
+        travel_zone="in_town",
+        access_difficulty=access_difficulty,
+        has_dense_materials=False,
+    )
+    assert float(result["total_cash_cad"]) == expected_cash, (
+        f"bags={bags}, access={access_difficulty}: "
+        f"expected {expected_cash}, got {result['total_cash_cad']}"
+    )
+
+
+def test_haul_away_awkward_small_load_floor_not_applied_for_normal_access() -> None:
+    """The awkward small-load floor must NOT change normal-access pricing."""
+    for bags in (1, 2, 3):
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=bags,
+            travel_zone="in_town",
+            access_difficulty="normal",
+            has_dense_materials=False,
+        )
+        assert result["_internal"]["awkward_small_load_floor_cad"] == 0.0
+    # Spot-check 1-bag to confirm existing contract unchanged
+    assert float(
+        calculate_quote("haul_away", 1.0, crew_size=1, garbage_bag_count=1,
+                        travel_zone="in_town", access_difficulty="normal")["total_cash_cad"]
+    ) == 75.0
+
+
+def test_haul_away_awkward_small_load_floor_not_applied_for_4_bags() -> None:
+    """The floor only targets small-load-protected jobs (1–3 bags); 4+ bags are excluded."""
+    for access in ("difficult", "extreme"):
+        result_4 = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=4,
+            travel_zone="in_town",
+            access_difficulty=access,
+            has_dense_materials=False,
+        )
+        assert result_4["_internal"]["awkward_small_load_floor_cad"] == 0.0
+
+
+def test_haul_away_awkward_small_load_floor_not_applied_for_dense_materials() -> None:
+    """Dense materials bypass small-load protection, so the awkward floor must not apply."""
+    for access in ("difficult", "extreme"):
+        result = calculate_quote(
+            "haul_away",
+            1.0,
+            crew_size=1,
+            garbage_bag_count=1,
+            travel_zone="in_town",
+            access_difficulty=access,
+            has_dense_materials=True,
+        )
+        assert result["_internal"]["awkward_small_load_floor_cad"] == 0.0
+
+
+def test_haul_away_awkward_floor_raises_extreme_above_difficult() -> None:
+    """Extreme floor must produce a higher total than difficult floor for the same bag count."""
+    for bags in (1, 2):
+        q_diff = calculate_quote(
+            "haul_away", 1.0, crew_size=1, garbage_bag_count=bags,
+            travel_zone="in_town", access_difficulty="difficult", has_dense_materials=False,
+        )
+        q_ext = calculate_quote(
+            "haul_away", 1.0, crew_size=1, garbage_bag_count=bags,
+            travel_zone="in_town", access_difficulty="extreme", has_dense_materials=False,
+        )
+        assert float(q_ext["total_cash_cad"]) > float(q_diff["total_cash_cad"]), (
+            f"bags={bags}: extreme ({q_ext['total_cash_cad']}) must exceed "
+            f"difficult ({q_diff['total_cash_cad']})"
+        )

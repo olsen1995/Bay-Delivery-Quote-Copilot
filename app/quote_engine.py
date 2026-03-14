@@ -249,6 +249,30 @@ def _haul_away_bag_type_floor(service_conf: Dict[str, Any], bag_type: str | None
     return float(bag_count) * float(anchor)
 
 
+def _haul_away_access_difficulty_small_load_floor(
+    service_conf: Dict[str, Any], access_difficulty: str | None, small_load_protected: bool
+) -> float:
+    """Return the config-backed minimum total for tiny awkward haul-away jobs.
+
+    Only applies when the job is small-load protected (see
+    small_load_protected definition; typically a small load of non-dense
+    materials) AND access is difficult or extreme.  Returns 0 for all other
+    combinations so existing pricing is unaffected.
+    """
+    if not small_load_protected:
+        return 0.0
+    ad = (access_difficulty or "normal").strip().lower()
+    if ad not in ("difficult", "extreme"):
+        return 0.0
+    anchors = service_conf.get("access_difficulty_small_load_floor_cad") or {}
+    if not isinstance(anchors, dict):
+        return 0.0
+    anchor = anchors.get(ad)
+    if anchor is None:
+        return 0.0
+    return float(anchor)
+
+
 def _haul_away_trailer_fill_floor(service_conf: Dict[str, Any], trailer_fill_estimate: str | None) -> float:
     trailer_fill_key = str(trailer_fill_estimate or "").strip().lower()
     if not trailer_fill_key:
@@ -455,10 +479,12 @@ def calculate_quote(
 
     bag_type_floor = 0.0
     trailer_fill_floor = 0.0
+    awkward_small_load_floor = 0.0
     if normalized == "haul_away":
         bag_type_floor = _haul_away_bag_type_floor(svc, bag_type, int(garbage_bag_count))
         trailer_fill_floor = _haul_away_trailer_class_fill_floor(svc, trailer_class, trailer_fill_estimate)
-        cash_before_round = max(cash_before_round, bag_type_floor, trailer_fill_floor)
+        awkward_small_load_floor = _haul_away_access_difficulty_small_load_floor(svc, _ad, small_load_protected)
+        cash_before_round = max(cash_before_round, bag_type_floor, trailer_fill_floor, awkward_small_load_floor)
 
     cash_total = _round_cash_to_nearest_5(cash_before_round)
     emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
@@ -505,6 +531,7 @@ def calculate_quote(
             "trailer_fill_estimate": trailer_fill_estimate,
             "trailer_class": trailer_class,
             "trailer_fill_floor_cad": round(float(trailer_fill_floor), 2),
+            "awkward_small_load_floor_cad": round(float(awkward_small_load_floor), 2),
             "access_difficulty": _ad,
             "access_difficulty_adder_cad": round(float(access_adder), 2),
         },
