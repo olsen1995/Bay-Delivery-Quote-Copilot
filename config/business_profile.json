@@ -94,6 +94,7 @@
     "item_delivery": {
       "label": "Item Delivery",
       "item_delivery_protected_base_floor_cad": 100,
+      "enclosed_trailer_adder_cad": 30,
       "minimum_total": 50
     },
     "demolition": {
