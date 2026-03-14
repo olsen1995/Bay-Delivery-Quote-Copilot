@@ -45,12 +45,16 @@ For `small_move` and `item_delivery`, also required:
   - Optional haul-away inputs currently supported:
     - `bag_type` (`light`, `heavy_mixed`, `construction_debris`) applies a per-bag floor
     - `trailer_fill_estimate` (`under_quarter`, `quarter`, `half`, `three_quarter`, `full`) applies a trailer-fill floor
-    - `trailer_class` (`single_axle_open_aluminum`, `double_axle_open_aluminum`, `older_enclosed`, `newer_enclosed`) selects lane-specific fill anchors **only when** a `trailer_fill_estimate` is also provided; by itself, `trailer_class` is accepted as metadata but does **not** change pricing
+    - `trailer_class` (`single_axle_open_aluminum`, `double_axle_open_aluminum`, `older_enclosed`, `newer_enclosed`) selects lane-specific fill anchors **only when** a `trailer_fill_estimate` is also provided; for **haul-away**, `trailer_class` is otherwise accepted as metadata and does **not** independently change pricing
   - Current trailer-class behavior (all conditional on `trailer_fill_estimate` being set):
     - `single_axle_open_aluminum` has a class-specific `quarter` floor
     - `double_axle_open_aluminum` currently falls back to default fill anchors
     - enclosed classes are accepted but currently use default fill anchors (no additional enclosed-class pricing impact yet)
     - if `trailer_fill_estimate` is **not** provided, trailer-class fill floors are treated as 0 and `trailer_class` has no effect on the quote total
+
+- **Small Move**
+  - When `trailer_class` is `older_enclosed` or `newer_enclosed`, a **$40** enclosed-trailer adder applies
+  - This adder is specific to `small_move` and is separate from haul-away trailer-class fill-floor behavior
 
 - **Scrap Pickup**
   - Curbside/outside: **$0**
