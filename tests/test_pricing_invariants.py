@@ -1298,7 +1298,7 @@ def test_valid_trailer_class_accepted_and_persisted(client: TestClient) -> None:
     (2, "difficult", 115.0),
     (3, "difficult", 130.0),  # raw $130 already exceeds floor
     (1, "extreme",  145.0),
-    (2, "extreme",  150.0),  # 145 floor binds pre-round, then rounds to 150
+    (2, "extreme",  150.0),  # raw total is $150 here; $145 floor does not bind
     (3, "extreme",  165.0),  # raw $165 already exceeds floor
 ])
 def test_haul_away_awkward_small_load_floor_exact_values(

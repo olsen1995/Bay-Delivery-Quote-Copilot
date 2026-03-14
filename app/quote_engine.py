@@ -250,12 +250,13 @@ def _haul_away_bag_type_floor(service_conf: Dict[str, Any], bag_type: str | None
 
 
 def _haul_away_access_difficulty_small_load_floor(
-    service_conf: Dict[str, Any], access_difficulty: str, small_load_protected: bool
+    service_conf: Dict[str, Any], access_difficulty: str | None, small_load_protected: bool
 ) -> float:
     """Return the config-backed minimum total for tiny awkward haul-away jobs.
 
-    Only applies when the job is small-load protected (1–SMALL_LOAD_MAX_BAGS
-    light bags) AND access is difficult or extreme.  Returns 0 for all other
+    Only applies when the job is small-load protected (see
+    small_load_protected definition; typically a small load of non-dense
+    materials) AND access is difficult or extreme.  Returns 0 for all other
     combinations so existing pricing is unaffected.
     """
     if not small_load_protected:
