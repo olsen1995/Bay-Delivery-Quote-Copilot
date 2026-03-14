@@ -23,6 +23,13 @@ def test_quote_page_uses_external_script_for_csp():
     assert "<script>" not in quote_html
 
 
+def test_quote_upload_formdata_includes_accept_token() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    assert 'formData.append("quote_id", lastQuoteId);' in quote_js
+    assert 'formData.append("accept_token", lastAcceptToken);' in quote_js
+
+
 def test_quote_page_includes_haul_away_floor_fields() -> None:
     """Ensure haul-away-only floor-detail fields are present with backend-compatible values."""
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")

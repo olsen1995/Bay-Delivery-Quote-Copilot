@@ -580,6 +580,7 @@ el("btnUpload").addEventListener("click", async () => {
 
   const formData = new FormData();
   formData.append("quote_id", lastQuoteId);
+  formData.append("accept_token", lastAcceptToken);
   for (const f of input.files) formData.append("files", f);
 
   showBox("uploadStatus", "Uploading photos...");
