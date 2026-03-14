@@ -90,6 +90,8 @@
       "min_labor_per_crew_hour": 35,
       "long_job_min_labor_per_crew_hour": 40,
       "enclosed_trailer_adder_cad": 40
+      "min_labor_per_crew_hour": 36,
+      "long_job_min_labor_per_crew_hour": 50
     },
     "item_delivery": {
       "label": "Item Delivery",

@@ -1051,7 +1051,7 @@ def test_quote_api_rejects_invalid_haul_away_floor_fields(
 def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> None:
     """
     The minimum 4h/2-person move must include a labour-floor component of at least
-    $280 cash (floor = 35 * 2 * 4 = 280), before adding travel and other surcharges.
+    $288 pre-round labour (labour floor = 36 * 2 * 4 = 288), before adding travel and other surcharges.
 
     This ensures the move labour rate is priced above the raw haul-away labour rate,
     which is too low for the moving market.
@@ -1063,15 +1063,14 @@ def test_small_move_labor_floor_applied_on_minimum_job(client: TestClient) -> No
     response = _post_quote(client, payload)
     assert response.status_code == 200
     cash, _ = _assert_success_schema_and_totals(response.json())
-    # floor labor = 35 * 2 crew * 4 h = 280; add travel $40 → raw $320, cash $320
-    assert cash == 320.0, (
-        f"Minimum 4h/2-person move must produce cash == $320; got {cash}"
+    # floor labor = 36 * 2 crew * 4 h = 288; add travel $40 → raw $328, cash $330
+    assert cash == 330.0, (
+        f"Minimum 4h/2-person move must produce cash == $330; got {cash}"
     )
-    # labour floor = 35 * 2 crew * 4 h = 280; base travel adds $40 for an expected
-    # total cash of $320 on an in-town/normal job, but this assertion only guards
-    # the labour-floor minimum of $280.
-    assert cash >= 280, (
-        f"Minimum 4h/2-person move must produce cash >= $280 (labour floor bound); got {cash}"
+    # labour floor = 36 * 2 crew * 4 h = 288; base travel adds $40 for a raw
+    # pre-round total of $328 on an in-town/normal job.
+    assert cash >= 288, (
+        f"Minimum 4h/2-person move must produce cash >= $288 (labour floor bound); got {cash}"
     )
 
 
@@ -1190,14 +1189,36 @@ def test_small_move_long_job_floor_only_applies_after_four_hours() -> None:
     # At 5 hours, the long-job floor should be applied.
     assert quote_5h["_internal"]["move_long_job_floor_applied"] is True
 
-    # The internal labor component for 5h should exceed that for 4h; this checks
-    # the floor-driven behavior without relying on exact total cash amounts.
+    # The internal labor component for 5h should exceed that for 4h, confirming
+    # the floor-driven behavior; we also assert exact total cash amounts here to
+    # lock in the current pricing for this scenario.
     labor_4h = quote_4h["_internal"]["labor_cad"]
     labor_5h = quote_5h["_internal"]["labor_cad"]
     assert labor_5h > labor_4h
-    assert quote_4h["total_cash_cad"] == 320.0
+    assert quote_4h["total_cash_cad"] == 330.0
 
-    assert quote_5h["total_cash_cad"] == 400.0
+    assert quote_5h["total_cash_cad"] == 430.0
+
+
+@pytest.mark.parametrize(
+    ("hours", "access_difficulty", "expected_cash"),
+    [
+        (4.0, "normal", 330.0),
+        (5.0, "normal", 430.0),
+        (4.0, "difficult", 355.0),
+        (5.0, "difficult", 455.0),
+    ],
+)
+def test_small_move_two_person_selective_targets(hours: float, access_difficulty: str, expected_cash: float) -> None:
+    quote = calculate_quote(
+        "small_move",
+        hours,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty=access_difficulty,
+    )
+
+    assert float(quote["total_cash_cad"]) == expected_cash
 
 
 # =============================================================================
