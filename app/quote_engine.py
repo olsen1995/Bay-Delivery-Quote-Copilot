@@ -151,6 +151,14 @@ def _get_long_job_min_labor_per_crew_hour(service_conf: Dict[str, Any]) -> float
     return float(val)
 
 
+def _get_item_delivery_protected_base_floor(service_conf: Dict[str, Any]) -> float:
+    """Protected pre-access floor for item_delivery to avoid soft two-address quotes."""
+    val = service_conf.get("item_delivery_protected_base_floor_cad")
+    if val is None:
+        return 0.0
+    return float(val)
+
+
 def _rates(service_conf: Dict[str, Any]) -> Dict[str, float]:
     """
     Supports:
@@ -472,7 +480,14 @@ def calculate_quote(
     if normalized == "haul_away" and (int(mattresses_count) > 0 or int(box_springs_count) > 0):
         mattress_boxspring = _mattress_boxspring_fee(svc, int(mattresses_count), int(box_springs_count))
 
-    raw_cash = travel + labor + disposal_allowance + mattress_boxspring + access_adder
+    pre_access_subtotal = travel + labor + disposal_allowance + mattress_boxspring
+
+    item_delivery_protected_base_floor = 0.0
+    if normalized == "item_delivery":
+        item_delivery_protected_base_floor = _get_item_delivery_protected_base_floor(svc)
+        pre_access_subtotal = max(pre_access_subtotal, item_delivery_protected_base_floor)
+
+    raw_cash = pre_access_subtotal + access_adder
 
     min_total = _get_min_total(svc)
     cash_before_round = max(raw_cash, min_total)
@@ -526,6 +541,7 @@ def calculate_quote(
             "small_load_protected": small_load_protected,
             "disposal_allowance_cad": round(float(disposal_allowance), 2),
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
+            "item_delivery_protected_base_floor_cad": round(float(item_delivery_protected_base_floor), 2),
             "bag_type": bag_type,
             "bag_type_floor_cad": round(float(bag_type_floor), 2),
             "trailer_fill_estimate": trailer_fill_estimate,

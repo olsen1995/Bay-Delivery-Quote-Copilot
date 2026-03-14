@@ -92,6 +92,7 @@
     },
     "item_delivery": {
       "label": "Item Delivery",
+      "item_delivery_protected_base_floor_cad": 100,
       "minimum_total": 50
     },
     "demolition": {
