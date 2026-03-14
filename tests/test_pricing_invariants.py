@@ -1344,8 +1344,9 @@ def test_small_move_open_or_missing_trailer_class_remains_unchanged(trailer_clas
     assert float(with_tc["_internal"]["small_move_enclosed_trailer_adder_cad"]) == 0.0
 
 
-def test_item_delivery_newer_enclosed_total_unchanged() -> None:
-    """item_delivery with newer_enclosed trailer class must have zero pricing impact."""
+@pytest.mark.parametrize("trailer_class", ["older_enclosed", "newer_enclosed"])
+def test_item_delivery_enclosed_trailer_adds_30_uplift(trailer_class: str) -> None:
+    """item_delivery applies a +$30 adder only for enclosed trailer classes."""
     base = calculate_quote(
         "item_delivery", 0.0,
         crew_size=1,
@@ -1355,9 +1356,28 @@ def test_item_delivery_newer_enclosed_total_unchanged() -> None:
         "item_delivery", 0.0,
         crew_size=1,
         travel_zone="in_town", access_difficulty="normal",
-        trailer_class="newer_enclosed",
+        trailer_class=trailer_class,
+    )
+    assert float(with_tc["total_cash_cad"]) == float(base["total_cash_cad"]) + 30.0
+    assert float(with_tc["_internal"]["item_delivery_enclosed_trailer_adder_cad"]) == 30.0
+
+
+@pytest.mark.parametrize("trailer_class", [None, "single_axle_open_aluminum", "double_axle_open_aluminum"])
+def test_item_delivery_open_or_missing_trailer_class_remains_unchanged(trailer_class: str | None) -> None:
+    """item_delivery keeps open trailer classes and missing trailer_class neutral."""
+    base = calculate_quote(
+        "item_delivery", 0.0,
+        crew_size=1,
+        travel_zone="in_town", access_difficulty="normal",
+    )
+    with_tc = calculate_quote(
+        "item_delivery", 0.0,
+        crew_size=1,
+        travel_zone="in_town", access_difficulty="normal",
+        trailer_class=trailer_class,
     )
     assert float(with_tc["total_cash_cad"]) == float(base["total_cash_cad"])
+    assert float(with_tc["_internal"]["item_delivery_enclosed_trailer_adder_cad"]) == 0.0
 
 
 def test_invalid_trailer_class_rejected(client: TestClient) -> None:

@@ -159,6 +159,14 @@ def _get_item_delivery_protected_base_floor(service_conf: Dict[str, Any]) -> flo
     return float(val)
 
 
+def _get_item_delivery_enclosed_trailer_adder(service_conf: Dict[str, Any]) -> float:
+    """Flat pre-access adder for enclosed-trailer item deliveries."""
+    val = service_conf.get("enclosed_trailer_adder_cad")
+    if val is None:
+        return 0.0
+    return float(val)
+
+
 def _get_small_move_enclosed_trailer_adder(service_conf: Dict[str, Any]) -> float:
     """Flat pre-access adder for enclosed-trailer small moves."""
     val = service_conf.get("enclosed_trailer_adder_cad")
@@ -497,9 +505,14 @@ def calculate_quote(
     pre_access_subtotal = travel + labor + disposal_allowance + mattress_boxspring + small_move_enclosed_trailer_adder
 
     item_delivery_protected_base_floor = 0.0
+    item_delivery_enclosed_trailer_adder = 0.0
     if normalized == "item_delivery":
+        trailer_class_key = str(trailer_class or "").strip().lower()
+        if trailer_class_key in _ENCLOSED_TRAILER_CLASSES:
+            item_delivery_enclosed_trailer_adder = _get_item_delivery_enclosed_trailer_adder(svc)
         item_delivery_protected_base_floor = _get_item_delivery_protected_base_floor(svc)
         pre_access_subtotal = max(pre_access_subtotal, item_delivery_protected_base_floor)
+        pre_access_subtotal += item_delivery_enclosed_trailer_adder
 
     raw_cash = pre_access_subtotal + access_adder
 
@@ -557,6 +570,7 @@ def calculate_quote(
             "mattress_boxspring_cad": round(float(mattress_boxspring), 2),
             "small_move_enclosed_trailer_adder_cad": round(float(small_move_enclosed_trailer_adder), 2),
             "item_delivery_protected_base_floor_cad": round(float(item_delivery_protected_base_floor), 2),
+            "item_delivery_enclosed_trailer_adder_cad": round(float(item_delivery_enclosed_trailer_adder), 2),
             "bag_type": bag_type,
             "bag_type_floor_cad": round(float(bag_type_floor), 2),
             "trailer_fill_estimate": trailer_fill_estimate,

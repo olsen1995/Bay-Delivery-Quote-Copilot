@@ -301,7 +301,8 @@ Current trailer-lane behavior:
 
 Current scope limit:
 
-- enclosed trailer classes are supported inputs, but there is no additional enclosed-class pricing impact yet
+- for `haul_away`, enclosed trailer classes are supported inputs and currently use default fill anchors
+- for `item_delivery`, enclosed trailer classes (`older_enclosed`, `newer_enclosed`) apply a flat `enclosed_trailer_adder_cad`
 
 ### Highest current pricing priority
 
