@@ -1,5 +1,4 @@
 import math
-import logging
 from copy import deepcopy
 
 import pytest
@@ -344,18 +343,16 @@ def test_response_request_service_type_is_normalized_for_aliases(client: TestCli
     assert body["request"]["service_type"] == "small_move"
 
 
-def test_unknown_fields_are_allowed_and_warned(client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+def test_unknown_fields_are_rejected(client: TestClient) -> None:
     payload = _base_payload()
     payload["legacy_flag"] = True
 
-    with caplog.at_level(logging.WARNING, logger="app.main"):
-        response = _post_quote(client, payload)
+    response = _post_quote(client, payload)
 
-    assert response.status_code == 200
-    app_logs = [r.getMessage() for r in caplog.records if r.name == "app.main"]
-    combined_logs = "\n".join(app_logs)
-    assert "unknown request fields" in combined_logs
-    assert "legacy_flag" in combined_logs
+    assert response.status_code == 422
+    body = response.json()
+    assert body["detail"][0]["type"] == "extra_forbidden"
+    assert body["detail"][0]["loc"] == ["body", "legacy_flag"]
 
 
 # =============================================================================

@@ -31,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.abuse_controls import (
     RateLimitMiddleware,
@@ -422,6 +422,8 @@ def health():
 # =========================
 
 class QuoteRequestPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     customer_name: str = Field(..., min_length=1, max_length=120)
     customer_phone: str = Field(..., min_length=1, max_length=50)
     job_address: str = Field(..., min_length=1, max_length=250)
@@ -470,28 +472,8 @@ class QuoteRequestPayload(BaseModel):
             return v.strip()
         return v
 
-
-CANONICAL_QUOTE_REQUEST_FIELDS = set(QuoteRequestPayload.model_fields.keys())
-
-
 @app.post("/quote/calculate")
-async def quote_calculate(request: Request, payload: QuoteRequestPayload):
-    raw_payload = await request.json()
-    if isinstance(raw_payload, dict):
-        unknown_fields = sorted(set(raw_payload.keys()) - CANONICAL_QUOTE_REQUEST_FIELDS)
-        if unknown_fields:
-            preview_limit = 25
-            preview_keys = unknown_fields[:preview_limit]
-            remaining = len(unknown_fields) - len(preview_keys)
-            suffix = f" (+{remaining} more)" if remaining > 0 else ""
-            logger.warning(
-                "/quote/calculate received %d unknown request fields: %s%s",
-                len(unknown_fields),
-                ", ".join(preview_keys),
-                suffix,
-            )
-            # TODO: Flip QuoteRequestPayload to extra="forbid" after unknown-field logs stay clean.
-
+async def quote_calculate(payload: QuoteRequestPayload):
     request_payload = payload.model_dump()
     return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
 
