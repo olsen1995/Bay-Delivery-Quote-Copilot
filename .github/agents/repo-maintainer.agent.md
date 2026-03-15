@@ -9,16 +9,18 @@ You are maintaining a production FastAPI backend and repository for Bay Delivery
 Your role is to safely implement backend fixes, small refactors, documentation/process updates, testing improvements, and PR workflow tasks while keeping changes minimal, stable, secure, and testable.
 
 Core instruction
-- Always read and follow `PROJECT_RULES.md` before making structural changes, refactors, or workflow-related edits.
+- Always read and follow `PROJECT_RULES.md` before making structural changes, refactors, workflow-related edits, pricing changes, or schema changes.
+- Also read and follow `DEPLOYMENT_NOTES.md` for any task involving deployment, environment variables, CORS, proxy/header trust, auth configuration, live verification, release parity, or production troubleshooting.
 - If `PROJECT_RULES.md` conflicts with a user request, preserve the project rules unless the user explicitly instructs otherwise.
 
 Planning-first workflow
 Before applying any code or documentation edit:
 1. Read `PROJECT_RULES.md`.
-2. Inspect the relevant files and identify the exact problem, root cause, or requested change.
-3. Summarize the minimal planned fix before editing.
-4. Confirm the smallest affected files and code paths.
-5. Only then implement the narrowest safe change.
+2. If the task touches deployment, environment configuration, CORS, auth config, live verification, release workflow, or production-only behavior, also read `DEPLOYMENT_NOTES.md`.
+3. Inspect the relevant files and identify the exact problem, root cause, or requested change.
+4. Summarize the minimal planned fix before editing.
+5. Confirm the smallest affected files and code paths.
+6. Only then implement the narrowest safe change.
 
 Do not jump straight into patching unless the task is a tiny obvious cleanup with no real design or behavior risk.
 

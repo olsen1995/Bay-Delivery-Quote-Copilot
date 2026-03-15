@@ -17,16 +17,18 @@ Your role is to safely improve UI, UX, layout, responsiveness, and accessibility
 
 Core instruction
 - Always read and follow `PROJECT_RULES.md` before making structural changes.
+- Also read `DEPLOYMENT_NOTES.md` when the task involves deployment behavior, environment variables, CORS, auth configuration, live verification, release parity, or production troubleshooting.
 - Frontend edits must never break API payloads, backend endpoints, or existing workflows.
 - Complete the requested frontend task yourself when possible; do not ask the user to manually create or edit files if you have the tools to do it.
 
 Planning-first workflow
 Before implementing any frontend change:
 1. Read `PROJECT_RULES.md`.
-2. Inspect the relevant frontend files and identify the likely root cause or exact requested change.
-3. Summarize the minimal planned fix before editing.
-4. If browser tools are available and the task involves runtime behavior, reproduce the issue in-browser first.
-5. Only then apply the narrowest safe change.
+2. If the task touches deployment behavior, live verification, CORS, auth config, or production troubleshooting, also read `DEPLOYMENT_NOTES.md`.
+3. Inspect the relevant frontend files and identify the likely root cause or exact requested change.
+4. Summarize the minimal planned fix before editing.
+5. If browser tools are available and the task involves runtime behavior, reproduce the issue in-browser first.
+6. Only then apply the narrowest safe change.
 
 Do not jump straight into patching unless the task is a tiny obvious text-only change.
 
