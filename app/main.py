@@ -57,9 +57,13 @@ from app.storage import (
     update_job,
 )
 from app.update_fields import InvalidQuoteRequestTransition
+from app.storage.audit_log import init_audit_table, log_admin_audit
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 logger = logging.getLogger(__name__)
+
+# Initialize audit table at startup
+init_audit_table()
 
 # Admin brute-force protection (in-memory tracking)
 _admin_failed_attempts: dict[str, list[float]] = {}
@@ -768,9 +772,24 @@ def admin_decide_quote_request(
         )
     except InvalidQuoteRequestTransition as e:
         return _invalid_status_transition_response(e)
+            log_admin_audit(
+                operator_username=operator_username,
+                action_type=body.action,
+                entity_type="quote_request",
+                record_id=request_id,
+                success=True,
+            )
 
     _maybe_auto_snapshot(background_tasks)
     return result
+            log_admin_audit(
+                operator_username=operator_username,
+                action_type=body.action,
+                entity_type="quote_request",
+                record_id=request_id,
+                success=False,
+                error_summary=str(e),
+            )
 
 
 @app.post("/admin/api/jobs/{job_id}/schedule")
@@ -787,6 +806,13 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     # Delegate to service layer
     try:
         job = job_scheduling_service.schedule_job(job_id, start_utc, end_utc)
+            log_admin_audit(
+                operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+                action_type="schedule_job",
+                entity_type="job",
+                record_id=job_id,
+                success=True,
+            )
         return {"ok": True, "job": job}
     except ValueError as e:
         error_msg = str(e)
@@ -796,6 +822,14 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
             raise HTTPException(status_code=400, detail=error_msg)
         if "not schedulable" in error_msg.lower():
             raise HTTPException(status_code=400, detail=error_msg)
+            log_admin_audit(
+                operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+                action_type="schedule_job",
+                entity_type="job",
+                record_id=job_id,
+                success=False,
+                error_summary=error_msg,
+            )
         raise HTTPException(status_code=400, detail=error_msg)
 
 
@@ -813,6 +847,13 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
     # Delegate to service layer
     try:
         job = job_scheduling_service.reschedule_job(job_id, start_utc, end_utc)
+            log_admin_audit(
+                operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+                action_type="reschedule_job",
+                entity_type="job",
+                record_id=job_id,
+                success=True,
+            )
         return {"ok": True, "job": job}
     except ValueError as e:
         error_msg = str(e)
@@ -824,6 +865,14 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
             raise HTTPException(status_code=400, detail=error_msg)
         if "not scheduled" in error_msg.lower():
             raise HTTPException(status_code=400, detail=error_msg)
+            log_admin_audit(
+                operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+                action_type="reschedule_job",
+                entity_type="job",
+                record_id=job_id,
+                success=False,
+                error_summary=error_msg,
+            )
         raise HTTPException(status_code=400, detail=error_msg)
 
 
@@ -834,11 +883,26 @@ def admin_cancel_job(request: Request, job_id: str):
     # Delegate to service layer
     try:
         job = job_scheduling_service.cancel_job(job_id)
+            log_admin_audit(
+                operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+                action_type="cancel_job",
+                entity_type="job",
+                record_id=job_id,
+                success=True,
+            )
         return {"ok": True, "job": job}
     except ValueError as e:
         error_msg = str(e)
         if "not found" in error_msg.lower():
             raise HTTPException(status_code=404, detail=error_msg)
+            log_admin_audit(
+                operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+                action_type="cancel_job",
+                entity_type="job",
+                record_id=job_id,
+                success=False,
+                error_summary=error_msg,
+            )
         raise HTTPException(status_code=400, detail=error_msg)
 
 
