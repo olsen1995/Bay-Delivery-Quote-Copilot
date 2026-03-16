@@ -770,26 +770,25 @@ def admin_decide_quote_request(
             notes_provided=notes_provided,
             now_iso=_now_local_iso(),
         )
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type=body.action,
+            entity_type="quote_request",
+            record_id=request_id,
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        return result
     except InvalidQuoteRequestTransition as e:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type=body.action,
+            entity_type="quote_request",
+            record_id=request_id,
+            success=False,
+            error_summary=str(e),
+        )
         return _invalid_status_transition_response(e)
-            log_admin_audit(
-                operator_username=operator_username,
-                action_type=body.action,
-                entity_type="quote_request",
-                record_id=request_id,
-                success=True,
-            )
-
-    _maybe_auto_snapshot(background_tasks)
-    return result
-            log_admin_audit(
-                operator_username=operator_username,
-                action_type=body.action,
-                entity_type="quote_request",
-                record_id=request_id,
-                success=False,
-                error_summary=str(e),
-            )
 
 
 @app.post("/admin/api/jobs/{job_id}/schedule")
