@@ -1046,3 +1046,14 @@ def admin_drive_restore(request: Request, body: DriveRestorePayload, background_
         "restored": result.get("restored", {}),
         "restored_from_file_id": body.file_id,
     }
+
+
+@app.get("/admin/api/audit-log/export")
+def admin_audit_log_export(request: Request):
+    """
+    Export admin audit log as CSV (admin-only).
+    - Requires Basic Auth admin credentials
+    - Response: text/csv, download-friendly filename
+    """
+    from app.admin_audit_log_export import export_admin_audit_log_csv
+    return export_admin_audit_log_csv(request)
