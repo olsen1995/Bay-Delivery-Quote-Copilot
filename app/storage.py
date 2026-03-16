@@ -331,9 +331,25 @@ def init_db() -> None:
             # Don't block startup; worst case we just don't get the unique index.
             pass
 
+
         # Refresh schema cache in case init created new tables/cols.
         _TABLE_COL_CACHE.clear()
 
+        # Ensure admin_audit_log table exists for audit logging
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                operator_username TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                success INTEGER NOT NULL,
+                error_summary TEXT
+            )
+            """
+        )
         conn.commit()
     finally:
         conn.close()
