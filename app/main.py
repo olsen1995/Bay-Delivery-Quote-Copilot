@@ -762,14 +762,14 @@ def admin_decide_quote_request(
 
         # Extract admin username from Basic Auth header (same as _require_admin logic)
         header = request.headers.get("authorization") or ""
-        operator_username = None
+        operator_username = "unknown"
         if header.lower().startswith("basic "):
             try:
                 decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
                 user, pw = decoded.split(":", 1)
-                operator_username = user
+                operator_username = user or "unknown"
             except Exception:
-                operator_username = None
+                operator_username = "unknown"
 
         provided_fields = getattr(body, "model_fields_set", None)
         if provided_fields is None:
