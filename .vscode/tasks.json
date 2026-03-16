@@ -1,22 +1,35 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Run API (venv)",
-            "type": "shell",
-            "command": "powershell",
-            "args": [
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                "if (Test-Path .\\.venv\\Scripts\\Activate.ps1) { . .\\.venv\\Scripts\\Activate.ps1 } elseif (Test-Path .\\venv\\Scripts\\Activate.ps1) { . .\\venv\\Scripts\\Activate.ps1 } else { throw 'No venv found. Create .venv or venv first.' }; uvicorn app.main:app --reload"
-            ],
-            "problemMatcher": [],
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated"
-            }
-        }
-    ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run API (venv)",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"if (Test-Path .\\.venv\\Scripts\\Activate.ps1) { . .\\.venv\\Scripts\\Activate.ps1 } elseif (Test-Path .\\venv\\Scripts\\Activate.ps1) { . .\\venv\\Scripts\\Activate.ps1 } else { throw 'No venv found. Create .venv or venv first.' }; uvicorn app.main:app --reload"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "Create branch for audit log review feature",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"checkout",
+				"-b",
+				"admin-audit-log-review"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
 }
