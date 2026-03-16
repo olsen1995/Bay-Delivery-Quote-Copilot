@@ -1,3 +1,56 @@
+function renderAuditLog(items) {
+  const box = document.getElementById("auditLogBox");
+  if (!items || items.length === 0) return addEmptyState(box, "No audit log entries yet.");
+  clearNode(box);
+
+  const { table, tbody } = createTable([
+    "Timestamp",
+    "Operator",
+    "Action",
+    "Entity",
+    "Record ID",
+    "Success",
+    "Error Summary"
+  ]);
+
+  items.forEach((entry) => {
+    const tr = document.createElement("tr");
+
+    const tdTime = document.createElement("td");
+    tdTime.className = "small";
+    tdTime.textContent = entry.timestamp || "";
+    tr.appendChild(tdTime);
+
+    const tdOp = document.createElement("td");
+    tdOp.textContent = entry.operator_username || "";
+    tr.appendChild(tdOp);
+
+    const tdAction = document.createElement("td");
+    tdAction.textContent = entry.action_type || "";
+    tr.appendChild(tdAction);
+
+    const tdEntity = document.createElement("td");
+    tdEntity.textContent = entry.entity_type || "";
+    tr.appendChild(tdEntity);
+
+    const tdRec = document.createElement("td");
+    tdRec.textContent = entry.record_id || "";
+    tr.appendChild(tdRec);
+
+    const tdSuccess = document.createElement("td");
+    tdSuccess.textContent = entry.success ? "Yes" : "No";
+    tr.appendChild(tdSuccess);
+
+    const tdErr = document.createElement("td");
+    tdErr.className = "small muted";
+    tdErr.textContent = entry.error_summary || "";
+    tr.appendChild(tdErr);
+
+    tbody.appendChild(tr);
+  });
+
+  box.appendChild(table);
+}
 const statusLine = document.getElementById("statusLine");
 const refreshBtn = document.getElementById("refreshBtn");
 const adminUsernameInput = document.getElementById("adminUsername");
@@ -552,6 +605,7 @@ async function refreshAll() {
   }
 
   try {
+
     adminSessionReady = false;
     closeScheduleModal();
     setProtectedDashboardVisible(false);
@@ -566,6 +620,9 @@ async function refreshAll() {
 
     const jobs = await fetchJSON("/admin/api/jobs");
     renderJobs((jobs.items || []));
+
+    const auditLog = await fetchJSON("/admin/api/audit-log");
+    renderAuditLog((auditLog.items || []));
 
     adminSessionReady = true;
     setProtectedDashboardVisible(true);
