@@ -57,7 +57,7 @@ from app.storage import (
     update_job,
 )
 from app.update_fields import InvalidQuoteRequestTransition
-from app.storage.audit_log import init_audit_table, log_admin_audit
+from app.audit_log import init_audit_table, log_admin_audit
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 logger = logging.getLogger(__name__)
@@ -756,39 +756,50 @@ def admin_decide_quote_request(
     body: AdminDecision,
     background_tasks: BackgroundTasks,
 ):
-    _require_admin(request)
+        _require_admin(request)
 
-    provided_fields = getattr(body, "model_fields_set", None)
-    if provided_fields is None:
-        provided_fields = getattr(body, "__fields_set__", set())
-    notes_provided = "notes" in provided_fields
-    try:
-        result = booking_service.process_admin_decision(
-            request_id,
-            action=body.action,
-            notes=body.notes,
-            notes_provided=notes_provided,
-            now_iso=_now_local_iso(),
-        )
-        log_admin_audit(
-            operator_username=operator_username,
-            action_type=body.action,
-            entity_type="quote_request",
-            record_id=request_id,
-            success=True,
-        )
-        _maybe_auto_snapshot(background_tasks)
-        return result
-    except InvalidQuoteRequestTransition as e:
-        log_admin_audit(
-            operator_username=operator_username,
-            action_type=body.action,
-            entity_type="quote_request",
-            record_id=request_id,
-            success=False,
-            error_summary=str(e),
-        )
-        return _invalid_status_transition_response(e)
+        # Extract admin username from Basic Auth header (same as _require_admin logic)
+        header = request.headers.get("authorization") or ""
+        operator_username = None
+        if header.lower().startswith("basic "):
+            try:
+                decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
+                user, pw = decoded.split(":", 1)
+                operator_username = user
+            except Exception:
+                operator_username = None
+
+        provided_fields = getattr(body, "model_fields_set", None)
+        if provided_fields is None:
+            provided_fields = getattr(body, "__fields_set__", set())
+        notes_provided = "notes" in provided_fields
+        try:
+            result = booking_service.process_admin_decision(
+                request_id,
+                action=body.action,
+                notes=body.notes,
+                notes_provided=notes_provided,
+                now_iso=_now_local_iso(),
+            )
+            log_admin_audit(
+                operator_username=operator_username,
+                action_type=body.action,
+                entity_type="quote_request",
+                record_id=request_id,
+                success=True,
+            )
+            _maybe_auto_snapshot(background_tasks)
+            return result
+        except InvalidQuoteRequestTransition as e:
+            log_admin_audit(
+                operator_username=operator_username,
+                action_type=body.action,
+                entity_type="quote_request",
+                record_id=request_id,
+                success=False,
+                error_summary=str(e),
+            )
+            return _invalid_status_transition_response(e)
 
 
 @app.post("/admin/api/jobs/{job_id}/schedule")
