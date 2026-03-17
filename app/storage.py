@@ -12,7 +12,7 @@ from app.update_fields import validate_quote_request_transition
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("/var/data/bay_delivery.sqlite3")
+DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
 DB_PATH = DEFAULT_DB_PATH  # overridable by tests
 UNSET = object()
 
@@ -135,7 +135,10 @@ def _resolve_db_path() -> Path:
             env_path_obj.relative_to(app_data_dir)
             return env_path_obj
         except ValueError:
-            # Path is outside app/data; silently use default
+            # Allow explicit absolute production paths like /var/data/... while
+            # still defaulting safely for local/dev if something invalid is set.
+            if env_path_obj.is_absolute():
+                return env_path_obj
             return DEFAULT_DB_PATH
 
     return DEFAULT_DB_PATH
@@ -330,7 +333,6 @@ def init_db() -> None:
         except Exception:
             # Don't block startup; worst case we just don't get the unique index.
             pass
-
 
         # Refresh schema cache in case init created new tables/cols.
         _TABLE_COL_CACHE.clear()
@@ -965,7 +967,7 @@ def update_job(
         conn.close()
 
     # Return updated job
-    return cast(Job, get_job(job_id))
+    return cast(Optional[Job], get_job(job_id))
 
 
 # =========================
