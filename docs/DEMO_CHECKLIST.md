@@ -37,8 +37,8 @@ Use this quick list to run a lean end-to-end demo in staging/production.
 
 ## 6) Drive snapshot + list backups
 
-  - Call `POST /admin/api/drive/snapshot`
-  - Call `GET /admin/api/drive/backups`
+- Call `POST /admin/api/drive/snapshot`
+- Call `GET /admin/api/drive/backups`
 
 ## 7) Restore backup
 
