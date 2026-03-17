@@ -42,7 +42,11 @@ Use this quick list to run a lean end-to-end demo in staging/production.
 
 ## 7) Restore backup
 
-### Post-PR Live Smoke-Test Checklist
+- From backup list, pick a backup `file_id`.
+- Call `POST /admin/api/drive/restore` with `{"file_id":"..."}`.
+- Confirm restore reports restored table counts.
+
+## Post-PR Live Smoke-Test Checklist
 
 Use this checklist after merging a PR to verify live-safe behavior on production.
 
