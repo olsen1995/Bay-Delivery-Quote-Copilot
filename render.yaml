@@ -1,20 +1,19 @@
 services:
   - type: web
     name: bay-delivery-quote-copilot
-    runtime: python                      # unchanged
-    🔸plan: starter                      # was free ─ disks need Starter+
+    runtime: python
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
 
-    # NEW ───────────────────────────────────────────────────────────
     disk:
-      name: data                         # arbitrary ID in :contentReference[oaicite:0]{index=0}
-      mountPath: /var/data               # path your code will use
-      sizeGB: 1                          # same 1 GB you saw in the dashboard
-    # ───────────────────────────────────────────────────────────────
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
 
-    # Keep env vars explicit in Render dashboard/Blueprint settings.
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
+      - key: BAYDELIVERY_DB_PATH
+        value: /var/data/bay_delivery.sqlite3
