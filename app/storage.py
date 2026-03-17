@@ -6,7 +6,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, NotRequired, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, NotRequired, Optional, Tuple, TypedDict, cast
 
 from app.update_fields import validate_quote_request_transition
 
@@ -135,7 +135,10 @@ def _resolve_db_path() -> Path:
             env_path_obj.relative_to(app_data_dir)
             return env_path_obj
         except ValueError:
-            # Path is outside app/data; silently use default
+            # Allow explicit absolute production paths like /var/data/... while
+            # still defaulting safely for local/dev if something invalid is set.
+            if env_path_obj.is_absolute():
+                return env_path_obj
             return DEFAULT_DB_PATH
 
     return DEFAULT_DB_PATH
@@ -331,7 +334,6 @@ def init_db() -> None:
             # Don't block startup; worst case we just don't get the unique index.
             pass
 
-
         # Refresh schema cache in case init created new tables/cols.
         _TABLE_COL_CACHE.clear()
 
@@ -520,7 +522,7 @@ def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
     if "total_cad" in row_dict:
         out["total_cad"] = row_dict["total_cad"]
 
-    return out
+    return cast(QuoteRecord, out)
 
 
 def list_quotes(limit: int = 50) -> List[QuoteRecord]:
@@ -554,6 +556,7 @@ def list_quotes(limit: int = 50) -> List[QuoteRecord]:
             "created_at": r["created_at"],
             "request": req,
             "response": resp,
+            "accept_token": r["accept_token"] if "accept_token" in r.keys() else None,
         }
         if "job_type" in r.keys():
             item["job_type"] = r["job_type"]
@@ -752,7 +755,7 @@ def update_quote_request(
             "booking_token_created_at": updated.get("booking_token_created_at"),
         }
     )
-    return updated
+    return cast(QuoteRequest, updated)
 
 
 # =========================
@@ -964,7 +967,7 @@ def update_job(
         conn.close()
 
     # Return updated job
-    return get_job(job_id)
+    return cast(Optional[Job], get_job(job_id))
 
 
 # =========================

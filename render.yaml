@@ -1,22 +1,20 @@
 services:
   - type: web
     name: bay-delivery-quote-copilot
-    runtime: python
-    plan: free
+    runtime: python                      # unchanged
+    🔸plan: starter                      # was free ─ disks need Starter+
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+
+    # NEW ───────────────────────────────────────────────────────────
+    disk:
+      name: data                         # arbitrary ID in :contentReference[oaicite:0]{index=0}
+      mountPath: /var/data               # path your code will use
+      sizeGB: 1                          # same 1 GB you saw in the dashboard
+    # ───────────────────────────────────────────────────────────────
+
     # Keep env vars explicit in Render dashboard/Blueprint settings.
-    # Required for protected admin APIs in public deployments:
-    # - ADMIN_USERNAME
-    # - ADMIN_PASSWORD
-    # Recommended:
-    # - BAYDELIVERY_CORS_ORIGINS (comma-separated allowlist)
-    # Optional:
-    # - GDRIVE_FOLDER_ID
-    # - GDRIVE_SA_KEY_B64
-    # - GDRIVE_BACKUP_KEEP
-    # - GDRIVE_AUTO_SNAPSHOT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
