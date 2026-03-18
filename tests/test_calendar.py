@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app import storage
 from app.main import app
+from app.services import booking_service
 
 
 class CalendarIntegrationTests(unittest.TestCase):
@@ -30,6 +31,8 @@ class CalendarIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.client.__exit__(None, None, None)
         self._tmp.cleanup()
+        storage.DB_PATH = storage.DEFAULT_DB_PATH
+        storage._TABLE_COL_CACHE.clear()
 
     def _seed_job(self, job_id: str) -> None:
         storage.save_job({
@@ -48,6 +51,31 @@ class CalendarIntegrationTests(unittest.TestCase):
             "emt_total_cad": 113.0,
             "request_json": {"service_type": "dump_run"},
             "notes": "Test notes",
+        })
+
+    def _seed_quote_request(self, request_id: str = "r-approved", quote_id: str = "q-approved") -> None:
+        storage.save_quote_request({
+            "request_id": request_id,
+            "created_at": "2026-02-26T09:00:00",
+            "status": "customer_accepted",
+            "quote_id": quote_id,
+            "customer_name": "Approved Customer",
+            "customer_phone": "555-0123",
+            "job_address": "456 Approved Ave",
+            "job_description_customer": "Approved job",
+            "job_description_internal": "Approved internal desc",
+            "service_type": "dump_run",
+            "cash_total_cad": 200.0,
+            "emt_total_cad": 226.0,
+            "request_json": {"service_type": "dump_run"},
+            "notes": "Needs approval",
+            "requested_job_date": "2026-03-10",
+            "requested_time_window": "morning",
+            "customer_accepted_at": "2026-02-26T09:00:00",
+            "admin_approved_at": None,
+            "accept_token": "accept-token",
+            "booking_token": "booking-token",
+            "booking_token_created_at": "2026-02-26T09:00:00",
         })
 
     def test_schedule_job_success(self):
@@ -150,3 +178,30 @@ class CalendarIntegrationTests(unittest.TestCase):
             self.assertEqual(job["calendar_sync_status"], "failed")
             self.assertEqual(job["google_calendar_event_id"], "event123")  # Preserved
             self.assertIn("Delete failed", job["calendar_last_error"])
+
+    def test_admin_approval_creates_schedulable_job(self):
+        self._seed_quote_request()
+
+        result = booking_service.process_admin_decision(
+            "r-approved",
+            action="approve",
+            notes=None,
+            notes_provided=False,
+            now_iso="2026-02-26T10:00:00",
+        )
+
+        created_job = result["job"]
+        self.assertIsNotNone(created_job)
+        self.assertEqual(created_job["status"], "approved")
+
+        payload = {"scheduled_start": "2026-03-10T09:00:00", "scheduled_end": "2026-03-10T11:00:00"}
+        with patch('app.gcalendar.is_configured', return_value=False):
+            resp = self.client.post(f"/admin/api/jobs/{created_job['job_id']}/schedule", json=payload, headers=self._admin_headers)
+
+        self.assertEqual(resp.status_code, 200)
+        scheduled_job = storage.require_job(created_job["job_id"])
+        self.assertEqual(scheduled_job["status"], "approved")
+        self.assertEqual(scheduled_job["calendar_sync_status"], "not_configured")
+        self.assertIsNotNone(scheduled_job["scheduled_start"])
+        self.assertIsNotNone(scheduled_job["scheduled_end"])
+
