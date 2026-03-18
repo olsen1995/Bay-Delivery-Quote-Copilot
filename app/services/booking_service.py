@@ -186,7 +186,7 @@ def process_admin_decision(
             job = {
                 "job_id": str(uuid4()),
                 "created_at": now_iso,
-                "status": "in_progress",
+                "status": "approved",
                 "quote_id": updated["quote_id"],
                 "request_id": updated["request_id"],
                 "customer_name": updated.get("customer_name"),

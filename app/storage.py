@@ -297,6 +297,7 @@ def init_db() -> None:
                 quote_id TEXT,
                 request_id TEXT,
                 job_id TEXT,
+                analysis_id TEXT,
                 filename TEXT NOT NULL,
                 mime_type TEXT NOT NULL,
                 size_bytes INTEGER,
@@ -323,6 +324,9 @@ def init_db() -> None:
         _try_add_column(conn, "jobs", "google_calendar_event_id TEXT")
         _try_add_column(conn, "jobs", "calendar_sync_status TEXT")
         _try_add_column(conn, "jobs", "calendar_last_error TEXT")
+
+        # Add assistant-compatible linkage to attachments without breaking existing uploads
+        _try_add_column(conn, "attachments", "analysis_id TEXT")
 
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
         try:
@@ -980,9 +984,9 @@ def save_attachment(att: Dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO attachments
-            (attachment_id, created_at, quote_id, request_id, job_id,
+            (attachment_id, created_at, quote_id, request_id, job_id, analysis_id,
              filename, mime_type, size_bytes, drive_file_id, drive_web_view_link)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 att["attachment_id"],
@@ -990,6 +994,7 @@ def save_attachment(att: Dict[str, Any]) -> None:
                 att.get("quote_id"),
                 att.get("request_id"),
                 att.get("job_id"),
+                att.get("analysis_id"),
                 att["filename"],
                 att["mime_type"],
                 int(att["size_bytes"]) if att.get("size_bytes") is not None else None,
@@ -1013,7 +1018,7 @@ def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Di
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     sql = f"""
         SELECT
-            attachment_id, created_at, quote_id, request_id, job_id,
+            attachment_id, created_at, quote_id, request_id, job_id, analysis_id,
             filename, mime_type, size_bytes, drive_file_id, drive_web_view_link
         FROM attachments
         {where_sql}
@@ -1035,11 +1040,41 @@ def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Di
             "quote_id": r["quote_id"],
             "request_id": r["request_id"],
             "job_id": r["job_id"],
+            "analysis_id": r["analysis_id"] if "analysis_id" in r.keys() else None,
             "filename": r["filename"],
             "mime_type": r["mime_type"],
             "size_bytes": r["size_bytes"],
             "drive_file_id": r["drive_file_id"],
             "drive_web_view_link": r["drive_web_view_link"],
+        }
+        for r in rows
+    ]
+
+
+def list_admin_audit_log(limit: int = 50) -> List[Dict[str, Any]]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT timestamp, operator_username, action_type, entity_type, record_id, success, error_summary
+            FROM admin_audit_log
+            ORDER BY timestamp DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [
+        {
+            "timestamp": r["timestamp"],
+            "operator_username": r["operator_username"],
+            "action_type": r["action_type"],
+            "entity_type": r["entity_type"],
+            "record_id": r["record_id"],
+            "success": bool(r["success"]),
+            "error_summary": r["error_summary"],
         }
         for r in rows
     ]

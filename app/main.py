@@ -1,6 +1,5 @@
 # Fix: __future__ import must be first
 from __future__ import annotations
-import sqlite3
 # (moved below app = FastAPI)
 import base64
 import hmac
@@ -52,6 +51,7 @@ from app.storage import (
     init_db,
     Job,
     list_attachments,
+    list_admin_audit_log,
     list_jobs,
     list_quote_requests,
     list_quotes,
@@ -1061,28 +1061,4 @@ def admin_audit_log(request: Request):
     Requires admin authentication.
     """
     _require_admin(request)
-    conn = sqlite3.connect("app/data/bay_delivery.sqlite3")
-    try:
-        cur = conn.execute(
-            """
-            SELECT timestamp, operator_username, action_type, entity_type, record_id, success, error_summary
-            FROM admin_audit_log
-            ORDER BY timestamp DESC
-            LIMIT 50
-            """
-        )
-        rows = [
-            {
-                "timestamp": row[0],
-                "operator_username": row[1],
-                "action_type": row[2],
-                "entity_type": row[3],
-                "record_id": row[4],
-                "success": bool(row[5]),
-                "error_summary": row[6],
-            }
-            for row in cur.fetchall()
-        ]
-        return {"items": rows}
-    finally:
-        conn.close()
+    return {"items": list_admin_audit_log(limit=50)}

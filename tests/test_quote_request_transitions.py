@@ -247,7 +247,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(job["quote_id"], quote_id)
         self.assertEqual(job["request_id"], request_id)
         self.assertIn("job_id", job)
-        self.assertEqual(job["status"], "in_progress")
+        self.assertEqual(job["status"], "approved")
 
         # Job must appear in the admin Jobs list
         jobs_resp = self.client.get("/admin/api/jobs", headers=self._admin_headers)
