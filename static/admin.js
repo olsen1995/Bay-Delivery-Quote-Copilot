@@ -60,6 +60,8 @@ const adminProtectedSections = Array.from(document.querySelectorAll("[data-admin
 const adminPageRoot = document.body;
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
+const assistantAnalyzeBtn = document.getElementById("assistantAnalyzeBtn");
+const assistantStatusLine = document.getElementById("assistantStatusLine");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 
@@ -73,6 +75,7 @@ function getAdminCreds() {
 function setLoading(isLoading) {
   refreshBtn.disabled = isLoading;
   refreshBtn.textContent = isLoading ? "Loading..." : refreshButtonLabel;
+  if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = isLoading;
 }
 
 function authHeaders() {
@@ -138,7 +141,7 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["quotesBox", "requestsBox", "jobsBox"];
+  const boxIds = ["quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
@@ -596,6 +599,149 @@ async function cancelJob(jobId) {
   }
 }
 
+function parseAttachmentIds(rawValue) {
+  return String(rawValue || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function collectAssistantPayload() {
+  const candidate = {};
+  const serviceType = (document.getElementById("assistantServiceType").value || "").trim();
+  const estimatedHours = (document.getElementById("assistantEstimatedHours").value || "").trim();
+  const crewSize = (document.getElementById("assistantCrewSize").value || "").trim();
+  const jobAddress = (document.getElementById("assistantJobAddress").value || "").trim();
+  const pickupAddress = (document.getElementById("assistantPickupAddress").value || "").trim();
+  const dropoffAddress = (document.getElementById("assistantDropoffAddress").value || "").trim();
+
+  if (serviceType) candidate.service_type = serviceType;
+  if (estimatedHours) candidate.estimated_hours = Number(estimatedHours);
+  if (crewSize) candidate.crew_size = Number(crewSize);
+  if (jobAddress) candidate.job_address = jobAddress;
+  if (pickupAddress) candidate.pickup_address = pickupAddress;
+  if (dropoffAddress) candidate.dropoff_address = dropoffAddress;
+
+  return {
+    message: (document.getElementById("assistantMessage").value || "").trim(),
+    screenshot_attachment_ids: parseAttachmentIds(document.getElementById("assistantAttachmentIds").value),
+    candidate_inputs: candidate,
+    operator_overrides: {}
+  };
+}
+
+function formatMoney(value) {
+  if (typeof value !== "number") return "—";
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(value);
+}
+
+function renderScreenshotAssistantResult(item) {
+  const box = document.getElementById("assistantResultBox");
+  if (!item) return addEmptyState(box, "No screenshot analysis yet.");
+  clearNode(box);
+
+  const panel = document.createElement("div");
+  panel.className = "assistantResultPanel";
+
+  const title = document.createElement("h4");
+  title.textContent = "Latest draft analysis";
+  panel.appendChild(title);
+
+  const meta = document.createElement("div");
+  meta.className = "small muted";
+  meta.textContent = `Analysis ${item.analysis_id} • ${item.status} • ${item.updated_at}`;
+  panel.appendChild(meta);
+
+  const keyGrid = document.createElement("div");
+  keyGrid.className = "assistantKeyGrid";
+  [
+    ["Recommended Service", safeGet(item, "quote_guidance.service_type", "—")],
+    ["Cash Guidance", formatMoney(safeGet(item, "quote_guidance.cash_total_cad", null))],
+    ["EMT Guidance", formatMoney(safeGet(item, "quote_guidance.emt_total_cad", null))]
+  ].forEach(([label, value]) => {
+    const cell = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = label;
+    const valueNode = document.createElement("div");
+    valueNode.textContent = value;
+    cell.append(strong, valueNode);
+    keyGrid.appendChild(cell);
+  });
+  panel.appendChild(keyGrid);
+
+  const disclaimer = document.createElement("div");
+  disclaimer.className = "muted";
+  disclaimer.textContent = safeGet(item, "quote_guidance.disclaimer", "");
+  panel.appendChild(disclaimer);
+
+  const attachmentWrap = document.createElement("div");
+  attachmentWrap.className = "assistantAttachmentList";
+  const attachmentTitle = document.createElement("strong");
+  attachmentTitle.textContent = "Linked screenshots";
+  attachmentWrap.appendChild(attachmentTitle);
+  const attachmentBody = document.createElement("div");
+  attachmentBody.className = "small";
+  attachmentBody.textContent = (item.attachments || []).map((att) => att.filename || att.attachment_id).join(", ") || "None linked";
+  attachmentWrap.appendChild(attachmentBody);
+  panel.appendChild(attachmentWrap);
+
+  box.appendChild(panel);
+}
+
+function renderScreenshotAssistantHistory(items) {
+  const box = document.getElementById("assistantHistoryBox");
+  if (!items || items.length === 0) return addEmptyState(box, "No screenshot assistant drafts yet.");
+  clearNode(box);
+
+  const { table, tbody } = createTable(["Analysis", "Updated", "Service", "Cash", "Attachments", "Mode"]);
+  items.forEach((item) => {
+    const tr = document.createElement("tr");
+    const attachmentIds = safeGet(item, "intake.screenshot_attachment_ids", []);
+    [
+      item.analysis_id || "",
+      item.updated_at || "",
+      safeGet(item, "quote_guidance.service_type", ""),
+      formatMoney(safeGet(item, "quote_guidance.cash_total_cad", null)),
+      Array.isArray(attachmentIds) ? attachmentIds.length : 0,
+      item.recommendation_only ? "Recommendation only" : "—"
+    ].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = String(value);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  box.appendChild(table);
+}
+
+async function submitScreenshotAssistantAnalysis() {
+  if (!adminSessionReady) {
+    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before using Screenshot Quote Assistant.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setLine(assistantStatusLine, "ok", "Analyzing intake draft...");
+    const resp = await fetch("/admin/api/screenshot-assistant/analyses/intake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(collectAssistantPayload())
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+    renderScreenshotAssistantResult(data);
+    setLine(assistantStatusLine, "ok", "Draft analysis saved. Pricing guidance reused the existing quote engine.");
+
+    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
+    renderScreenshotAssistantHistory((analyses.items || []));
+  } catch (err) {
+    const parsed = parseApiError(err);
+    const detail = safeGet(parsed, "data.detail", "Please review the intake fields and try again.");
+    setLine(assistantStatusLine, "bad", "Screenshot assistant error. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
+  } finally {
+    setLoading(false);
+  }
+}
+
 async function refreshAll() {
   const { username, password } = getAdminCreds();
   if (!username || !password) {
@@ -623,6 +769,11 @@ async function refreshAll() {
 
     const auditLog = await fetchJSON("/admin/api/audit-log");
     renderAuditLog((auditLog.items || []));
+
+    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
+    const analysisItems = analyses.items || [];
+    renderScreenshotAssistantHistory(analysisItems);
+    renderScreenshotAssistantResult(analysisItems[0] || null);
 
     adminSessionReady = true;
     setProtectedDashboardVisible(true);
@@ -661,6 +812,7 @@ adminUsernameInput.addEventListener("keydown", handleCredsKeydown);
 adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 if (scheduleCloseBtn) scheduleCloseBtn.addEventListener("click", closeScheduleModal);
 if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeScheduleModal);
+if (assistantAnalyzeBtn) assistantAnalyzeBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
 
 resetProtectedDashboard();
 closeScheduleModal();

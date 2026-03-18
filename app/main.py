@@ -42,7 +42,7 @@ from app.abuse_controls import (
     extract_client_ip,
 )
 from app import gcalendar, gdrive
-from app.services import booking_service, job_scheduling_service, quote_service
+from app.services import booking_service, job_scheduling_service, quote_service, screenshot_assistant_service
 from app.storage import (
     export_db_to_json,
     get_job,
@@ -102,6 +102,19 @@ def _reset_admin_attempts(client_ip: str) -> None:
 
 def _cap_admin_list_limit(limit: int) -> int:
     return min(int(limit), _admin_list_limit_cap)
+
+
+def _admin_operator_username(request: Request) -> str:
+    header = request.headers.get("authorization") or ""
+    if header.lower().startswith("basic "):
+        try:
+            decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
+            user, _pw = decoded.split(":", 1)
+            if user:
+                return user
+        except Exception:
+            pass
+    return os.getenv("ADMIN_USERNAME", "").strip() or "unknown"
 
 
 def _local_iso_to_utc_iso(local_iso: str) -> str:
@@ -557,6 +570,82 @@ class BookingDetails(BaseModel):
         return v
 
 
+class ScreenshotAssistantCandidatePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_name: Optional[str] = Field(None, max_length=120)
+    customer_phone: Optional[str] = Field(None, max_length=50)
+    job_address: Optional[str] = Field(None, max_length=250)
+    job_description_customer: Optional[str] = Field(None, max_length=1000)
+    description: Optional[str] = Field(None, max_length=1000)
+    service_type: Optional[str] = Field(None, max_length=50)
+    payment_method: Optional[str] = Field(None, max_length=20)
+    pickup_address: Optional[str] = Field(None, max_length=250)
+    dropoff_address: Optional[str] = Field(None, max_length=250)
+    estimated_hours: Optional[float] = Field(None, ge=0)
+    crew_size: Optional[int] = Field(None, ge=1)
+    garbage_bag_count: Optional[int] = Field(None, ge=0)
+    bag_type: Optional[Literal["light", "heavy_mixed", "construction_debris"]] = Field(None)
+    trailer_fill_estimate: Optional[Literal["under_quarter", "quarter", "half", "three_quarter", "full"]] = Field(None)
+    trailer_class: Optional[Literal["single_axle_open_aluminum", "double_axle_open_aluminum", "older_enclosed", "newer_enclosed"]] = Field(None)
+    mattresses_count: Optional[int] = Field(None, ge=0)
+    box_springs_count: Optional[int] = Field(None, ge=0)
+    scrap_pickup_location: Optional[str] = Field(None, max_length=50)
+    travel_zone: Optional[str] = Field(None, max_length=50)
+    access_difficulty: Optional[str] = Field(None, max_length=50)
+    has_dense_materials: Optional[bool] = None
+
+    @field_validator(
+        "customer_name",
+        "customer_phone",
+        "job_address",
+        "job_description_customer",
+        "description",
+        "service_type",
+        "payment_method",
+        "pickup_address",
+        "dropoff_address",
+        "scrap_pickup_location",
+        "travel_zone",
+        "access_difficulty",
+        mode="before",
+    )
+    @classmethod
+    def strip(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
+class ScreenshotAssistantIntakePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: Optional[str] = Field(None, max_length=4000)
+    screenshot_attachment_ids: list[str] = Field(default_factory=list, max_length=10)
+    candidate_inputs: ScreenshotAssistantCandidatePayload = Field(default_factory=ScreenshotAssistantCandidatePayload)
+    operator_overrides: ScreenshotAssistantCandidatePayload = Field(default_factory=ScreenshotAssistantCandidatePayload)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def strip(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @field_validator("screenshot_attachment_ids", mode="before")
+    @classmethod
+    def normalize_attachment_ids(cls, v):
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("screenshot_attachment_ids must be a list")
+        return [str(item).strip() for item in v if str(item).strip()]
+
+
 class ScheduleJobPayload(BaseModel):
     scheduled_start: str = Field(..., description="Local ISO datetime (YYYY-MM-DDTHH:MM:SS)")
     scheduled_end: str = Field(..., description="Local ISO datetime (YYYY-MM-DDTHH:MM:SS)")
@@ -751,6 +840,60 @@ def admin_list_uploads(request: Request, quote_id: Optional[str] = None, limit: 
     return {"items": list_attachments(quote_id=quote_id, limit=_cap_admin_list_limit(limit))}
 
 
+@app.get("/admin/api/screenshot-assistant/analyses")
+def admin_list_screenshot_assistant_analyses(request: Request, limit: int = 50):
+    _require_admin(request)
+    return {"items": screenshot_assistant_service.list_analyses(limit=_cap_admin_list_limit(limit))}
+
+
+@app.get("/admin/api/screenshot-assistant/analyses/{analysis_id}")
+def admin_get_screenshot_assistant_analysis(request: Request, analysis_id: str):
+    _require_admin(request)
+    analysis = screenshot_assistant_service.get_analysis(analysis_id)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
+    return analysis
+
+
+@app.post("/admin/api/screenshot-assistant/analyses/intake")
+def admin_create_screenshot_assistant_analysis(
+    request: Request,
+    body: ScreenshotAssistantIntakePayload,
+    background_tasks: BackgroundTasks,
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    try:
+        result = screenshot_assistant_service.create_analysis(
+            operator_username=operator_username,
+            message=body.message,
+            candidate_inputs=body.candidate_inputs.model_dump(exclude_none=True),
+            operator_overrides=body.operator_overrides.model_dump(exclude_none=True),
+            screenshot_attachment_ids=body.screenshot_attachment_ids,
+            now_iso=_now_local_iso(),
+        )
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="create_screenshot_analysis",
+            entity_type="screenshot_assistant_analysis",
+            record_id=result["analysis_id"],
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        return result
+    except HTTPException as exc:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="create_screenshot_analysis",
+            entity_type="screenshot_assistant_analysis",
+            record_id="draft",
+            success=False,
+            error_summary=str(exc.detail),
+        )
+        raise
+
+
 @app.post("/admin/api/quote-requests/{request_id}/decision")
 def admin_decide_quote_request(
     request: Request,
@@ -760,16 +903,7 @@ def admin_decide_quote_request(
 ):
         _require_admin(request)
 
-        # Extract admin username from Basic Auth header (same as _require_admin logic)
-        header = request.headers.get("authorization") or ""
-        operator_username = "unknown"
-        if header.lower().startswith("basic "):
-            try:
-                decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
-                user, pw = decoded.split(":", 1)
-                operator_username = user or "unknown"
-            except Exception:
-                operator_username = "unknown"
+        operator_username = _admin_operator_username(request)
 
         provided_fields = getattr(body, "model_fields_set", None)
         if provided_fields is None:

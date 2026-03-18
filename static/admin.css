@@ -456,3 +456,68 @@ textarea:focus {
 		min-width: 620px;
 	}
 }
+
+
+#assistantResultBox,
+#assistantHistoryBox {
+	overflow-x: auto;
+}
+
+.assistantCard {
+	grid-column: 1 / -1;
+}
+
+.assistantFormGrid {
+	display: grid;
+	gap: 14px;
+}
+
+.assistantFormBlock {
+	display: grid;
+}
+
+.assistantFieldRow {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 12px;
+}
+
+.assistantActions {
+	align-items: center;
+}
+
+.assistantResultPanel {
+	margin-top: 14px;
+	padding: 14px;
+	border: 1px solid rgba(18, 32, 51, 0.08);
+	border-radius: 14px;
+	background: rgba(18, 32, 51, 0.02);
+}
+
+.assistantKeyGrid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	margin-top: 12px;
+}
+
+.assistantKeyGrid strong,
+.assistantAttachmentList strong {
+	display: block;
+	font-size: 0.8rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	margin-bottom: 4px;
+	color: var(--ink-muted);
+}
+
+.assistantAttachmentList {
+	margin-top: 12px;
+}
+
+@media (max-width: 980px) {
+	.assistantFieldRow,
+	.assistantKeyGrid {
+		grid-template-columns: 1fr;
+	}
+}

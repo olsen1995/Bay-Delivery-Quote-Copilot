@@ -77,6 +77,60 @@
         <div id="requestsBox"></div>
       </div>
 
+      <div class="card dataCard assistantCard">
+        <div class="sectionHeader compact">
+          <div>
+            <h3>Screenshot Quote Assistant</h3>
+            <div class="muted">Admin-only recommendation tool. No AI image estimation, quote draft, or booking handoff yet.</div>
+          </div>
+        </div>
+        <div class="assistantFormGrid">
+          <div class="assistantFormBlock">
+            <label for="assistantMessage">Customer Message / Intake Notes</label>
+            <textarea id="assistantMessage" rows="5" placeholder="Paste the customer message or operator summary here."></textarea>
+          </div>
+          <div class="assistantFormBlock">
+            <label for="assistantAttachmentIds">Screenshot Attachment IDs</label>
+            <input id="assistantAttachmentIds" type="text" placeholder="att-1, att-2" />
+            <div class="small">Optional: comma-separated attachment IDs to link via attachments.analysis_id.</div>
+          </div>
+          <div class="assistantFieldRow">
+            <div>
+              <label for="assistantServiceType">Service Type</label>
+              <input id="assistantServiceType" type="text" placeholder="haul_away" />
+            </div>
+            <div>
+              <label for="assistantEstimatedHours">Estimated Hours</label>
+              <input id="assistantEstimatedHours" type="number" min="0" step="0.25" placeholder="1.5" />
+            </div>
+            <div>
+              <label for="assistantCrewSize">Crew Size</label>
+              <input id="assistantCrewSize" type="number" min="1" step="1" placeholder="2" />
+            </div>
+          </div>
+          <div class="assistantFieldRow">
+            <div>
+              <label for="assistantJobAddress">Job Address</label>
+              <input id="assistantJobAddress" type="text" placeholder="123 Example St" />
+            </div>
+            <div>
+              <label for="assistantPickupAddress">Pickup Address</label>
+              <input id="assistantPickupAddress" type="text" placeholder="Optional for move/delivery" />
+            </div>
+            <div>
+              <label for="assistantDropoffAddress">Dropoff Address</label>
+              <input id="assistantDropoffAddress" type="text" placeholder="Optional for move/delivery" />
+            </div>
+          </div>
+        </div>
+        <div class="rowToken mt10 assistantActions">
+          <div class="small">This saves a draft analysis and routes pricing guidance through the existing quote engine only.</div>
+          <button id="assistantAnalyzeBtn" class="primaryAction" type="button">Analyze Intake</button>
+        </div>
+        <div id="assistantStatusLine" class="statusNotice muted" role="status" aria-live="polite"></div>
+        <div id="assistantResultBox"></div>
+      </div>
+
       <div class="card dataCard">
         <div class="sectionHeader compact">
           <div>
@@ -96,6 +150,16 @@
         </div>
       </div>
       <div id="jobsBox"></div>
+    </div>
+
+    <div class="card dataCard adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
+      <div class="sectionHeader compact">
+        <div>
+          <h3>Screenshot Assistant Drafts</h3>
+          <div class="muted">Recent screenshot intake analyses for operator review.</div>
+        </div>
+      </div>
+      <div id="assistantHistoryBox"></div>
     </div>
   </div>
 </div>
