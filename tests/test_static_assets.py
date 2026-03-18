@@ -83,7 +83,7 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
 
     protected_block = protected_match.group(1)
     remainder = admin_html.replace(protected_block, "", 1)
-    for heading in ["Recent Estimates", "Booking Requests", "Jobs"]:
+    for heading in ["Recent Estimates", "Booking Requests", "Jobs", "Screenshot Quote Assistant", "Screenshot Assistant Drafts"]:
         assert f"<h3>{heading}</h3>" in protected_block
         assert f"<h3>{heading}</h3>" not in remainder
 
@@ -91,3 +91,16 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     assert 'hidden aria-hidden="true"' in admin_html
     assert "setProtectedDashboardVisible(true);" in admin_js
     assert "setProtectedDashboardVisible(false);" in admin_js
+
+
+def test_admin_page_includes_screenshot_assistant_shell() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+
+    assert 'id="assistantAnalyzeBtn"' in admin_html
+    assert 'id="assistantResultBox"' in admin_html
+    assert 'id="assistantHistoryBox"' in admin_html
+    assert 'Screenshot Quote Assistant' in admin_html
+    assert 'Screenshot Assistant Drafts' in admin_html
+    assert '/admin/api/screenshot-assistant/analyses/intake' in admin_js
+    assert 'submitScreenshotAssistantAnalysis' in admin_js

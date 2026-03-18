@@ -9,7 +9,7 @@ from app.quote_engine import calculate_quote
 from app.storage import save_quote
 
 
-def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[str, Any]:
+def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     requested_service_type = str(request_payload.get("service_type", "")).strip()
 
     engine_quote = calculate_quote(
@@ -57,18 +57,29 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
     }
 
+    response = {
+        "cash_total_cad": float(engine_quote["total_cash_cad"]),
+        "emt_total_cad": float(engine_quote["total_emt_cad"]),
+        "disclaimer": str(engine_quote["disclaimer"]),
+    }
+
+    return {
+        "normalized_request": normalized_request,
+        "response": response,
+    }
+
+
+def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[str, Any]:
+    quote_artifacts = build_quote_artifacts(request_payload)
+
     # Generate accept_token for this quote (before saving)
     accept_token = str(uuid4())
 
     quote = {
         "quote_id": str(uuid4()),
         "created_at": now_iso,
-        "request": normalized_request,
-        "response": {
-            "cash_total_cad": float(engine_quote["total_cash_cad"]),
-            "emt_total_cad": float(engine_quote["total_emt_cad"]),
-            "disclaimer": str(engine_quote["disclaimer"]),
-        },
+        "request": quote_artifacts["normalized_request"],
+        "response": quote_artifacts["response"],
     }
 
     save_quote(

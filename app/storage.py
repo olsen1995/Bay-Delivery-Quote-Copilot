@@ -77,6 +77,17 @@ class QuoteRequest(TypedDict):
     booking_token_created_at: Optional[str]
 
 
+class ScreenshotAssistantAnalysis(TypedDict):
+    analysis_id: str
+    created_at: str
+    updated_at: str
+    operator_username: str
+    status: str
+    intake_json: Any
+    normalized_candidate_json: Any
+    guidance_json: Any
+
+
 def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY_DAYS) -> bool:
     """Check if a token has expired. Returns True if expired or if created_at is None."""
     if not token_created_at:
@@ -91,7 +102,7 @@ def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY
         return True
 
 # Explicit table list keeps backup/restore deterministic and safe.
-KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments"]
+KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments", "screenshot_assistant_analyses"]
 
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
@@ -303,6 +314,21 @@ def init_db() -> None:
                 size_bytes INTEGER,
                 drive_file_id TEXT NOT NULL,
                 drive_web_view_link TEXT
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS screenshot_assistant_analyses (
+                analysis_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                operator_username TEXT NOT NULL,
+                status TEXT NOT NULL,
+                intake_json TEXT NOT NULL,
+                normalized_candidate_json TEXT NOT NULL,
+                guidance_json TEXT NOT NULL
             )
             """
         )
@@ -1007,13 +1033,17 @@ def save_attachment(att: Dict[str, Any]) -> None:
         conn.close()
 
 
-def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+def list_attachments(quote_id: Optional[str] = None, analysis_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
     where: List[str] = []
     params: List[Any] = []
 
     if quote_id:
         where.append("quote_id = ?")
         params.append(quote_id)
+
+    if analysis_id:
+        where.append("analysis_id = ?")
+        params.append(analysis_id)
 
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     sql = f"""
@@ -1049,6 +1079,99 @@ def list_attachments(quote_id: Optional[str] = None, limit: int = 50) -> List[Di
         }
         for r in rows
     ]
+
+
+def assign_attachments_to_analysis(attachment_ids: List[str], analysis_id: str) -> None:
+    normalized_ids = [str(att_id).strip() for att_id in attachment_ids if str(att_id).strip()]
+    if not normalized_ids:
+        return
+
+    placeholders = ",".join(["?"] * len(normalized_ids))
+    conn = _connect()
+    try:
+        conn.execute(
+            f"UPDATE attachments SET analysis_id = ? WHERE attachment_id IN ({placeholders})",
+            [analysis_id, *normalized_ids],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _row_to_screenshot_assistant_analysis(row: sqlite3.Row) -> ScreenshotAssistantAnalysis:
+    row_dict = dict(row)
+    for key in ("intake_json", "normalized_candidate_json", "guidance_json"):
+        value = row_dict.get(key)
+        if isinstance(value, str):
+            try:
+                row_dict[key] = json.loads(value)
+            except Exception:
+                pass
+    return cast(ScreenshotAssistantAnalysis, row_dict)
+
+
+def save_screenshot_assistant_analysis(record: Dict[str, Any]) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO screenshot_assistant_analyses
+            (analysis_id, created_at, updated_at, operator_username, status, intake_json, normalized_candidate_json, guidance_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["analysis_id"],
+                record["created_at"],
+                record["updated_at"],
+                record["operator_username"],
+                record["status"],
+                json.dumps(record.get("intake_json") or {}, ensure_ascii=False),
+                json.dumps(record.get("normalized_candidate_json") or {}, ensure_ascii=False),
+                json.dumps(record.get("guidance_json") or {}, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_screenshot_assistant_analysis(analysis_id: str) -> Optional[ScreenshotAssistantAnalysis]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT analysis_id, created_at, updated_at, operator_username, status, intake_json,
+                   normalized_candidate_json, guidance_json
+            FROM screenshot_assistant_analyses
+            WHERE analysis_id = ?
+            """,
+            (analysis_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return _row_to_screenshot_assistant_analysis(row)
+
+
+def list_screenshot_assistant_analyses(limit: int = 50) -> List[ScreenshotAssistantAnalysis]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT analysis_id, created_at, updated_at, operator_username, status, intake_json,
+                   normalized_candidate_json, guidance_json
+            FROM screenshot_assistant_analyses
+            ORDER BY updated_at DESC, created_at DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [_row_to_screenshot_assistant_analysis(row) for row in rows]
 
 
 def list_admin_audit_log(limit: int = 50) -> List[Dict[str, Any]]:
