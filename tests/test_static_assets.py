@@ -33,6 +33,15 @@ def test_quote_upload_formdata_includes_accept_token() -> None:
 def test_quote_page_supports_persisted_review_mode() -> None:
     quote_js = Path("static/quote.js").read_text(encoding="utf-8")
 
+    for helper_name in [
+        "persistedReviewFields",
+        "setPersistedReviewMode",
+        "populateQuoteFormFromRequest",
+        "showPersistedQuoteReview",
+        "loadPersistedQuoteReview",
+    ]:
+        assert quote_js.count(f"function {helper_name}(") == 1
+
     assert "let persistedReviewMode = false;" in quote_js
     assert "persistedReviewHelperText" in quote_js
     assert "setPersistedReviewMode(true);" in quote_js
