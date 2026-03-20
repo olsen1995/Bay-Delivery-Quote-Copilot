@@ -368,6 +368,47 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         existing_job_typed = cast(Dict[str, Any], existing_job)
         self.assertEqual(existing_job_typed["job_id"], first_job_typed["job_id"])
 
+    def test_job_execution_transitions_do_not_change_quote_request_status(self) -> None:
+        request_id = "req_exec_linkage"
+        quote_id = "q_exec_linkage"
+        self._seed_request(
+            request_id,
+            quote_id,
+            "customer_accepted",
+            accept_token="tok_exec_linkage",
+        )
+
+        approve_resp = self.client.post(
+            f"/admin/api/quote-requests/{request_id}/decision",
+            headers=self._admin_headers,
+            json={"action": "approve"},
+        )
+        self.assertEqual(approve_resp.status_code, 200)
+        job = approve_resp.json()["job"]
+        self.assertIsNotNone(job)
+        job_id = job["job_id"]
+
+        start_resp = self.client.post(f"/admin/api/jobs/{job_id}/start", headers=self._admin_headers)
+        self.assertEqual(start_resp.status_code, 200)
+
+        complete_resp = self.client.post(
+            f"/admin/api/jobs/{job_id}/complete",
+            headers=self._admin_headers,
+            json={"closeout_notes": "Delivered successfully"},
+        )
+        self.assertEqual(complete_resp.status_code, 200)
+
+        request = storage.get_quote_request(request_id)
+        self.assertIsNotNone(request)
+        request_typed = cast(Dict[str, Any], request)
+        self.assertEqual(request_typed["status"], "admin_approved")
+
+        job_record = storage.get_job(job_id)
+        self.assertIsNotNone(job_record)
+        job_typed = cast(Dict[str, Any], job_record)
+        self.assertEqual(job_typed["request_id"], request_id)
+        self.assertEqual(job_typed["status"], "completed")
+
     def test_submit_booking_success(self) -> None:
         # Get the quote first to retrieve accept_token and quote_id
         resp = self.client.post("/quote/calculate", json={

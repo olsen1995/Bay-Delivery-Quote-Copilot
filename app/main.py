@@ -58,7 +58,7 @@ from app.storage import (
     save_attachment,
     update_job,
 )
-from app.update_fields import InvalidQuoteRequestTransition
+from app.update_fields import InvalidJobTransition, InvalidQuoteRequestTransition
 from app.audit_log import init_audit_table, log_admin_audit
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
@@ -438,6 +438,21 @@ def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSO
     )
 
 
+def _invalid_job_transition_response(e: InvalidJobTransition) -> JSONResponse:
+    allowed_text = ", ".join(e.allowed) if e.allowed else "(none)"
+    detail = f"Invalid job status transition from {e.from_status} to {e.to_status}. Allowed: {allowed_text}"
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": "invalid_job_status_transition",
+            "from": e.from_status,
+            "to": e.to_status,
+            "allowed": e.allowed,
+            "detail": detail,
+        },
+    )
+
+
 def _looks_like_supported_image(content: bytes) -> bool:
     """Cheap signature check to avoid trusting MIME alone."""
     if len(content) < 12:
@@ -774,6 +789,17 @@ class ScheduleJobPayload(BaseModel):
             raise ValueError("Datetime must be in ISO format (YYYY-MM-DDTHH:MM:SS)")
 
 
+class JobCloseoutPayload(BaseModel):
+    closeout_notes: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("closeout_notes", mode="before")
+    @classmethod
+    def strip(cls, v):
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
     provided_fields = getattr(body, "model_fields_set", None)
@@ -1108,6 +1134,7 @@ def admin_decide_quote_request(
 @app.post("/admin/api/jobs/{job_id}/schedule")
 def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     _require_admin(request)
+    operator_username = _admin_operator_username(request)
 
     # Convert local to UTC
     try:
@@ -1120,7 +1147,7 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     try:
         job = job_scheduling_service.schedule_job(job_id, start_utc, end_utc)
         log_admin_audit(
-            operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+            operator_username=operator_username,
             action_type="schedule_job",
             entity_type="job",
             record_id=job_id,
@@ -1136,7 +1163,7 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
         if "not schedulable" in error_msg.lower():
             raise HTTPException(status_code=400, detail=error_msg)
         log_admin_audit(
-            operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+            operator_username=operator_username,
             action_type="schedule_job",
             entity_type="job",
             record_id=job_id,
@@ -1149,6 +1176,7 @@ def admin_schedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
 @app.post("/admin/api/jobs/{job_id}/reschedule")
 def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload):
     _require_admin(request)
+    operator_username = _admin_operator_username(request)
 
     # Convert local to UTC
     try:
@@ -1161,7 +1189,7 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
     try:
         job = job_scheduling_service.reschedule_job(job_id, start_utc, end_utc)
         log_admin_audit(
-            operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+            operator_username=operator_username,
             action_type="reschedule_job",
             entity_type="job",
             record_id=job_id,
@@ -1179,7 +1207,7 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
         if "not scheduled" in error_msg.lower():
             raise HTTPException(status_code=400, detail=error_msg)
         log_admin_audit(
-            operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+            operator_username=operator_username,
             action_type="reschedule_job",
             entity_type="job",
             record_id=job_id,
@@ -1189,33 +1217,132 @@ def admin_reschedule_job(request: Request, job_id: str, body: ScheduleJobPayload
         raise HTTPException(status_code=400, detail=error_msg)
 
 
-@app.post("/admin/api/jobs/{job_id}/cancel")
-def admin_cancel_job(request: Request, job_id: str):
+@app.post("/admin/api/jobs/{job_id}/start")
+def admin_start_job(request: Request, job_id: str):
     _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    try:
+        job = job_scheduling_service.start_job(job_id, _now_local_iso())
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="start_job",
+            entity_type="job",
+            record_id=job_id,
+            success=True,
+        )
+        return {"ok": True, "job": job}
+    except InvalidJobTransition as e:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="start_job",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary=str(e),
+        )
+        return _invalid_job_transition_response(e)
+    except ValueError as e:
+        error_msg = str(e)
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="start_job",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary=error_msg,
+        )
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+
+
+@app.post("/admin/api/jobs/{job_id}/complete")
+def admin_complete_job(request: Request, job_id: str, body: Optional[JobCloseoutPayload] = None):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    try:
+        job = job_scheduling_service.complete_job(
+            job_id,
+            _now_local_iso(),
+            body.closeout_notes if body else None,
+        )
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="complete_job",
+            entity_type="job",
+            record_id=job_id,
+            success=True,
+        )
+        return {"ok": True, "job": job}
+    except InvalidJobTransition as e:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="complete_job",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary=str(e),
+        )
+        return _invalid_job_transition_response(e)
+    except ValueError as e:
+        error_msg = str(e)
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="complete_job",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary=error_msg,
+        )
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+
+
+@app.post("/admin/api/jobs/{job_id}/cancel")
+def admin_cancel_job(request: Request, job_id: str, body: Optional[JobCloseoutPayload] = None):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
 
     # Delegate to service layer
     try:
-        job = job_scheduling_service.cancel_job(job_id)
+        job = job_scheduling_service.cancel_job(
+            job_id,
+            _now_local_iso(),
+            body.closeout_notes if body else None,
+        )
         log_admin_audit(
-            operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+            operator_username=operator_username,
             action_type="cancel_job",
             entity_type="job",
             record_id=job_id,
             success=True,
         )
         return {"ok": True, "job": job}
+    except InvalidJobTransition as e:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="cancel_job",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary=str(e),
+        )
+        return _invalid_job_transition_response(e)
     except ValueError as e:
         error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
         log_admin_audit(
-            operator_username=os.getenv("ADMIN_USERNAME", "").strip(),
+            operator_username=operator_username,
             action_type="cancel_job",
             entity_type="job",
             record_id=job_id,
             success=False,
             error_summary=error_msg,
         )
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
         raise HTTPException(status_code=400, detail=error_msg)
 
 

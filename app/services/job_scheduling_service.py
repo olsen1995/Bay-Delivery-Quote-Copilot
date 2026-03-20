@@ -13,6 +13,7 @@ from typing import Optional
 
 from app.integrations import google_calendar_client
 from app.storage import Job, get_job, update_job
+from app.update_fields import validate_job_transition
 
 
 def _validate_datetime_range(start_utc: str, end_utc: str) -> None:
@@ -32,6 +33,10 @@ def _require_job(job_id: str) -> Job:
     if not job:
         raise ValueError("Job not found")
     return job
+
+
+def _ensure_transition(job: Job, next_status: str) -> None:
+    validate_job_transition(str(job.get("status") or ""), next_status)
 
 
 def schedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job:
@@ -150,9 +155,42 @@ def reschedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job
     return _require_job(job_id)
 
 
-def cancel_job(job_id: str) -> Job:
+def start_job(job_id: str, started_at: str) -> Job:
+    """Mark an approved job as in progress."""
+    job = _require_job(job_id)
+    _ensure_transition(job, "in_progress")
+
+    updated = update_job(
+        job_id,
+        status="in_progress",
+        started_at=started_at,
+    )
+    if not updated:
+        raise ValueError("Failed to update job in database")
+
+    return _require_job(job_id)
+
+
+def complete_job(job_id: str, completed_at: str, closeout_notes: Optional[str]) -> Job:
+    """Mark an in-progress job as completed."""
+    job = _require_job(job_id)
+    _ensure_transition(job, "completed")
+
+    updated = update_job(
+        job_id,
+        status="completed",
+        completed_at=completed_at,
+        closeout_notes=closeout_notes,
+    )
+    if not updated:
+        raise ValueError("Failed to update job in database")
+
+    return _require_job(job_id)
+
+
+def cancel_job(job_id: str, cancelled_at: Optional[str], closeout_notes: Optional[str] = None) -> Job:
     """
-    Cancel a scheduled job.
+    Cancel an approved or in-progress job.
 
     Preserves scheduling history (scheduled_start/end remain in DB).
 
@@ -175,12 +213,15 @@ def cancel_job(job_id: str) -> Job:
     job = get_job(job_id)
     if not job:
         raise ValueError("Job not found")
+    _ensure_transition(job, "cancelled")
 
     # DB first: mark cancelled (preserves scheduled_start/end)
     updated = update_job(
         job_id,
         status="cancelled",
         calendar_sync_status="cancelled",
+        cancelled_at=cancelled_at,
+        closeout_notes=closeout_notes,
     )
     if not updated:
         raise ValueError("Failed to update job in database")

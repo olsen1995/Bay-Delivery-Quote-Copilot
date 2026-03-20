@@ -316,10 +316,17 @@ button:disabled {
 
 .status-customer_accepted,
 .status-admin_approved,
+.status-completed,
 .status-scheduled {
 	background: #dcfce7;
 	border-color: #86efac;
 	color: #166534;
+}
+
+.status-in_progress {
+	background: #dbeafe;
+	border-color: #93c5fd;
+	color: #1d4ed8;
 }
 
 .status-cancelled,
