@@ -33,12 +33,21 @@ def test_quote_upload_formdata_includes_accept_token() -> None:
 def test_quote_page_supports_persisted_review_mode() -> None:
     quote_js = Path("static/quote.js").read_text(encoding="utf-8")
 
+    assert "let persistedReviewMode = false;" in quote_js
+    assert "persistedReviewHelperText" in quote_js
+    assert "setPersistedReviewMode(true);" in quote_js
+    assert 'if (calcBtn) calcBtn.disabled = persistedReviewMode;' in quote_js
+    assert 'if (clearBtn) clearBtn.disabled = persistedReviewMode;' in quote_js
+    assert 'if (persistedReviewMode) {' in quote_js
+    assert 'showBox("flowStatus", persistedReviewHelperText, "info");' in quote_js
     assert "new URLSearchParams(window.location.search)" in quote_js
     assert 'params.get("quote_id")' in quote_js
     assert 'params.get("accept_token")' in quote_js
     assert '/view?accept_token=' in quote_js
     assert 'loadPersistedQuoteReview();' in quote_js
     assert 'showPersistedQuoteReview' in quote_js
+    assert "You are reviewing a saved quote prepared for you. To request changes, contact Bay Delivery." in quote_js
+    assert 'const res = await fetch("/quote/calculate"' in quote_js
 
 
 def test_quote_page_includes_haul_away_floor_fields() -> None:

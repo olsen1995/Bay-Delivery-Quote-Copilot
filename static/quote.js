@@ -2,7 +2,9 @@ const el = (id) => document.getElementById(id);
 let lastQuoteId = null;
 let lastAcceptToken = null;
 let lastBookingToken = null;
+let persistedReviewMode = false;
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const persistedReviewHelperText = "You are reviewing a saved quote prepared for you. To request changes, contact Bay Delivery.";
 
 function setBoxState(box, state) {
   box.classList.remove("boxInfo", "boxSuccess", "boxError");
@@ -82,6 +84,39 @@ function setFieldValue(id, value, fallback = "") {
     return;
   }
   node.value = value ?? fallback;
+}
+
+function persistedReviewFields() {
+  return [
+    "customer_name",
+    "customer_phone",
+    "job_address",
+    "description",
+    "service_type",
+    "pickup_address",
+    "dropoff_address",
+    "estimated_hours",
+    "crew_size",
+    "access_difficulty",
+    "has_dense_materials",
+    "garbage_bag_count",
+    "mattresses_count",
+    "box_springs_count",
+    "scrap_pickup_location",
+    "bag_type",
+    "trailer_fill_estimate"
+  ].map((id) => el(id)).filter(Boolean);
+}
+
+function setPersistedReviewMode(isActive) {
+  persistedReviewMode = Boolean(isActive);
+  const calcBtn = el("btnCalc");
+  const clearBtn = el("btnClear");
+  if (calcBtn) calcBtn.disabled = persistedReviewMode;
+  if (clearBtn) clearBtn.disabled = persistedReviewMode;
+  persistedReviewFields().forEach((field) => {
+    field.disabled = persistedReviewMode;
+  });
 }
 
 function getLoadSizeLabel(bagCount) {
@@ -248,6 +283,7 @@ function clearForm() {
   lastQuoteId = null;
   lastAcceptToken = null;
   lastBookingToken = null;
+  setPersistedReviewMode(false);
   el("photos").value = "";
   el("decisionNotes").value = "";
   el("bookingDate").value = "";
@@ -384,6 +420,7 @@ function showPersistedQuoteReview(data, acceptToken) {
   lastBookingToken = null;
 
   populateQuoteFormFromRequest(requestData);
+  setPersistedReviewMode(true);
 
   revealCard("uploadCard");
   revealCard("decisionCard");
@@ -405,7 +442,7 @@ function showPersistedQuoteReview(data, acceptToken) {
   );
 
   const statusText = data.quote_request_status ? ` Current status: ${data.quote_request_status}.` : "";
-  showBox("flowStatus", "Loaded your saved quote for review." + statusText, "info");
+  showBox("flowStatus", persistedReviewHelperText + statusText, "info");
   scrollToElement("resultBox");
 }
 
@@ -523,6 +560,10 @@ async function submitDecision(action) {
 
 el("btnClear").addEventListener("click", (e) => {
   e.preventDefault();
+  if (persistedReviewMode) {
+    showBox("flowStatus", persistedReviewHelperText, "info");
+    return;
+  }
   clearForm();
 });
 
@@ -535,6 +576,10 @@ el("service_type").addEventListener("change", () => {
 });
 
 el("btnCalc").addEventListener("click", async () => {
+  if (persistedReviewMode) {
+    showBox("flowStatus", persistedReviewHelperText, "info");
+    return;
+  }
   hideBox("resultBox");
   hideBox("uploadStatus");
   hideBox("decisionStatus");
@@ -692,5 +737,6 @@ el("btnUpload").addEventListener("click", async () => {
 
 syncRouteFields();
 syncServiceFields();
+setPersistedReviewMode(false);
 setFlowStage(1);
 loadPersistedQuoteReview();
