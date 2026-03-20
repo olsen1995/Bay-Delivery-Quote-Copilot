@@ -396,6 +396,70 @@ def test_create_quote_draft_from_screenshot_analysis_requires_admin(client: Test
     assert unauthorized.status_code in {401, 403}
 
 
+def test_prepare_customer_handoff_from_linked_quote_draft_reuses_quote_request_and_keeps_attachment_linkage(
+    client: TestClient,
+) -> None:
+    storage.save_attachment(
+        {
+            "attachment_id": "att-handoff",
+            "created_at": "2026-03-01T10:05:00",
+            "quote_id": None,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": None,
+            "filename": "handoff.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 456,
+            "drive_file_id": "drive-handoff",
+            "drive_web_view_link": "https://example.com/handoff",
+        }
+    )
+
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Prepare this quote for customer review.",
+            "screenshot_attachment_ids": ["att-handoff"],
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {
+                "job_address": "789 Handoff St",
+                "customer_name": "Morgan",
+                "customer_phone": "555-0202",
+            },
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+    quote_id = create_quote.json()["quote"]["quote_id"]
+
+    handoff_response = client.post(
+        f"/admin/api/quotes/{quote_id}/handoff",
+        headers=admin_headers(),
+    )
+    assert handoff_response.status_code == 200
+    handoff_body = handoff_response.json()
+    assert handoff_body["quote_id"] == quote_id
+    assert handoff_body["status"] == "customer_pending"
+    assert handoff_body["already_existed"] is False
+
+    stored_request = storage.get_quote_request(handoff_body["request_id"])
+    assert stored_request is not None
+    assert stored_request["quote_id"] == quote_id
+
+    attachments = storage.list_attachments(analysis_id=analysis_id)
+    assert len(attachments) == 1
+    assert attachments[0]["analysis_id"] == analysis_id
+    assert attachments[0]["quote_id"] == quote_id
+    assert attachments[0]["request_id"] is None
+
+
 def test_linked_screenshot_assistant_analysis_cannot_receive_more_uploads(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,

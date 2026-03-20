@@ -78,6 +78,7 @@ const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
 let currentAssistantLocked = false;
+let currentAssistantHandoff = null;
 
 function assistantDraftFields() {
   return [
@@ -189,6 +190,7 @@ function resetProtectedDashboard() {
     if (box) clearNode(box);
   });
   currentAssistantAnalysisId = "";
+  currentAssistantHandoff = null;
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
   if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
@@ -658,6 +660,9 @@ function syncAssistantAttachmentIds(attachments) {
 function updateAssistantDraftMeta(item) {
   currentAssistantAnalysisId = (item && item.analysis_id) || "";
   setAssistantDraftLocked(!!(item && item.quote_id));
+  if (!item || !item.quote_id || !currentAssistantHandoff || currentAssistantHandoff.quote_id !== item.quote_id) {
+    currentAssistantHandoff = null;
+  }
   if (!assistantDraftMeta) return;
   if (!item) {
     assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
@@ -670,6 +675,7 @@ function updateAssistantDraftMeta(item) {
 
 function beginNewScreenshotAssistantDraft() {
   currentAssistantAnalysisId = "";
+  currentAssistantHandoff = null;
   setAssistantDraftLocked(false);
   updateAssistantDraftMeta(null);
   if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
@@ -779,6 +785,39 @@ function renderScreenshotAssistantResult(item) {
     lockNotice.className = "small muted";
     lockNotice.textContent = "This analysis is locked because a quote draft has already been created.";
     panel.appendChild(lockNotice);
+
+    const handoffRow = document.createElement("div");
+    handoffRow.className = "rowToken mt10 assistantActions";
+    const handoffHelper = document.createElement("div");
+    handoffHelper.className = "small";
+    handoffHelper.textContent = "Prepare a normal customer handoff only after the quote draft is final.";
+    const handoffBtn = document.createElement("button");
+    handoffBtn.id = "assistantPrepareHandoffBtn";
+    handoffBtn.className = "secondaryAction";
+    handoffBtn.type = "button";
+    handoffBtn.textContent = "Prepare Customer Handoff";
+    handoffBtn.disabled = !adminSessionReady;
+    handoffBtn.addEventListener("click", () => prepareCustomerHandoff(item.quote_id || ""));
+    handoffRow.append(handoffHelper, handoffBtn);
+    panel.appendChild(handoffRow);
+
+    if (currentAssistantHandoff && currentAssistantHandoff.quote_id === item.quote_id) {
+      const handoffWrap = document.createElement("div");
+      handoffWrap.className = "assistantAttachmentList";
+      const handoffTitle = document.createElement("strong");
+      handoffTitle.textContent = "Customer handoff";
+      handoffWrap.appendChild(handoffTitle);
+
+      const handoffMeta = document.createElement("div");
+      handoffMeta.className = "small";
+      handoffMeta.textContent = `Request ${currentAssistantHandoff.request_id} • ${currentAssistantHandoff.status}${currentAssistantHandoff.already_existed ? " • existing request reused" : ""}`;
+      handoffWrap.appendChild(handoffMeta);
+
+      const handoffUrl = document.createElement("code");
+      handoffUrl.textContent = currentAssistantHandoff.handoff_url || "";
+      handoffWrap.appendChild(handoffUrl);
+      panel.appendChild(handoffWrap);
+    }
   }
 
   if (!item.quote_id) {
@@ -979,6 +1018,47 @@ async function createQuoteDraftFromAnalysis(analysisId) {
     const parsed = parseApiError(err);
     const detail = safeGet(parsed, "data.detail", "Please review the draft and try again.");
     setLine(assistantStatusLine, "bad", "Quote draft creation failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function prepareCustomerHandoff(quoteId) {
+  if (!adminSessionReady) {
+    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before preparing customer handoff.");
+    return;
+  }
+  if (!quoteId) {
+    setLine(assistantStatusLine, "bad", "Create a linked quote draft before preparing customer handoff.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setLine(assistantStatusLine, "ok", "Preparing customer handoff...");
+
+    const resp = await fetch(`/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff`, {
+      method: "POST",
+      headers: authHeaders()
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+
+    currentAssistantHandoff = data;
+
+    if (currentAssistantAnalysisId) {
+      const refreshed = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAssistantAnalysisId)}`);
+      renderScreenshotAssistantResult(refreshed);
+    }
+
+    const reqs = await fetchJSON("/admin/api/quote-requests");
+    renderRequests((reqs.items || []));
+
+    setLine(assistantStatusLine, "ok", `Customer handoff ready for request ${data.request_id}.`, data.handoff_url || undefined);
+  } catch (err) {
+    const parsed = parseApiError(err);
+    const detail = safeGet(parsed, "data.detail", "Please review the quote draft and try again.");
+    setLine(assistantStatusLine, "bad", "Customer handoff failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
   } finally {
     setLoading(false);
   }
