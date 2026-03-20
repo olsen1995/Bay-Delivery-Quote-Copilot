@@ -30,6 +30,17 @@ def test_quote_upload_formdata_includes_accept_token() -> None:
     assert 'formData.append("accept_token", lastAcceptToken);' in quote_js
 
 
+def test_quote_page_supports_persisted_review_mode() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    assert "new URLSearchParams(window.location.search)" in quote_js
+    assert 'params.get("quote_id")' in quote_js
+    assert 'params.get("accept_token")' in quote_js
+    assert '/view?accept_token=' in quote_js
+    assert 'loadPersistedQuoteReview();' in quote_js
+    assert 'showPersistedQuoteReview' in quote_js
+
+
 def test_quote_page_includes_haul_away_floor_fields() -> None:
     """Ensure haul-away-only floor-detail fields are present with backend-compatible values."""
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
@@ -111,9 +122,13 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert '/admin/api/screenshot-assistant/analyses/intake' in admin_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' in admin_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft' in admin_js
+    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' in admin_js
     assert 'assistantCreateQuoteDraftBtn' in admin_js
+    assert 'assistantPrepareHandoffBtn' in admin_js
     assert 'Create Quote Draft' in admin_js
+    assert 'Prepare Customer Handoff' in admin_js
     assert 'Linked quote draft' in admin_js
+    assert 'Customer handoff' in admin_js
     assert 'This analysis is locked because a quote draft has already been created.' in admin_js
     assert 'setAssistantDraftLocked' in admin_js
     assert 'beginNewScreenshotAssistantDraft' in admin_js
@@ -121,5 +136,6 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'submitScreenshotAssistantAnalysis' in admin_js
     assert 'uploadScreenshotAssistantFiles' in admin_js
     assert 'createQuoteDraftFromAnalysis' in admin_js
+    assert 'prepareCustomerHandoff' in admin_js
     assert '.assistantUploadRow' in admin_css
     assert '.assistantDraftBar' in admin_css

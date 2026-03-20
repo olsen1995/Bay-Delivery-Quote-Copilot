@@ -218,7 +218,56 @@ class AcceptTokenValidationTests(unittest.TestCase):
         self.assertTrue(decision_data.get("ok"))
         self.assertEqual("customer_declined", decision_data.get("status"))
 
+    def test_quote_review_view_allows_valid_accept_token(self) -> None:
+        calculate_resp = self.client.post(
+            "/quote/calculate",
+            json={
+                "customer_name": "Frank",
+                "customer_phone": "555-0006",
+                "job_address": "111 Review St",
+                "description": "Saved quote review",
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+            },
+        )
+        self.assertEqual(200, calculate_resp.status_code)
+        quote_data = calculate_resp.json()
+
+        view_resp = self.client.get(
+            f"/quote/{quote_data['quote_id']}/view",
+            params={"accept_token": quote_data["accept_token"]},
+        )
+        self.assertEqual(200, view_resp.status_code)
+        body = view_resp.json()
+        self.assertEqual(body["quote_id"], quote_data["quote_id"])
+        self.assertEqual(body["request"]["customer_name"], "Frank")
+        self.assertIn("cash_total_cad", body["response"])
+        self.assertIsNone(body["quote_request_status"])
+
+    def test_quote_review_view_rejects_invalid_accept_token(self) -> None:
+        calculate_resp = self.client.post(
+            "/quote/calculate",
+            json={
+                "customer_name": "Grace",
+                "customer_phone": "555-0007",
+                "job_address": "222 Review St",
+                "description": "Saved quote review",
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+            },
+        )
+        self.assertEqual(200, calculate_resp.status_code)
+        quote_data = calculate_resp.json()
+
+        view_resp = self.client.get(
+            f"/quote/{quote_data['quote_id']}/view",
+            params={"accept_token": "wrong-token"},
+        )
+        self.assertEqual(401, view_resp.status_code)
+        self.assertEqual(view_resp.json(), {"detail": "Invalid or expired accept token."})
+
 
 if __name__ == "__main__":
     unittest.main()
-

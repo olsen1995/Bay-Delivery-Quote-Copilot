@@ -74,6 +74,16 @@ function createInfoBlock(label, value, extraClass) {
   return block;
 }
 
+function setFieldValue(id, value, fallback = "") {
+  const node = el(id);
+  if (!node) return;
+  if (node.type === "checkbox") {
+    node.checked = Boolean(value);
+    return;
+  }
+  node.value = value ?? fallback;
+}
+
 function getLoadSizeLabel(bagCount) {
   if (bagCount <= 0) return "Estimated";
   if (bagCount <= 5) return "Small";
@@ -343,6 +353,87 @@ function syncRouteFields() {
   }
 }
 
+function populateQuoteFormFromRequest(requestData) {
+  if (!requestData || typeof requestData !== "object") return;
+
+  setFieldValue("customer_name", requestData.customer_name || "");
+  setFieldValue("customer_phone", requestData.customer_phone || "");
+  setFieldValue("job_address", requestData.job_address || "");
+  setFieldValue("description", requestData.job_description_customer || requestData.description || "");
+  setFieldValue("service_type", requestData.service_type || "haul_away");
+  setFieldValue("pickup_address", requestData.pickup_address || "");
+  setFieldValue("dropoff_address", requestData.dropoff_address || "");
+  setFieldValue("estimated_hours", requestData.estimated_hours ?? "1.0");
+  setFieldValue("crew_size", requestData.crew_size ?? "1");
+  setFieldValue("access_difficulty", requestData.access_difficulty || "normal");
+  setFieldValue("garbage_bag_count", requestData.garbage_bag_count ?? 0);
+  setFieldValue("mattresses_count", requestData.mattresses_count ?? 0);
+  setFieldValue("box_springs_count", requestData.box_springs_count ?? 0);
+  setFieldValue("scrap_pickup_location", requestData.scrap_pickup_location || "curbside");
+  setFieldValue("bag_type", requestData.bag_type || "light");
+  setFieldValue("trailer_fill_estimate", requestData.trailer_fill_estimate || "under_quarter");
+  setFieldValue("has_dense_materials", Boolean(requestData.has_dense_materials));
+  syncRouteFields();
+  syncServiceFields();
+}
+
+function showPersistedQuoteReview(data, acceptToken) {
+  const requestData = data.request || {};
+  lastQuoteId = data.quote_id || null;
+  lastAcceptToken = acceptToken || null;
+  lastBookingToken = null;
+
+  populateQuoteFormFromRequest(requestData);
+
+  revealCard("uploadCard");
+  revealCard("decisionCard");
+  revealCard("quoteSummaryCard");
+  setFlowStage(3);
+
+  el("summaryService").textContent = el("service_type").selectedOptions[0].textContent;
+  el("summaryCustomer").textContent = `${requestData.customer_name || ""} • ${requestData.customer_phone || ""}`.trim();
+  el("summaryLocation").textContent = requestData.job_address || "";
+
+  renderQuoteResult(
+    {
+      quote_id: data.quote_id,
+      created_at: data.created_at,
+      request: requestData,
+      response: data.response || {}
+    },
+    data.response || {}
+  );
+
+  const statusText = data.quote_request_status ? ` Current status: ${data.quote_request_status}.` : "";
+  showBox("flowStatus", "Loaded your saved quote for review." + statusText, "info");
+  scrollToElement("resultBox");
+}
+
+async function loadPersistedQuoteReview() {
+  const params = new URLSearchParams(window.location.search);
+  const quoteId = (params.get("quote_id") || "").trim();
+  const acceptToken = (params.get("accept_token") || "").trim();
+  if (!quoteId || !acceptToken) return;
+
+  hideBox("resultBox");
+  hideBox("decisionStatus");
+  hideBox("bookingStatus");
+  showBox("flowStatus", "Loading your saved quote...", "info");
+
+  try {
+    const res = await fetch(`/quote/${encodeURIComponent(quoteId)}/view?accept_token=${encodeURIComponent(acceptToken)}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showBox("resultBox", "Error:\n" + (data.detail || "Unable to load saved quote."));
+      return;
+    }
+
+    showPersistedQuoteReview(data, acceptToken);
+  } catch (_err) {
+    showBox("resultBox", "Error:\nFailed to load saved quote.");
+  }
+}
+
 async function submitBooking() {
   hideBox("bookingStatus");
 
@@ -602,3 +693,4 @@ el("btnUpload").addEventListener("click", async () => {
 syncRouteFields();
 syncServiceFields();
 setFlowStage(1);
+loadPersistedQuoteReview();

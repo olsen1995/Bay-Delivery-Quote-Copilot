@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -16,6 +17,114 @@ from app.storage import (
     update_quote_request,
 )
 from app.update_fields import InvalidQuoteRequestTransition, validate_quote_request_transition
+
+
+def _validate_quote_handoff_data(quote: dict[str, Any]) -> None:
+    request = quote.get("request") or {}
+    response = quote.get("response") or {}
+
+    required_request_fields = (
+        "customer_name",
+        "customer_phone",
+        "job_address",
+        "job_description_customer",
+        "service_type",
+    )
+    missing_request_fields = [
+        field_name for field_name in required_request_fields if not str(request.get(field_name) or "").strip()
+    ]
+    if missing_request_fields:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Quote is missing required customer handoff data: {', '.join(missing_request_fields)}.",
+        )
+
+    if not str(quote.get("accept_token") or "").strip():
+        raise HTTPException(status_code=409, detail="Quote is missing an accept token.")
+
+    for field_name in ("cash_total_cad", "emt_total_cad"):
+        if response.get(field_name) is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Quote is missing required response data: {field_name}.",
+            )
+
+
+def prepare_customer_handoff(quote_id: str, *, now_iso: str) -> dict[str, Any]:
+    quote = get_quote_record(quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found.")
+
+    _validate_quote_handoff_data(quote)
+
+    existing = get_quote_request_by_quote_id(quote_id)
+    handoff_url = f"/quote?quote_id={quote_id}&accept_token={quote['accept_token']}"
+    if existing:
+        return {
+            "ok": True,
+            "quote_id": quote_id,
+            "request_id": existing["request_id"],
+            "status": existing["status"],
+            "handoff_url": handoff_url,
+            "already_existed": True,
+        }
+
+    validate_quote_request_transition("__new__", "customer_pending")
+
+    request_id = str(uuid4())
+    save_quote_request(
+        {
+            "request_id": request_id,
+            "created_at": now_iso,
+            "status": "customer_pending",
+            "quote_id": quote_id,
+            "customer_name": quote["request"].get("customer_name"),
+            "customer_phone": quote["request"].get("customer_phone"),
+            "job_address": quote["request"].get("job_address"),
+            "job_description_customer": quote["request"].get("job_description_customer"),
+            "job_description_internal": quote["response"].get("job_description_internal"),
+            "service_type": quote["request"].get("service_type"),
+            "cash_total_cad": quote["response"].get("cash_total_cad"),
+            "emt_total_cad": quote["response"].get("emt_total_cad"),
+            "request_json": quote["request"],
+            "notes": None,
+            "requested_job_date": None,
+            "requested_time_window": None,
+            "customer_accepted_at": None,
+            "admin_approved_at": None,
+            "accept_token": quote.get("accept_token"),
+            "booking_token": None,
+            "booking_token_created_at": None,
+        }
+    )
+
+    return {
+        "ok": True,
+        "quote_id": quote_id,
+        "request_id": request_id,
+        "status": "customer_pending",
+        "handoff_url": handoff_url,
+        "already_existed": False,
+    }
+
+
+def load_quote_for_customer_review(quote_id: str, *, accept_token: str) -> dict[str, Any]:
+    quote = get_quote_record(quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found.")
+
+    server_token = str(quote.get("accept_token") or "")
+    if not server_token or not hmac.compare_digest(accept_token, server_token):
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+
+    existing = get_quote_request_by_quote_id(quote_id)
+    return {
+        "quote_id": quote["quote_id"],
+        "created_at": quote["created_at"],
+        "request": quote["request"],
+        "response": quote["response"],
+        "quote_request_status": existing["status"] if existing else None,
+    }
 
 
 def process_customer_decision(

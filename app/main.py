@@ -796,6 +796,11 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
     return result
 
 
+@app.get("/quote/{quote_id}/view")
+def quote_review_view(quote_id: str, accept_token: str):
+    return booking_service.load_quote_for_customer_review(quote_id, accept_token=accept_token)
+
+
 @app.post("/quote/{quote_id}/booking")
 async def submit_booking(quote_id: str, body: BookingDetails):
     return booking_service.submit_booking_details(
@@ -1018,6 +1023,38 @@ def admin_create_screenshot_assistant_quote_draft(
             action_type="create_quote_draft",
             entity_type="screenshot_assistant_analysis",
             record_id=analysis_id,
+            success=False,
+            error_summary=str(exc.detail),
+        )
+        raise
+
+
+@app.post("/admin/api/quotes/{quote_id}/handoff")
+def admin_prepare_customer_handoff(
+    request: Request,
+    quote_id: str,
+    background_tasks: BackgroundTasks,
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    try:
+        result = booking_service.prepare_customer_handoff(quote_id, now_iso=_now_local_iso())
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="prepare_customer_handoff",
+            entity_type="quote_request",
+            record_id=result["request_id"],
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        return result
+    except HTTPException as exc:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="prepare_customer_handoff",
+            entity_type="quote",
+            record_id=quote_id,
             success=False,
             error_summary=str(exc.detail),
         )
