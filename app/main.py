@@ -745,17 +745,42 @@ class ScreenshotAssistantIntakePayload(BaseModel):
 
     analysis_id: Optional[str] = Field(None, max_length=120)
     message: Optional[str] = Field(None, max_length=4000)
+    requested_job_date: Optional[str] = Field(None, max_length=10, description="YYYY-MM-DD format")
+    requested_time_window: Optional[str] = Field(None, max_length=20, description="morning|afternoon|evening|flexible")
     screenshot_attachment_ids: list[str] = Field(default_factory=list, max_length=10)
     candidate_inputs: ScreenshotAssistantCandidatePayload = Field(default_factory=ScreenshotAssistantCandidatePayload)
     operator_overrides: ScreenshotAssistantCandidatePayload = Field(default_factory=ScreenshotAssistantCandidatePayload)
 
-    @field_validator("analysis_id", "message", mode="before")
+    @field_validator("analysis_id", "message", "requested_job_date", "requested_time_window", mode="before")
     @classmethod
     def strip(cls, v):
         if v is None:
             return None
         if isinstance(v, str):
             return v.strip()
+        return v
+
+    @field_validator("requested_job_date")
+    @classmethod
+    def validate_requested_job_date(cls, v):
+        if v in {None, ""}:
+            return None
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+            return v
+        except ValueError as e:
+            if "does not match format" in str(e):
+                raise ValueError("Date must be in YYYY-MM-DD format")
+            raise
+
+    @field_validator("requested_time_window")
+    @classmethod
+    def validate_requested_time_window(cls, v):
+        if v in {None, ""}:
+            return None
+        valid_windows = {"morning", "afternoon", "evening", "flexible"}
+        if v not in valid_windows:
+            raise ValueError(f"Time window must be one of: {', '.join(sorted(valid_windows))}")
         return v
 
     @field_validator("screenshot_attachment_ids", mode="before")
@@ -945,6 +970,8 @@ def admin_create_screenshot_assistant_analysis(
             analysis_id=body.analysis_id,
             operator_username=operator_username,
             message=body.message,
+            requested_job_date=body.requested_job_date,
+            requested_time_window=body.requested_time_window,
             candidate_inputs=body.candidate_inputs.model_dump(exclude_none=True),
             operator_overrides=body.operator_overrides.model_dump(exclude_none=True),
             screenshot_attachment_ids=body.screenshot_attachment_ids,

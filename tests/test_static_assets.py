@@ -134,6 +134,11 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'id="assistantUploadList"' in admin_html
     assert 'id="assistantResultBox"' in admin_html
     assert 'id="assistantHistoryBox"' in admin_html
+    assert 'id="assistantCustomerName"' in admin_html
+    assert 'id="assistantCustomerPhone"' in admin_html
+    assert 'id="assistantDescription"' in admin_html
+    assert 'id="assistantRequestedJobDate"' in admin_html
+    assert 'id="assistantRequestedTimeWindow"' in admin_html
     assert 'Screenshot Quote Assistant' in admin_html
     assert 'Screenshot Assistant Drafts' in admin_html
     assert 'optionally create a real quote draft from the saved analysis' in admin_html
@@ -155,6 +160,15 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'uploadScreenshotAssistantFiles' in admin_js
     assert 'createQuoteDraftFromAnalysis' in admin_js
     assert 'prepareCustomerHandoff' in admin_js
+    assert 'assistantSuggestionPanel' in admin_js
+    assert 'assistantApplyAllSuggestionsBtn' in admin_js
+    assert 'applyAllEmptyAssistantSuggestions' in admin_js
+    assert 'applyAssistantSuggestion' in admin_js
+    assert 'Autofill Suggestions' in admin_js
+    assert 'Apply All Empty Fields' in admin_js
+    assert 'Suggestions stay non-binding until you explicitly apply or edit them.' in admin_js
+    assert 'Missing fields:' in admin_js
+    assert 'Warnings:' in admin_js
     assert '.assistantUploadRow' in admin_css
     assert '.assistantDraftBar' in admin_css
 

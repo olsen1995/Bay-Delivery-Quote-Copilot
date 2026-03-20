@@ -154,6 +154,9 @@ def test_screenshot_assistant_structured_output_contract(client: TestClient) -> 
         "quote_guidance",
         "attachments",
         "recommendation_only",
+        "autofill_suggestions",
+        "autofill_missing_fields",
+        "autofill_warnings",
     }
     assert body["status"] == "draft"
     assert body["recommendation_only"] is True
@@ -164,6 +167,118 @@ def test_screenshot_assistant_structured_output_contract(client: TestClient) -> 
     assert isinstance(body["quote_guidance"]["disclaimer"], str)
     assert body["normalized_candidate"]["pickup_address"] == "1 Pickup Ave"
     assert body["normalized_candidate"]["dropoff_address"] == "2 Dropoff Rd"
+    assert isinstance(body["autofill_suggestions"], dict)
+    assert isinstance(body["autofill_missing_fields"], list)
+    assert isinstance(body["autofill_warnings"], list)
+
+
+def test_screenshot_assistant_message_autofill_suggestions_are_persisted_separately(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": (
+                "Hi, my name is Taylor. You can reach me at 415-555-0199. "
+                "The address is 123 Example St. I need junk removed on 2026-04-12 in the morning."
+            ),
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.5, "crew_size": 2},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["autofill_suggestions"]["customer_name"] == {
+        "value": "Taylor",
+        "confidence": "medium",
+        "source": "message",
+        "needs_review": True,
+    }
+    assert body["autofill_suggestions"]["customer_phone"]["value"] == "(415) 555-0199"
+    assert body["autofill_suggestions"]["job_address"]["value"] == "123 Example St"
+    assert body["autofill_suggestions"]["requested_job_date"]["value"] == "2026-04-12"
+    assert body["autofill_suggestions"]["requested_time_window"]["value"] == "morning"
+    assert body["autofill_suggestions"]["description"]["source"] == "message"
+    assert body["autofill_missing_fields"] == []
+    assert body["normalized_candidate"]["customer_name"] == ""
+    assert body["normalized_candidate"]["customer_phone"] == ""
+    assert body["normalized_candidate"]["job_address"] == ""
+    assert body["intake"]["autofill_suggestions"]["customer_phone"]["value"] == "(415) 555-0199"
+
+
+def test_screenshot_assistant_message_autofill_reports_missing_fields_and_warnings(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["autofill_suggestions"] == {}
+    assert body["autofill_missing_fields"] == [
+        "customer_name",
+        "customer_phone",
+        "job_address",
+        "description",
+        "requested_job_date",
+        "requested_time_window",
+    ]
+    assert body["autofill_warnings"] == ["Paste a customer message to generate autofill suggestions."]
+
+
+def test_screenshot_assistant_requested_date_and_window_round_trip_without_affecting_guidance(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Customer asked for morning availability and shared a haul-away request.",
+            "requested_job_date": "2026-04-12",
+            "requested_time_window": "morning",
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.25,
+                "crew_size": 2,
+                "customer_name": "Taylor",
+                "customer_phone": "(415) 555-0199",
+                "job_address": "123 Example St",
+                "description": "Reviewed draft description",
+            },
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intake"]["requested_job_date"] == "2026-04-12"
+    assert body["intake"]["requested_time_window"] == "morning"
+    assert body["autofill_missing_fields"] == []
+    assert body["normalized_candidate"]["customer_name"] == "Taylor"
+    assert body["normalized_candidate"]["customer_phone"] == "(415) 555-0199"
+    assert body["normalized_candidate"]["job_address"] == "123 Example St"
+    assert body["normalized_candidate"]["job_description_customer"] == "Reviewed draft description"
+    assert body["quote_guidance"]["service_type"] == "haul_away"
+
+    detail = client.get(
+        f"/admin/api/screenshot-assistant/analyses/{body['analysis_id']}",
+        headers=admin_headers(),
+    )
+    assert detail.status_code == 200
+    assert detail.json()["intake"]["requested_job_date"] == "2026-04-12"
+
+    listing = client.get("/admin/api/screenshot-assistant/analyses", headers=admin_headers())
+    assert listing.status_code == 200
+    list_item = listing.json()["items"][0]
+    assert "autofill_suggestions" not in list_item
+    assert "autofill_suggestions" not in list_item["intake"]
 
 
 def test_screenshot_assistant_upload_requires_admin_and_persists_analysis_link(
