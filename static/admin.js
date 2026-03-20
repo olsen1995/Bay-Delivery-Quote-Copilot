@@ -68,6 +68,11 @@ const assistantDraftMeta = document.getElementById("assistantDraftMeta");
 const assistantAttachmentIdsInput = document.getElementById("assistantAttachmentIds");
 const assistantScreenshotFilesInput = document.getElementById("assistantScreenshotFiles");
 const assistantMessageInput = document.getElementById("assistantMessage");
+const assistantCustomerNameInput = document.getElementById("assistantCustomerName");
+const assistantCustomerPhoneInput = document.getElementById("assistantCustomerPhone");
+const assistantDescriptionInput = document.getElementById("assistantDescription");
+const assistantRequestedJobDateInput = document.getElementById("assistantRequestedJobDate");
+const assistantRequestedTimeWindowInput = document.getElementById("assistantRequestedTimeWindow");
 const assistantServiceTypeInput = document.getElementById("assistantServiceType");
 const assistantEstimatedHoursInput = document.getElementById("assistantEstimatedHours");
 const assistantCrewSizeInput = document.getElementById("assistantCrewSize");
@@ -80,12 +85,45 @@ let currentAssistantAnalysisId = "";
 let currentAssistantLocked = false;
 let currentAssistantHandoff = null;
 let currentJobsById = {};
+let assistantDraftDirty = false;
+const assistantUnsavedDraftWarning = "Suggestions applied locally. Click Analyze Intake to save reviewed fields before creating a quote draft.";
+const assistantAutofillFieldConfig = {
+  customer_name: { input: assistantCustomerNameInput, label: "Customer Name" },
+  customer_phone: { input: assistantCustomerPhoneInput, label: "Customer Phone" },
+  job_address: { input: assistantJobAddressInput, label: "Job Address" },
+  description: { input: assistantDescriptionInput, label: "Description" },
+  requested_job_date: { input: assistantRequestedJobDateInput, label: "Requested Job Date" },
+  requested_time_window: { input: assistantRequestedTimeWindowInput, label: "Requested Time Window" }
+};
 
 function assistantDraftFields() {
   return [
     assistantMessageInput,
+    assistantCustomerNameInput,
+    assistantCustomerPhoneInput,
+    assistantDescriptionInput,
+    assistantRequestedJobDateInput,
+    assistantRequestedTimeWindowInput,
     assistantAttachmentIdsInput,
     assistantScreenshotFilesInput,
+    assistantServiceTypeInput,
+    assistantEstimatedHoursInput,
+    assistantCrewSizeInput,
+    assistantJobAddressInput,
+    assistantPickupAddressInput,
+    assistantDropoffAddressInput
+  ].filter(Boolean);
+}
+
+function assistantReviewedDraftFields() {
+  return [
+    assistantMessageInput,
+    assistantCustomerNameInput,
+    assistantCustomerPhoneInput,
+    assistantDescriptionInput,
+    assistantRequestedJobDateInput,
+    assistantRequestedTimeWindowInput,
+    assistantAttachmentIdsInput,
     assistantServiceTypeInput,
     assistantEstimatedHoursInput,
     assistantCrewSizeInput,
@@ -120,6 +158,33 @@ function setLoading(isLoading) {
   assistantDraftFields().forEach((field) => {
     field.disabled = isLoading || currentAssistantLocked;
   });
+}
+
+function syncAssistantDraftActionState() {
+  const createBtn = document.getElementById("assistantCreateQuoteDraftBtn");
+  const createHelper = document.getElementById("assistantCreateQuoteDraftHelper");
+  if (createBtn) {
+    createBtn.disabled = !adminSessionReady || assistantDraftDirty;
+  }
+  if (createHelper) {
+    createHelper.textContent = assistantDraftDirty
+      ? assistantUnsavedDraftWarning
+      : "Create a real quote draft only after reviewing the recommendation.";
+  }
+}
+
+function setAssistantDraftDirty(isDirty) {
+  assistantDraftDirty = !!isDirty;
+  syncAssistantDraftActionState();
+}
+
+function markAssistantDraftDirty(message) {
+  if (!currentAssistantAnalysisId || currentAssistantLocked) return;
+  const wasDirty = assistantDraftDirty;
+  setAssistantDraftDirty(true);
+  if (message && !wasDirty) {
+    setLine(assistantStatusLine, "bad", message);
+  }
 }
 
 function authHeaders() {
@@ -193,8 +258,14 @@ function resetProtectedDashboard() {
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
   currentJobsById = {};
+  setAssistantDraftDirty(false);
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
+  if (assistantCustomerNameInput) assistantCustomerNameInput.value = "";
+  if (assistantCustomerPhoneInput) assistantCustomerPhoneInput.value = "";
+  if (assistantDescriptionInput) assistantDescriptionInput.value = "";
+  if (assistantRequestedJobDateInput) assistantRequestedJobDateInput.value = "";
+  if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = "";
   if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
   if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
 }
@@ -806,8 +877,15 @@ function updateAssistantDraftMeta(item) {
 function beginNewScreenshotAssistantDraft() {
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
+  setAssistantDraftDirty(false);
   setAssistantDraftLocked(false);
   updateAssistantDraftMeta(null);
+  if (assistantMessageInput) assistantMessageInput.value = "";
+  if (assistantCustomerNameInput) assistantCustomerNameInput.value = "";
+  if (assistantCustomerPhoneInput) assistantCustomerPhoneInput.value = "";
+  if (assistantDescriptionInput) assistantDescriptionInput.value = "";
+  if (assistantRequestedJobDateInput) assistantRequestedJobDateInput.value = "";
+  if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = "";
   if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
   if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
   const resultBox = document.getElementById("assistantResultBox");
@@ -819,6 +897,11 @@ function beginNewScreenshotAssistantDraft() {
 
 function collectAssistantPayload() {
   const candidate = {};
+  const customerName = (assistantCustomerNameInput && assistantCustomerNameInput.value || "").trim();
+  const customerPhone = (assistantCustomerPhoneInput && assistantCustomerPhoneInput.value || "").trim();
+  const description = (assistantDescriptionInput && assistantDescriptionInput.value || "").trim();
+  const requestedJobDate = (assistantRequestedJobDateInput && assistantRequestedJobDateInput.value || "").trim();
+  const requestedTimeWindow = (assistantRequestedTimeWindowInput && assistantRequestedTimeWindowInput.value || "").trim();
   const serviceType = (document.getElementById("assistantServiceType").value || "").trim();
   const estimatedHours = (document.getElementById("assistantEstimatedHours").value || "").trim();
   const crewSize = (document.getElementById("assistantCrewSize").value || "").trim();
@@ -826,6 +909,9 @@ function collectAssistantPayload() {
   const pickupAddress = (document.getElementById("assistantPickupAddress").value || "").trim();
   const dropoffAddress = (document.getElementById("assistantDropoffAddress").value || "").trim();
 
+  if (customerName) candidate.customer_name = customerName;
+  if (customerPhone) candidate.customer_phone = customerPhone;
+  if (description) candidate.description = description;
   if (serviceType) candidate.service_type = serviceType;
   if (estimatedHours) candidate.estimated_hours = Number(estimatedHours);
   if (crewSize) candidate.crew_size = Number(crewSize);
@@ -836,6 +922,8 @@ function collectAssistantPayload() {
   return {
     analysis_id: currentAssistantAnalysisId || undefined,
     message: (document.getElementById("assistantMessage").value || "").trim(),
+    requested_job_date: requestedJobDate || undefined,
+    requested_time_window: requestedTimeWindow || undefined,
     screenshot_attachment_ids: parseAttachmentIds(assistantAttachmentIdsInput ? assistantAttachmentIdsInput.value : ""),
     candidate_inputs: candidate,
     operator_overrides: {}
@@ -847,12 +935,146 @@ function formatMoney(value) {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(value);
 }
 
+function getAutofillInputValue(fieldName) {
+  const config = assistantAutofillFieldConfig[fieldName];
+  if (!config || !config.input) return "";
+  return (config.input.value || "").trim();
+}
+
+function populateAssistantReviewedFields(item) {
+  const candidateInputs = safeGet(item, "intake.candidate_inputs", {});
+  if (assistantCustomerNameInput) assistantCustomerNameInput.value = safeGet(candidateInputs, "customer_name", "");
+  if (assistantCustomerPhoneInput) assistantCustomerPhoneInput.value = safeGet(candidateInputs, "customer_phone", "");
+  if (assistantDescriptionInput) assistantDescriptionInput.value = safeGet(candidateInputs, "description", "");
+  if (assistantRequestedJobDateInput) assistantRequestedJobDateInput.value = safeGet(item, "intake.requested_job_date", "");
+  if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = safeGet(item, "intake.requested_time_window", "");
+}
+
+function applyAssistantSuggestion(fieldName, value, onlyIfEmpty = true, announceDirty = true) {
+  const config = assistantAutofillFieldConfig[fieldName];
+  if (!config || !config.input) return false;
+  const currentValue = getAutofillInputValue(fieldName);
+  if (onlyIfEmpty && currentValue) return false;
+  config.input.value = value || "";
+  if (announceDirty) {
+    markAssistantDraftDirty(assistantUnsavedDraftWarning);
+  }
+  return true;
+}
+
+function applyAllEmptyAssistantSuggestions(item) {
+  const suggestions = (item && item.autofill_suggestions) || {};
+  let appliedCount = 0;
+  Object.entries(suggestions).forEach(([fieldName, meta]) => {
+    if (applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true, false)) {
+      appliedCount += 1;
+    }
+  });
+
+  if (appliedCount > 0) {
+    markAssistantDraftDirty();
+    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
+    return;
+  }
+  setLine(assistantStatusLine, "bad", "No empty draft fields were available for autofill suggestions.");
+}
+
+function renderAssistantAutofillPanel(item) {
+  const wrap = document.createElement("div");
+  wrap.id = "assistantSuggestionPanel";
+  wrap.className = "assistantAttachmentList";
+
+  const title = document.createElement("strong");
+  title.textContent = "Autofill Suggestions";
+  wrap.appendChild(title);
+
+  const suggestions = item.autofill_suggestions || {};
+  const suggestionEntries = Object.entries(suggestions);
+  if (suggestionEntries.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "small muted";
+    empty.textContent = "No message-based suggestions detected yet.";
+    wrap.appendChild(empty);
+  } else {
+    const helper = document.createElement("div");
+    helper.className = "small muted";
+    helper.textContent = "Suggestions stay non-binding until you explicitly apply or edit them.";
+    wrap.appendChild(helper);
+
+    const applyAllBtn = document.createElement("button");
+    applyAllBtn.id = "assistantApplyAllSuggestionsBtn";
+    applyAllBtn.className = "secondaryAction";
+    applyAllBtn.type = "button";
+    applyAllBtn.textContent = "Apply All Empty Fields";
+    applyAllBtn.disabled = !adminSessionReady;
+    applyAllBtn.addEventListener("click", () => applyAllEmptyAssistantSuggestions(item));
+    wrap.appendChild(applyAllBtn);
+
+    suggestionEntries.forEach(([fieldName, meta]) => {
+      const row = document.createElement("div");
+      row.className = "rowToken";
+      const label = document.createElement("strong");
+      label.textContent = `${safeGet(assistantAutofillFieldConfig[fieldName], "label", fieldName)}:`;
+      const value = document.createElement("span");
+      value.textContent = ` ${safeGet(meta, "value", "—")}`;
+      row.append(label, value);
+
+      const detail = document.createElement("div");
+      detail.className = "small muted";
+      detail.textContent = `Confidence: ${safeGet(meta, "confidence", "low")} • Source: ${safeGet(meta, "source", "message")} • Review required`;
+
+      const applyBtn = document.createElement("button");
+      applyBtn.id = `assistantApplySuggestion-${fieldName}`;
+      applyBtn.className = "secondaryAction btnSpacer";
+      applyBtn.type = "button";
+      applyBtn.textContent = "Apply";
+      applyBtn.disabled = !adminSessionReady || !!getAutofillInputValue(fieldName);
+      applyBtn.addEventListener("click", () => {
+        const applied = applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true);
+        if (applied) {
+          applyBtn.disabled = true;
+          return;
+        }
+        setLine(assistantStatusLine, "bad", `${safeGet(assistantAutofillFieldConfig[fieldName], "label", fieldName)} already has a reviewed value.`);
+      });
+
+      wrap.append(row, detail, applyBtn);
+    });
+  }
+
+  const missingFields = Array.isArray(item.autofill_missing_fields) ? item.autofill_missing_fields : [];
+  const warnings = Array.isArray(item.autofill_warnings) ? item.autofill_warnings : [];
+
+  if (missingFields.length > 0) {
+    const missing = document.createElement("div");
+    missing.id = "assistantAutofillMissingFields";
+    missing.className = "small muted";
+    missing.textContent = `Missing fields: ${missingFields.map((fieldName) => safeGet(assistantAutofillFieldConfig[fieldName], "label", fieldName)).join(", ")}`;
+    wrap.appendChild(missing);
+  }
+
+  if (warnings.length > 0) {
+    const warningList = document.createElement("div");
+    warningList.id = "assistantAutofillWarnings";
+    warningList.className = "small muted";
+    warningList.textContent = `Warnings: ${warnings.join(" | ")}`;
+    wrap.appendChild(warningList);
+  }
+
+  return wrap;
+}
+
 function renderScreenshotAssistantResult(item) {
   const box = document.getElementById("assistantResultBox");
-  if (!item) return addEmptyState(box, "No screenshot analysis yet.");
+  if (!item) {
+    setAssistantDraftDirty(false);
+    return addEmptyState(box, "No screenshot analysis yet.");
+  }
   clearNode(box);
   updateAssistantDraftMeta(item);
   syncAssistantAttachmentIds(item.attachments || []);
+  populateAssistantReviewedFields(item);
+  setAssistantDraftDirty(false);
 
   const panel = document.createElement("div");
   panel.className = "assistantResultPanel";
@@ -887,6 +1109,8 @@ function renderScreenshotAssistantResult(item) {
   disclaimer.className = "muted";
   disclaimer.textContent = safeGet(item, "quote_guidance.disclaimer", "");
   panel.appendChild(disclaimer);
+
+  panel.appendChild(renderAssistantAutofillPanel(item));
 
   const attachmentWrap = document.createElement("div");
   attachmentWrap.className = "assistantAttachmentList";
@@ -954,14 +1178,17 @@ function renderScreenshotAssistantResult(item) {
     const actionRow = document.createElement("div");
     actionRow.className = "rowToken mt10 assistantActions";
     const helper = document.createElement("div");
+    helper.id = "assistantCreateQuoteDraftHelper";
     helper.className = "small";
-    helper.textContent = "Create a real quote draft only after reviewing the recommendation.";
+    helper.textContent = assistantDraftDirty
+      ? assistantUnsavedDraftWarning
+      : "Create a real quote draft only after reviewing the recommendation.";
     const button = document.createElement("button");
     button.id = "assistantCreateQuoteDraftBtn";
     button.className = "secondaryAction";
     button.type = "button";
     button.textContent = "Create Quote Draft";
-    button.disabled = !adminSessionReady;
+    button.disabled = !adminSessionReady || assistantDraftDirty;
     button.addEventListener("click", () => createQuoteDraftFromAnalysis(item.analysis_id || ""));
     actionRow.append(helper, button);
     panel.appendChild(actionRow);
@@ -1037,6 +1264,7 @@ async function saveScreenshotAssistantDraft() {
   });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+  setAssistantDraftDirty(false);
   renderScreenshotAssistantResult(data);
   renderScreenshotAssistantUploads(data.attachments || []);
   return data;
@@ -1115,6 +1343,10 @@ async function uploadScreenshotAssistantFiles() {
 async function createQuoteDraftFromAnalysis(analysisId) {
   if (!adminSessionReady) {
     setLine(assistantStatusLine, "bad", "Authenticate and load admin data before creating a quote draft.");
+    return;
+  }
+  if (assistantDraftDirty) {
+    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
     return;
   }
   if (!analysisId) {
@@ -1222,13 +1454,19 @@ async function refreshAll() {
     const auditLog = await fetchJSON("/admin/api/audit-log");
     renderAuditLog((auditLog.items || []));
 
+    adminSessionReady = true;
     const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
     const analysisItems = analyses.items || [];
     renderScreenshotAssistantHistory(analysisItems);
-    renderScreenshotAssistantResult(analysisItems[0] || null);
-    renderScreenshotAssistantUploads((analysisItems[0] && analysisItems[0].attachments) || []);
+    if (analysisItems[0] && analysisItems[0].analysis_id) {
+      const latestAnalysis = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisItems[0].analysis_id)}`);
+      renderScreenshotAssistantResult(latestAnalysis);
+      renderScreenshotAssistantUploads(latestAnalysis.attachments || []);
+    } else {
+      renderScreenshotAssistantResult(null);
+      renderScreenshotAssistantUploads([]);
+    }
 
-    adminSessionReady = true;
     setProtectedDashboardVisible(true);
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
@@ -1268,6 +1506,10 @@ if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeSchedule
 if (assistantStartDraftBtn) assistantStartDraftBtn.addEventListener("click", beginNewScreenshotAssistantDraft);
 if (assistantUploadBtn) assistantUploadBtn.addEventListener("click", uploadScreenshotAssistantFiles);
 if (assistantAnalyzeBtn) assistantAnalyzeBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
+assistantReviewedDraftFields().forEach((field) => {
+  const eventName = field.tagName === "SELECT" ? "change" : "input";
+  field.addEventListener(eventName, () => markAssistantDraftDirty(assistantUnsavedDraftWarning));
+});
 
 resetProtectedDashboard();
 closeScheduleModal();

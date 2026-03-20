@@ -96,6 +96,39 @@
             <label for="assistantMessage">Customer Message / Intake Notes</label>
             <textarea id="assistantMessage" rows="5" placeholder="Paste the customer message or operator summary here."></textarea>
           </div>
+          <div class="assistantFieldRow">
+            <div>
+              <label for="assistantCustomerName">Customer Name</label>
+              <input id="assistantCustomerName" type="text" placeholder="Taylor Example" />
+            </div>
+            <div>
+              <label for="assistantCustomerPhone">Customer Phone</label>
+              <input id="assistantCustomerPhone" type="tel" placeholder="(555) 010-0101" />
+            </div>
+            <div>
+              <label for="assistantDescription">Description</label>
+              <input id="assistantDescription" type="text" placeholder="Short reviewed job summary" />
+            </div>
+          </div>
+          <div class="assistantFieldRow">
+            <div>
+              <label for="assistantRequestedJobDate">Requested Job Date</label>
+              <input id="assistantRequestedJobDate" type="date" />
+            </div>
+            <div>
+              <label for="assistantRequestedTimeWindow">Requested Time Window</label>
+              <select id="assistantRequestedTimeWindow">
+                <option value="">Select window</option>
+                <option value="morning">Morning</option>
+                <option value="afternoon">Afternoon</option>
+                <option value="evening">Evening</option>
+                <option value="flexible">Flexible</option>
+              </select>
+            </div>
+            <div class="small assistantSuggestionHint">
+              Suggestions are admin-only and stay separate from pricing inputs until you explicitly apply or edit them.
+            </div>
+          </div>
           <div class="assistantFormBlock">
             <label for="assistantAttachmentIds">Linked Screenshot Attachment IDs</label>
             <input id="assistantAttachmentIds" type="text" placeholder="Attachment IDs populate after upload" />
