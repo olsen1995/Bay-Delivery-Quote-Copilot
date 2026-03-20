@@ -253,6 +253,8 @@ function statusLabel(status) {
     customer_accepted: "Customer accepted",
     customer_declined: "Customer declined",
     admin_approved: "Admin approved",
+    in_progress: "In progress",
+    completed: "Completed",
     scheduled: "Scheduled",
     cancelled: "Cancelled",
     rejected: "Rejected"
@@ -474,6 +476,18 @@ function renderJobs(items) {
 
     const tdStatus = document.createElement("td");
     tdStatus.appendChild(makeStatusBadge(j.status || "pending"));
+    const lifecycleRows = [
+      ["Started:", j.started_at || ""],
+      ["Completed:", j.completed_at || ""],
+      ["Cancelled:", j.cancelled_at || ""],
+      ["Close-out notes:", j.closeout_notes || ""]
+    ].filter(([, value]) => value);
+    lifecycleRows.forEach(([label, value]) => {
+      const line = document.createElement("div");
+      line.className = "small muted";
+      line.textContent = `${label} ${value}`;
+      tdStatus.appendChild(line);
+    });
 
     const tdCustomer = document.createElement("td");
     const name = document.createElement("div");
@@ -523,31 +537,50 @@ function renderJobs(items) {
     }
 
     const tdActions = document.createElement("td");
-    if (j.status !== "cancelled") {
+    if (j.status === "approved") {
+      const startBtn = document.createElement("button");
+      startBtn.type = "button";
+      startBtn.className = "actionBtn";
+      startBtn.textContent = "Start Job";
+      startBtn.addEventListener("click", () => startJob(j.job_id));
+      tdActions.appendChild(startBtn);
+
       if (!j.scheduled_start) {
-        // Schedule button
         const scheduleBtn = document.createElement("button");
         scheduleBtn.type = "button";
-        scheduleBtn.className = "actionBtn";
+        scheduleBtn.className = "actionBtn btnSpacer";
         scheduleBtn.textContent = "Schedule";
         scheduleBtn.addEventListener("click", () => showScheduleModal(j.job_id, false));
         tdActions.appendChild(scheduleBtn);
       } else {
-        // Reschedule and Cancel buttons
         const rescheduleBtn = document.createElement("button");
         rescheduleBtn.type = "button";
-        rescheduleBtn.className = "actionBtn";
+        rescheduleBtn.className = "actionBtn btnSpacer";
         rescheduleBtn.textContent = "Reschedule";
         rescheduleBtn.addEventListener("click", () => showScheduleModal(j.job_id, true));
         tdActions.appendChild(rescheduleBtn);
-
-        const cancelBtn = document.createElement("button");
-        cancelBtn.type = "button";
-        cancelBtn.textContent = "Cancel";
-        cancelBtn.className = "danger btnSpacer actionBtn";
-        cancelBtn.addEventListener("click", () => cancelJob(j.job_id));
-        tdActions.appendChild(cancelBtn);
       }
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.className = "danger btnSpacer actionBtn";
+      cancelBtn.addEventListener("click", () => cancelJob(j.job_id));
+      tdActions.appendChild(cancelBtn);
+    } else if (j.status === "in_progress") {
+      const completeBtn = document.createElement("button");
+      completeBtn.type = "button";
+      completeBtn.className = "actionBtn";
+      completeBtn.textContent = "Mark Complete";
+      completeBtn.addEventListener("click", () => completeJob(j.job_id));
+      tdActions.appendChild(completeBtn);
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.className = "danger btnSpacer actionBtn";
+      cancelBtn.addEventListener("click", () => cancelJob(j.job_id));
+      tdActions.appendChild(cancelBtn);
     }
 
     tr.append(tdJob, tdQuote, tdStatus, tdCustomer, tdAddress, tdTotal, tdScheduled, tdSync, tdActions);
@@ -690,12 +723,50 @@ async function rescheduleJob(jobId, start, end) {
   }
 }
 
+async function startJob(jobId) {
+  try {
+    const resp = await fetch(`/admin/api/jobs/${jobId}/start`, {
+      method: "POST",
+      headers: authHeaders()
+    });
+    if (resp.ok) {
+      refreshAll();
+    } else {
+      alert("Error starting job: " + await resp.text());
+    }
+  } catch (err) {
+    alert("Error: " + err);
+  }
+}
+
+async function completeJob(jobId) {
+  const notes = prompt("Close-out notes (optional):", "");
+  if (notes === null) return;
+  try {
+    const resp = await fetch(`/admin/api/jobs/${jobId}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ closeout_notes: notes.trim() || null })
+    });
+    if (resp.ok) {
+      refreshAll();
+    } else {
+      alert("Error completing job: " + await resp.text());
+    }
+  } catch (err) {
+    alert("Error: " + err);
+  }
+}
+
 async function cancelJob(jobId) {
+  const notes = prompt("Close-out notes (optional):", "");
+  if (notes === null) return;
   if (!confirm("Are you sure you want to cancel this job?")) return;
   try {
     const resp = await fetch(`/admin/api/jobs/${jobId}/cancel`, {
       method: "POST",
-      headers: { "Authorization": `Basic ${btoa(`${document.getElementById("adminUsername").value}:${document.getElementById("adminPassword").value}`)}` }
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ closeout_notes: notes.trim() || null })
     });
     if (resp.ok) {
       refreshAll();

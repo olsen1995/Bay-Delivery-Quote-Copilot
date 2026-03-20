@@ -41,6 +41,10 @@ class Job(TypedDict):
     google_calendar_event_id: Optional[str]
     calendar_sync_status: Optional[str]
     calendar_last_error: Optional[str]
+    started_at: Optional[str]
+    completed_at: Optional[str]
+    cancelled_at: Optional[str]
+    closeout_notes: Optional[str]
     scheduling_context: NotRequired[Dict[str, Any]]
 
 
@@ -390,6 +394,10 @@ def init_db() -> None:
         _try_add_column(conn, "jobs", "google_calendar_event_id TEXT")
         _try_add_column(conn, "jobs", "calendar_sync_status TEXT")
         _try_add_column(conn, "jobs", "calendar_last_error TEXT")
+        _try_add_column(conn, "jobs", "started_at TEXT")
+        _try_add_column(conn, "jobs", "completed_at TEXT")
+        _try_add_column(conn, "jobs", "cancelled_at TEXT")
+        _try_add_column(conn, "jobs", "closeout_notes TEXT")
 
         # Add assistant-compatible linkage to attachments without breaking existing uploads
         _try_add_column(conn, "attachments", "analysis_id TEXT")
@@ -842,8 +850,11 @@ def save_job(job: Dict[str, Any]) -> None:
             (job_id, created_at, status, quote_id, request_id,
              customer_name, customer_phone, job_address,
              job_description_customer, job_description_internal,
-             service_type, cash_total_cad, emt_total_cad, request_json, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             service_type, cash_total_cad, emt_total_cad, request_json, notes,
+             scheduled_start, scheduled_end, google_calendar_event_id,
+             calendar_sync_status, calendar_last_error, started_at,
+             completed_at, cancelled_at, closeout_notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job["job_id"],
@@ -861,6 +872,15 @@ def save_job(job: Dict[str, Any]) -> None:
                 float(job["emt_total_cad"]),
                 json.dumps(job["request_json"], ensure_ascii=False),
                 job.get("notes"),
+                job.get("scheduled_start"),
+                job.get("scheduled_end"),
+                job.get("google_calendar_event_id"),
+                job.get("calendar_sync_status"),
+                job.get("calendar_last_error"),
+                job.get("started_at"),
+                job.get("completed_at"),
+                job.get("cancelled_at"),
+                job.get("closeout_notes"),
             ),
         )
         conn.commit()
@@ -906,6 +926,10 @@ def get_job(job_id: str) -> Optional[Job]:
         "google_calendar_event_id": row_dict["google_calendar_event_id"] if "google_calendar_event_id" in row_dict else None,
         "calendar_sync_status": row_dict["calendar_sync_status"] if "calendar_sync_status" in row_dict else None,
         "calendar_last_error": row_dict["calendar_last_error"] if "calendar_last_error" in row_dict else None,
+        "started_at": row_dict["started_at"] if "started_at" in row_dict else None,
+        "completed_at": row_dict["completed_at"] if "completed_at" in row_dict else None,
+        "cancelled_at": row_dict["cancelled_at"] if "cancelled_at" in row_dict else None,
+        "closeout_notes": row_dict["closeout_notes"] if "closeout_notes" in row_dict else None,
         "scheduling_context": _build_job_scheduling_context(
             row_dict["request_id"],
             fallback_notes=row_dict["notes"],
@@ -965,6 +989,10 @@ _ALLOWED_JOB_UPDATE_FIELDS = {
     "google_calendar_event_id",
     "calendar_sync_status",
     "calendar_last_error",
+    "started_at",
+    "completed_at",
+    "cancelled_at",
+    "closeout_notes",
 }
 
 
@@ -977,6 +1005,10 @@ def update_job(
     google_calendar_event_id: Any = UNSET,
     calendar_sync_status: Any = UNSET,
     calendar_last_error: Any = UNSET,
+    started_at: Any = UNSET,
+    completed_at: Any = UNSET,
+    cancelled_at: Any = UNSET,
+    closeout_notes: Any = UNSET,
 ) -> Optional[Job]:
     existing = get_job(job_id)
     if not existing:
@@ -1027,6 +1059,31 @@ def update_job(
             error_str = error_str[:500] + "... (truncated)"
         updates.append(f"{field_name} = ?")
         params.append(error_str)
+    if started_at is not UNSET:
+        field_name = "started_at"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(started_at)
+    if completed_at is not UNSET:
+        field_name = "completed_at"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(completed_at)
+    if cancelled_at is not UNSET:
+        field_name = "cancelled_at"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        updates.append(f"{field_name} = ?")
+        params.append(cancelled_at)
+    if closeout_notes is not UNSET:
+        field_name = "closeout_notes"
+        if field_name not in _ALLOWED_JOB_UPDATE_FIELDS:
+            raise ValueError(f"Field '{field_name}' is not allowed for update")
+        notes_str = str(closeout_notes) if closeout_notes else None
+        updates.append(f"{field_name} = ?")
+        params.append(notes_str)
 
     if not updates:
         return existing  # No changes

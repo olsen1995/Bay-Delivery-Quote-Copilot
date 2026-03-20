@@ -78,6 +78,9 @@ class CalendarIntegrationTests(unittest.TestCase):
             "booking_token_created_at": "2026-02-26T09:00:00",
         })
 
+    def _latest_audit(self) -> dict:
+        return storage.list_admin_audit_log(limit=1)[0]
+
     def test_schedule_job_success(self):
         self._seed_job("j123")
         payload = {"scheduled_start": "2026-03-10T09:00:00", "scheduled_end": "2026-03-10T11:00:00"}
@@ -112,6 +115,10 @@ class CalendarIntegrationTests(unittest.TestCase):
         self.assertEqual(listed_job["scheduling_context"]["notes"], "Needs approval")
         self.assertTrue(listed_job["scheduling_context"]["scheduling_ready"])
         self.assertEqual(listed_job["scheduling_context"]["missing_fields"], [])
+        self.assertIn("started_at", listed_job)
+        self.assertIn("completed_at", listed_job)
+        self.assertIn("cancelled_at", listed_job)
+        self.assertIn("closeout_notes", listed_job)
 
     def test_schedule_job_invalid_datetime(self):
         self._seed_job("j123")
@@ -173,6 +180,131 @@ class CalendarIntegrationTests(unittest.TestCase):
         resp = self.client.post("/admin/api/jobs/j123/reschedule", json=payload, headers=self._admin_headers)
         self.assertEqual(resp.status_code, 400)
 
+    def test_start_job_success(self):
+        self._seed_job("j123")
+
+        resp = self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+        self.assertEqual(resp.status_code, 200)
+
+        job = storage.require_job("j123")
+        self.assertEqual(job["status"], "in_progress")
+        self.assertIsNotNone(job["started_at"])
+        self.assertIsNone(job["completed_at"])
+        self.assertIsNone(job["cancelled_at"])
+
+        audit = self._latest_audit()
+        self.assertEqual(audit["action_type"], "start_job")
+        self.assertEqual(audit["entity_type"], "job")
+        self.assertEqual(audit["record_id"], "j123")
+        self.assertTrue(audit["success"])
+
+    def test_complete_job_success(self):
+        self._seed_job("j123")
+        self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+
+        resp = self.client.post(
+            "/admin/api/jobs/j123/complete",
+            json={"closeout_notes": "Wrapped and finished cleanly"},
+            headers=self._admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        job = storage.require_job("j123")
+        self.assertEqual(job["status"], "completed")
+        self.assertIsNotNone(job["started_at"])
+        self.assertIsNotNone(job["completed_at"])
+        self.assertEqual(job["closeout_notes"], "Wrapped and finished cleanly")
+
+        audit = self._latest_audit()
+        self.assertEqual(audit["action_type"], "complete_job")
+        self.assertEqual(audit["entity_type"], "job")
+        self.assertEqual(audit["record_id"], "j123")
+        self.assertTrue(audit["success"])
+
+    def test_complete_job_invalid_transition_logged(self):
+        self._seed_job("j123")
+
+        resp = self.client.post(
+            "/admin/api/jobs/j123/complete",
+            json={"closeout_notes": "too early"},
+            headers=self._admin_headers,
+        )
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "invalid_job_status_transition")
+
+        audit = self._latest_audit()
+        self.assertEqual(audit["action_type"], "complete_job")
+        self.assertFalse(audit["success"])
+
+    def test_start_completed_job_invalid_transition_logged(self):
+        self._seed_job("j123")
+        self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+        self.client.post("/admin/api/jobs/j123/complete", headers=self._admin_headers)
+
+        resp = self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "invalid_job_status_transition")
+
+        audit = self._latest_audit()
+        self.assertEqual(audit["action_type"], "start_job")
+        self.assertFalse(audit["success"])
+
+    def test_start_cancelled_job_invalid_transition_logged(self):
+        self._seed_job("j123")
+        self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
+
+        resp = self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "invalid_job_status_transition")
+
+    def test_complete_cancelled_job_invalid_transition_logged(self):
+        self._seed_job("j123")
+        self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
+
+        resp = self.client.post("/admin/api/jobs/j123/complete", headers=self._admin_headers)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "invalid_job_status_transition")
+
+    def test_cancel_approved_job_success(self):
+        self._seed_job("j123")
+
+        resp = self.client.post(
+            "/admin/api/jobs/j123/cancel",
+            json={"closeout_notes": "Customer no-show"},
+            headers=self._admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        job = storage.require_job("j123")
+        self.assertEqual(job["status"], "cancelled")
+        self.assertIsNotNone(job["cancelled_at"])
+        self.assertEqual(job["closeout_notes"], "Customer no-show")
+
+    def test_cancel_in_progress_job_success(self):
+        self._seed_job("j123")
+        self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+
+        resp = self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
+        self.assertEqual(resp.status_code, 200)
+
+        job = storage.require_job("j123")
+        self.assertEqual(job["status"], "cancelled")
+        self.assertIsNotNone(job["started_at"])
+        self.assertIsNotNone(job["cancelled_at"])
+
+    def test_repeated_terminal_cancel_fails_cleanly(self):
+        self._seed_job("j123")
+        first = self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
+        self.assertEqual(first.status_code, 200)
+
+        second = self.client.post("/admin/api/jobs/j123/cancel", headers=self._admin_headers)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(second.json()["error"], "invalid_job_status_transition")
+
+        audit = self._latest_audit()
+        self.assertEqual(audit["action_type"], "cancel_job")
+        self.assertFalse(audit["success"])
+
     def test_cancel_job_success(self):
         self._seed_job("j123")
         storage.update_job("j123", scheduled_start="2026-03-10T09:00:00Z", scheduled_end="2026-03-10T11:00:00Z", google_calendar_event_id="event123")
@@ -185,6 +317,7 @@ class CalendarIntegrationTests(unittest.TestCase):
             self.assertEqual(job["status"], "cancelled")
             self.assertEqual(job["calendar_sync_status"], "cancelled")
             self.assertIsNone(job["google_calendar_event_id"])
+            self.assertIsNotNone(job["cancelled_at"])
             mock_delete.assert_called_once()
 
     def test_cancel_job_delete_failure_preserves_event_id(self):

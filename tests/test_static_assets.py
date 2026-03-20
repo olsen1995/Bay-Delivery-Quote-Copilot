@@ -177,3 +177,16 @@ def test_admin_schedule_modal_includes_scheduling_handoff_context() -> None:
         "Last calendar error:",
     ]:
         assert label in admin_js
+
+
+def test_admin_page_includes_job_lifecycle_controls() -> None:
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+
+    assert "Start Job" in admin_js
+    assert "Mark Complete" in admin_js
+    assert 'in_progress: "In progress"' in admin_js
+    assert 'completed: "Completed"' in admin_js
+    for label in ["Started:", "Completed:", "Cancelled:", "Close-out notes:"]:
+        assert label in admin_js
+    assert "/admin/api/jobs/${jobId}/start" in admin_js
+    assert "/admin/api/jobs/${jobId}/complete" in admin_js

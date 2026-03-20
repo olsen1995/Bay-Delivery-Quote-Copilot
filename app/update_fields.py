@@ -17,6 +17,13 @@ QUOTE_REQUEST_INITIAL_ALLOWED: list[str] = [
     "customer_declined",
 ]
 
+JOB_ALLOWED_TRANSITIONS: dict[str, list[str]] = {
+    "approved": ["in_progress", "cancelled"],
+    "in_progress": ["completed", "cancelled"],
+    "completed": [],
+    "cancelled": [],
+}
+
 
 class InvalidQuoteRequestTransition(ValueError):
     def __init__(self, from_status: str, to_status: str, allowed: list[str]):
@@ -24,6 +31,14 @@ class InvalidQuoteRequestTransition(ValueError):
         self.to_status = to_status
         self.allowed = allowed
         super().__init__(f"invalid quote_request status transition: from={from_status}, to={to_status}, allowed={allowed}")
+
+
+class InvalidJobTransition(ValueError):
+    def __init__(self, from_status: str, to_status: str, allowed: list[str]):
+        self.from_status = from_status
+        self.to_status = to_status
+        self.allowed = allowed
+        super().__init__(f"invalid job status transition: from={from_status}, to={to_status}, allowed={allowed}")
 
 
 def validate_quote_request_transition(old_status: str, new_status: str) -> list[str]:
@@ -40,6 +55,18 @@ def validate_quote_request_transition(old_status: str, new_status: str) -> list[
 
     if new_status not in allowed:
         raise InvalidQuoteRequestTransition(old_status, new_status, allowed)
+
+    return allowed
+
+
+def validate_job_transition(old_status: str, new_status: str) -> list[str]:
+    allowed = list(JOB_ALLOWED_TRANSITIONS.get(old_status, []))
+
+    if old_status == new_status:
+        raise InvalidJobTransition(old_status, new_status, allowed)
+
+    if new_status not in allowed:
+        raise InvalidJobTransition(old_status, new_status, allowed)
 
     return allowed
 
