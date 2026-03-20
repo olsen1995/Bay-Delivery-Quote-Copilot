@@ -83,3 +83,30 @@ def test_save_attachment_with_analysis_id_and_round_trip_backup(tmp_path: Path) 
     restored_items = storage.list_attachments(limit=10)
     assert len(restored_items) == 1
     assert restored_items[0]["analysis_id"] == "analysis-1"
+
+
+def test_assign_analysis_attachments_to_quote_adds_quote_link_without_removing_analysis(tmp_path: Path) -> None:
+    _init_tmp_db(tmp_path)
+
+    storage.save_attachment(
+        {
+            "attachment_id": "att-quote-link",
+            "created_at": "2026-03-01T10:05:00",
+            "quote_id": None,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": "analysis-quote-link",
+            "filename": "prequote.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 456,
+            "drive_file_id": "drive-2",
+            "drive_web_view_link": "https://example.com/2",
+        }
+    )
+
+    storage.assign_analysis_attachments_to_quote("analysis-quote-link", "quote-123")
+
+    items = storage.list_attachments(analysis_id="analysis-quote-link", limit=10)
+    assert len(items) == 1
+    assert items[0]["analysis_id"] == "analysis-quote-link"
+    assert items[0]["quote_id"] == "quote-123"

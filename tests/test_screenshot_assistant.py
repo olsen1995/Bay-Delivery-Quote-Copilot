@@ -148,6 +148,7 @@ def test_screenshot_assistant_structured_output_contract(client: TestClient) -> 
         "updated_at",
         "operator_username",
         "status",
+        "quote_id",
         "intake",
         "normalized_candidate",
         "quote_guidance",
@@ -281,3 +282,253 @@ def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClien
     assert updated["created_at"] == created["created_at"]
     assert updated["normalized_candidate"]["estimated_hours"] == 2.0
     assert updated["normalized_candidate"]["job_address"] == "456 Updated St"
+    assert updated["quote_id"] is None
+
+
+def test_linked_screenshot_assistant_analysis_cannot_be_updated(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Initial draft",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+
+    update_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "analysis_id": analysis_id,
+            "message": "Updated draft",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 2.0},
+            "operator_overrides": {"job_address": "456 Updated St"},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert update_response.status_code == 409
+    assert update_response.json() == {"detail": "Screenshot assistant analysis is locked after quote draft creation."}
+
+
+def test_create_quote_draft_from_screenshot_analysis_success_and_attachment_linkage(client: TestClient) -> None:
+    storage.save_attachment(
+        {
+            "attachment_id": "att-analysis-quote",
+            "created_at": "2026-03-01T10:05:00",
+            "quote_id": None,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": None,
+            "filename": "prequote.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 456,
+            "drive_file_id": "drive-2",
+            "drive_web_view_link": "https://example.com/2",
+        }
+    )
+
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Customer asked for a haul away estimate.",
+            "screenshot_attachment_ids": ["att-analysis-quote"],
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.5, "crew_size": 2},
+            "operator_overrides": {"job_address": "123 Review St", "customer_name": "Taylor", "customer_phone": "555-0101"},
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    response = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["analysis"]["analysis_id"] == analysis_id
+    assert body["analysis"]["quote_id"] == body["quote"]["quote_id"]
+    assert "accept_token" not in body["quote"]
+
+    saved_quote = storage.get_quote_record(body["quote"]["quote_id"])
+    assert saved_quote is not None
+    assert saved_quote["request"]["job_address"] == "123 Review St"
+    assert saved_quote["request"]["customer_name"] == "Taylor"
+    assert saved_quote["request"]["customer_phone"] == "555-0101"
+
+    saved_analysis = storage.get_screenshot_assistant_analysis(analysis_id)
+    assert saved_analysis is not None
+    assert saved_analysis["quote_id"] == body["quote"]["quote_id"]
+
+    attachments = storage.list_attachments(analysis_id=analysis_id)
+    assert len(attachments) == 1
+    assert attachments[0]["analysis_id"] == analysis_id
+    assert attachments[0]["quote_id"] == body["quote"]["quote_id"]
+
+
+def test_create_quote_draft_from_screenshot_analysis_requires_admin(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Need a reviewed estimate.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    unauthorized = client.post(f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft")
+    assert unauthorized.status_code in {401, 403}
+
+
+def test_linked_screenshot_assistant_analysis_cannot_receive_more_uploads(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_upload_mocks(monkeypatch)
+
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Need a reviewed estimate.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+
+    upload_response = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments",
+        headers=admin_headers(),
+        files=[("files", ("photo.jpg", b"\xff\xd8\xff" + (b"a" * 32), "image/jpeg"))],
+    )
+    assert upload_response.status_code == 409
+    assert upload_response.json() == {"detail": "Screenshot assistant analysis is locked after quote draft creation."}
+
+
+def test_create_quote_draft_from_screenshot_analysis_missing_analysis_returns_404(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/missing-analysis/quote-draft",
+        headers=admin_headers(),
+    )
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Screenshot assistant analysis not found."}
+
+    audit_items = storage.list_admin_audit_log(limit=5)
+    assert audit_items[0]["action_type"] == "create_quote_draft"
+    assert audit_items[0]["entity_type"] == "screenshot_assistant_analysis"
+    assert audit_items[0]["record_id"] == "missing-analysis"
+    assert audit_items[0]["success"] is False
+
+
+def test_create_quote_draft_from_screenshot_analysis_blocks_duplicate_creation(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Need a reviewed estimate.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    first = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert second.status_code == 409
+    assert second.json() == {"detail": "Quote draft already exists for this analysis."}
+
+
+def test_create_quote_draft_uses_normalized_candidate_as_source_of_truth(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Raw message should not override reviewed values.",
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+                "job_address": "111 Raw St",
+                "customer_name": "Raw Name",
+            },
+            "operator_overrides": {
+                "job_address": "222 Reviewed Ave",
+                "estimated_hours": 2.5,
+                "customer_name": "Reviewed Name",
+            },
+            "screenshot_attachment_ids": [],
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis = create_analysis.json()
+
+    response = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis['analysis_id']}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert response.status_code == 200
+
+    saved_quote = storage.get_quote_record(response.json()["quote"]["quote_id"])
+    assert saved_quote is not None
+    assert saved_quote["request"]["job_address"] == analysis["normalized_candidate"]["job_address"] == "222 Reviewed Ave"
+    assert saved_quote["request"]["estimated_hours"] == analysis["normalized_candidate"]["estimated_hours"] == 2.5
+    assert saved_quote["request"]["customer_name"] == analysis["normalized_candidate"]["customer_name"] == "Reviewed Name"
+
+
+def test_create_quote_draft_logs_success_audit_entry(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Need a reviewed estimate.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    response = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert response.status_code == 200
+
+    audit_items = storage.list_admin_audit_log(limit=10)
+    matching = [item for item in audit_items if item["action_type"] == "create_quote_draft" and item["record_id"] == analysis_id]
+    assert matching
+    assert matching[0]["entity_type"] == "screenshot_assistant_analysis"
+    assert matching[0]["success"] is True

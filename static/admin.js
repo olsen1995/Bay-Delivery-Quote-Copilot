@@ -67,9 +67,40 @@ const assistantStatusLine = document.getElementById("assistantStatusLine");
 const assistantDraftMeta = document.getElementById("assistantDraftMeta");
 const assistantAttachmentIdsInput = document.getElementById("assistantAttachmentIds");
 const assistantScreenshotFilesInput = document.getElementById("assistantScreenshotFiles");
+const assistantMessageInput = document.getElementById("assistantMessage");
+const assistantServiceTypeInput = document.getElementById("assistantServiceType");
+const assistantEstimatedHoursInput = document.getElementById("assistantEstimatedHours");
+const assistantCrewSizeInput = document.getElementById("assistantCrewSize");
+const assistantJobAddressInput = document.getElementById("assistantJobAddress");
+const assistantPickupAddressInput = document.getElementById("assistantPickupAddress");
+const assistantDropoffAddressInput = document.getElementById("assistantDropoffAddress");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
+let currentAssistantLocked = false;
+
+function assistantDraftFields() {
+  return [
+    assistantMessageInput,
+    assistantAttachmentIdsInput,
+    assistantScreenshotFilesInput,
+    assistantServiceTypeInput,
+    assistantEstimatedHoursInput,
+    assistantCrewSizeInput,
+    assistantJobAddressInput,
+    assistantPickupAddressInput,
+    assistantDropoffAddressInput
+  ].filter(Boolean);
+}
+
+function setAssistantDraftLocked(isLocked) {
+  currentAssistantLocked = !!isLocked;
+  if (assistantUploadBtn) assistantUploadBtn.disabled = currentAssistantLocked;
+  if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = currentAssistantLocked;
+  assistantDraftFields().forEach((field) => {
+    field.disabled = currentAssistantLocked;
+  });
+}
 
 function getAdminCreds() {
   return {
@@ -82,8 +113,11 @@ function setLoading(isLoading) {
   refreshBtn.disabled = isLoading;
   refreshBtn.textContent = isLoading ? "Loading..." : refreshButtonLabel;
   if (assistantStartDraftBtn) assistantStartDraftBtn.disabled = isLoading;
-  if (assistantUploadBtn) assistantUploadBtn.disabled = isLoading;
-  if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = isLoading;
+  if (assistantUploadBtn) assistantUploadBtn.disabled = isLoading || currentAssistantLocked;
+  if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = isLoading || currentAssistantLocked;
+  assistantDraftFields().forEach((field) => {
+    field.disabled = isLoading || currentAssistantLocked;
+  });
 }
 
 function authHeaders() {
@@ -155,6 +189,7 @@ function resetProtectedDashboard() {
     if (box) clearNode(box);
   });
   currentAssistantAnalysisId = "";
+  setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
   if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
   if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
@@ -622,12 +657,28 @@ function syncAssistantAttachmentIds(attachments) {
 
 function updateAssistantDraftMeta(item) {
   currentAssistantAnalysisId = (item && item.analysis_id) || "";
+  setAssistantDraftLocked(!!(item && item.quote_id));
   if (!assistantDraftMeta) return;
   if (!item) {
     assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
     return;
   }
-  assistantDraftMeta.textContent = `Analysis ${item.analysis_id} • ${item.status} • updated ${item.updated_at}`;
+  assistantDraftMeta.textContent = item.quote_id
+    ? `Analysis ${item.analysis_id} • locked to quote ${item.quote_id} • updated ${item.updated_at}`
+    : `Analysis ${item.analysis_id} • ${item.status} • updated ${item.updated_at}`;
+}
+
+function beginNewScreenshotAssistantDraft() {
+  currentAssistantAnalysisId = "";
+  setAssistantDraftLocked(false);
+  updateAssistantDraftMeta(null);
+  if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
+  if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
+  const resultBox = document.getElementById("assistantResultBox");
+  const uploadList = document.getElementById("assistantUploadList");
+  if (resultBox) clearNode(resultBox);
+  if (uploadList) clearNode(uploadList);
+  setLine(assistantStatusLine, "ok", "Fresh screenshot draft ready. Analyze intake or upload screenshots to create it.");
 }
 
 function collectAssistantPayload() {
@@ -712,6 +763,41 @@ function renderScreenshotAssistantResult(item) {
   attachmentWrap.appendChild(attachmentBody);
   panel.appendChild(attachmentWrap);
 
+  const quoteWrap = document.createElement("div");
+  quoteWrap.className = "assistantAttachmentList";
+  const quoteTitle = document.createElement("strong");
+  quoteTitle.textContent = "Linked quote draft";
+  quoteWrap.appendChild(quoteTitle);
+  const quoteBody = document.createElement("div");
+  quoteBody.className = "small";
+  quoteBody.textContent = item.quote_id || "No quote draft created yet.";
+  quoteWrap.appendChild(quoteBody);
+  panel.appendChild(quoteWrap);
+
+  if (item.quote_id) {
+    const lockNotice = document.createElement("div");
+    lockNotice.className = "small muted";
+    lockNotice.textContent = "This analysis is locked because a quote draft has already been created.";
+    panel.appendChild(lockNotice);
+  }
+
+  if (!item.quote_id) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "rowToken mt10 assistantActions";
+    const helper = document.createElement("div");
+    helper.className = "small";
+    helper.textContent = "Create a real quote draft only after reviewing the recommendation.";
+    const button = document.createElement("button");
+    button.id = "assistantCreateQuoteDraftBtn";
+    button.className = "secondaryAction";
+    button.type = "button";
+    button.textContent = "Create Quote Draft";
+    button.disabled = !adminSessionReady;
+    button.addEventListener("click", () => createQuoteDraftFromAnalysis(item.analysis_id || ""));
+    actionRow.append(helper, button);
+    panel.appendChild(actionRow);
+  }
+
   box.appendChild(panel);
 }
 
@@ -746,7 +832,7 @@ function renderScreenshotAssistantHistory(items) {
   if (!items || items.length === 0) return addEmptyState(box, "No screenshot assistant drafts yet.");
   clearNode(box);
 
-  const { table, tbody } = createTable(["Analysis", "Updated", "Service", "Cash", "Attachments", "Mode"]);
+  const { table, tbody } = createTable(["Analysis", "Updated", "Service", "Cash", "Quote", "Attachments", "Mode"]);
   items.forEach((item) => {
     const tr = document.createElement("tr");
     const attachmentIds = safeGet(item, "intake.screenshot_attachment_ids", []);
@@ -755,6 +841,7 @@ function renderScreenshotAssistantHistory(items) {
       item.updated_at || "",
       safeGet(item, "quote_guidance.service_type", ""),
       formatMoney(safeGet(item, "quote_guidance.cash_total_cad", null)),
+      item.quote_id || "—",
       Array.isArray(attachmentIds) ? attachmentIds.length : 0,
       item.recommendation_only ? "Recommendation only" : "—"
     ].forEach((value) => {
@@ -856,6 +943,47 @@ async function uploadScreenshotAssistantFiles() {
   }
 }
 
+async function createQuoteDraftFromAnalysis(analysisId) {
+  if (!adminSessionReady) {
+    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before creating a quote draft.");
+    return;
+  }
+  if (!analysisId) {
+    setLine(assistantStatusLine, "bad", "Create or load a screenshot analysis before creating a quote draft.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setLine(assistantStatusLine, "ok", "Creating quote draft from reviewed analysis...");
+
+    const resp = await fetch(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft`, {
+      method: "POST",
+      headers: authHeaders()
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+
+    renderScreenshotAssistantResult(data.analysis || null);
+    renderScreenshotAssistantUploads((data.analysis && data.analysis.attachments) || []);
+
+    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
+    renderScreenshotAssistantHistory((analyses.items || []));
+
+    const quotes = await fetchJSON("/admin/api/quotes");
+    renderQuotes((quotes.items || []));
+
+    const createdQuoteId = safeGet(data, "quote.quote_id", "");
+    setLine(assistantStatusLine, "ok", `Quote draft ${createdQuoteId || "created"} linked to the current analysis.`);
+  } catch (err) {
+    const parsed = parseApiError(err);
+    const detail = safeGet(parsed, "data.detail", "Please review the draft and try again.");
+    setLine(assistantStatusLine, "bad", "Quote draft creation failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
+  } finally {
+    setLoading(false);
+  }
+}
+
 async function refreshAll() {
   const { username, password } = getAdminCreds();
   if (!username || !password) {
@@ -927,7 +1055,7 @@ adminUsernameInput.addEventListener("keydown", handleCredsKeydown);
 adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 if (scheduleCloseBtn) scheduleCloseBtn.addEventListener("click", closeScheduleModal);
 if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeScheduleModal);
-if (assistantStartDraftBtn) assistantStartDraftBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
+if (assistantStartDraftBtn) assistantStartDraftBtn.addEventListener("click", beginNewScreenshotAssistantDraft);
 if (assistantUploadBtn) assistantUploadBtn.addEventListener("click", uploadScreenshotAssistantFiles);
 if (assistantAnalyzeBtn) assistantAnalyzeBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
 

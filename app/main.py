@@ -950,10 +950,13 @@ async def admin_upload_screenshot_assistant_attachments(
     _require_admin(request)
     operator_username = _admin_operator_username(request)
 
-    if not screenshot_assistant_service.get_analysis(analysis_id):
-        raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
-
     try:
+        analysis = screenshot_assistant_service.get_analysis(analysis_id)
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
+        if str(analysis.get("quote_id") or "").strip():
+            raise HTTPException(status_code=409, detail="Screenshot assistant analysis is locked after quote draft creation.")
+
         uploaded_items = await _store_image_attachments(
             files=files,
             folder_name=f"analysis_{analysis_id}",
@@ -978,6 +981,41 @@ async def admin_upload_screenshot_assistant_attachments(
         log_admin_audit(
             operator_username=operator_username,
             action_type="upload_screenshot_analysis_attachments",
+            entity_type="screenshot_assistant_analysis",
+            record_id=analysis_id,
+            success=False,
+            error_summary=str(exc.detail),
+        )
+        raise
+
+
+@app.post("/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft")
+def admin_create_screenshot_assistant_quote_draft(
+    request: Request,
+    analysis_id: str,
+    background_tasks: BackgroundTasks,
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    try:
+        result = screenshot_assistant_service.create_quote_draft_from_analysis(
+            analysis_id=analysis_id,
+            now_iso=_now_local_iso(),
+        )
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="create_quote_draft",
+            entity_type="screenshot_assistant_analysis",
+            record_id=analysis_id,
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        return result
+    except HTTPException as exc:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="create_quote_draft",
             entity_type="screenshot_assistant_analysis",
             record_id=analysis_id,
             success=False,
