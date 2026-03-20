@@ -41,6 +41,7 @@ class Job(TypedDict):
     google_calendar_event_id: Optional[str]
     calendar_sync_status: Optional[str]
     calendar_last_error: Optional[str]
+    scheduling_context: NotRequired[Dict[str, Any]]
 
 
 class QuoteRecord(TypedDict):
@@ -87,6 +88,43 @@ class ScreenshotAssistantAnalysis(TypedDict):
     normalized_candidate_json: Any
     guidance_json: Any
     quote_id: Optional[str]
+
+
+def _clean_missing_field(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
+def _build_job_scheduling_context(
+    request_id: Optional[str],
+    fallback_notes: Optional[str] = None,
+) -> Dict[str, Any]:
+    missing_fields: List[str] = []
+    request: Optional[QuoteRequest] = get_quote_request(request_id) if request_id else None
+
+    requested_job_date = request.get("requested_job_date") if request else None
+    requested_time_window = request.get("requested_time_window") if request else None
+    notes = request.get("notes") if request else fallback_notes
+
+    if request is None:
+        missing_fields.extend(["quote_request", "requested_job_date", "requested_time_window"])
+    else:
+        if _clean_missing_field(requested_job_date):
+            missing_fields.append("requested_job_date")
+        if _clean_missing_field(requested_time_window):
+            missing_fields.append("requested_time_window")
+
+    return {
+        "request_id": request.get("request_id") if request else request_id,
+        "requested_job_date": requested_job_date,
+        "requested_time_window": requested_time_window,
+        "notes": notes,
+        "scheduling_ready": len(missing_fields) == 0,
+        "missing_fields": missing_fields,
+    }
 
 
 def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY_DAYS) -> bool:
@@ -868,6 +906,10 @@ def get_job(job_id: str) -> Optional[Job]:
         "google_calendar_event_id": row_dict["google_calendar_event_id"] if "google_calendar_event_id" in row_dict else None,
         "calendar_sync_status": row_dict["calendar_sync_status"] if "calendar_sync_status" in row_dict else None,
         "calendar_last_error": row_dict["calendar_last_error"] if "calendar_last_error" in row_dict else None,
+        "scheduling_context": _build_job_scheduling_context(
+            row_dict["request_id"],
+            fallback_notes=row_dict["notes"],
+        ),
     }
 
 

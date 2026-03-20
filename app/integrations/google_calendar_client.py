@@ -37,11 +37,12 @@ def create_event(job: "Job", start_utc: str, end_utc: str) -> str:
     return gcalendar.create_event(job, start_utc, end_utc)
 
 
-def update_event(event_id: str, start_utc: str, end_utc: str) -> None:
+def update_event(job: "Job", event_id: str, start_utc: str, end_utc: str) -> None:
     """
     Update an existing Calendar event.
     
     Args:
+        job: Job record
         event_id: Event ID to update
         start_utc: UTC ISO datetime string
         end_utc: UTC ISO datetime string
@@ -50,7 +51,7 @@ def update_event(event_id: str, start_utc: str, end_utc: str) -> None:
         CalendarNotConfigured: If Calendar is not configured
         Exception: On API errors
     """
-    gcalendar.update_event(event_id, start_utc, end_utc)
+    gcalendar.update_event(job, event_id, start_utc, end_utc)
 
 
 def delete_event(event_id: str) -> None:

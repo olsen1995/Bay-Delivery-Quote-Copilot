@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.storage import (
+    get_job,
     get_job_by_quote_id,
     get_quote_record,
     get_quote_request,
@@ -310,7 +311,7 @@ def process_admin_decision(
                 "notes": updated.get("notes"),
             }
             save_job(job)
-            created_job = job
+            created_job = get_job(job["job_id"]) or job
 
         return {"ok": True, "request": updated, "job": created_job}
 

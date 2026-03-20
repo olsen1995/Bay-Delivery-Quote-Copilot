@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
@@ -81,6 +82,57 @@ def _calendar_id() -> str:
     return calendar_id
 
 
+def _compact_service_label(service_type: str) -> str:
+    value = str(service_type or "").strip().replace("_", " ")
+    return re.sub(r"\s+", " ", value).title() or "Job"
+
+
+def _compact_location(address: Any) -> str:
+    text = str(address or "").strip()
+    if not text:
+        return "Location TBD"
+    head = text.split(",", 1)[0].strip()
+    return head[:48]
+
+
+def _event_summary(job: "Job") -> str:
+    service_label = _compact_service_label(job.get("service_type", ""))
+    customer_name = str(job.get("customer_name") or "").strip()
+    location = _compact_location(job.get("job_address"))
+    parts = [service_label]
+    if customer_name:
+        parts.append(customer_name)
+    if location:
+        parts.append(location)
+    return " - ".join(parts[:3])[:120]
+
+
+def _event_description(job: "Job") -> str:
+    scheduling_context = job.get("scheduling_context") or {}
+    lines = [
+        f"Customer: {job.get('customer_name') or 'N/A'}",
+        f"Phone: {job.get('customer_phone') or 'N/A'}",
+        f"Address: {job.get('job_address') or 'N/A'}",
+        f"Service: {_compact_service_label(job.get('service_type', ''))}",
+        f"Quote ID: {job.get('quote_id') or 'N/A'}",
+        f"Request ID: {scheduling_context.get('request_id') or job.get('request_id') or 'N/A'}",
+        f"Job ID: {job.get('job_id') or 'N/A'}",
+        f"Requested Date: {scheduling_context.get('requested_job_date') or 'Not provided'}",
+        f"Requested Window: {scheduling_context.get('requested_time_window') or 'Not provided'}",
+        f"Booking Notes: {scheduling_context.get('notes') or 'None'}",
+    ]
+
+    internal_summary = str(job.get("job_description_internal") or "").strip()
+    if internal_summary:
+        lines.append(f"Internal Summary: {internal_summary}")
+
+    customer_summary = str(job.get("job_description_customer") or "").strip()
+    if customer_summary:
+        lines.append(f"Customer Summary: {customer_summary}")
+
+    return "\n".join(lines)
+
+
 def create_event(job: "Job", start_utc: str, end_utc: str) -> str:
     """
     Create a Calendar event for the job.
@@ -90,11 +142,8 @@ def create_event(job: "Job", start_utc: str, end_utc: str) -> str:
     service = _service()
     calendar_id = _calendar_id()
 
-    customer_name = job.get("customer_name", "")
-    short_name = customer_name.split()[0] if customer_name else "Customer"
-
-    summary = f"{job['service_type']} - Job {job['job_id']} - {short_name}"
-    description = f"Job ID: {job['job_id']}\nService: {job['service_type']}\nLocation: {job.get('job_address', 'N/A')}"
+    summary = _event_summary(job)
+    description = _event_description(job)
 
     event = {
         'summary': summary,
@@ -107,7 +156,7 @@ def create_event(job: "Job", start_utc: str, end_utc: str) -> str:
     return created_event['id']
 
 
-def update_event(event_id: str, start_utc: str, end_utc: str) -> None:
+def update_event(job: "Job", event_id: str, start_utc: str, end_utc: str) -> None:
     """
     Update an existing Calendar event's times.
     """
@@ -115,6 +164,8 @@ def update_event(event_id: str, start_utc: str, end_utc: str) -> None:
     calendar_id = _calendar_id()
 
     event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+    event['summary'] = _event_summary(job)
+    event['description'] = _event_description(job)
     event['start'] = {'dateTime': start_utc, 'timeZone': 'UTC'}
     event['end'] = {'dateTime': end_utc, 'timeZone': 'UTC'}
 
