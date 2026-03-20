@@ -107,9 +107,16 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'id="assistantHistoryBox"' in admin_html
     assert 'Screenshot Quote Assistant' in admin_html
     assert 'Screenshot Assistant Drafts' in admin_html
+    assert 'optionally create a real quote draft from the saved analysis' in admin_html
     assert '/admin/api/screenshot-assistant/analyses/intake' in admin_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' in admin_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft' in admin_js
+    assert 'assistantCreateQuoteDraftBtn' in admin_js
+    assert 'Create Quote Draft' in admin_js
+    assert 'Linked quote draft' in admin_js
+    assert '["Analysis", "Updated", "Service", "Cash", "Quote", "Attachments", "Mode"]' in admin_js
     assert 'submitScreenshotAssistantAnalysis' in admin_js
     assert 'uploadScreenshotAssistantFiles' in admin_js
+    assert 'createQuoteDraftFromAnalysis' in admin_js
     assert '.assistantUploadRow' in admin_css
     assert '.assistantDraftBar' in admin_css

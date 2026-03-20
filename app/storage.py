@@ -86,6 +86,7 @@ class ScreenshotAssistantAnalysis(TypedDict):
     intake_json: Any
     normalized_candidate_json: Any
     guidance_json: Any
+    quote_id: Optional[str]
 
 
 def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY_DAYS) -> bool:
@@ -328,7 +329,8 @@ def init_db() -> None:
                 status TEXT NOT NULL,
                 intake_json TEXT NOT NULL,
                 normalized_candidate_json TEXT NOT NULL,
-                guidance_json TEXT NOT NULL
+                guidance_json TEXT NOT NULL,
+                quote_id TEXT
             )
             """
         )
@@ -353,6 +355,7 @@ def init_db() -> None:
 
         # Add assistant-compatible linkage to attachments without breaking existing uploads
         _try_add_column(conn, "attachments", "analysis_id TEXT")
+        _try_add_column(conn, "screenshot_assistant_analyses", "quote_id TEXT")
 
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
         try:
@@ -1098,6 +1101,23 @@ def assign_attachments_to_analysis(attachment_ids: List[str], analysis_id: str) 
         conn.close()
 
 
+def assign_analysis_attachments_to_quote(analysis_id: str, quote_id: str) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            UPDATE attachments
+            SET quote_id = ?
+            WHERE analysis_id = ?
+              AND quote_id IS NULL
+            """,
+            (quote_id, analysis_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _row_to_screenshot_assistant_analysis(row: sqlite3.Row) -> ScreenshotAssistantAnalysis:
     row_dict = dict(row)
     for key in ("intake_json", "normalized_candidate_json", "guidance_json"):
@@ -1116,8 +1136,8 @@ def save_screenshot_assistant_analysis(record: Dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO screenshot_assistant_analyses
-            (analysis_id, created_at, updated_at, operator_username, status, intake_json, normalized_candidate_json, guidance_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (analysis_id, created_at, updated_at, operator_username, status, intake_json, normalized_candidate_json, guidance_json, quote_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["analysis_id"],
@@ -1128,6 +1148,7 @@ def save_screenshot_assistant_analysis(record: Dict[str, Any]) -> None:
                 json.dumps(record.get("intake_json") or {}, ensure_ascii=False),
                 json.dumps(record.get("normalized_candidate_json") or {}, ensure_ascii=False),
                 json.dumps(record.get("guidance_json") or {}, ensure_ascii=False),
+                record.get("quote_id"),
             ),
         )
         conn.commit()
@@ -1141,7 +1162,7 @@ def get_screenshot_assistant_analysis(analysis_id: str) -> Optional[ScreenshotAs
         row = conn.execute(
             """
             SELECT analysis_id, created_at, updated_at, operator_username, status, intake_json,
-                   normalized_candidate_json, guidance_json
+                   normalized_candidate_json, guidance_json, quote_id
             FROM screenshot_assistant_analyses
             WHERE analysis_id = ?
             """,
@@ -1161,7 +1182,7 @@ def list_screenshot_assistant_analyses(limit: int = 50) -> List[ScreenshotAssist
         rows = conn.execute(
             """
             SELECT analysis_id, created_at, updated_at, operator_username, status, intake_json,
-                   normalized_candidate_json, guidance_json
+                   normalized_candidate_json, guidance_json, quote_id
             FROM screenshot_assistant_analyses
             ORDER BY updated_at DESC, created_at DESC
             LIMIT ?
