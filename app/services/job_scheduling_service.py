@@ -80,9 +80,9 @@ def schedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job:
     try:
         if google_calendar_client.is_configured():
             event_id = google_calendar_client.create_event(job, scheduled_start, scheduled_end)
-            update_job(job_id, google_calendar_event_id=event_id, calendar_sync_status="synced")
+            update_job(job_id, google_calendar_event_id=event_id, calendar_sync_status="synced", calendar_last_error=None)
         else:
-            update_job(job_id, calendar_sync_status="not_configured")
+            update_job(job_id, calendar_sync_status="not_configured", calendar_last_error=None)
     except Exception as e:
         # Sync failed, but DB is intact. Update only sync state.
         update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
@@ -138,10 +138,11 @@ def reschedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job
     try:
         event_id = job.get("google_calendar_event_id")
         if google_calendar_client.is_configured() and event_id:
-            google_calendar_client.update_event(event_id, scheduled_start, scheduled_end)
-            update_job(job_id, calendar_sync_status="synced")
+            latest_job = updated
+            google_calendar_client.update_event(latest_job, event_id, scheduled_start, scheduled_end)
+            update_job(job_id, calendar_sync_status="synced", calendar_last_error=None)
         else:
-            update_job(job_id, calendar_sync_status="not_configured")
+            update_job(job_id, calendar_sync_status="not_configured", calendar_last_error=None)
     except Exception as e:
         # Sync failed, but DB is intact. Update only sync state.
         update_job(job_id, calendar_sync_status="failed", calendar_last_error=str(e))
@@ -191,7 +192,7 @@ def cancel_job(job_id: str) -> Job:
             if google_calendar_client.is_configured():
                 google_calendar_client.delete_event(event_id)
                 # Delete success: clear event_id
-                update_job(job_id, google_calendar_event_id=None)
+                update_job(job_id, google_calendar_event_id=None, calendar_last_error=None)
             else:
                 # Not configured, keep event_id as-is
                 pass

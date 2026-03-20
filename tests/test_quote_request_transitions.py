@@ -324,12 +324,20 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(job["request_id"], request_id)
         self.assertIn("job_id", job)
         self.assertEqual(job["status"], "approved")
+        self.assertIn("scheduling_context", job)
+        self.assertEqual(job["scheduling_context"]["request_id"], request_id)
+        self.assertIsNone(job["scheduling_context"]["requested_job_date"])
+        self.assertIsNone(job["scheduling_context"]["requested_time_window"])
+        self.assertFalse(job["scheduling_context"]["scheduling_ready"])
 
         # Job must appear in the admin Jobs list
         jobs_resp = self.client.get("/admin/api/jobs", headers=self._admin_headers)
         self.assertEqual(jobs_resp.status_code, 200)
-        job_ids = [j["job_id"] for j in jobs_resp.json()["items"]]
+        items = jobs_resp.json()["items"]
+        job_ids = [j["job_id"] for j in items]
         self.assertIn(job["job_id"], job_ids)
+        listed_job = next(item for item in items if item["job_id"] == job["job_id"])
+        self.assertEqual(listed_job["scheduling_context"]["request_id"], request_id)
 
     def test_admin_approval_does_not_duplicate_job(self) -> None:
         request_id = "req_no_dup_job"
@@ -435,6 +443,53 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(updated_typed["status"], "customer_accepted")
         self.assertEqual(updated_typed["requested_job_date"], "2026-03-10")
         self.assertEqual(updated_typed["requested_time_window"], "afternoon")
+
+    def test_admin_jobs_include_linked_booking_preferences_after_approval(self) -> None:
+        quote_resp = self.client.post("/quote/calculate", json={
+            "customer_name": "Schedule Test",
+            "customer_phone": "555-0101",
+            "job_address": "123 Main St",
+            "description": "desc",
+            "service_type": "haul_away",
+            "estimated_hours": 1.0,
+            "crew_size": 1,
+        })
+        quote_id = quote_resp.json()["quote_id"]
+        accept_token = quote_resp.json()["accept_token"]
+
+        accept_resp = self.client.post(
+            f"/quote/{quote_id}/decision",
+            json={"action": "accept", "accept_token": accept_token},
+        )
+        self.assertEqual(accept_resp.status_code, 200)
+        request_id = accept_resp.json()["request_id"]
+        booking_token = accept_resp.json()["booking_token"]
+
+        booking_resp = self.client.post(
+            f"/quote/{quote_id}/booking",
+            json={
+                "booking_token": booking_token,
+                "requested_job_date": "2026-03-10",
+                "requested_time_window": "morning",
+                "notes": "Call when outside gate",
+            },
+        )
+        self.assertEqual(booking_resp.status_code, 200)
+
+        approval_resp = self.client.post(
+            f"/admin/api/quote-requests/{request_id}/decision",
+            headers=self._admin_headers,
+            json={"action": "approve"},
+        )
+        self.assertEqual(approval_resp.status_code, 200)
+
+        job = approval_resp.json()["job"]
+        self.assertEqual(job["scheduling_context"]["request_id"], request_id)
+        self.assertEqual(job["scheduling_context"]["requested_job_date"], "2026-03-10")
+        self.assertEqual(job["scheduling_context"]["requested_time_window"], "morning")
+        self.assertEqual(job["scheduling_context"]["notes"], "Call when outside gate")
+        self.assertTrue(job["scheduling_context"]["scheduling_ready"])
+        self.assertEqual(job["scheduling_context"]["missing_fields"], [])
 
     def test_submit_booking_no_request(self) -> None:
         resp = self.client.post("/quote/nonexistent/booking", json={

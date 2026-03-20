@@ -79,6 +79,7 @@ let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
 let currentAssistantLocked = false;
 let currentAssistantHandoff = null;
+let currentJobsById = {};
 
 function assistantDraftFields() {
   return [
@@ -191,6 +192,7 @@ function resetProtectedDashboard() {
   });
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
+  currentJobsById = {};
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
   if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
@@ -450,6 +452,7 @@ function renderJobs(items) {
   const box = document.getElementById("jobsBox");
   if (!items || items.length === 0) return addEmptyState(box, "No jobs yet.");
   clearNode(box);
+  currentJobsById = Object.fromEntries((items || []).filter((item) => item && item.job_id).map((item) => [item.job_id, item]));
 
   const { table, tbody } = createTable(["Job", "Quote", "Status", "Customer", "Address", "Cash Total", "Scheduled", "Calendar Sync", "Actions"]);
 
@@ -554,12 +557,67 @@ function renderJobs(items) {
   box.appendChild(table);
 }
 
+function renderScheduleContext(job) {
+  const summary = document.getElementById("scheduleContextSummary");
+  const fields = document.getElementById("scheduleContextFields");
+  if (!summary || !fields) return;
+
+  clearNode(fields);
+  if (!job) {
+    summary.textContent = "Load a job to view customer booking preferences and calendar sync details.";
+    return;
+  }
+
+  const schedulingContext = job.scheduling_context || {};
+  const missingFields = Array.isArray(schedulingContext.missing_fields) ? schedulingContext.missing_fields : [];
+  const syncStatus = job.calendar_sync_status || "not_configured";
+  const readinessLabel = schedulingContext.scheduling_ready ? "Scheduling-ready" : "Review booking preferences";
+  summary.textContent = `${readinessLabel} • Calendar sync: ${syncStatus}`;
+
+  const rows = [
+    ["Customer", job.customer_name || "—"],
+    ["Phone", job.customer_phone || "—"],
+    ["Service", job.service_type || "—"],
+    ["Job Address", job.job_address || "—"],
+    ["Requested Job Date", schedulingContext.requested_job_date || "—"],
+    ["Requested Time Window", schedulingContext.requested_time_window || "—"],
+    ["Booking Notes", schedulingContext.notes || "—"],
+    ["Request ID", schedulingContext.request_id || job.request_id || "—"],
+  ];
+
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "rowToken";
+    const name = document.createElement("strong");
+    name.textContent = `${label}:`;
+    const text = document.createElement("span");
+    text.textContent = ` ${value}`;
+    row.append(name, text);
+    fields.appendChild(row);
+  });
+
+  if (missingFields.length > 0) {
+    const missing = document.createElement("div");
+    missing.className = "small muted";
+    missing.textContent = `Missing booking preference fields: ${missingFields.join(", ")}`;
+    fields.appendChild(missing);
+  }
+
+  if (job.calendar_last_error) {
+    const error = document.createElement("div");
+    error.className = "small muted";
+    error.textContent = `Last calendar error: ${job.calendar_last_error}`;
+    fields.appendChild(error);
+  }
+}
+
 function showScheduleModal(jobId, isReschedule) {
   if (!adminSessionReady) {
     closeScheduleModal();
     setLine(statusLine, "bad", "Authenticate and click Refresh before scheduling jobs.");
     return;
   }
+  renderScheduleContext(currentJobsById[jobId] || null);
   document.getElementById("scheduleTitle").textContent = isReschedule ? "Reschedule Job" : "Schedule Job";
   document.getElementById("scheduleModal").style.display = "block";
   const form = document.getElementById("scheduleForm");
@@ -582,6 +640,7 @@ function closeScheduleModal() {
   modal.style.display = "none";
   form.reset();
   form.onsubmit = null;
+  renderScheduleContext(null);
 }
 
 document.addEventListener("keydown", (e) => {

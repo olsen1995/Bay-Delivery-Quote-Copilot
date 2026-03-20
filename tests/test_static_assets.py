@@ -157,3 +157,23 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'prepareCustomerHandoff' in admin_js
     assert '.assistantUploadRow' in admin_css
     assert '.assistantDraftBar' in admin_css
+
+
+def test_admin_schedule_modal_includes_scheduling_handoff_context() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+
+    assert 'id="scheduleContextBox"' in admin_html
+    assert 'id="scheduleContextSummary"' in admin_html
+    assert 'id="scheduleContextFields"' in admin_html
+    assert "Scheduling handoff" in admin_html
+    assert "renderScheduleContext" in admin_js
+    for label in [
+        "Requested Job Date",
+        "Requested Time Window",
+        "Booking Notes",
+        "Calendar sync:",
+        "Missing booking preference fields:",
+        "Last calendar error:",
+    ]:
+        assert label in admin_js
