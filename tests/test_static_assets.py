@@ -96,11 +96,20 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
 def test_admin_page_includes_screenshot_assistant_shell() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
 
     assert 'id="assistantAnalyzeBtn"' in admin_html
+    assert 'id="assistantStartDraftBtn"' in admin_html
+    assert 'id="assistantUploadBtn"' in admin_html
+    assert 'id="assistantScreenshotFiles"' in admin_html
+    assert 'id="assistantUploadList"' in admin_html
     assert 'id="assistantResultBox"' in admin_html
     assert 'id="assistantHistoryBox"' in admin_html
     assert 'Screenshot Quote Assistant' in admin_html
     assert 'Screenshot Assistant Drafts' in admin_html
     assert '/admin/api/screenshot-assistant/analyses/intake' in admin_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' in admin_js
     assert 'submitScreenshotAssistantAnalysis' in admin_js
+    assert 'uploadScreenshotAssistantFiles' in admin_js
+    assert '.assistantUploadRow' in admin_css
+    assert '.assistantDraftBar' in admin_css

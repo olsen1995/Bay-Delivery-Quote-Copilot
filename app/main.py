@@ -171,6 +171,11 @@ DB_IMPORT_SIZE_CAP_BYTES = 20 * 1024 * 1024
 
 SIZE_LIMIT_RULES = [
     SizeLimitRule(method="POST", exact_path="/quote/upload-photos", max_bytes=12 * 1024 * 1024),
+    SizeLimitRule(
+        method="POST",
+        path_regex=re.compile(r"^/admin/api/screenshot-assistant/analyses/[^/]+/attachments$"),
+        max_bytes=12 * 1024 * 1024,
+    ),
     SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", exact_path="/admin/api/db/import", max_bytes=DB_IMPORT_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
@@ -180,6 +185,12 @@ SIZE_LIMIT_RULES = [
 RATE_LIMIT_RULES = [
     RateLimitRule(rule_id="quote_calculate", method="POST", exact_path="/quote/calculate", limit=10),
     RateLimitRule(rule_id="quote_upload_photos", method="POST", exact_path="/quote/upload-photos", limit=6),
+    RateLimitRule(
+        rule_id="assistant_upload_photos",
+        method="POST",
+        path_regex=re.compile(r"^/admin/api/screenshot-assistant/analyses/[^/]+/attachments$"),
+        limit=6,
+    ),
     RateLimitRule(rule_id="quote_quote", method="POST", prefix_path="/quote/", limit=20),
     RateLimitRule(rule_id="admin_api", prefix_path="/admin/api/", limit=120),
 ]
@@ -315,6 +326,101 @@ def _drive_call(desc: str, fn):
         logging.error(f"Google Drive error during {desc}: {e}")
         # 502 = upstream dependency failure
         raise HTTPException(status_code=502, detail="Google Drive service unavailable.")
+
+
+def _safe_upload_filename(filename: str | None) -> str:
+    safe_name = (filename or "upload.jpg").replace("/", "_").replace("\\", "_").strip()
+    return safe_name or "upload.jpg"
+
+
+async def _store_image_attachments(
+    *,
+    files: list[UploadFile],
+    folder_name: str,
+    quote_id: str | None = None,
+    analysis_id: str | None = None,
+) -> list[dict[str, Any]]:
+    if not _drive_enabled():
+        raise HTTPException(status_code=501, detail="Photo upload is not configured (Google Drive not set).")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files received.")
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Too many images (max 5).")
+
+    max_total_bytes = 10_000_000  # ~10MB total
+    max_per_file_bytes = 5_000_000  # ~5MB each
+    total_bytes = 0
+
+    vault = _drive_call("vault setup", lambda: gdrive.ensure_vault_subfolders())
+    target_folder = _drive_call(
+        "attachment folder setup",
+        lambda: gdrive.ensure_folder(folder_name, vault["uploads"]),
+    )
+
+    uploaded_items: list[dict[str, Any]] = []
+    for upload in files:
+        mime_type = (upload.content_type or "").lower().strip()
+        content = await upload.read()
+        if not content:
+            continue
+
+        if len(content) > max_per_file_bytes:
+            raise HTTPException(status_code=400, detail="An image is too large (max ~5MB each).")
+
+        total_bytes += len(content)
+        if total_bytes > max_total_bytes:
+            raise HTTPException(status_code=400, detail="Images too large (max ~10MB total).")
+
+        if mime_type and mime_type not in _ALLOWED_IMAGE_MIMES:
+            raise HTTPException(status_code=400, detail="Unsupported image type (use JPG/PNG/WEBP/GIF).")
+        if not _looks_like_supported_image(content):
+            raise HTTPException(status_code=400, detail="Unsupported or invalid image content.")
+
+        safe_name = _safe_upload_filename(upload.filename)
+        normalized_mime_type = mime_type or "image/jpeg"
+        drive_file = _drive_call(
+            "upload",
+            lambda: gdrive.upload_bytes(
+                parent_id=target_folder.file_id,
+                filename=safe_name,
+                mime_type=normalized_mime_type,
+                content=content,
+            ),
+        )
+
+        attachment_id = str(uuid4())
+        created_at = _now_local_iso()
+        save_attachment(
+            {
+                "attachment_id": attachment_id,
+                "created_at": created_at,
+                "quote_id": quote_id,
+                "request_id": None,
+                "job_id": None,
+                "analysis_id": analysis_id,
+                "filename": safe_name,
+                "mime_type": normalized_mime_type,
+                "size_bytes": len(content),
+                "drive_file_id": drive_file.file_id,
+                "drive_web_view_link": drive_file.web_view_link,
+            }
+        )
+        uploaded_items.append(
+            {
+                "attachment_id": attachment_id,
+                "created_at": created_at,
+                "quote_id": quote_id,
+                "analysis_id": analysis_id,
+                "filename": safe_name,
+                "mime_type": normalized_mime_type,
+                "size_bytes": len(content),
+                "drive_file_id": drive_file.file_id,
+                "drive_web_view_link": drive_file.web_view_link,
+            }
+        )
+
+    return uploaded_items
 
 
 def _invalid_status_transition_response(e: InvalidQuoteRequestTransition) -> JSONResponse:
@@ -622,12 +728,13 @@ class ScreenshotAssistantCandidatePayload(BaseModel):
 class ScreenshotAssistantIntakePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    analysis_id: Optional[str] = Field(None, max_length=120)
     message: Optional[str] = Field(None, max_length=4000)
     screenshot_attachment_ids: list[str] = Field(default_factory=list, max_length=10)
     candidate_inputs: ScreenshotAssistantCandidatePayload = Field(default_factory=ScreenshotAssistantCandidatePayload)
     operator_overrides: ScreenshotAssistantCandidatePayload = Field(default_factory=ScreenshotAssistantCandidatePayload)
 
-    @field_validator("message", mode="before")
+    @field_validator("analysis_id", "message", mode="before")
     @classmethod
     def strip(cls, v):
         if v is None:
@@ -715,88 +822,26 @@ async def quote_upload_photos(
     if not server_token or not hmac.compare_digest(accept_token, str(server_token)):
         raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
-    if not _drive_enabled():
-        raise HTTPException(status_code=501, detail="Photo upload is not configured (Google Drive not set).")
-
-    if not files:
-        raise HTTPException(status_code=400, detail="No files received.")
-    if len(files) > 5:
-        raise HTTPException(status_code=400, detail="Too many images (max 5).")
-
-    MAX_TOTAL_BYTES = 10_000_000  # ~10MB total
-    MAX_PER_FILE_BYTES = 5_000_000  # ~5MB each
-
-    total_bytes = 0
-
-    vault = _drive_call("vault setup", lambda: gdrive.ensure_vault_subfolders())
-    uploads_root = vault["uploads"]
-    quote_folder = _drive_call("quote folder setup", lambda: gdrive.ensure_folder(f"quote_{quote_id}", uploads_root))
-
-    uploaded_items = []
-    for f in files:
-        ct = (f.content_type or "").lower().strip()
-
-        b = await f.read()
-        if not b:
-            continue
-
-        if len(b) > MAX_PER_FILE_BYTES:
-            raise HTTPException(status_code=400, detail="An image is too large (max ~5MB each).")
-
-        total_bytes += len(b)
-        if total_bytes > MAX_TOTAL_BYTES:
-            raise HTTPException(status_code=400, detail="Images too large (max ~10MB total).")
-
-        if ct and ct not in _ALLOWED_IMAGE_MIMES:
-            raise HTTPException(status_code=400, detail="Unsupported image type (use JPG/PNG/WEBP/GIF).")
-        if not _looks_like_supported_image(b):
-            raise HTTPException(status_code=400, detail="Unsupported or invalid image content.")
-
-        safe_name = (f.filename or "upload.jpg").replace("/", "_").replace("\\", "_").strip()
-        if not safe_name:
-            safe_name = "upload.jpg"
-
-        mime_type = ct or "image/jpeg"
-
-        df = _drive_call(
-            "upload",
-            lambda: gdrive.upload_bytes(
-                parent_id=quote_folder.file_id,
-                filename=safe_name,
-                mime_type=mime_type,
-                content=b,
-            ),
-        )
-
-        att_id = str(uuid4())
-        created_at = _now_local_iso()
-        save_attachment(
-            {
-                "attachment_id": att_id,
-                "created_at": created_at,
-                "quote_id": quote_id,
-                "request_id": None,
-                "job_id": None,
-                "filename": safe_name,
-                "mime_type": mime_type,
-                "size_bytes": len(b),
-                "drive_file_id": df.file_id,
-                "drive_web_view_link": df.web_view_link,
-            }
-        )
-
-        uploaded_items.append(
-            {
-                "attachment_id": att_id,
-                "filename": safe_name,
-                "drive_file_id": df.file_id,
-                "drive_web_view_link": df.web_view_link,
-            }
-        )
+    uploaded_items = await _store_image_attachments(
+        files=files,
+        folder_name=f"quote_{quote_id}",
+        quote_id=quote_id,
+    )
 
     _maybe_auto_snapshot(background_tasks)
 
-    return {"ok": True, "uploaded": uploaded_items}
+    return {
+        "ok": True,
+        "uploaded": [
+            {
+                "attachment_id": item["attachment_id"],
+                "filename": item["filename"],
+                "drive_file_id": item["drive_file_id"],
+                "drive_web_view_link": item["drive_web_view_link"],
+            }
+            for item in uploaded_items
+        ],
+    }
 
 
 # =========================
@@ -866,6 +911,7 @@ def admin_create_screenshot_assistant_analysis(
 
     try:
         result = screenshot_assistant_service.create_analysis(
+            analysis_id=body.analysis_id,
             operator_username=operator_username,
             message=body.message,
             candidate_inputs=body.candidate_inputs.model_dump(exclude_none=True),
@@ -888,6 +934,52 @@ def admin_create_screenshot_assistant_analysis(
             action_type="create_screenshot_analysis",
             entity_type="screenshot_assistant_analysis",
             record_id="draft",
+            success=False,
+            error_summary=str(exc.detail),
+        )
+        raise
+
+
+@app.post("/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments")
+async def admin_upload_screenshot_assistant_attachments(
+    request: Request,
+    analysis_id: str,
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(...),
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    if not screenshot_assistant_service.get_analysis(analysis_id):
+        raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
+
+    try:
+        uploaded_items = await _store_image_attachments(
+            files=files,
+            folder_name=f"analysis_{analysis_id}",
+            analysis_id=analysis_id,
+        )
+        refreshed = screenshot_assistant_service.get_analysis(analysis_id)
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="upload_screenshot_analysis_attachments",
+            entity_type="screenshot_assistant_analysis",
+            record_id=analysis_id,
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        return {
+            "ok": True,
+            "analysis_id": analysis_id,
+            "uploaded": uploaded_items,
+            "attachments": refreshed["attachments"] if refreshed else list_attachments(analysis_id=analysis_id, limit=25),
+        }
+    except HTTPException as exc:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="upload_screenshot_analysis_attachments",
+            entity_type="screenshot_assistant_analysis",
+            record_id=analysis_id,
             success=False,
             error_summary=str(exc.detail),
         )
