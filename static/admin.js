@@ -85,6 +85,8 @@ let currentAssistantAnalysisId = "";
 let currentAssistantLocked = false;
 let currentAssistantHandoff = null;
 let currentJobsById = {};
+let assistantDraftDirty = false;
+const assistantUnsavedDraftWarning = "Suggestions applied locally. Click Analyze Intake to save reviewed fields before creating a quote draft.";
 const assistantAutofillFieldConfig = {
   customer_name: { input: assistantCustomerNameInput, label: "Customer Name" },
   customer_phone: { input: assistantCustomerPhoneInput, label: "Customer Phone" },
@@ -104,6 +106,24 @@ function assistantDraftFields() {
     assistantRequestedTimeWindowInput,
     assistantAttachmentIdsInput,
     assistantScreenshotFilesInput,
+    assistantServiceTypeInput,
+    assistantEstimatedHoursInput,
+    assistantCrewSizeInput,
+    assistantJobAddressInput,
+    assistantPickupAddressInput,
+    assistantDropoffAddressInput
+  ].filter(Boolean);
+}
+
+function assistantReviewedDraftFields() {
+  return [
+    assistantMessageInput,
+    assistantCustomerNameInput,
+    assistantCustomerPhoneInput,
+    assistantDescriptionInput,
+    assistantRequestedJobDateInput,
+    assistantRequestedTimeWindowInput,
+    assistantAttachmentIdsInput,
     assistantServiceTypeInput,
     assistantEstimatedHoursInput,
     assistantCrewSizeInput,
@@ -138,6 +158,33 @@ function setLoading(isLoading) {
   assistantDraftFields().forEach((field) => {
     field.disabled = isLoading || currentAssistantLocked;
   });
+}
+
+function syncAssistantDraftActionState() {
+  const createBtn = document.getElementById("assistantCreateQuoteDraftBtn");
+  const createHelper = document.getElementById("assistantCreateQuoteDraftHelper");
+  if (createBtn) {
+    createBtn.disabled = !adminSessionReady || assistantDraftDirty;
+  }
+  if (createHelper) {
+    createHelper.textContent = assistantDraftDirty
+      ? assistantUnsavedDraftWarning
+      : "Create a real quote draft only after reviewing the recommendation.";
+  }
+}
+
+function setAssistantDraftDirty(isDirty) {
+  assistantDraftDirty = !!isDirty;
+  syncAssistantDraftActionState();
+}
+
+function markAssistantDraftDirty(message) {
+  if (!currentAssistantAnalysisId || currentAssistantLocked) return;
+  const wasDirty = assistantDraftDirty;
+  setAssistantDraftDirty(true);
+  if (message && !wasDirty) {
+    setLine(assistantStatusLine, "bad", message);
+  }
 }
 
 function authHeaders() {
@@ -211,6 +258,7 @@ function resetProtectedDashboard() {
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
   currentJobsById = {};
+  setAssistantDraftDirty(false);
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
   if (assistantCustomerNameInput) assistantCustomerNameInput.value = "";
@@ -829,6 +877,7 @@ function updateAssistantDraftMeta(item) {
 function beginNewScreenshotAssistantDraft() {
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
+  setAssistantDraftDirty(false);
   setAssistantDraftLocked(false);
   updateAssistantDraftMeta(null);
   if (assistantMessageInput) assistantMessageInput.value = "";
@@ -901,12 +950,15 @@ function populateAssistantReviewedFields(item) {
   if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = safeGet(item, "intake.requested_time_window", "");
 }
 
-function applyAssistantSuggestion(fieldName, value, onlyIfEmpty = true) {
+function applyAssistantSuggestion(fieldName, value, onlyIfEmpty = true, announceDirty = true) {
   const config = assistantAutofillFieldConfig[fieldName];
   if (!config || !config.input) return false;
   const currentValue = getAutofillInputValue(fieldName);
   if (onlyIfEmpty && currentValue) return false;
   config.input.value = value || "";
+  if (announceDirty) {
+    markAssistantDraftDirty(assistantUnsavedDraftWarning);
+  }
   return true;
 }
 
@@ -914,13 +966,14 @@ function applyAllEmptyAssistantSuggestions(item) {
   const suggestions = (item && item.autofill_suggestions) || {};
   let appliedCount = 0;
   Object.entries(suggestions).forEach(([fieldName, meta]) => {
-    if (applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true)) {
+    if (applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true, false)) {
       appliedCount += 1;
     }
   });
 
   if (appliedCount > 0) {
-    setLine(assistantStatusLine, "ok", `Applied ${appliedCount} suggestion(s) to empty draft fields.`);
+    markAssistantDraftDirty();
+    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
     return;
   }
   setLine(assistantStatusLine, "bad", "No empty draft fields were available for autofill suggestions.");
@@ -980,7 +1033,6 @@ function renderAssistantAutofillPanel(item) {
         const applied = applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true);
         if (applied) {
           applyBtn.disabled = true;
-          setLine(assistantStatusLine, "ok", `Applied ${safeGet(assistantAutofillFieldConfig[fieldName], "label", fieldName)} to the draft.`);
           return;
         }
         setLine(assistantStatusLine, "bad", `${safeGet(assistantAutofillFieldConfig[fieldName], "label", fieldName)} already has a reviewed value.`);
@@ -1014,11 +1066,15 @@ function renderAssistantAutofillPanel(item) {
 
 function renderScreenshotAssistantResult(item) {
   const box = document.getElementById("assistantResultBox");
-  if (!item) return addEmptyState(box, "No screenshot analysis yet.");
+  if (!item) {
+    setAssistantDraftDirty(false);
+    return addEmptyState(box, "No screenshot analysis yet.");
+  }
   clearNode(box);
   updateAssistantDraftMeta(item);
   syncAssistantAttachmentIds(item.attachments || []);
   populateAssistantReviewedFields(item);
+  setAssistantDraftDirty(false);
 
   const panel = document.createElement("div");
   panel.className = "assistantResultPanel";
@@ -1122,14 +1178,17 @@ function renderScreenshotAssistantResult(item) {
     const actionRow = document.createElement("div");
     actionRow.className = "rowToken mt10 assistantActions";
     const helper = document.createElement("div");
+    helper.id = "assistantCreateQuoteDraftHelper";
     helper.className = "small";
-    helper.textContent = "Create a real quote draft only after reviewing the recommendation.";
+    helper.textContent = assistantDraftDirty
+      ? assistantUnsavedDraftWarning
+      : "Create a real quote draft only after reviewing the recommendation.";
     const button = document.createElement("button");
     button.id = "assistantCreateQuoteDraftBtn";
     button.className = "secondaryAction";
     button.type = "button";
     button.textContent = "Create Quote Draft";
-    button.disabled = !adminSessionReady;
+    button.disabled = !adminSessionReady || assistantDraftDirty;
     button.addEventListener("click", () => createQuoteDraftFromAnalysis(item.analysis_id || ""));
     actionRow.append(helper, button);
     panel.appendChild(actionRow);
@@ -1205,6 +1264,7 @@ async function saveScreenshotAssistantDraft() {
   });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+  setAssistantDraftDirty(false);
   renderScreenshotAssistantResult(data);
   renderScreenshotAssistantUploads(data.attachments || []);
   return data;
@@ -1283,6 +1343,10 @@ async function uploadScreenshotAssistantFiles() {
 async function createQuoteDraftFromAnalysis(analysisId) {
   if (!adminSessionReady) {
     setLine(assistantStatusLine, "bad", "Authenticate and load admin data before creating a quote draft.");
+    return;
+  }
+  if (assistantDraftDirty) {
+    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
     return;
   }
   if (!analysisId) {
@@ -1442,6 +1506,10 @@ if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeSchedule
 if (assistantStartDraftBtn) assistantStartDraftBtn.addEventListener("click", beginNewScreenshotAssistantDraft);
 if (assistantUploadBtn) assistantUploadBtn.addEventListener("click", uploadScreenshotAssistantFiles);
 if (assistantAnalyzeBtn) assistantAnalyzeBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
+assistantReviewedDraftFields().forEach((field) => {
+  const eventName = field.tagName === "SELECT" ? "change" : "input";
+  field.addEventListener(eventName, () => markAssistantDraftDirty(assistantUnsavedDraftWarning));
+});
 
 resetProtectedDashboard();
 closeScheduleModal();

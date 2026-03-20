@@ -164,11 +164,21 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'assistantApplyAllSuggestionsBtn' in admin_js
     assert 'applyAllEmptyAssistantSuggestions' in admin_js
     assert 'applyAssistantSuggestion' in admin_js
+    assert 'let assistantDraftDirty = false;' in admin_js
+    assert 'assistantUnsavedDraftWarning' in admin_js
+    assert 'setAssistantDraftDirty' in admin_js
+    assert 'markAssistantDraftDirty' in admin_js
+    assert 'syncAssistantDraftActionState' in admin_js
     assert 'Autofill Suggestions' in admin_js
     assert 'Apply All Empty Fields' in admin_js
     assert 'Suggestions stay non-binding until you explicitly apply or edit them.' in admin_js
     assert 'Missing fields:' in admin_js
     assert 'Warnings:' in admin_js
+    assert 'Click Analyze Intake to save reviewed fields before creating a quote draft.' in admin_js
+    assert 'assistantCreateQuoteDraftHelper' in admin_js
+    assert 'button.disabled = !adminSessionReady || assistantDraftDirty;' in admin_js
+    assert 'if (assistantDraftDirty) {' in admin_js
+    assert 'markAssistantDraftDirty(assistantUnsavedDraftWarning)' in admin_js
     assert '.assistantUploadRow' in admin_css
     assert '.assistantDraftBar' in admin_css
 
