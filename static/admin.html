@@ -85,14 +85,31 @@
           </div>
         </div>
         <div class="assistantFormGrid">
+          <div class="assistantDraftBar">
+            <div>
+              <strong>Current Draft</strong>
+              <div id="assistantDraftMeta" class="small">No draft analysis yet. Uploading screenshots will create one automatically.</div>
+            </div>
+            <button id="assistantStartDraftBtn" class="secondaryAction" type="button">Start Draft</button>
+          </div>
           <div class="assistantFormBlock">
             <label for="assistantMessage">Customer Message / Intake Notes</label>
             <textarea id="assistantMessage" rows="5" placeholder="Paste the customer message or operator summary here."></textarea>
           </div>
           <div class="assistantFormBlock">
-            <label for="assistantAttachmentIds">Screenshot Attachment IDs</label>
-            <input id="assistantAttachmentIds" type="text" placeholder="att-1, att-2" />
-            <div class="small">Optional: comma-separated attachment IDs to link via attachments.analysis_id.</div>
+            <label for="assistantAttachmentIds">Linked Screenshot Attachment IDs</label>
+            <input id="assistantAttachmentIds" type="text" placeholder="Attachment IDs populate after upload" />
+            <div class="small">Uploads sync this field automatically. You can still paste IDs manually if needed.</div>
+          </div>
+          <div class="assistantUploadRow">
+            <div class="assistantFormBlock">
+              <label for="assistantScreenshotFiles">Screenshot Uploads</label>
+              <input id="assistantScreenshotFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+              <div class="small">Supports JPG, PNG, WEBP, and GIF. Max 5 images, ~5MB each, ~10MB total.</div>
+            </div>
+            <div class="assistantUploadActions">
+              <button id="assistantUploadBtn" class="secondaryAction" type="button">Upload Screenshots</button>
+            </div>
           </div>
           <div class="assistantFieldRow">
             <div>
@@ -129,6 +146,7 @@
         </div>
         <div id="assistantStatusLine" class="statusNotice muted" role="status" aria-live="polite"></div>
         <div id="assistantResultBox"></div>
+        <div id="assistantUploadList"></div>
       </div>
 
       <div class="card dataCard">

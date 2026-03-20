@@ -60,10 +60,16 @@ const adminProtectedSections = Array.from(document.querySelectorAll("[data-admin
 const adminPageRoot = document.body;
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
+const assistantStartDraftBtn = document.getElementById("assistantStartDraftBtn");
+const assistantUploadBtn = document.getElementById("assistantUploadBtn");
 const assistantAnalyzeBtn = document.getElementById("assistantAnalyzeBtn");
 const assistantStatusLine = document.getElementById("assistantStatusLine");
+const assistantDraftMeta = document.getElementById("assistantDraftMeta");
+const assistantAttachmentIdsInput = document.getElementById("assistantAttachmentIds");
+const assistantScreenshotFilesInput = document.getElementById("assistantScreenshotFiles");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
+let currentAssistantAnalysisId = "";
 
 function getAdminCreds() {
   return {
@@ -75,6 +81,8 @@ function getAdminCreds() {
 function setLoading(isLoading) {
   refreshBtn.disabled = isLoading;
   refreshBtn.textContent = isLoading ? "Loading..." : refreshButtonLabel;
+  if (assistantStartDraftBtn) assistantStartDraftBtn.disabled = isLoading;
+  if (assistantUploadBtn) assistantUploadBtn.disabled = isLoading;
   if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = isLoading;
 }
 
@@ -141,11 +149,15 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox"];
+  const boxIds = ["quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
   });
+  currentAssistantAnalysisId = "";
+  if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
+  if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
+  if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
 }
 
 function createTable(headers) {
@@ -603,6 +615,21 @@ function parseAttachmentIds(rawValue) {
   return String(rawValue || "").split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+function syncAssistantAttachmentIds(attachments) {
+  const ids = (attachments || []).map((item) => item.attachment_id).filter(Boolean);
+  if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = ids.join(", ");
+}
+
+function updateAssistantDraftMeta(item) {
+  currentAssistantAnalysisId = (item && item.analysis_id) || "";
+  if (!assistantDraftMeta) return;
+  if (!item) {
+    assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
+    return;
+  }
+  assistantDraftMeta.textContent = `Analysis ${item.analysis_id} • ${item.status} • updated ${item.updated_at}`;
+}
+
 function collectAssistantPayload() {
   const candidate = {};
   const serviceType = (document.getElementById("assistantServiceType").value || "").trim();
@@ -620,8 +647,9 @@ function collectAssistantPayload() {
   if (dropoffAddress) candidate.dropoff_address = dropoffAddress;
 
   return {
+    analysis_id: currentAssistantAnalysisId || undefined,
     message: (document.getElementById("assistantMessage").value || "").trim(),
-    screenshot_attachment_ids: parseAttachmentIds(document.getElementById("assistantAttachmentIds").value),
+    screenshot_attachment_ids: parseAttachmentIds(assistantAttachmentIdsInput ? assistantAttachmentIdsInput.value : ""),
     candidate_inputs: candidate,
     operator_overrides: {}
   };
@@ -636,6 +664,8 @@ function renderScreenshotAssistantResult(item) {
   const box = document.getElementById("assistantResultBox");
   if (!item) return addEmptyState(box, "No screenshot analysis yet.");
   clearNode(box);
+  updateAssistantDraftMeta(item);
+  syncAssistantAttachmentIds(item.attachments || []);
 
   const panel = document.createElement("div");
   panel.className = "assistantResultPanel";
@@ -685,6 +715,32 @@ function renderScreenshotAssistantResult(item) {
   box.appendChild(panel);
 }
 
+function renderScreenshotAssistantUploads(attachments) {
+  const box = document.getElementById("assistantUploadList");
+  if (!box) return;
+  if (!attachments || attachments.length === 0) return addEmptyState(box, "No screenshots uploaded for this draft yet.");
+  clearNode(box);
+
+  const { table, tbody } = createTable(["Attachment", "Filename", "Type", "Size", "Uploaded"]);
+  attachments.forEach((item) => {
+    const tr = document.createElement("tr");
+    [
+      item.attachment_id || "",
+      item.filename || "",
+      item.mime_type || "",
+      item.size_bytes || 0,
+      item.created_at || ""
+    ].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = String(value);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  box.appendChild(table);
+}
+
 function renderScreenshotAssistantHistory(items) {
   const box = document.getElementById("assistantHistoryBox");
   if (!items || items.length === 0) return addEmptyState(box, "No screenshot assistant drafts yet.");
@@ -712,23 +768,29 @@ function renderScreenshotAssistantHistory(items) {
   box.appendChild(table);
 }
 
-async function submitScreenshotAssistantAnalysis() {
+async function saveScreenshotAssistantDraft() {
   if (!adminSessionReady) {
     setLine(assistantStatusLine, "bad", "Authenticate and load admin data before using Screenshot Quote Assistant.");
-    return;
+    throw new Error("admin auth required");
   }
 
+  const resp = await fetch("/admin/api/screenshot-assistant/analyses/intake", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(collectAssistantPayload())
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+  renderScreenshotAssistantResult(data);
+  renderScreenshotAssistantUploads(data.attachments || []);
+  return data;
+}
+
+async function submitScreenshotAssistantAnalysis() {
   try {
     setLoading(true);
     setLine(assistantStatusLine, "ok", "Analyzing intake draft...");
-    const resp = await fetch("/admin/api/screenshot-assistant/analyses/intake", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify(collectAssistantPayload())
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
-    renderScreenshotAssistantResult(data);
+    await saveScreenshotAssistantDraft();
     setLine(assistantStatusLine, "ok", "Draft analysis saved. Pricing guidance reused the existing quote engine.");
 
     const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
@@ -737,6 +799,58 @@ async function submitScreenshotAssistantAnalysis() {
     const parsed = parseApiError(err);
     const detail = safeGet(parsed, "data.detail", "Please review the intake fields and try again.");
     setLine(assistantStatusLine, "bad", "Screenshot assistant error. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function uploadScreenshotAssistantFiles() {
+  if (!adminSessionReady) {
+    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before uploading screenshots.");
+    return;
+  }
+
+  const selectedFiles = Array.from((assistantScreenshotFilesInput && assistantScreenshotFilesInput.files) || []);
+  if (selectedFiles.length === 0) {
+    setLine(assistantStatusLine, "bad", "Choose at least one screenshot before uploading.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setLine(assistantStatusLine, "ok", "Preparing screenshot upload...");
+
+    let analysisId = currentAssistantAnalysisId;
+    if (!analysisId) {
+      const draft = await saveScreenshotAssistantDraft();
+      analysisId = draft.analysis_id || "";
+    }
+
+    const formData = new FormData();
+    selectedFiles.forEach((file) => formData.append("files", file));
+
+    const resp = await fetch(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
+
+    syncAssistantAttachmentIds(data.attachments || []);
+    renderScreenshotAssistantUploads(data.attachments || []);
+    if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
+
+    const refreshed = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(data.analysis_id)}`);
+    renderScreenshotAssistantResult(refreshed);
+
+    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
+    renderScreenshotAssistantHistory((analyses.items || []));
+    setLine(assistantStatusLine, "ok", `Uploaded ${Array.isArray(data.uploaded) ? data.uploaded.length : 0} screenshot(s) to the current draft.`);
+  } catch (err) {
+    const parsed = parseApiError(err);
+    const detail = safeGet(parsed, "data.detail", "Please review the files and try again.");
+    setLine(assistantStatusLine, "bad", "Screenshot upload failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
   } finally {
     setLoading(false);
   }
@@ -774,6 +888,7 @@ async function refreshAll() {
     const analysisItems = analyses.items || [];
     renderScreenshotAssistantHistory(analysisItems);
     renderScreenshotAssistantResult(analysisItems[0] || null);
+    renderScreenshotAssistantUploads((analysisItems[0] && analysisItems[0].attachments) || []);
 
     adminSessionReady = true;
     setProtectedDashboardVisible(true);
@@ -812,6 +927,8 @@ adminUsernameInput.addEventListener("keydown", handleCredsKeydown);
 adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 if (scheduleCloseBtn) scheduleCloseBtn.addEventListener("click", closeScheduleModal);
 if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeScheduleModal);
+if (assistantStartDraftBtn) assistantStartDraftBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
+if (assistantUploadBtn) assistantUploadBtn.addEventListener("click", uploadScreenshotAssistantFiles);
 if (assistantAnalyzeBtn) assistantAnalyzeBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
 
 resetProtectedDashboard();

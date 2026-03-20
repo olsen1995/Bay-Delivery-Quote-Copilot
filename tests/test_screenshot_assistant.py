@@ -1,5 +1,6 @@
 import base64
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,6 +29,24 @@ def client() -> TestClient:
 def admin_headers() -> dict[str, str]:
     token = base64.b64encode(b"admin:secret").decode("utf-8")
     return {"Authorization": f"Basic {token}"}
+
+
+def configure_upload_mocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.main._drive_enabled", lambda: True)
+    monkeypatch.setattr("app.main._maybe_auto_snapshot", lambda _background_tasks: None)
+    monkeypatch.setattr("app.main._drive_call", lambda _desc, fn: fn())
+    monkeypatch.setattr(
+        "app.main.gdrive.ensure_vault_subfolders",
+        lambda: {"uploads": "uploads-folder"},
+    )
+    monkeypatch.setattr(
+        "app.main.gdrive.ensure_folder",
+        lambda _name, _parent: SimpleNamespace(file_id="assistant-folder"),
+    )
+    monkeypatch.setattr(
+        "app.main.gdrive.upload_bytes",
+        lambda **_kwargs: SimpleNamespace(file_id="file-1", web_view_link="https://example.com/file-1"),
+    )
 
 
 def test_screenshot_assistant_admin_only_access_control(client: TestClient) -> None:
@@ -144,3 +163,121 @@ def test_screenshot_assistant_structured_output_contract(client: TestClient) -> 
     assert isinstance(body["quote_guidance"]["disclaimer"], str)
     assert body["normalized_candidate"]["pickup_address"] == "1 Pickup Ave"
     assert body["normalized_candidate"]["dropoff_address"] == "2 Dropoff Rd"
+
+
+def test_screenshot_assistant_upload_requires_admin_and_persists_analysis_link(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_upload_mocks(monkeypatch)
+
+    create_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Start a draft before uploading screenshots.",
+            "candidate_inputs": {"service_type": "haul_away"},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    assert create_response.status_code == 200
+    analysis_id = create_response.json()["analysis_id"]
+
+    unauthorized = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments",
+        files=[("files", ("photo.jpg", b"\xff\xd8\xff" + (b"a" * 32), "image/jpeg"))],
+    )
+    assert unauthorized.status_code in {401, 403}
+
+    authorized = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments",
+        headers=admin_headers(),
+        files=[("files", ("photo.jpg", b"\xff\xd8\xff" + (b"a" * 32), "image/jpeg"))],
+    )
+    assert authorized.status_code == 200
+
+    payload = authorized.json()
+    assert payload["ok"] is True
+    assert payload["analysis_id"] == analysis_id
+    assert len(payload["uploaded"]) == 1
+    assert payload["uploaded"][0]["analysis_id"] == analysis_id
+
+    attachments = storage.list_attachments(analysis_id=analysis_id)
+    assert len(attachments) == 1
+    assert attachments[0]["analysis_id"] == analysis_id
+    assert attachments[0]["quote_id"] is None
+
+
+def test_screenshot_assistant_upload_rejects_invalid_file_type(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_upload_mocks(monkeypatch)
+
+    create_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Draft for invalid upload validation.",
+            "candidate_inputs": {"service_type": "haul_away"},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_response.json()["analysis_id"]
+
+    response = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments",
+        headers=admin_headers(),
+        files=[("files", ("notes.txt", b"plain text is not an image", "text/plain"))],
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Unsupported image type (use JPG/PNG/WEBP/GIF)."}
+    assert storage.list_attachments(analysis_id=analysis_id) == []
+
+
+def test_screenshot_assistant_upload_over_12mb_returns_413(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/analysis-123/attachments",
+        headers={"content-length": str((12 * 1024 * 1024) + 1), **admin_headers()},
+        data=b"",
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"detail": "payload too large"}
+
+
+def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClient) -> None:
+    create_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Initial draft",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    assert create_response.status_code == 200
+    created = create_response.json()
+
+    update_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "analysis_id": created["analysis_id"],
+            "message": "Updated draft",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 2.0},
+            "operator_overrides": {"job_address": "456 Updated St"},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["analysis_id"] == created["analysis_id"]
+    assert updated["created_at"] == created["created_at"]
+    assert updated["normalized_candidate"]["estimated_hours"] == 2.0
+    assert updated["normalized_candidate"]["job_address"] == "456 Updated St"

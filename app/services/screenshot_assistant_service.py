@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
+from fastapi import HTTPException
+
 from app.services.quote_service import build_quote_artifacts
 from app.storage import (
     assign_attachments_to_analysis,
@@ -144,6 +146,7 @@ def _format_analysis(record: dict[str, Any]) -> dict[str, Any]:
 
 def create_analysis(
     *,
+    analysis_id: str | None,
     operator_username: str,
     message: str | None,
     candidate_inputs: dict[str, Any] | None,
@@ -151,9 +154,15 @@ def create_analysis(
     screenshot_attachment_ids: list[Any] | None,
     now_iso: str,
 ) -> dict[str, Any]:
+    existing = get_screenshot_assistant_analysis(analysis_id) if analysis_id else None
+    if analysis_id and not existing:
+        raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
+
     normalized_candidates = _normalize_candidate_map(candidate_inputs)
     normalized_overrides = _normalize_candidate_map(operator_overrides)
     attachment_ids = _normalize_attachment_ids(screenshot_attachment_ids)
+    if existing and not attachment_ids:
+        attachment_ids = [item["attachment_id"] for item in list_attachments(analysis_id=analysis_id, limit=25)]
     normalized_candidate = _build_normalized_candidate(
         _clean_text(message),
         normalized_candidates,
@@ -161,7 +170,7 @@ def create_analysis(
     )
     quote_artifacts = build_quote_artifacts(normalized_candidate)
 
-    analysis_id = str(uuid4())
+    analysis_id = analysis_id or str(uuid4())
     guidance = {
         **quote_artifacts["response"],
         "service_type": quote_artifacts["normalized_request"]["service_type"],
@@ -178,7 +187,7 @@ def create_analysis(
     save_screenshot_assistant_analysis(
         {
             "analysis_id": analysis_id,
-            "created_at": now_iso,
+            "created_at": existing["created_at"] if existing else now_iso,
             "updated_at": now_iso,
             "operator_username": operator_username,
             "status": "draft",
