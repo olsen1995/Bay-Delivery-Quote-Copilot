@@ -285,6 +285,42 @@ def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClien
     assert updated["quote_id"] is None
 
 
+def test_linked_screenshot_assistant_analysis_cannot_be_updated(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Initial draft",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+
+    update_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "analysis_id": analysis_id,
+            "message": "Updated draft",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 2.0},
+            "operator_overrides": {"job_address": "456 Updated St"},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert update_response.status_code == 409
+    assert update_response.json() == {"detail": "Screenshot assistant analysis is locked after quote draft creation."}
+
+
 def test_create_quote_draft_from_screenshot_analysis_success_and_attachment_linkage(client: TestClient) -> None:
     storage.save_attachment(
         {
@@ -358,6 +394,39 @@ def test_create_quote_draft_from_screenshot_analysis_requires_admin(client: Test
 
     unauthorized = client.post(f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft")
     assert unauthorized.status_code in {401, 403}
+
+
+def test_linked_screenshot_assistant_analysis_cannot_receive_more_uploads(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_upload_mocks(monkeypatch)
+
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Need a reviewed estimate.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+
+    upload_response = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments",
+        headers=admin_headers(),
+        files=[("files", ("photo.jpg", b"\xff\xd8\xff" + (b"a" * 32), "image/jpeg"))],
+    )
+    assert upload_response.status_code == 409
+    assert upload_response.json() == {"detail": "Screenshot assistant analysis is locked after quote draft creation."}
 
 
 def test_create_quote_draft_from_screenshot_analysis_missing_analysis_returns_404(client: TestClient) -> None:

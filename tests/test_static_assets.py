@@ -114,6 +114,9 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'assistantCreateQuoteDraftBtn' in admin_js
     assert 'Create Quote Draft' in admin_js
     assert 'Linked quote draft' in admin_js
+    assert 'This analysis is locked because a quote draft has already been created.' in admin_js
+    assert 'setAssistantDraftLocked' in admin_js
+    assert 'beginNewScreenshotAssistantDraft' in admin_js
     assert '["Analysis", "Updated", "Service", "Cash", "Quote", "Attachments", "Mode"]' in admin_js
     assert 'submitScreenshotAssistantAnalysis' in admin_js
     assert 'uploadScreenshotAssistantFiles' in admin_js

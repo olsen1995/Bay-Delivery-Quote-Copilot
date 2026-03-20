@@ -159,6 +159,8 @@ def create_analysis(
     existing = get_screenshot_assistant_analysis(analysis_id) if analysis_id else None
     if analysis_id and not existing:
         raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
+    if existing and str(existing.get("quote_id") or "").strip():
+        raise HTTPException(status_code=409, detail="Screenshot assistant analysis is locked after quote draft creation.")
 
     normalized_candidates = _normalize_candidate_map(candidate_inputs)
     normalized_overrides = _normalize_candidate_map(operator_overrides)

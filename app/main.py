@@ -950,10 +950,13 @@ async def admin_upload_screenshot_assistant_attachments(
     _require_admin(request)
     operator_username = _admin_operator_username(request)
 
-    if not screenshot_assistant_service.get_analysis(analysis_id):
-        raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
-
     try:
+        analysis = screenshot_assistant_service.get_analysis(analysis_id)
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
+        if str(analysis.get("quote_id") or "").strip():
+            raise HTTPException(status_code=409, detail="Screenshot assistant analysis is locked after quote draft creation.")
+
         uploaded_items = await _store_image_attachments(
             files=files,
             folder_name=f"analysis_{analysis_id}",
