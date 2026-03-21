@@ -513,6 +513,30 @@ function buildCandidateInputs() {
   return payload;
 }
 
+function isQuoteLockConflict(parsed) {
+  const detail = String(parsed?.data?.detail || parsed?.raw || "");
+  return parsed?.status === 409 && /quote draft|locked after quote draft creation/i.test(detail);
+}
+
+async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage) {
+  if (!state.currentAnalysisId) return false;
+
+  try {
+    await loadAnalysis(state.currentAnalysisId);
+    const linkedQuoteId = state.currentAnalysis?.quote_id || "";
+    setStatus(
+      statusEl,
+      "warn",
+      linkedQuoteId
+        ? `This analysis is now locked because quote draft ${linkedQuoteId} was linked by another operator.`
+        : fallbackMessage
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function buildAnalysisPayload() {
   return {
     analysis_id: state.currentAnalysisId || null,
@@ -650,6 +674,9 @@ async function saveDraftAnalysis(event) {
     await loadDashboardData();
   } catch (err) {
     const parsed = parseApiError(err);
+    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(intakeStatus, "This analysis is now locked because a quote draft was linked by another operator.")) {
+      return;
+    }
     setStatus(intakeStatus, "bad", `Save failed. ${parsed.data?.detail || parsed.raw || "Please review the intake fields and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   } finally {
     setLoading(saveDraftBtn, false, "Saving...");
@@ -708,6 +735,9 @@ async function uploadScreenshots() {
     setStatus(uploadStatus, "ok", `Uploaded ${(data.uploaded || []).length} screenshot(s). OCR previews are shown below.`);
   } catch (err) {
     const parsed = parseApiError(err);
+    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(uploadStatus, "This analysis is now locked because a quote draft was linked by another operator.")) {
+      return;
+    }
     setStatus(uploadStatus, "bad", `Upload failed. ${parsed.data?.detail || parsed.raw || "Please review the files and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   } finally {
     setLoading(uploadScreenshotsBtn, false, "Uploading...");
@@ -741,6 +771,9 @@ async function createQuoteDraft() {
     setStatus(handoffStatus, "ok", `Quote draft ${data.quote?.quote_id || "created"} linked. You can now prepare customer handoff.`);
   } catch (err) {
     const parsed = parseApiError(err);
+    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(handoffStatus, "This analysis is now locked because a quote draft was linked by another operator.")) {
+      return;
+    }
     setStatus(handoffStatus, "bad", `Quote draft failed. ${parsed.data?.detail || parsed.raw || "Please review the draft and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   } finally {
     setLoading(createQuoteDraftBtn, false, "Creating...");

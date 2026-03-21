@@ -264,6 +264,9 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'This analysis is locked because a quote draft is already linked.' in mobile_js
     assert 'function formatSuggestionValue(meta)' in mobile_js
     assert 'return meta.value ?? "";' in mobile_js
+    assert 'function isQuoteLockConflict(parsed)' in mobile_js
+    assert 'async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage)' in mobile_js
+    assert 'This analysis is now locked because quote draft ${linkedQuoteId} was linked by another operator.' in mobile_js
     assert 'candidate_inputs: buildCandidateInputs()' in mobile_js
     assert 'operator_overrides: {}' in mobile_js
     assert 'const candidate = getReviewedCandidateInputs(analysis);' in mobile_js
