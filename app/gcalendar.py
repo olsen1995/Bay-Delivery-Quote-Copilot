@@ -5,7 +5,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 
 # IMPORTANT:
 # We intentionally DO NOT import google-auth libraries at module import time.
@@ -87,57 +87,31 @@ def _compact_service_label(service_type: str) -> str:
     return re.sub(r"\s+", " ", value).title() or "Job"
 
 
-def _compact_location(address: Any) -> str:
-    text = str(address or "").strip()
-    if not text:
-        return "Location TBD"
-    head = text.split(",", 1)[0].strip()
-    return head[:48]
-
-
 def _event_summary(job: "Job") -> str:
     service_label = _compact_service_label(job.get("service_type", ""))
-    customer_name = str(job.get("customer_name") or "").strip()
-    location = _compact_location(job.get("job_address"))
-    parts = [service_label]
-    if customer_name:
-        parts.append(customer_name)
-    if location:
-        parts.append(location)
-    return " - ".join(parts[:3])[:120]
+    job_id = str(job.get("job_id") or "N/A").strip() or "N/A"
+    return f"{service_label} - Job {job_id}"[:120]
 
 
 def _event_description(job: "Job") -> str:
     scheduling_context = job.get("scheduling_context") or {}
     lines = [
-        f"Customer: {job.get('customer_name') or 'N/A'}",
-        f"Phone: {job.get('customer_phone') or 'N/A'}",
-        f"Address: {job.get('job_address') or 'N/A'}",
-        f"Service: {_compact_service_label(job.get('service_type', ''))}",
+        f"Job ID: {job.get('job_id') or 'N/A'}",
         f"Quote ID: {job.get('quote_id') or 'N/A'}",
         f"Request ID: {scheduling_context.get('request_id') or job.get('request_id') or 'N/A'}",
-        f"Job ID: {job.get('job_id') or 'N/A'}",
+        f"Service: {_compact_service_label(job.get('service_type', ''))}",
         f"Requested Date: {scheduling_context.get('requested_job_date') or 'Not provided'}",
         f"Requested Window: {scheduling_context.get('requested_time_window') or 'Not provided'}",
-        f"Booking Notes: {scheduling_context.get('notes') or 'None'}",
+        "Location details in Bay Delivery system",
     ]
-
-    internal_summary = str(job.get("job_description_internal") or "").strip()
-    if internal_summary:
-        lines.append(f"Internal Summary: {internal_summary}")
-
-    customer_summary = str(job.get("job_description_customer") or "").strip()
-    if customer_summary:
-        lines.append(f"Customer Summary: {customer_summary}")
-
     return "\n".join(lines)
 
 
 def create_event(job: "Job", start_utc: str, end_utc: str) -> str:
     """
-    Create a Calendar event for the job.
-    Title: {service_type} - Job {job_id} - {short_customer_name}
-    Description: Job ID, service type, concise location.
+    Create a minimal mirror Calendar event for the job.
+    Title: {service_type} - Job {job_id}
+    Description: safe internal identifiers and scheduling context only.
     """
     service = _service()
     calendar_id = _calendar_id()
