@@ -360,7 +360,7 @@ class CalendarIntegrationTests(unittest.TestCase):
         self.assertIsNotNone(scheduled_job["scheduled_start"])
         self.assertIsNotNone(scheduled_job["scheduled_end"])
 
-    def test_calendar_event_payload_uses_richer_job_context(self):
+    def test_calendar_event_payload_is_minimized(self):
         job = {
             "job_id": "j123",
             "created_at": "2026-02-26T10:00:00",
@@ -413,15 +413,18 @@ class CalendarIntegrationTests(unittest.TestCase):
 
         self.assertEqual(event_id, "event123")
         self.assertEqual(captured["calendarId"], "calendar123")
-        self.assertEqual(captured["body"]["summary"], "Item Delivery - Taylor Customer - 123 Main St")
+        self.assertEqual(captured["body"]["summary"], "Item Delivery - Job j123")
         description = captured["body"]["description"]
-        self.assertIn("Customer: Taylor Customer", description)
-        self.assertIn("Phone: 555-0101", description)
-        self.assertIn("Address: 123 Main St, Nanaimo, BC", description)
+        self.assertIn("Job ID: j123", description)
         self.assertIn("Quote ID: q123", description)
         self.assertIn("Request ID: r123", description)
-        self.assertIn("Job ID: j123", description)
+        self.assertIn("Service: Item Delivery", description)
         self.assertIn("Requested Date: 2026-03-10", description)
         self.assertIn("Requested Window: afternoon", description)
-        self.assertIn("Booking Notes: Call when outside gate", description)
-        self.assertIn("Internal Summary: Bring straps and blankets", description)
+        self.assertIn("Location details in Bay Delivery system", description)
+        self.assertNotIn("Taylor Customer", description)
+        self.assertNotIn("555-0101", description)
+        self.assertNotIn("123 Main St", description)
+        self.assertNotIn("Call when outside gate", description)
+        self.assertNotIn("Bring straps and blankets", description)
+        self.assertNotIn("Remove a couch", description)
