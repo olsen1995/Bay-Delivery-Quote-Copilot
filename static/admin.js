@@ -993,7 +993,7 @@ function renderAssistantAutofillPanel(item) {
   if (suggestionEntries.length === 0) {
     const empty = document.createElement("div");
     empty.className = "small muted";
-    empty.textContent = "No message-based suggestions detected yet.";
+    empty.textContent = "No message/OCR-based suggestions detected yet.";
     wrap.appendChild(empty);
   } else {
     const helper = document.createElement("div");
@@ -1203,15 +1203,21 @@ function renderScreenshotAssistantUploads(attachments) {
   if (!attachments || attachments.length === 0) return addEmptyState(box, "No screenshots uploaded for this draft yet.");
   clearNode(box);
 
-  const { table, tbody } = createTable(["Attachment", "Filename", "Type", "Size", "Uploaded"]);
+  const { table, tbody } = createTable(["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]);
   attachments.forEach((item) => {
     const tr = document.createElement("tr");
+    const ocrMeta = item.ocr_json || {};
+    const ocrStatus = safeGet(ocrMeta, "status", "skipped");
+    const ocrPreview = safeGet(ocrMeta, "preview", "");
+    const ocrWarning = safeGet(ocrMeta, "warning", "");
     [
       item.attachment_id || "",
       item.filename || "",
       item.mime_type || "",
       item.size_bytes || 0,
-      item.created_at || ""
+      item.created_at || "",
+      ocrStatus,
+      ocrWarning ? `${ocrPreview || "—"} (${ocrWarning})` : (ocrPreview || "—"),
     ].forEach((value) => {
       const td = document.createElement("td");
       td.textContent = String(value);
