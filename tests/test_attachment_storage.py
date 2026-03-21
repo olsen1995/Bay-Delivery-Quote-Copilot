@@ -60,17 +60,25 @@ def test_save_attachment_with_analysis_id_and_round_trip_backup(tmp_path: Path) 
             "size_bytes": 456,
             "drive_file_id": "drive-2",
             "drive_web_view_link": "https://example.com/2",
+            "ocr_json": {
+                "status": "success",
+                "text": "Call me at 415-555-0199",
+                "preview": "Call me at 415-555-0199",
+                "warning": None,
+            },
         }
     )
 
     items = storage.list_attachments(limit=10)
     assert len(items) == 1
     assert items[0]["analysis_id"] == "analysis-1"
+    assert items[0]["ocr_json"]["status"] == "success"
 
     payload = storage.export_db_to_json()
     attachment_rows = payload["tables"]["attachments"]
     assert len(attachment_rows) == 1
     assert attachment_rows[0]["analysis_id"] == "analysis-1"
+    assert attachment_rows[0]["ocr_json"]["status"] == "success"
 
     restored_db_path = tmp_path / "attachments-restored.sqlite3"
     storage.DB_PATH = restored_db_path
@@ -83,6 +91,7 @@ def test_save_attachment_with_analysis_id_and_round_trip_backup(tmp_path: Path) 
     restored_items = storage.list_attachments(limit=10)
     assert len(restored_items) == 1
     assert restored_items[0]["analysis_id"] == "analysis-1"
+    assert restored_items[0]["ocr_json"]["status"] == "success"
 
 
 def test_assign_analysis_attachments_to_quote_adds_quote_link_without_removing_analysis(tmp_path: Path) -> None:

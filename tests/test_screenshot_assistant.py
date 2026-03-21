@@ -47,6 +47,15 @@ def configure_upload_mocks(monkeypatch: pytest.MonkeyPatch) -> None:
         "app.main.gdrive.upload_bytes",
         lambda **_kwargs: SimpleNamespace(file_id="file-1", web_view_link="https://example.com/file-1"),
     )
+    monkeypatch.setattr(
+        "app.main.screenshot_ocr_service.extract_attachment_ocr",
+        lambda **_kwargs: {
+            "status": "success",
+            "text": "Taylor 415-555-0199 123 Example St 2026-04-12 morning",
+            "preview": "Taylor 415-555-0199 123 Example St 2026-04-12 morning",
+            "warning": None,
+        },
+    )
 
 
 def test_screenshot_assistant_admin_only_access_control(client: TestClient) -> None:
@@ -323,6 +332,46 @@ def test_screenshot_assistant_upload_requires_admin_and_persists_analysis_link(
     assert len(attachments) == 1
     assert attachments[0]["analysis_id"] == analysis_id
     assert attachments[0]["quote_id"] is None
+    assert attachments[0]["ocr_json"]["status"] == "success"
+
+
+def test_screenshot_assistant_upload_stores_ocr_failure_without_blocking_upload(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_upload_mocks(monkeypatch)
+    monkeypatch.setattr(
+        "app.main.screenshot_ocr_service.extract_attachment_ocr",
+        lambda **_kwargs: {
+            "status": "failed",
+            "text": "",
+            "preview": "",
+            "warning": "OCR failed for this screenshot. Upload still succeeded.",
+        },
+    )
+
+    create_response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Start a draft before uploading screenshots.",
+            "candidate_inputs": {"service_type": "haul_away"},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+    analysis_id = create_response.json()["analysis_id"]
+
+    upload = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/attachments",
+        headers=admin_headers(),
+        files=[("files", ("photo.jpg", b"\xff\xd8\xff" + (b"a" * 32), "image/jpeg"))],
+    )
+
+    assert upload.status_code == 200
+    attachment = storage.list_attachments(analysis_id=analysis_id)[0]
+    assert attachment["ocr_json"]["status"] == "failed"
+    assert attachment["ocr_json"]["warning"] == "OCR failed for this screenshot. Upload still succeeded."
 
 
 def test_screenshot_assistant_upload_rejects_invalid_file_type(
@@ -398,6 +447,94 @@ def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClien
     assert updated["normalized_candidate"]["estimated_hours"] == 2.0
     assert updated["normalized_candidate"]["job_address"] == "456 Updated St"
     assert updated["quote_id"] is None
+
+
+def test_screenshot_assistant_ocr_autofill_can_fill_v1a_fields_without_message(client: TestClient) -> None:
+    storage.save_attachment(
+        {
+            "attachment_id": "att-ocr-1",
+            "created_at": "2026-03-01T10:05:00",
+            "quote_id": None,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": None,
+            "filename": "thread.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 456,
+            "drive_file_id": "drive-2",
+            "drive_web_view_link": "https://example.com/2",
+            "ocr_json": {
+                "status": "success",
+                "text": "Hi my name is Taylor. Call me at 415-555-0199. Address is 123 Example St. 2026-04-12 morning.",
+                "preview": "Hi my name is Taylor. Call me at 415-555-0199.",
+                "warning": None,
+            },
+        }
+    )
+
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": ["att-ocr-1"],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["autofill_suggestions"]["customer_name"]["source"] == "ocr"
+    assert body["autofill_suggestions"]["customer_phone"]["value"] == "(415) 555-0199"
+    assert body["autofill_suggestions"]["job_address"]["value"] == "123 Example St"
+    assert body["autofill_suggestions"]["requested_job_date"]["value"] == "2026-04-12"
+    assert body["autofill_suggestions"]["requested_time_window"]["value"] == "morning"
+    assert body["autofill_suggestions"]["description"]["source"] == "ocr"
+    assert body["normalized_candidate"]["customer_name"] == ""
+
+
+def test_screenshot_assistant_combines_message_and_ocr_sources_without_overwriting_description(client: TestClient) -> None:
+    storage.save_attachment(
+        {
+            "attachment_id": "att-ocr-2",
+            "created_at": "2026-03-01T10:05:00",
+            "quote_id": None,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": None,
+            "filename": "thread.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 456,
+            "drive_file_id": "drive-2",
+            "drive_web_view_link": "https://example.com/2",
+            "ocr_json": {
+                "status": "success",
+                "text": "My name is Taylor. 415-555-0199. 123 Example St.",
+                "preview": "My name is Taylor. 415-555-0199. 123 Example St.",
+                "warning": None,
+            },
+        }
+    )
+
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Hi, my name is Taylor. Please help with the address and phone from the screenshots.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": ["att-ocr-2"],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["autofill_suggestions"]["customer_name"]["source"] == "message+ocr"
+    assert body["autofill_suggestions"]["customer_phone"]["source"] == "ocr"
+    assert body["autofill_suggestions"]["job_address"]["source"] == "ocr"
+    assert body["autofill_suggestions"]["description"]["source"] == "message"
+    assert body["autofill_suggestions"]["description"]["value"].startswith("Hi, my name is Taylor.")
 
 
 def test_linked_screenshot_assistant_analysis_cannot_be_updated(client: TestClient) -> None:

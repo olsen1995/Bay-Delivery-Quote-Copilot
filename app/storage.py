@@ -94,6 +94,21 @@ class ScreenshotAssistantAnalysis(TypedDict):
     quote_id: Optional[str]
 
 
+class AttachmentRecord(TypedDict):
+    attachment_id: str
+    created_at: str
+    quote_id: Optional[str]
+    request_id: Optional[str]
+    job_id: Optional[str]
+    analysis_id: Optional[str]
+    filename: str
+    mime_type: str
+    size_bytes: Optional[int]
+    drive_file_id: str
+    drive_web_view_link: Optional[str]
+    ocr_json: NotRequired[Dict[str, Any]]
+
+
 def _clean_missing_field(value: Any) -> bool:
     if value is None:
         return True
@@ -356,7 +371,8 @@ def init_db() -> None:
                 mime_type TEXT NOT NULL,
                 size_bytes INTEGER,
                 drive_file_id TEXT NOT NULL,
-                drive_web_view_link TEXT
+                drive_web_view_link TEXT,
+                ocr_json TEXT
             )
             """
         )
@@ -401,6 +417,7 @@ def init_db() -> None:
 
         # Add assistant-compatible linkage to attachments without breaking existing uploads
         _try_add_column(conn, "attachments", "analysis_id TEXT")
+        _try_add_column(conn, "attachments", "ocr_json TEXT")
         _try_add_column(conn, "screenshot_assistant_analyses", "quote_id TEXT")
 
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
@@ -1113,8 +1130,8 @@ def save_attachment(att: Dict[str, Any]) -> None:
             """
             INSERT OR REPLACE INTO attachments
             (attachment_id, created_at, quote_id, request_id, job_id, analysis_id,
-             filename, mime_type, size_bytes, drive_file_id, drive_web_view_link)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             filename, mime_type, size_bytes, drive_file_id, drive_web_view_link, ocr_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 att["attachment_id"],
@@ -1128,6 +1145,7 @@ def save_attachment(att: Dict[str, Any]) -> None:
                 int(att["size_bytes"]) if att.get("size_bytes") is not None else None,
                 att["drive_file_id"],
                 att.get("drive_web_view_link"),
+                json.dumps(att.get("ocr_json") or {}, ensure_ascii=False),
             ),
         )
         conn.commit()
@@ -1135,7 +1153,33 @@ def save_attachment(att: Dict[str, Any]) -> None:
         conn.close()
 
 
-def list_attachments(quote_id: Optional[str] = None, analysis_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+def _parse_attachment_row(row: sqlite3.Row) -> AttachmentRecord:
+    ocr_payload = row["ocr_json"] if "ocr_json" in row.keys() else None
+    if isinstance(ocr_payload, str):
+        try:
+            ocr_payload = json.loads(ocr_payload)
+        except Exception:
+            ocr_payload = {}
+    if not isinstance(ocr_payload, dict):
+        ocr_payload = {}
+
+    return {
+        "attachment_id": row["attachment_id"],
+        "created_at": row["created_at"],
+        "quote_id": row["quote_id"],
+        "request_id": row["request_id"],
+        "job_id": row["job_id"],
+        "analysis_id": row["analysis_id"] if "analysis_id" in row.keys() else None,
+        "filename": row["filename"],
+        "mime_type": row["mime_type"],
+        "size_bytes": row["size_bytes"],
+        "drive_file_id": row["drive_file_id"],
+        "drive_web_view_link": row["drive_web_view_link"],
+        "ocr_json": ocr_payload,
+    }
+
+
+def list_attachments(quote_id: Optional[str] = None, analysis_id: Optional[str] = None, limit: int = 50) -> List[AttachmentRecord]:
     where: List[str] = []
     params: List[Any] = []
 
@@ -1151,7 +1195,7 @@ def list_attachments(quote_id: Optional[str] = None, analysis_id: Optional[str] 
     sql = f"""
         SELECT
             attachment_id, created_at, quote_id, request_id, job_id, analysis_id,
-            filename, mime_type, size_bytes, drive_file_id, drive_web_view_link
+            filename, mime_type, size_bytes, drive_file_id, drive_web_view_link, ocr_json
         FROM attachments
         {where_sql}
         ORDER BY created_at DESC
@@ -1165,22 +1209,32 @@ def list_attachments(quote_id: Optional[str] = None, analysis_id: Optional[str] 
     finally:
         conn.close()
 
-    return [
-        {
-            "attachment_id": r["attachment_id"],
-            "created_at": r["created_at"],
-            "quote_id": r["quote_id"],
-            "request_id": r["request_id"],
-            "job_id": r["job_id"],
-            "analysis_id": r["analysis_id"] if "analysis_id" in r.keys() else None,
-            "filename": r["filename"],
-            "mime_type": r["mime_type"],
-            "size_bytes": r["size_bytes"],
-            "drive_file_id": r["drive_file_id"],
-            "drive_web_view_link": r["drive_web_view_link"],
-        }
-        for r in rows
-    ]
+    return [_parse_attachment_row(r) for r in rows]
+
+
+def list_attachments_by_ids(attachment_ids: List[str]) -> List[AttachmentRecord]:
+    normalized_ids = [str(att_id).strip() for att_id in attachment_ids if str(att_id).strip()]
+    if not normalized_ids:
+        return []
+
+    placeholders = ",".join(["?"] * len(normalized_ids))
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT
+                attachment_id, created_at, quote_id, request_id, job_id, analysis_id,
+                filename, mime_type, size_bytes, drive_file_id, drive_web_view_link, ocr_json
+            FROM attachments
+            WHERE attachment_id IN ({placeholders})
+            ORDER BY created_at DESC
+            """,
+            normalized_ids,
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [_parse_attachment_row(r) for r in rows]
 
 
 def assign_attachments_to_analysis(attachment_ids: List[str], analysis_id: str) -> None:

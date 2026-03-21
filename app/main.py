@@ -42,7 +42,13 @@ from app.abuse_controls import (
     extract_client_ip,
 )
 from app import gcalendar, gdrive
-from app.services import booking_service, job_scheduling_service, quote_service, screenshot_assistant_service
+from app.services import (
+    booking_service,
+    job_scheduling_service,
+    quote_service,
+    screenshot_assistant_service,
+    screenshot_ocr_service,
+)
 from app.storage import (
     export_db_to_json,
     get_job,
@@ -391,6 +397,10 @@ async def _store_image_attachments(
 
         attachment_id = str(uuid4())
         created_at = _now_local_iso()
+        ocr_payload = screenshot_ocr_service.extract_attachment_ocr(
+            filename=safe_name,
+            content=content,
+        )
         save_attachment(
             {
                 "attachment_id": attachment_id,
@@ -404,6 +414,7 @@ async def _store_image_attachments(
                 "size_bytes": len(content),
                 "drive_file_id": drive_file.file_id,
                 "drive_web_view_link": drive_file.web_view_link,
+                "ocr_json": ocr_payload,
             }
         )
         uploaded_items.append(
@@ -417,6 +428,7 @@ async def _store_image_attachments(
                 "size_bytes": len(content),
                 "drive_file_id": drive_file.file_id,
                 "drive_web_view_link": drive_file.web_view_link,
+                "ocr_json": ocr_payload,
             }
         )
 

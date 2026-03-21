@@ -174,6 +174,10 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'Suggestions stay non-binding until you explicitly apply or edit them.' in admin_js
     assert 'Missing fields:' in admin_js
     assert 'Warnings:' in admin_js
+    assert 'No message/OCR-based suggestions detected yet.' in admin_js
+    assert '["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]' in admin_js
+    assert 'Upload results include best-effort OCR status and a short preview for admin review.' in admin_html
+    assert 'ocr_json' in admin_js
     assert 'Click Analyze Intake to save reviewed fields before creating a quote draft.' in admin_js
     assert 'assistantCreateQuoteDraftHelper' in admin_js
     assert 'button.disabled = !adminSessionReady || assistantDraftDirty;' in admin_js

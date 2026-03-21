@@ -13,6 +13,7 @@ from app.storage import (
     assign_attachments_to_analysis,
     get_screenshot_assistant_analysis,
     list_attachments,
+    list_attachments_by_ids,
     list_screenshot_assistant_analyses,
     save_screenshot_assistant_analysis,
 )
@@ -81,6 +82,8 @@ _NAME_PATTERNS = (
     re.compile(r"\b(?:i am|i'm|this is)\s+([A-Za-z][A-Za-z' -]{1,60})", re.IGNORECASE),
 )
 _MONTH_FORMATS = ("%B %d %Y", "%b %d %Y", "%B %d, %Y", "%b %d, %Y")
+_OCR_ATTACHMENT_TEXT_MAX_CHARS = 1200
+_COMBINED_OCR_TEXT_MAX_CHARS = 4000
 
 
 def _clean_text(value: Any) -> str | None:
@@ -218,25 +221,64 @@ def _extract_requested_time_window(message_text: str) -> str | None:
 def _build_autofill_suggestions(
     *,
     message: str | None,
+    attachment_ocr_entries: list[dict[str, Any]] | None,
     candidate_inputs: dict[str, Any],
     operator_overrides: dict[str, Any],
     requested_job_date: str | None,
     requested_time_window: str | None,
 ) -> tuple[dict[str, dict[str, Any]], list[str], list[str]]:
     message_text = _clean_message_text(message)
+    ocr_entries = attachment_ocr_entries or []
     warnings: list[str] = []
     suggestions: dict[str, dict[str, Any]] = {}
 
-    if not message_text:
-        return suggestions, list(_AUTOFILL_FIELDS), ["Paste a customer message to generate autofill suggestions."]
+    successful_ocr_texts: list[str] = []
+    successful_ocr_count = 0
+    unsuccessful_ocr_count = 0
+    ocr_warning_count = 0
+
+    for entry in ocr_entries:
+        status = _clean_text(entry.get("status")) or ""
+        warning = _clean_text(entry.get("warning"))
+        text = _clean_message_text(_clean_text(entry.get("text")))
+        if warning:
+            ocr_warning_count += 1
+        if status == "success" and text:
+            successful_ocr_count += 1
+            successful_ocr_texts.append(text[:_OCR_ATTACHMENT_TEXT_MAX_CHARS])
+        else:
+            unsuccessful_ocr_count += 1
+
+    combined_ocr_text = " ".join(successful_ocr_texts)[:_COMBINED_OCR_TEXT_MAX_CHARS].strip()
+
+    if not message_text and not combined_ocr_text:
+        base_warning = "Paste a customer message to generate autofill suggestions."
+        if ocr_entries:
+            base_warning = "No readable message or screenshot OCR text was available to generate autofill suggestions."
+        return suggestions, list(_AUTOFILL_FIELDS), [base_warning]
+
+    message_extracted = {
+        "customer_name": _extract_customer_name(message_text) if message_text else None,
+        "customer_phone": _extract_customer_phone(message_text) if message_text else None,
+        "job_address": _extract_job_address(message_text) if message_text else None,
+        "requested_job_date": _extract_requested_job_date(message_text) if message_text else None,
+        "requested_time_window": _extract_requested_time_window(message_text) if message_text else None,
+    }
+    ocr_extracted = {
+        "customer_name": _extract_customer_name(combined_ocr_text) if combined_ocr_text else None,
+        "customer_phone": _extract_customer_phone(combined_ocr_text) if combined_ocr_text else None,
+        "job_address": _extract_job_address(combined_ocr_text) if combined_ocr_text else None,
+        "requested_job_date": _extract_requested_job_date(combined_ocr_text) if combined_ocr_text else None,
+        "requested_time_window": _extract_requested_time_window(combined_ocr_text) if combined_ocr_text else None,
+    }
 
     extracted_values = {
-        "customer_name": _extract_customer_name(message_text),
-        "customer_phone": _extract_customer_phone(message_text),
-        "job_address": _extract_job_address(message_text),
-        "description": message_text,
-        "requested_job_date": _extract_requested_job_date(message_text),
-        "requested_time_window": _extract_requested_time_window(message_text),
+        "customer_name": message_extracted["customer_name"] or ocr_extracted["customer_name"],
+        "customer_phone": message_extracted["customer_phone"] or ocr_extracted["customer_phone"],
+        "job_address": message_extracted["job_address"] or ocr_extracted["job_address"],
+        "description": message_text or combined_ocr_text,
+        "requested_job_date": message_extracted["requested_job_date"] or ocr_extracted["requested_job_date"],
+        "requested_time_window": message_extracted["requested_time_window"] or ocr_extracted["requested_time_window"],
     }
     confidence_map = {
         "customer_name": "medium",
@@ -246,6 +288,24 @@ def _build_autofill_suggestions(
         "requested_job_date": "medium",
         "requested_time_window": "medium",
     }
+    source_map = {
+        "customer_name": "message",
+        "customer_phone": "message",
+        "job_address": "message",
+        "description": "message" if message_text else "ocr",
+        "requested_job_date": "message",
+        "requested_time_window": "message",
+    }
+
+    for field_name in ("customer_name", "customer_phone", "job_address", "requested_job_date", "requested_time_window"):
+        from_message = _clean_text(message_extracted[field_name])
+        from_ocr = _clean_text(ocr_extracted[field_name])
+        if from_message and from_ocr and _trim_suggestion_value(from_message).lower() == _trim_suggestion_value(from_ocr).lower():
+            source_map[field_name] = "message+ocr"
+        elif from_message:
+            source_map[field_name] = "message"
+        elif from_ocr:
+            source_map[field_name] = "ocr"
 
     for field_name, value in extracted_values.items():
         cleaned_value = _clean_text(value)
@@ -254,7 +314,7 @@ def _build_autofill_suggestions(
         suggestions[field_name] = {
             "value": cleaned_value,
             "confidence": confidence_map[field_name],
-            "source": "message",
+            "source": source_map[field_name],
             "needs_review": True,
         }
 
@@ -273,11 +333,40 @@ def _build_autofill_suggestions(
     ]
 
     if "description" in suggestions and len(suggestions["description"]["value"]) > 240:
-        warnings.append("Description suggestion mirrors the pasted message. Trim it before creating a quote draft.")
+        if message_text:
+            warnings.append("Description suggestion mirrors the pasted message. Trim it before creating a quote draft.")
+        else:
+            warnings.append("Description suggestion mirrors screenshot OCR text. Trim it before creating a quote draft.")
+    if successful_ocr_count:
+        warnings.append(f"OCR text was extracted from {successful_ocr_count} screenshot(s) and added to autofill review.")
+    if unsuccessful_ocr_count:
+        warnings.append(f"OCR was unavailable or empty for {unsuccessful_ocr_count} screenshot(s).")
+    if ocr_warning_count and not unsuccessful_ocr_count:
+        warnings.append("One or more screenshot OCR warnings were recorded for admin review.")
     if not suggestions:
-        warnings.append("No autofill suggestions were detected from the pasted message.")
+        warnings.append("No autofill suggestions were detected from the available message or screenshot OCR text.")
 
     return suggestions, missing_fields, warnings
+
+
+def _collect_attachment_ocr_entries(attachment_ids: list[str]) -> list[dict[str, Any]]:
+    if not attachment_ids:
+        return []
+
+    entries: list[dict[str, Any]] = []
+    for attachment in list_attachments_by_ids(attachment_ids):
+        ocr_payload = attachment.get("ocr_json") or {}
+        if not isinstance(ocr_payload, dict):
+            continue
+        entries.append(
+            {
+                "attachment_id": attachment.get("attachment_id"),
+                "status": _clean_text(ocr_payload.get("status")) or "skipped",
+                "text": _clean_text(ocr_payload.get("text")) or "",
+                "warning": _clean_text(ocr_payload.get("warning")),
+            }
+        )
+    return entries
 
 
 def _build_normalized_candidate(message: str | None, candidate_inputs: dict[str, Any], operator_overrides: dict[str, Any]) -> dict[str, Any]:
@@ -377,6 +466,7 @@ def create_analysis(
 
     autofill_suggestions, autofill_missing_fields, autofill_warnings = _build_autofill_suggestions(
         message=message,
+        attachment_ocr_entries=_collect_attachment_ocr_entries(attachment_ids),
         candidate_inputs=normalized_candidates,
         operator_overrides=normalized_overrides,
         requested_job_date=requested_job_date,
