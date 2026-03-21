@@ -260,6 +260,10 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'id="draftLockNotice"' in mobile_html
     assert 'This analysis is locked because a quote draft is already linked. Start a new draft to make changes.' in mobile_html
     assert 'function setDraftLocked(isLocked)' in mobile_js
+    assert 'function enterNewDraftState()' in mobile_js
+    assert 'currentDraftMeta.textContent = "New unsaved draft.";' in mobile_js
+    assert 'Enter the intake details, then save/analyze to create the draft.' in mobile_js
+    assert 'Upload screenshots now or after the first save/analyze.' in mobile_js
     assert 'Draft loaded in locked view because a quote is already linked.' in mobile_js
     assert 'This analysis is locked because a quote draft is already linked.' in mobile_js
     assert 'function formatSuggestionValue(meta)' in mobile_js
@@ -278,6 +282,9 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'function renderRequests()' in mobile_js
     assert 'function renderJobs()' in mobile_js
     assert 'function logout()' in mobile_js
+    assert 'homeNewIntakeBtn.addEventListener("click", () => {' in mobile_js
+    assert 'enterNewDraftState();' in mobile_js
+    assert 'newDraftBtn.addEventListener("click", enterNewDraftState);' in mobile_js
     assert 'localStorage' not in mobile_js
     assert '.mobileNav' in mobile_css
     assert '.metricGrid' in mobile_css
