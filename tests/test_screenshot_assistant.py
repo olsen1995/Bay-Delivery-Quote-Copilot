@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app import storage
 from app.main import app
+from app.services.quote_service import build_quote_artifacts
 
 
 @pytest.fixture(autouse=True)
@@ -174,6 +175,13 @@ def test_screenshot_assistant_structured_output_contract(client: TestClient) -> 
     assert isinstance(body["quote_guidance"]["cash_total_cad"], float)
     assert isinstance(body["quote_guidance"]["emt_total_cad"], float)
     assert isinstance(body["quote_guidance"]["disclaimer"], str)
+    assert body["quote_guidance"]["range"]["recommended_target_cash_cad"] == body["quote_guidance"]["cash_total_cad"]
+    assert isinstance(body["quote_guidance"]["range"]["minimum_safe_cash_cad"], float)
+    assert isinstance(body["quote_guidance"]["range"]["upper_reasonable_cash_cad"], float)
+    assert body["quote_guidance"]["confidence"] in {"high", "medium", "low"}
+    assert isinstance(body["quote_guidance"]["unknowns"], list)
+    assert isinstance(body["quote_guidance"]["risk_notes"], list)
+    assert body["quote_guidance"]["range_basis"]["anchor"] == "existing_quote_engine_cash_total"
     assert body["normalized_candidate"]["pickup_address"] == "1 Pickup Ave"
     assert body["normalized_candidate"]["dropoff_address"] == "2 Dropoff Rd"
     assert isinstance(body["autofill_suggestions"], dict)
@@ -241,6 +249,32 @@ def test_screenshot_assistant_message_autofill_reports_missing_fields_and_warnin
         "requested_time_window",
     ]
     assert body["autofill_warnings"] == ["Paste a customer message to generate autofill suggestions."]
+
+
+def test_screenshot_assistant_quote_range_is_ordered_and_target_is_engine_anchor(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Reviewed haul-away request with enough detail for a normal recommendation.",
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 2.0,
+                "crew_size": 2,
+                "garbage_bag_count": 8,
+                "job_address": "123 Example St",
+                "description": "Eight light bags from a garage with normal access and confirmed reviewed scope.",
+            },
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    guidance = response.json()["quote_guidance"]
+    assert guidance["range"]["minimum_safe_cash_cad"] <= guidance["range"]["recommended_target_cash_cad"]
+    assert guidance["range"]["recommended_target_cash_cad"] <= guidance["range"]["upper_reasonable_cash_cad"]
+    assert guidance["range"]["recommended_target_cash_cad"] == guidance["cash_total_cad"]
 
 
 def test_screenshot_assistant_requested_date_and_window_round_trip_without_affecting_guidance(client: TestClient) -> None:
@@ -449,6 +483,26 @@ def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClien
     assert updated["quote_id"] is None
 
 
+def test_screenshot_assistant_low_information_analysis_keeps_minimum_safe_at_target(client: TestClient) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "",
+            "candidate_inputs": {"estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    guidance = response.json()["quote_guidance"]
+    assert guidance["confidence"] == "low"
+    assert guidance["range"]["minimum_safe_cash_cad"] == guidance["range"]["recommended_target_cash_cad"]
+    assert any("default assistant assumption" in item.lower() for item in guidance["unknowns"])
+    assert any("reviewed description" in item.lower() for item in guidance["unknowns"])
+
+
 def test_screenshot_assistant_ocr_autofill_can_fill_v1a_fields_without_message(client: TestClient) -> None:
     storage.save_attachment(
         {
@@ -535,6 +589,36 @@ def test_screenshot_assistant_combines_message_and_ocr_sources_without_overwriti
     assert body["autofill_suggestions"]["job_address"]["source"] == "ocr"
     assert body["autofill_suggestions"]["description"]["source"] == "message"
     assert body["autofill_suggestions"]["description"]["value"].startswith("Hi, my name is Taylor.")
+
+
+def test_screenshot_assistant_minimum_safe_respects_active_engine_floors(client: TestClient) -> None:
+    payload = {
+        "service_type": "item_delivery",
+        "estimated_hours": 1.0,
+        "crew_size": 1,
+        "pickup_address": "1 Pickup Ave",
+        "dropoff_address": "2 Dropoff Rd",
+        "job_address": "2 Dropoff Rd",
+        "description": "Reviewed item delivery with protected route details and enclosed trailer.",
+        "trailer_class": "older_enclosed",
+    }
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Reviewed delivery draft.",
+            "candidate_inputs": payload,
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    guidance = response.json()["quote_guidance"]
+    artifacts = build_quote_artifacts(payload)
+    protected_floor = artifacts["engine_quote"]["_internal"]["item_delivery_protected_base_floor_cad"]
+    assert protected_floor > 0
+    assert guidance["range"]["minimum_safe_cash_cad"] >= protected_floor
 
 
 def test_linked_screenshot_assistant_analysis_cannot_be_updated(client: TestClient) -> None:

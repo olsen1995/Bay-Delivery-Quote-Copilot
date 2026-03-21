@@ -409,6 +409,174 @@ def _trim_intake_payload(intake: dict[str, Any], *, include_autofill: bool) -> d
     return trimmed
 
 
+def _round_up_to_nearest_5(value: float) -> float:
+    if value <= 0:
+        return 0.0
+    rounded = int((float(value) + 4.9999) // 5) * 5
+    return float(max(rounded, 0))
+
+
+def _has_meaningful_reviewed_description(value: Any) -> bool:
+    text = _clean_text(value) or ""
+    if len(text) < 20:
+        return False
+    return len([part for part in re.split(r"\s+", text) if part]) >= 4
+
+
+def _service_type_requires_route_details(service_type: str | None) -> bool:
+    normalized = (service_type or "").strip().lower()
+    return normalized in {"small_move", "item_delivery"}
+
+
+def _build_quote_range_guidance(
+    *,
+    normalized_candidate: dict[str, Any],
+    intake: dict[str, Any],
+    quote_artifacts: dict[str, Any],
+) -> dict[str, Any]:
+    response = quote_artifacts.get("response") or {}
+    engine_quote = quote_artifacts.get("engine_quote") or {}
+    internal = engine_quote.get("_internal") or {}
+
+    target = float(response.get("cash_total_cad", 0.0) or 0.0)
+    service_type = _clean_text((quote_artifacts.get("normalized_request") or {}).get("service_type")) or ""
+    candidate_inputs = intake.get("candidate_inputs") or {}
+    operator_overrides = intake.get("operator_overrides") or {}
+    autofill_warnings = intake.get("autofill_warnings") or []
+    attachment_ids = intake.get("screenshot_attachment_ids") or []
+
+    unknowns: list[str] = []
+    risk_notes: list[str] = []
+    floor_drivers: list[str] = []
+    width_drivers: list[str] = []
+
+    service_type_reviewed = bool(_clean_text(candidate_inputs.get("service_type")) or _clean_text(operator_overrides.get("service_type")))
+    reviewed_description = _has_meaningful_reviewed_description(normalized_candidate.get("description"))
+    reviewed_job_address = bool(_clean_text(normalized_candidate.get("job_address")))
+    route_required = _service_type_requires_route_details(service_type)
+    route_complete = bool(_clean_text(normalized_candidate.get("pickup_address")) and _clean_text(normalized_candidate.get("dropoff_address")))
+    access_explicit = "access_difficulty" in candidate_inputs or "access_difficulty" in operator_overrides
+    load_size_reviewed = any(
+        normalized_candidate.get(field) not in {None, "", 0}
+        for field in ("garbage_bag_count", "bag_type", "trailer_fill_estimate", "trailer_class")
+    )
+    ocr_ambiguity = any(
+        isinstance(warning, str)
+        and any(token in warning.lower() for token in ("ocr", "no autofill", "paste a customer message"))
+        for warning in autofill_warnings
+    )
+
+    if not service_type_reviewed:
+        unknowns.append("Service type is still using the default assistant assumption.")
+        width_drivers.append("default_service_type")
+    if not reviewed_description:
+        unknowns.append("Reviewed description is still minimal.")
+        width_drivers.append("limited_reviewed_description")
+    if not reviewed_job_address and not route_complete:
+        unknowns.append("Job or route address details are not fully reviewed.")
+        width_drivers.append("missing_reviewed_address")
+    if route_required and not route_complete:
+        unknowns.append("Pickup and dropoff details are not fully reviewed.")
+        width_drivers.append("incomplete_route_details")
+    if not access_explicit:
+        unknowns.append("Access difficulty is still at the default assumption.")
+        width_drivers.append("default_access_assumption")
+    if service_type == "haul_away" and not load_size_reviewed:
+        unknowns.append("Load size is not fully confirmed.")
+        width_drivers.append("unconfirmed_load_size")
+    if attachment_ids and ocr_ambiguity:
+        unknowns.append("OCR or message review still has ambiguity.")
+        width_drivers.append("ocr_message_ambiguity")
+
+    confidence = "high"
+    if route_required and not route_complete:
+        confidence = "low"
+    elif len(width_drivers) >= 4:
+        confidence = "low"
+    elif len(width_drivers) >= 2:
+        confidence = "medium"
+
+    floor_candidates: list[tuple[str, float]] = [
+        ("service_minimum", float(internal.get("min_total_cad", 0.0) or 0.0)),
+        ("travel_minimum", float(internal.get("travel_min_cad", 0.0) or 0.0)),
+        ("travel_total", float(internal.get("travel_total_cad", 0.0) or 0.0)),
+        ("item_delivery_protected_floor", float(internal.get("item_delivery_protected_base_floor_cad", 0.0) or 0.0)),
+        ("bag_type_floor", float(internal.get("bag_type_floor_cad", 0.0) or 0.0)),
+        ("trailer_fill_floor", float(internal.get("trailer_fill_floor_cad", 0.0) or 0.0)),
+        ("awkward_small_load_floor", float(internal.get("awkward_small_load_floor_cad", 0.0) or 0.0)),
+        ("protected_subtotal", float(internal.get("pre_access_subtotal_cad", 0.0) or 0.0)),
+        ("cash_before_round", float(internal.get("cash_before_round_cad", 0.0) or 0.0)),
+    ]
+    active_floor_values = []
+    for label, value in floor_candidates:
+        if value > 0:
+            active_floor_values.append(value)
+        if value > 0 and label not in {"travel_total", "protected_subtotal", "cash_before_round"}:
+            floor_drivers.append(label)
+
+    highest_floor = _round_up_to_nearest_5(max(active_floor_values, default=0.0))
+    downward_room = 0.0
+    if confidence == "high":
+        downward_room = 10.0
+    elif confidence == "medium":
+        downward_room = 5.0
+
+    if confidence == "low":
+        minimum_safe = target
+    else:
+        minimum_safe = max(highest_floor, target - downward_room)
+        minimum_safe = min(minimum_safe, target)
+
+    upward_room = 10.0
+    if confidence == "medium":
+        upward_room = 15.0
+    elif confidence == "low":
+        upward_room = 20.0
+
+    if "default_access_assumption" in width_drivers:
+        upward_room += 10.0
+    if "unconfirmed_load_size" in width_drivers:
+        upward_room += 10.0
+    if "ocr_message_ambiguity" in width_drivers:
+        upward_room += 5.0
+    if bool(normalized_candidate.get("has_dense_materials")):
+        upward_room += 10.0
+        width_drivers.append("dense_material_risk")
+    if float(internal.get("trailer_fill_floor_cad", 0.0) or 0.0) > 0:
+        upward_room += 5.0
+        width_drivers.append("trailer_floor_active")
+
+    upward_room = min(upward_room, 45.0)
+    upper_reasonable = target + upward_room
+
+    if "default_access_assumption" in width_drivers:
+        risk_notes.append("Avoid quoting the bottom of the band until access is confirmed.")
+    if "unconfirmed_load_size" in width_drivers:
+        risk_notes.append("Load size is not fully reviewed; trailer-floor pricing may still apply.")
+    if bool(normalized_candidate.get("has_dense_materials")):
+        risk_notes.append("Dense or heavy material risk may push this job toward the upper end.")
+    if float(internal.get("crew_escalated") or 0):
+        risk_notes.append("Crew sizing is already margin-protected; avoid quoting below the reviewed target.")
+    if not risk_notes and confidence != "high":
+        risk_notes.append("Use the recommended target unless the reviewed scope is clearly tighter than the current intake.")
+
+    return {
+        "range": {
+            "minimum_safe_cash_cad": float(round(minimum_safe, 2)),
+            "recommended_target_cash_cad": float(round(target, 2)),
+            "upper_reasonable_cash_cad": float(round(upper_reasonable, 2)),
+        },
+        "confidence": confidence,
+        "unknowns": unknowns,
+        "risk_notes": risk_notes,
+        "range_basis": {
+            "anchor": "existing_quote_engine_cash_total",
+            "floor_drivers": floor_drivers,
+            "width_drivers": width_drivers,
+        },
+    }
+
+
 def _format_analysis(record: dict[str, Any], *, include_autofill: bool = True) -> dict[str, Any]:
     analysis_id = record["analysis_id"]
     attachments = list_attachments(analysis_id=analysis_id, limit=25)
@@ -478,11 +646,22 @@ def create_analysis(
         normalized_overrides,
     )
     quote_artifacts = build_quote_artifacts(normalized_candidate)
+    range_guidance = _build_quote_range_guidance(
+        normalized_candidate=quote_artifacts["normalized_request"],
+        intake={
+            "candidate_inputs": normalized_candidates,
+            "operator_overrides": normalized_overrides,
+            "autofill_warnings": autofill_warnings,
+            "screenshot_attachment_ids": attachment_ids,
+        },
+        quote_artifacts=quote_artifacts,
+    )
 
     analysis_id = analysis_id or str(uuid4())
     guidance = {
         **quote_artifacts["response"],
         "service_type": quote_artifacts["normalized_request"]["service_type"],
+        **range_guidance,
         "recommendation_only": True,
         "source": "existing_quote_pricing_logic",
     }

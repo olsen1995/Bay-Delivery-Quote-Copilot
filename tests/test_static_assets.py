@@ -172,6 +172,14 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'Autofill Suggestions' in admin_js
     assert 'Apply All Empty Fields' in admin_js
     assert 'Suggestions stay non-binding until you explicitly apply or edit them.' in admin_js
+    assert 'Quote Range Guidance' in admin_js
+    assert 'Minimum Safe' in admin_js
+    assert 'Recommended Target' in admin_js
+    assert 'Upper Reasonable' in admin_js
+    assert 'Confidence' in admin_js
+    assert 'Unknowns:' in admin_js
+    assert 'Risk Notes:' in admin_js
+    assert 'Minimum Safe is a protective lower bound, not the preferred quote.' in admin_js
     assert 'Missing fields:' in admin_js
     assert 'Warnings:' in admin_js
     assert 'No message/OCR-based suggestions detected yet.' in admin_js
