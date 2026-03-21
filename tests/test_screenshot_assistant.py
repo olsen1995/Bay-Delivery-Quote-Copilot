@@ -277,6 +277,34 @@ def test_screenshot_assistant_quote_range_is_ordered_and_target_is_engine_anchor
     assert guidance["range"]["recommended_target_cash_cad"] == guidance["cash_total_cad"]
 
 
+def test_screenshot_assistant_reviewed_description_in_normalized_payload_does_not_trigger_minimal_unknown(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Reviewed haul-away request with pricing fields confirmed.",
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 2.0,
+                "crew_size": 2,
+                "garbage_bag_count": 8,
+                "job_address": "123 Example St",
+                "description": "Eight reviewed bags from a garage with normal access and confirmed quoted scope.",
+            },
+            "operator_overrides": {},
+            "screenshot_attachment_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    guidance = response.json()["quote_guidance"]
+    assert "Reviewed description is still minimal." not in guidance["unknowns"]
+    assert guidance["confidence"] == "high"
+    assert guidance["range"]["minimum_safe_cash_cad"] <= guidance["range"]["recommended_target_cash_cad"]
+
+
 def test_screenshot_assistant_requested_date_and_window_round_trip_without_affecting_guidance(client: TestClient) -> None:
     response = client.post(
         "/admin/api/screenshot-assistant/analyses/intake",

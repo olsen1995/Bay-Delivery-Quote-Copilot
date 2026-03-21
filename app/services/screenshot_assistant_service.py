@@ -451,7 +451,7 @@ def _build_quote_range_guidance(
     width_drivers: list[str] = []
 
     service_type_reviewed = bool(_clean_text(candidate_inputs.get("service_type")) or _clean_text(operator_overrides.get("service_type")))
-    reviewed_description = _has_meaningful_reviewed_description(normalized_candidate.get("description"))
+    reviewed_description = _has_meaningful_reviewed_description(normalized_candidate.get("job_description_customer"))
     reviewed_job_address = bool(_clean_text(normalized_candidate.get("job_address")))
     route_required = _service_type_requires_route_details(service_type)
     route_complete = bool(_clean_text(normalized_candidate.get("pickup_address")) and _clean_text(normalized_candidate.get("dropoff_address")))
