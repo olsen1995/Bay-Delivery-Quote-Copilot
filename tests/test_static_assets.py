@@ -257,6 +257,18 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert '/admin/api/quote-requests?limit=20' in mobile_js
     assert '/admin/api/jobs?limit=20' in mobile_js
     assert 'const state = {' in mobile_js
+    assert 'id="draftLockNotice"' in mobile_html
+    assert 'This analysis is locked because a quote draft is already linked. Start a new draft to make changes.' in mobile_html
+    assert 'function setDraftLocked(isLocked)' in mobile_js
+    assert 'Draft loaded in locked view because a quote is already linked.' in mobile_js
+    assert 'This analysis is locked because a quote draft is already linked.' in mobile_js
+    assert 'function formatSuggestionValue(meta)' in mobile_js
+    assert 'return meta.value ?? "";' in mobile_js
+    assert 'candidate_inputs: buildCandidateInputs()' in mobile_js
+    assert 'operator_overrides: {}' in mobile_js
+    assert 'const candidate = getReviewedCandidateInputs(analysis);' in mobile_js
+    assert '.draftLockNotice' in mobile_css
+    assert 'button:disabled,' in mobile_css
     assert 'function buildAnalysisPayload()' in mobile_js
     assert 'function renderQuoteGuidance(analysis)' in mobile_js
     assert 'function renderAttachmentReview(analysis)' in mobile_js

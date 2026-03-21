@@ -290,6 +290,20 @@ textarea {
   margin: 10px 0;
 }
 
+.draftLockNotice {
+  margin-bottom: 12px;
+  border-color: rgba(180, 35, 24, 0.2);
+  background: rgba(180, 35, 24, 0.08);
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .stickyMetaBar {
   position: sticky;
   top: calc(max(8px, env(safe-area-inset-top)) + 74px);

@@ -31,6 +31,7 @@ const intakeStatus = document.getElementById("intakeStatus");
 const uploadStatus = document.getElementById("uploadStatus");
 const handoffStatus = document.getElementById("handoffStatus");
 const currentDraftMeta = document.getElementById("currentDraftMeta");
+const draftLockNotice = document.getElementById("draftLockNotice");
 const recentDraftsList = document.getElementById("recentDraftsList");
 const requestsList = document.getElementById("requestsList");
 const jobsList = document.getElementById("jobsList");
@@ -78,7 +79,15 @@ function setStatus(el, level, message, code) {
 
 function setLoading(button, isLoading, label) {
   if (!button) return;
-  button.disabled = isLoading;
+  if (isLoading) {
+    button.disabled = true;
+  } else if ([saveDraftBtn, uploadScreenshotsBtn, createQuoteDraftBtn].includes(button)) {
+    button.disabled = isDraftLocked();
+  } else if (button === prepareHandoffBtn) {
+    button.disabled = !state.currentAnalysis?.quote_id;
+  } else {
+    button.disabled = false;
+  }
   if (label) button.textContent = isLoading ? label : button.dataset.idleLabel || button.textContent;
 }
 
@@ -174,6 +183,41 @@ function setAuthenticated(isAuthenticated) {
   logoutBtn.hidden = !isAuthenticated;
 }
 
+function reviewedDraftFields() {
+  return [
+    fields.message,
+    fields.customerName,
+    fields.customerPhone,
+    fields.description,
+    fields.requestedDate,
+    fields.requestedWindow,
+    fields.serviceType,
+    fields.jobAddress,
+    fields.estimatedHours,
+    fields.crewSize,
+    fields.pickupAddress,
+    fields.dropoffAddress,
+    fields.files,
+    fields.responseDraft
+  ].filter(Boolean);
+}
+
+function isDraftLocked(analysis = state.currentAnalysis) {
+  return !!(analysis && analysis.quote_id);
+}
+
+function setDraftLocked(isLocked) {
+  const locked = !!isLocked;
+  reviewedDraftFields().forEach((field) => {
+    field.disabled = locked;
+  });
+  saveDraftBtn.disabled = locked;
+  uploadScreenshotsBtn.disabled = locked;
+  createQuoteDraftBtn.disabled = locked;
+  prepareHandoffBtn.disabled = !state.currentAnalysis?.quote_id;
+  draftLockNotice.classList.toggle("hidden", !locked);
+}
+
 function resetDraftState() {
   state.currentAnalysisId = "";
   state.currentAnalysis = null;
@@ -199,15 +243,24 @@ function resetDraftState() {
   renderEmptyState(ocrReviewBox, "No screenshot uploads yet.");
   renderEmptyState(extractedDetailsBox, "No extracted details yet.");
   renderEmptyState(quoteGuidanceBox, "No quote guidance yet.");
+  setDraftLocked(false);
+}
+
+function getReviewedCandidateInputs(analysis) {
+  const intake = analysis?.intake || {};
+  return {
+    ...(intake.candidate_inputs || {}),
+    ...(intake.operator_overrides || {})
+  };
 }
 
 function applyAnalysisToForm(analysis) {
   const intake = analysis?.intake || {};
-  const candidate = analysis?.normalized_candidate || {};
+  const candidate = getReviewedCandidateInputs(analysis);
   fields.message.value = intake.message || "";
   fields.customerName.value = candidate.customer_name || "";
   fields.customerPhone.value = candidate.customer_phone || "";
-  fields.description.value = candidate.job_description_customer || "";
+  fields.description.value = candidate.description || candidate.job_description_customer || "";
   fields.requestedDate.value = intake.requested_job_date || "";
   fields.requestedWindow.value = intake.requested_time_window || "";
   fields.serviceType.value = candidate.service_type || "";
@@ -348,6 +401,13 @@ function renderAttachmentReview(analysis) {
   });
 }
 
+function formatSuggestionValue(meta) {
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    return meta.value ?? "";
+  }
+  return meta ?? "";
+}
+
 function renderExtractedDetails(analysis) {
   const suggestions = analysis?.autofill_suggestions || {};
   const missingFields = Array.isArray(analysis?.autofill_missing_fields) ? analysis.autofill_missing_fields : [];
@@ -355,7 +415,7 @@ function renderExtractedDetails(analysis) {
 
   clearNode(extractedDetailsBox);
 
-  const suggestionEntries = Object.entries(suggestions).filter(([, value]) => value !== null && value !== "");
+  const suggestionEntries = Object.entries(suggestions).filter(([, value]) => formatSuggestionValue(value) !== "");
   if (!suggestionEntries.length && !missingFields.length && !warnings.length) {
     renderEmptyState(extractedDetailsBox, "No extracted details available yet.");
     return;
@@ -368,7 +428,8 @@ function renderExtractedDetails(analysis) {
     suggestionEntries.forEach(([key, value]) => {
       const row = document.createElement("div");
       row.className = "mt12";
-      row.innerHTML = `<strong>${escapeHtml(key.replace(/_/g, " "))}:</strong> ${escapeHtml(value)}`;
+      const renderedValue = formatSuggestionValue(value);
+      row.innerHTML = `<strong>${escapeHtml(key.replace(/_/g, " "))}:</strong> ${escapeHtml(renderedValue)}`;
       suggestionCard.appendChild(row);
     });
     extractedDetailsBox.appendChild(suggestionCard);
@@ -429,7 +490,7 @@ function updateQueueMetrics() {
   upcomingCount.textContent = String(upcomingJobs.length);
 }
 
-function buildOperatorOverrides() {
+function buildCandidateInputs() {
   const payload = {};
   const mappings = {
     customer_name: fields.customerName.value,
@@ -461,8 +522,8 @@ function buildAnalysisPayload() {
     screenshot_attachment_ids: Array.isArray(state.currentAnalysis?.attachments)
       ? state.currentAnalysis.attachments.map((item) => item.attachment_id).filter(Boolean)
       : [],
-    candidate_inputs: {},
-    operator_overrides: buildOperatorOverrides()
+    candidate_inputs: buildCandidateInputs(),
+    operator_overrides: {}
   };
 }
 
@@ -494,8 +555,13 @@ async function loadAnalysis(analysisId) {
   renderAttachmentReview(analysis);
   renderExtractedDetails(analysis);
   renderQuoteGuidance(analysis);
-  setStatus(intakeStatus, "ok", "Draft loaded. Review fields and save again if you make edits.");
-  setStatus(uploadStatus, "warn", "Upload more screenshots if needed, then re-run Save / Analyze Intake.");
+  setDraftLocked(isDraftLocked(analysis));
+  setStatus(intakeStatus, "ok", isDraftLocked(analysis)
+    ? "Draft loaded in locked view because a quote is already linked."
+    : "Draft loaded. Review fields and save again if you make edits.");
+  setStatus(uploadStatus, "warn", isDraftLocked(analysis)
+    ? "Screenshot uploads are locked because the linked quote draft already exists."
+    : "Upload more screenshots if needed, then re-run Save / Analyze Intake.");
   setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
   showScreen("intakeScreen");
 }
@@ -558,6 +624,10 @@ async function refreshAllData() {
 
 async function saveDraftAnalysis(event) {
   event.preventDefault();
+  if (isDraftLocked()) {
+    setStatus(intakeStatus, "warn", "This analysis is locked because a quote draft is already linked.");
+    return;
+  }
   saveDraftBtn.dataset.idleLabel = "Save / Analyze Intake";
   setLoading(saveDraftBtn, true, "Saving...");
   setStatus(intakeStatus, "warn", "Saving reviewed intake and refreshing quote guidance...");
@@ -574,6 +644,7 @@ async function saveDraftAnalysis(event) {
     renderAttachmentReview(analysis);
     renderExtractedDetails(analysis);
     renderQuoteGuidance(analysis);
+    setDraftLocked(isDraftLocked(analysis));
     setStatus(intakeStatus, "ok", "Draft analysis saved. Guidance still reuses the existing quote engine.");
     setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft already exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
     await loadDashboardData();
@@ -586,6 +657,11 @@ async function saveDraftAnalysis(event) {
 }
 
 async function uploadScreenshots() {
+  if (isDraftLocked()) {
+    setStatus(uploadStatus, "warn", "This analysis is locked because a quote draft is already linked.");
+    return;
+  }
+
   const files = Array.from(fields.files.files || []);
   if (!files.length) {
     setStatus(uploadStatus, "bad", "Choose at least one screenshot or photo before uploading.");
@@ -643,6 +719,10 @@ async function createQuoteDraft() {
     setStatus(handoffStatus, "bad", "Create or load a draft analysis before creating a quote draft.");
     return;
   }
+  if (isDraftLocked()) {
+    setStatus(handoffStatus, "warn", "This analysis is locked because a quote draft is already linked.");
+    return;
+  }
 
   createQuoteDraftBtn.dataset.idleLabel = "Create Quote Draft";
   setLoading(createQuoteDraftBtn, true, "Creating...");
@@ -656,6 +736,7 @@ async function createQuoteDraft() {
     if (data.analysis?.analysis_id) state.currentAnalysisId = data.analysis.analysis_id;
     updateDraftMeta(state.currentAnalysis);
     renderQuoteGuidance(state.currentAnalysis);
+    setDraftLocked(isDraftLocked(state.currentAnalysis));
     await loadDashboardData();
     setStatus(handoffStatus, "ok", `Quote draft ${data.quote?.quote_id || "created"} linked. You can now prepare customer handoff.`);
   } catch (err) {
