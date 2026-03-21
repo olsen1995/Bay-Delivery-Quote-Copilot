@@ -555,6 +555,11 @@ def admin_page():
     return FileResponse(str(STATIC_DIR / "admin.html"))
 
 
+@app.get("/admin/mobile")
+def admin_mobile_page():
+    return FileResponse(str(STATIC_DIR / "admin_mobile.html"))
+
+
 @app.get("/admin/uploads")
 def admin_uploads_page():
     return FileResponse(str(STATIC_DIR / "admin_uploads.html"))

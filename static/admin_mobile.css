@@ -1,0 +1,333 @@
+:root {
+  --brand-red: #c12c27;
+  --brand-red-deep: #8f1f1b;
+  --ink-strong: #122033;
+  --ink-muted: #5d6b7c;
+  --line-soft: #d9e1ea;
+  --surface: #ffffff;
+  --surface-alt: #f6f8fb;
+  --shadow-soft: 0 18px 36px rgba(15, 23, 42, 0.08);
+  --radius-card: 18px;
+  --radius-control: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f2f5f8 100%);
+}
+
+body {
+  font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+  color: var(--ink-strong);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.mobileAppShell {
+  min-height: 100vh;
+  padding: max(16px, env(safe-area-inset-top)) 14px max(24px, env(safe-area-inset-bottom));
+}
+
+.mobileTopbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobileMain {
+  display: grid;
+  gap: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--brand-red);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 1.24rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+.muted {
+  color: var(--ink-muted);
+  line-height: 1.45;
+}
+
+.small {
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+}
+
+.screenCard,
+.subsectionCard,
+.metricCard,
+.statusNotice {
+  border: 1px solid rgba(217, 225, 234, 0.9);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-soft);
+}
+
+.screenCard,
+.subsectionCard {
+  padding: 16px;
+}
+
+.statusNotice {
+  padding: 12px 14px;
+  min-height: 48px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.compactHeader {
+  margin-bottom: 12px;
+}
+
+.stackForm {
+  display: grid;
+  gap: 10px;
+}
+
+label {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  background: #fff;
+  color: var(--ink-strong);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.primaryButton,
+.secondaryButton,
+.ghostButton,
+.navButton,
+.textButton {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-weight: 800;
+}
+
+.primaryButton {
+  background: var(--brand-red);
+  color: #fff;
+}
+
+.primaryButton:hover,
+.primaryButton:focus-visible {
+  background: var(--brand-red-deep);
+}
+
+.secondaryButton {
+  background: rgba(18, 32, 51, 0.06);
+  color: var(--ink-strong);
+}
+
+.ghostButton,
+.textButton {
+  background: transparent;
+  color: var(--ink-strong);
+  border-color: rgba(18, 32, 51, 0.1);
+}
+
+.mobileNav {
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top));
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(217, 225, 234, 0.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.navButton {
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.navButton.is-active {
+  background: rgba(193, 44, 39, 0.12);
+  color: var(--brand-red-deep);
+}
+
+.metricGrid,
+.twoCol,
+.actionStack,
+.cardList,
+.appScreen,
+.mobileMain,
+#authenticatedShell {
+  display: grid;
+  gap: 12px;
+}
+
+.metricGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metricCard {
+  padding: 14px;
+  text-align: center;
+}
+
+.metricCard strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.4rem;
+}
+
+.metricLabel {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cardItem {
+  border: 1px solid rgba(217, 225, 234, 0.9);
+  border-radius: 16px;
+  background: var(--surface-alt);
+  padding: 14px;
+}
+
+.cardItem h3,
+.cardItem strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.cardItem code {
+  display: block;
+  word-break: break-all;
+  white-space: pre-wrap;
+  background: rgba(18, 32, 51, 0.05);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.inlineMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(18, 32, 51, 0.08);
+  color: var(--ink-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.subtleDivider {
+  height: 1px;
+  background: rgba(217, 225, 234, 0.9);
+  margin: 10px 0;
+}
+
+.stickyMetaBar {
+  position: sticky;
+  top: calc(max(8px, env(safe-area-inset-top)) + 74px);
+  z-index: 4;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(18, 32, 51, 0.05);
+  border: 1px solid rgba(18, 32, 51, 0.08);
+  margin-bottom: 12px;
+}
+
+.okText {
+  color: #166534;
+}
+
+.badText {
+  color: #b42318;
+}
+
+.warningText {
+  color: #9a6700;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.mt12 {
+  margin-top: 12px;
+}
+
+@media (min-width: 760px) {
+  .mobileAppShell {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .twoCol {
+    grid-template-columns: 1fr 1fr;
+  }
+}

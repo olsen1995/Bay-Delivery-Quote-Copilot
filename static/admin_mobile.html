@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bay Delivery – Mobile Admin</title>
+  <link rel="stylesheet" href="/static/admin_mobile.css" />
+</head>
+<body class="mobileAdminPage">
+  <div class="mobileAppShell">
+    <header class="mobileTopbar">
+      <div>
+        <p class="eyebrow">Internal Admin</p>
+        <h1>Bay Delivery Mobile Ops</h1>
+      </div>
+      <button id="logoutBtn" class="ghostButton" type="button" hidden>Log Out</button>
+    </header>
+
+    <main class="mobileMain">
+      <section id="loginScreen" class="screenCard">
+        <div class="sectionHeader">
+          <div>
+            <h2>Mobile Login</h2>
+            <p class="muted">Reuse the existing admin username and password. No customer-facing flow changes.</p>
+          </div>
+        </div>
+        <form id="loginForm" class="stackForm" novalidate>
+          <label for="mobileAdminUsername">Username</label>
+          <input id="mobileAdminUsername" type="text" autocomplete="username" placeholder="Admin username" />
+
+          <label for="mobileAdminPassword">Password</label>
+          <input id="mobileAdminPassword" type="password" autocomplete="current-password" placeholder="Admin password" />
+
+          <button id="loginBtn" class="primaryButton" type="submit">Log In</button>
+        </form>
+        <div id="loginStatus" class="statusNotice muted" role="status" aria-live="polite"></div>
+      </section>
+
+      <div id="authenticatedShell" hidden>
+        <nav class="mobileNav" aria-label="Mobile admin navigation">
+          <button class="navButton is-active" data-screen="homeScreen" type="button">Home</button>
+          <button class="navButton" data-screen="intakeScreen" type="button">Intake</button>
+          <button class="navButton" data-screen="requestsScreen" type="button">Requests</button>
+          <button class="navButton" data-screen="jobsScreen" type="button">Jobs</button>
+        </nav>
+
+        <section id="homeScreen" class="screenCard appScreen">
+          <div class="sectionHeader compactHeader">
+            <div>
+              <h2>Home / Queue</h2>
+              <p class="muted">Fast links into the operator workflow.</p>
+            </div>
+            <button id="refreshHomeBtn" class="secondaryButton" type="button">Refresh</button>
+          </div>
+
+          <div class="metricGrid">
+            <article class="metricCard">
+              <span class="metricLabel">Draft Analyses</span>
+              <strong id="draftCount">0</strong>
+            </article>
+            <article class="metricCard">
+              <span class="metricLabel">Open Requests</span>
+              <strong id="requestCount">0</strong>
+            </article>
+            <article class="metricCard">
+              <span class="metricLabel">Upcoming Jobs</span>
+              <strong id="upcomingCount">0</strong>
+            </article>
+          </div>
+
+          <div class="actionStack">
+            <button id="homeNewIntakeBtn" class="primaryButton" type="button">Start New Intake</button>
+            <button id="homeResumeLatestBtn" class="secondaryButton" type="button">Resume Latest Draft</button>
+          </div>
+
+          <section class="subsectionCard">
+            <div class="sectionHeader compactHeader">
+              <div>
+                <h3>Recent Drafts</h3>
+                <p class="muted">Saved screenshot-assistant analyses.</p>
+              </div>
+            </div>
+            <div id="recentDraftsList" class="cardList"></div>
+          </section>
+        </section>
+
+        <section id="intakeScreen" class="screenCard appScreen" hidden>
+          <div class="sectionHeader compactHeader">
+            <div>
+              <h2>New Intake</h2>
+              <p class="muted">Create or update a draft using the existing screenshot-assistant workflow.</p>
+            </div>
+            <button id="newDraftBtn" class="secondaryButton" type="button">New Draft</button>
+          </div>
+
+          <div class="stickyMetaBar">
+            <div>
+              <strong>Current Draft</strong>
+              <div id="currentDraftMeta" class="small">No draft selected yet.</div>
+            </div>
+          </div>
+
+          <form id="intakeForm" class="stackForm" novalidate>
+            <label for="intakeMessage">Customer Message / Intake Notes</label>
+            <textarea id="intakeMessage" rows="6" placeholder="Paste customer message or operator notes here."></textarea>
+
+            <div class="twoCol">
+              <div>
+                <label for="intakeCustomerName">Customer Name</label>
+                <input id="intakeCustomerName" type="text" placeholder="Taylor Example" />
+              </div>
+              <div>
+                <label for="intakeCustomerPhone">Customer Phone</label>
+                <input id="intakeCustomerPhone" type="tel" placeholder="(555) 010-0101" />
+              </div>
+            </div>
+
+            <label for="intakeDescription">Reviewed Description</label>
+            <input id="intakeDescription" type="text" placeholder="Short reviewed job summary" />
+
+            <div class="twoCol">
+              <div>
+                <label for="intakeRequestedDate">Requested Date</label>
+                <input id="intakeRequestedDate" type="date" />
+              </div>
+              <div>
+                <label for="intakeRequestedWindow">Requested Window</label>
+                <select id="intakeRequestedWindow">
+                  <option value="">Select window</option>
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                  <option value="evening">Evening</option>
+                  <option value="flexible">Flexible</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="twoCol">
+              <div>
+                <label for="intakeServiceType">Service Type</label>
+                <input id="intakeServiceType" type="text" placeholder="haul_away" />
+              </div>
+              <div>
+                <label for="intakeJobAddress">Job Address</label>
+                <input id="intakeJobAddress" type="text" placeholder="123 Example St" />
+              </div>
+            </div>
+
+            <div class="twoCol">
+              <div>
+                <label for="intakeEstimatedHours">Estimated Hours</label>
+                <input id="intakeEstimatedHours" type="number" min="0" step="0.25" placeholder="1.5" />
+              </div>
+              <div>
+                <label for="intakeCrewSize">Crew Size</label>
+                <input id="intakeCrewSize" type="number" min="1" step="1" placeholder="2" />
+              </div>
+            </div>
+
+            <div class="twoCol">
+              <div>
+                <label for="intakePickupAddress">Pickup Address</label>
+                <input id="intakePickupAddress" type="text" placeholder="Required for move/delivery only" />
+              </div>
+              <div>
+                <label for="intakeDropoffAddress">Dropoff Address</label>
+                <input id="intakeDropoffAddress" type="text" placeholder="Required for move/delivery only" />
+              </div>
+            </div>
+
+            <div class="actionStack">
+              <button id="saveDraftBtn" class="primaryButton" type="submit">Save / Analyze Intake</button>
+            </div>
+          </form>
+
+          <div id="intakeStatus" class="statusNotice muted" role="status" aria-live="polite"></div>
+
+          <section class="subsectionCard">
+            <div class="sectionHeader compactHeader">
+              <div>
+                <h3>OCR + Extracted Details Review</h3>
+                <p class="muted">Upload screenshots/photos, then review OCR and suggestions.</p>
+              </div>
+            </div>
+            <label for="intakeScreenshotFiles">Screenshots / Photos</label>
+            <input id="intakeScreenshotFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+            <div class="actionStack mt12">
+              <button id="uploadScreenshotsBtn" class="secondaryButton" type="button">Upload Files</button>
+            </div>
+            <div id="uploadStatus" class="statusNotice muted" role="status" aria-live="polite"></div>
+            <div id="ocrReviewBox" class="cardList"></div>
+            <div id="extractedDetailsBox" class="cardList"></div>
+          </section>
+
+          <section class="subsectionCard">
+            <div class="sectionHeader compactHeader">
+              <div>
+                <h3>Quote Guidance</h3>
+                <p class="muted">Pricing guidance is still generated by the existing quote engine.</p>
+              </div>
+            </div>
+            <div id="quoteGuidanceBox" class="cardList"></div>
+            <label for="responseDraft">Response Draft</label>
+            <textarea id="responseDraft" rows="4" placeholder="Operator-only draft response area."></textarea>
+          </section>
+
+          <section class="subsectionCard">
+            <div class="sectionHeader compactHeader">
+              <div>
+                <h3>Quote Draft + Handoff</h3>
+                <p class="muted">Create the real quote draft, then trigger the normal customer handoff.</p>
+              </div>
+            </div>
+            <div class="actionStack">
+              <button id="createQuoteDraftBtn" class="primaryButton" type="button">Create Quote Draft</button>
+              <button id="prepareHandoffBtn" class="secondaryButton" type="button">Prepare Customer Handoff</button>
+            </div>
+            <div id="handoffStatus" class="statusNotice muted" role="status" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <section id="requestsScreen" class="screenCard appScreen" hidden>
+          <div class="sectionHeader compactHeader">
+            <div>
+              <h2>Requests</h2>
+              <p class="muted">Read-only mobile visibility into current booking/customer handoff requests.</p>
+            </div>
+            <button id="refreshRequestsBtn" class="secondaryButton" type="button">Refresh</button>
+          </div>
+          <div id="requestsList" class="cardList"></div>
+        </section>
+
+        <section id="jobsScreen" class="screenCard appScreen" hidden>
+          <div class="sectionHeader compactHeader">
+            <div>
+              <h2>Upcoming Jobs</h2>
+              <p class="muted">Approved, scheduled, and in-progress jobs using the existing jobs flow.</p>
+            </div>
+            <button id="refreshJobsBtn" class="secondaryButton" type="button">Refresh</button>
+          </div>
+          <div id="jobsList" class="cardList"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/admin_mobile.js" defer></script>
+</body>
+</html>

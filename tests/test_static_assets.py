@@ -226,3 +226,49 @@ def test_admin_page_includes_job_lifecycle_controls() -> None:
         assert label in admin_js
     assert "/admin/api/jobs/${jobId}/start" in admin_js
     assert "/admin/api/jobs/${jobId}/complete" in admin_js
+
+
+def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    mobile_css = Path("static/admin_mobile.css").read_text(encoding="utf-8")
+    main_py = Path("app/main.py").read_text(encoding="utf-8")
+
+    assert '<script src="/static/admin_mobile.js" defer></script>' in mobile_html
+    assert '<link rel="stylesheet" href="/static/admin_mobile.css" />' in mobile_html
+    assert '<section id="loginScreen" class="screenCard">' in mobile_html
+    assert 'Mobile Login' in mobile_html
+    assert 'Home / Queue' in mobile_html
+    assert 'New Intake' in mobile_html
+    assert 'OCR + Extracted Details Review' in mobile_html
+    assert 'Quote Guidance' in mobile_html
+    assert 'Quote Draft + Handoff' in mobile_html
+    assert 'Requests' in mobile_html
+    assert 'Upcoming Jobs' in mobile_html
+    assert 'data-screen="homeScreen"' in mobile_html
+    assert 'data-screen="intakeScreen"' in mobile_html
+    assert 'data-screen="requestsScreen"' in mobile_html
+    assert 'data-screen="jobsScreen"' in mobile_html
+    assert 'No customer-facing flow changes.' in mobile_html
+    assert '/admin/api/screenshot-assistant/analyses/intake' in mobile_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(state.currentAnalysisId)}/attachments' in mobile_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(state.currentAnalysisId)}/quote-draft' in mobile_js
+    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' in mobile_js
+    assert '/admin/api/quote-requests?limit=20' in mobile_js
+    assert '/admin/api/jobs?limit=20' in mobile_js
+    assert 'const state = {' in mobile_js
+    assert 'function buildAnalysisPayload()' in mobile_js
+    assert 'function renderQuoteGuidance(analysis)' in mobile_js
+    assert 'function renderAttachmentReview(analysis)' in mobile_js
+    assert 'function renderRequests()' in mobile_js
+    assert 'function renderJobs()' in mobile_js
+    assert 'function logout()' in mobile_js
+    assert 'localStorage' not in mobile_js
+    assert '.mobileNav' in mobile_css
+    assert '.metricGrid' in mobile_css
+    assert '.stickyMetaBar' in mobile_css
+    assert '.cardItem' in mobile_css
+    assert '@media (min-width: 760px)' in mobile_css
+    assert '@app.get("/admin/mobile")' in main_py
+    assert 'def admin_mobile_page():' in main_py
+    assert 'return FileResponse(str(STATIC_DIR / "admin_mobile.html"))' in main_py
