@@ -246,6 +246,13 @@ function resetDraftState() {
   setDraftLocked(false);
 }
 
+function enterNewDraftState() {
+  resetDraftState();
+  currentDraftMeta.textContent = "New unsaved draft.";
+  setStatus(intakeStatus, "warn", "Enter the intake details, then save/analyze to create the draft.");
+  setStatus(uploadStatus, "warn", "Upload screenshots now or after the first save/analyze.");
+}
+
 function getReviewedCandidateInputs(analysis) {
   const intake = analysis?.intake || {};
   return {
@@ -845,7 +852,7 @@ refreshHomeBtn.addEventListener("click", refreshAllData);
 refreshRequestsBtn.addEventListener("click", refreshAllData);
 refreshJobsBtn.addEventListener("click", refreshAllData);
 homeNewIntakeBtn.addEventListener("click", () => {
-  resetDraftState();
+  enterNewDraftState();
   showScreen("intakeScreen");
 });
 homeResumeLatestBtn.addEventListener("click", async () => {
@@ -855,7 +862,7 @@ homeResumeLatestBtn.addEventListener("click", async () => {
   }
   await loadAnalysis(state.analyses[0].analysis_id);
 });
-newDraftBtn.addEventListener("click", resetDraftState);
+newDraftBtn.addEventListener("click", enterNewDraftState);
 intakeForm.addEventListener("submit", saveDraftAnalysis);
 uploadScreenshotsBtn.addEventListener("click", uploadScreenshots);
 createQuoteDraftBtn.addEventListener("click", createQuoteDraft);
