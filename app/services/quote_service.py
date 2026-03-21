@@ -66,6 +66,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "normalized_request": normalized_request,
         "response": response,
+        "engine_quote": engine_quote,
     }
 
 

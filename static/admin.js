@@ -1105,6 +1105,53 @@ function renderScreenshotAssistantResult(item) {
   });
   panel.appendChild(keyGrid);
 
+  const rangeWrap = document.createElement("div");
+  rangeWrap.className = "assistantAttachmentList";
+  const rangeTitle = document.createElement("strong");
+  rangeTitle.textContent = "Quote Range Guidance";
+  rangeWrap.appendChild(rangeTitle);
+
+  const rangeHelper = document.createElement("div");
+  rangeHelper.className = "small muted";
+  rangeHelper.textContent = "Recommended Target is the normal quoting recommendation. Minimum Safe is a protective lower bound, not the preferred quote.";
+  rangeWrap.appendChild(rangeHelper);
+
+  const rangeGrid = document.createElement("div");
+  rangeGrid.className = "assistantKeyGrid";
+  [
+    ["Minimum Safe", formatMoney(safeGet(item, "quote_guidance.range.minimum_safe_cash_cad", null))],
+    ["Recommended Target", formatMoney(safeGet(item, "quote_guidance.range.recommended_target_cash_cad", safeGet(item, "quote_guidance.cash_total_cad", null)))],
+    ["Upper Reasonable", formatMoney(safeGet(item, "quote_guidance.range.upper_reasonable_cash_cad", null))],
+    ["Confidence", safeGet(item, "quote_guidance.confidence", "—")]
+  ].forEach(([label, value]) => {
+    const cell = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = label;
+    const valueNode = document.createElement("div");
+    valueNode.textContent = value;
+    cell.append(strong, valueNode);
+    rangeGrid.appendChild(cell);
+  });
+  rangeWrap.appendChild(rangeGrid);
+
+  const unknowns = safeGet(item, "quote_guidance.unknowns", []);
+  const unknownsWrap = document.createElement("div");
+  unknownsWrap.className = "small";
+  unknownsWrap.textContent = Array.isArray(unknowns) && unknowns.length
+    ? `Unknowns: ${unknowns.join(" | ")}`
+    : "Unknowns: none flagged from the reviewed pricing inputs.";
+  rangeWrap.appendChild(unknownsWrap);
+
+  const riskNotes = safeGet(item, "quote_guidance.risk_notes", []);
+  const riskWrap = document.createElement("div");
+  riskWrap.className = "small";
+  riskWrap.textContent = Array.isArray(riskNotes) && riskNotes.length
+    ? `Risk Notes: ${riskNotes.join(" | ")}`
+    : "Risk Notes: no extra margin warnings for the current reviewed draft.";
+  rangeWrap.appendChild(riskWrap);
+
+  panel.appendChild(rangeWrap);
+
   const disclaimer = document.createElement("div");
   disclaimer.className = "muted";
   disclaimer.textContent = safeGet(item, "quote_guidance.disclaimer", "");
