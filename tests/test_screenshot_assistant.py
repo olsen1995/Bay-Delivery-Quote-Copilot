@@ -824,6 +824,226 @@ def test_prepare_customer_handoff_from_linked_quote_draft_reuses_quote_request_a
     assert attachments[0]["request_id"] is None
 
 
+def test_screenshot_assistant_happy_path_full_chain_through_scheduling(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage.save_attachment(
+        {
+            "attachment_id": "att-full-chain",
+            "created_at": "2026-03-01T10:05:00",
+            "quote_id": None,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": None,
+            "filename": "full-chain.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 456,
+            "drive_file_id": "drive-full-chain",
+            "drive_web_view_link": "https://example.com/full-chain",
+        }
+    )
+
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Initial screenshot intake for a haul away request.",
+            "screenshot_attachment_ids": ["att-full-chain"],
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {"job_address": "111 Intake Ln"},
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    reviewed_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "analysis_id": analysis_id,
+            "message": "Reviewed and ready for customer handoff.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.5, "crew_size": 2},
+            "operator_overrides": {
+                "job_address": "222 Reviewed Ave",
+                "customer_name": "Jordan",
+                "customer_phone": "555-0303",
+                "description": "Reviewed haul away scope",
+            },
+            "screenshot_attachment_ids": ["att-full-chain"],
+        },
+    )
+    assert reviewed_analysis.status_code == 200
+    reviewed_body = reviewed_analysis.json()
+    assert reviewed_body["analysis_id"] == analysis_id
+    assert reviewed_body["normalized_candidate"]["job_address"] == "222 Reviewed Ave"
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+    quote_body = create_quote.json()
+    quote_id = quote_body["quote"]["quote_id"]
+    assert quote_body["analysis"]["quote_id"] == quote_id
+
+    saved_analysis = storage.get_screenshot_assistant_analysis(analysis_id)
+    assert saved_analysis is not None
+    assert saved_analysis["quote_id"] == quote_id
+
+    attachments = storage.list_attachments(analysis_id=analysis_id)
+    assert len(attachments) == 1
+    assert attachments[0]["quote_id"] == quote_id
+
+    review_response = client.get(
+        f"/quote/{quote_id}/view",
+        params={"accept_token": storage.get_quote_record(quote_id)["accept_token"]},
+    )
+    assert review_response.status_code == 200
+    assert review_response.json()["quote_id"] == quote_id
+
+    handoff_response = client.post(
+        f"/admin/api/quotes/{quote_id}/handoff",
+        headers=admin_headers(),
+    )
+    assert handoff_response.status_code == 200
+    handoff_body = handoff_response.json()
+    request_id = handoff_body["request_id"]
+    assert handoff_body["status"] == "customer_pending"
+
+    accept_token = storage.get_quote_record(quote_id)["accept_token"]
+    decision_response = client.post(
+        f"/quote/{quote_id}/decision",
+        json={"action": "accept", "accept_token": accept_token},
+    )
+    assert decision_response.status_code == 200
+    decision_body = decision_response.json()
+    assert decision_body["request_id"] == request_id
+    assert decision_body["status"] == "customer_accepted"
+
+    booking_response = client.post(
+        f"/quote/{quote_id}/booking",
+        json={
+            "booking_token": decision_body["booking_token"],
+            "requested_job_date": "2026-04-12",
+            "requested_time_window": "morning",
+            "notes": "Gate code 1234",
+        },
+    )
+    assert booking_response.status_code == 200
+
+    approval_response = client.post(
+        f"/admin/api/quote-requests/{request_id}/decision",
+        headers=admin_headers(),
+        json={"action": "approve"},
+    )
+    assert approval_response.status_code == 200
+    approval_body = approval_response.json()
+    job = approval_body["job"]
+    assert job is not None
+    job_id = job["job_id"]
+    assert approval_body["request"]["status"] == "admin_approved"
+    assert job["quote_id"] == quote_id
+    assert job["request_id"] == request_id
+
+    monkeypatch.setattr("app.integrations.google_calendar_client.is_configured", lambda: True)
+    monkeypatch.setattr("app.integrations.google_calendar_client.create_event", lambda *_args, **_kwargs: "event-full-chain")
+
+    schedule_response = client.post(
+        f"/admin/api/jobs/{job_id}/schedule",
+        headers=admin_headers(),
+        json={"scheduled_start": "2026-04-12T09:00:00", "scheduled_end": "2026-04-12T11:00:00"},
+    )
+    assert schedule_response.status_code == 200
+    schedule_body = schedule_response.json()
+    assert schedule_body["ok"] is True
+
+    saved_request = storage.get_quote_request(request_id)
+    assert saved_request is not None
+    assert saved_request["status"] == "admin_approved"
+    assert saved_request["requested_job_date"] == "2026-04-12"
+    assert saved_request["requested_time_window"] == "morning"
+
+    saved_job = storage.get_job(job_id)
+    assert saved_job is not None
+    assert saved_job["status"] == "approved"
+    assert saved_job["scheduled_start"].startswith("2026-04-12T09:00:00")
+    assert saved_job["scheduled_end"].startswith("2026-04-12T11:00:00")
+    assert saved_job["calendar_sync_status"] == "synced"
+    assert saved_job["google_calendar_event_id"] == "event-full-chain"
+
+
+def test_screenshot_assistant_decline_path_blocks_booking_and_job_creation(client: TestClient) -> None:
+    create_analysis = client.post(
+        "/admin/api/screenshot-assistant/analyses/intake",
+        headers=admin_headers(),
+        json={
+            "message": "Reviewed screenshot thread for decline guardrail coverage.",
+            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "operator_overrides": {
+                "job_address": "333 Decline Rd",
+                "customer_name": "Casey",
+                "customer_phone": "555-0404",
+                "description": "Decline path scope",
+            },
+            "screenshot_attachment_ids": [],
+        },
+    )
+    assert create_analysis.status_code == 200
+    analysis_id = create_analysis.json()["analysis_id"]
+
+    create_quote = client.post(
+        f"/admin/api/screenshot-assistant/analyses/{analysis_id}/quote-draft",
+        headers=admin_headers(),
+    )
+    assert create_quote.status_code == 200
+    quote_id = create_quote.json()["quote"]["quote_id"]
+    accept_token = storage.get_quote_record(quote_id)["accept_token"]
+
+    handoff_response = client.post(
+        f"/admin/api/quotes/{quote_id}/handoff",
+        headers=admin_headers(),
+    )
+    assert handoff_response.status_code == 200
+    request_id = handoff_response.json()["request_id"]
+
+    decline_response = client.post(
+        f"/quote/{quote_id}/decision",
+        json={"action": "decline", "accept_token": accept_token},
+    )
+    assert decline_response.status_code == 200
+    decline_body = decline_response.json()
+    assert decline_body["request_id"] == request_id
+    assert decline_body["status"] == "customer_declined"
+
+    booking_response = client.post(
+        f"/quote/{quote_id}/booking",
+        json={
+            "booking_token": "unused-after-decline",
+            "requested_job_date": "2026-04-12",
+            "requested_time_window": "afternoon",
+        },
+    )
+    assert booking_response.status_code == 400
+    assert booking_response.json() == {"detail": "Booking can only be submitted for accepted quotes."}
+
+    approval_response = client.post(
+        f"/admin/api/quote-requests/{request_id}/decision",
+        headers=admin_headers(),
+        json={"action": "approve"},
+    )
+    assert approval_response.status_code == 409
+    approval_body = approval_response.json()
+    assert approval_body["error"] == "invalid_status_transition"
+    assert approval_body["from"] == "customer_declined"
+    assert approval_body["to"] == "admin_approved"
+
+    saved_request = storage.get_quote_request(request_id)
+    assert saved_request is not None
+    assert saved_request["status"] == "customer_declined"
+    assert storage.get_job_by_quote_id(quote_id) is None
+
+
 def test_linked_screenshot_assistant_analysis_cannot_receive_more_uploads(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
