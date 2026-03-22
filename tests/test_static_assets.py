@@ -251,12 +251,21 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'data-screen="jobsScreen"' in mobile_html
     assert 'No customer-facing flow changes.' in mobile_html
     assert '/admin/api/screenshot-assistant/analyses/intake' in mobile_js
-    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(state.currentAnalysisId)}/attachments' in mobile_js
-    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(state.currentAnalysisId)}/quote-draft' in mobile_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/attachments' in mobile_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/quote-draft' in mobile_js
     assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' in mobile_js
     assert '/admin/api/quote-requests?limit=20' in mobile_js
     assert '/admin/api/jobs?limit=20' in mobile_js
     assert 'const state = {' in mobile_js
+    assert 'draftSessionId: 0,' in mobile_js
+    assert 'function startDraftSession(nextAnalysisId = "")' in mobile_js
+    assert 'function isActiveDraftSession(draftSessionId)' in mobile_js
+    assert 'function resetDraftActionButtons()' in mobile_js
+    assert 'function enterNewDraftState()' in mobile_js
+    assert 'resetDraftActionButtons();' in mobile_js
+    assert 'newDraftBtn.addEventListener("click", enterNewDraftState);' in mobile_js
+    assert 'homeNewIntakeBtn.addEventListener("click", () => {' in mobile_js
+    assert 'enterNewDraftState();' in mobile_js
     assert 'id="draftLockNotice"' in mobile_html
     assert 'This analysis is locked because a quote draft is already linked. Start a new draft to make changes.' in mobile_html
     assert 'function setDraftLocked(isLocked)' in mobile_js
@@ -265,8 +274,9 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'function formatSuggestionValue(meta)' in mobile_js
     assert 'return meta.value ?? "";' in mobile_js
     assert 'function isQuoteLockConflict(parsed)' in mobile_js
-    assert 'async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage)' in mobile_js
+    assert 'async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage, draftSessionId, analysisId = state.currentAnalysisId)' in mobile_js
     assert 'This analysis is now locked because quote draft ${linkedQuoteId} was linked by another operator.' in mobile_js
+    assert 'if (!analysisId || !isActiveDraftSession(draftSessionId)) return false;' in mobile_js
     assert 'candidate_inputs: buildCandidateInputs()' in mobile_js
     assert 'operator_overrides: {}' in mobile_js
     assert 'const candidate = getReviewedCandidateInputs(analysis);' in mobile_js
@@ -277,6 +287,18 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'function renderAttachmentReview(analysis)' in mobile_js
     assert 'function renderRequests()' in mobile_js
     assert 'function renderJobs()' in mobile_js
+    assert 'async function loadAnalysis(analysisId, options = {})' in mobile_js
+    assert 'const preserveSession = options.preserveSession === true;' in mobile_js
+    assert 'const draftSessionId = preserveSession ? (options.draftSessionId ?? state.draftSessionId) : startDraftSession(analysisId);' in mobile_js
+    assert 'if (!isActiveDraftSession(draftSessionId) || state.currentAnalysisId !== analysisId) return null;' in mobile_js
+    assert 'const draftSessionId = state.draftSessionId;' in mobile_js
+    assert 'if (!isActiveDraftSession(draftSessionId)) return;' in mobile_js
+    assert 'if (isActiveDraftSession(draftSessionId)) {' in mobile_js
+    assert 'await loadAnalysis(refreshedAnalysisId, { preserveSession: true, draftSessionId });' in mobile_js
+    assert 'await loadAnalysis(currentAnalysisId, { preserveSession: true, draftSessionId });' in mobile_js
+    assert 'async function refreshAllData()' in mobile_js
+    assert 'if (currentAnalysisId && isActiveDraftSession(draftSessionId) && state.currentAnalysisId === currentAnalysisId) {' in mobile_js
+    assert 'await loadAnalysis(currentAnalysisId, { preserveSession: true, draftSessionId });' in mobile_js
     assert 'function logout()' in mobile_js
     assert 'localStorage' not in mobile_js
     assert '.mobileNav' in mobile_css

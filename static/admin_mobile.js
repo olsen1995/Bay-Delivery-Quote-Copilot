@@ -5,6 +5,7 @@ const state = {
   currentAnalysisId: "",
   currentAnalysis: null,
   handoff: null,
+  draftSessionId: 0,
   analyses: [],
   requests: [],
   jobs: []
@@ -218,8 +219,33 @@ function setDraftLocked(isLocked) {
   draftLockNotice.classList.toggle("hidden", !locked);
 }
 
-function resetDraftState() {
-  state.currentAnalysisId = "";
+function startDraftSession(nextAnalysisId = "") {
+  state.draftSessionId += 1;
+  state.currentAnalysisId = nextAnalysisId;
+  return state.draftSessionId;
+}
+
+function isActiveDraftSession(draftSessionId) {
+  return draftSessionId === state.draftSessionId;
+}
+
+function resetDraftActionButtons() {
+  saveDraftBtn.dataset.idleLabel = "Save / Analyze Intake";
+  uploadScreenshotsBtn.dataset.idleLabel = "Upload Files";
+  createQuoteDraftBtn.dataset.idleLabel = "Create Quote Draft";
+  prepareHandoffBtn.dataset.idleLabel = "Prepare Customer Handoff";
+  saveDraftBtn.textContent = saveDraftBtn.dataset.idleLabel;
+  uploadScreenshotsBtn.textContent = uploadScreenshotsBtn.dataset.idleLabel;
+  createQuoteDraftBtn.textContent = createQuoteDraftBtn.dataset.idleLabel;
+  prepareHandoffBtn.textContent = prepareHandoffBtn.dataset.idleLabel;
+  saveDraftBtn.disabled = false;
+  uploadScreenshotsBtn.disabled = false;
+  createQuoteDraftBtn.disabled = false;
+  prepareHandoffBtn.disabled = true;
+}
+
+function enterNewDraftState() {
+  startDraftSession("");
   state.currentAnalysis = null;
   state.handoff = null;
   fields.message.value = "";
@@ -243,7 +269,12 @@ function resetDraftState() {
   renderEmptyState(ocrReviewBox, "No screenshot uploads yet.");
   renderEmptyState(extractedDetailsBox, "No extracted details yet.");
   renderEmptyState(quoteGuidanceBox, "No quote guidance yet.");
+  resetDraftActionButtons();
   setDraftLocked(false);
+}
+
+function resetDraftState() {
+  enterNewDraftState();
 }
 
 function getReviewedCandidateInputs(analysis) {
@@ -278,6 +309,26 @@ function updateDraftMeta(analysis) {
   }
   const serviceType = analysis?.quote_guidance?.service_type || analysis?.normalized_candidate?.service_type || "unknown service";
   currentDraftMeta.textContent = `${analysis.analysis_id} • ${statusLabel(analysis.status)} • ${serviceType}${analysis.quote_id ? ` • quote ${analysis.quote_id}` : ""}`;
+}
+
+function applyActiveAnalysisState(analysis) {
+  state.currentAnalysisId = analysis?.analysis_id || state.currentAnalysisId;
+  state.currentAnalysis = analysis;
+  state.handoff = null;
+  applyAnalysisToForm(analysis);
+  updateDraftMeta(analysis);
+  renderAttachmentReview(analysis);
+  renderExtractedDetails(analysis);
+  renderQuoteGuidance(analysis);
+  setDraftLocked(isDraftLocked(analysis));
+  setStatus(intakeStatus, "ok", isDraftLocked(analysis)
+    ? "Draft loaded in locked view because a quote is already linked."
+    : "Draft loaded. Review fields and save again if you make edits.");
+  setStatus(uploadStatus, "warn", isDraftLocked(analysis)
+    ? "Screenshot uploads are locked because the linked quote draft already exists."
+    : "Upload more screenshots if needed, then re-run Save / Analyze Intake.");
+  setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
+  showScreen("intakeScreen");
 }
 
 function renderRecentDrafts() {
@@ -518,12 +569,14 @@ function isQuoteLockConflict(parsed) {
   return parsed?.status === 409 && /quote draft|locked after quote draft creation/i.test(detail);
 }
 
-async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage) {
-  if (!state.currentAnalysisId) return false;
+async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage, draftSessionId, analysisId = state.currentAnalysisId) {
+  if (!analysisId || !isActiveDraftSession(draftSessionId)) return false;
 
   try {
-    await loadAnalysis(state.currentAnalysisId);
-    const linkedQuoteId = state.currentAnalysis?.quote_id || "";
+    const analysis = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}`);
+    if (!isActiveDraftSession(draftSessionId) || state.currentAnalysisId !== analysisId) return false;
+    applyActiveAnalysisState(analysis);
+    const linkedQuoteId = analysis.quote_id || "";
     setStatus(
       statusEl,
       "warn",
@@ -568,26 +621,15 @@ async function loadDashboardData() {
   updateQueueMetrics();
 }
 
-async function loadAnalysis(analysisId) {
-  if (!analysisId) return;
+async function loadAnalysis(analysisId, options = {}) {
+  if (!analysisId) return null;
+  const preserveSession = options.preserveSession === true;
+  const draftSessionId = preserveSession ? (options.draftSessionId ?? state.draftSessionId) : startDraftSession(analysisId);
+  state.currentAnalysisId = analysisId;
   const analysis = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}`);
-  state.currentAnalysisId = analysis.analysis_id || "";
-  state.currentAnalysis = analysis;
-  state.handoff = null;
-  applyAnalysisToForm(analysis);
-  updateDraftMeta(analysis);
-  renderAttachmentReview(analysis);
-  renderExtractedDetails(analysis);
-  renderQuoteGuidance(analysis);
-  setDraftLocked(isDraftLocked(analysis));
-  setStatus(intakeStatus, "ok", isDraftLocked(analysis)
-    ? "Draft loaded in locked view because a quote is already linked."
-    : "Draft loaded. Review fields and save again if you make edits.");
-  setStatus(uploadStatus, "warn", isDraftLocked(analysis)
-    ? "Screenshot uploads are locked because the linked quote draft already exists."
-    : "Upload more screenshots if needed, then re-run Save / Analyze Intake.");
-  setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
-  showScreen("intakeScreen");
+  if (!isActiveDraftSession(draftSessionId) || state.currentAnalysisId !== analysisId) return null;
+  applyActiveAnalysisState(analysis);
+  return analysis;
 }
 
 async function handleLogin(event) {
@@ -634,14 +676,18 @@ async function handleLogin(event) {
 
 async function refreshAllData() {
   const screenToRestore = state.currentScreen;
+  const draftSessionId = state.draftSessionId;
+  const currentAnalysisId = state.currentAnalysisId;
   try {
     await loadDashboardData();
-    if (state.currentAnalysisId) {
-      await loadAnalysis(state.currentAnalysisId);
+    if (currentAnalysisId && isActiveDraftSession(draftSessionId) && state.currentAnalysisId === currentAnalysisId) {
+      await loadAnalysis(currentAnalysisId, { preserveSession: true, draftSessionId });
     }
+    if (!isActiveDraftSession(draftSessionId)) return;
     showScreen(screenToRestore);
   } catch (err) {
     const parsed = parseApiError(err);
+    if (!isActiveDraftSession(draftSessionId)) return;
     setStatus(loginStatus, "bad", `Refresh failed. ${parsed.data?.detail || parsed.raw || "Please try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   }
 }
@@ -652,6 +698,8 @@ async function saveDraftAnalysis(event) {
     setStatus(intakeStatus, "warn", "This analysis is locked because a quote draft is already linked.");
     return;
   }
+  const draftSessionId = state.draftSessionId;
+  const currentAnalysisId = state.currentAnalysisId;
   saveDraftBtn.dataset.idleLabel = "Save / Analyze Intake";
   setLoading(saveDraftBtn, true, "Saving...");
   setStatus(intakeStatus, "warn", "Saving reviewed intake and refreshing quote guidance...");
@@ -662,24 +710,22 @@ async function saveDraftAnalysis(event) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildAnalysisPayload())
     });
-    state.currentAnalysisId = analysis.analysis_id || "";
-    state.currentAnalysis = analysis;
-    updateDraftMeta(analysis);
-    renderAttachmentReview(analysis);
-    renderExtractedDetails(analysis);
-    renderQuoteGuidance(analysis);
-    setDraftLocked(isDraftLocked(analysis));
+    if (!isActiveDraftSession(draftSessionId)) return;
+    applyActiveAnalysisState(analysis);
     setStatus(intakeStatus, "ok", "Draft analysis saved. Guidance still reuses the existing quote engine.");
     setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft already exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
     await loadDashboardData();
   } catch (err) {
     const parsed = parseApiError(err);
-    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(intakeStatus, "This analysis is now locked because a quote draft was linked by another operator.")) {
+    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(intakeStatus, "This analysis is now locked because a quote draft was linked by another operator.", draftSessionId, currentAnalysisId)) {
       return;
     }
+    if (!isActiveDraftSession(draftSessionId)) return;
     setStatus(intakeStatus, "bad", `Save failed. ${parsed.data?.detail || parsed.raw || "Please review the intake fields and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   } finally {
-    setLoading(saveDraftBtn, false, "Saving...");
+    if (isActiveDraftSession(draftSessionId)) {
+      setLoading(saveDraftBtn, false, "Saving...");
+    }
   }
 }
 
@@ -689,6 +735,8 @@ async function uploadScreenshots() {
     return;
   }
 
+  const draftSessionId = state.draftSessionId;
+  let currentAnalysisId = state.currentAnalysisId;
   const files = Array.from(fields.files.files || []);
   if (!files.length) {
     setStatus(uploadStatus, "bad", "Choose at least one screenshot or photo before uploading.");
@@ -700,13 +748,15 @@ async function uploadScreenshots() {
   setStatus(uploadStatus, "warn", "Uploading screenshots and collecting OCR previews...");
 
   try {
-    if (!state.currentAnalysisId) {
+    if (!currentAnalysisId) {
       const analysis = await fetchJSON("/admin/api/screenshot-assistant/analyses/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildAnalysisPayload())
       });
-      state.currentAnalysisId = analysis.analysis_id || "";
+      if (!isActiveDraftSession(draftSessionId)) return;
+      currentAnalysisId = analysis.analysis_id || "";
+      state.currentAnalysisId = currentAnalysisId;
       state.currentAnalysis = analysis;
       updateDraftMeta(analysis);
     }
@@ -714,7 +764,7 @@ async function uploadScreenshots() {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
 
-    const response = await fetch(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(state.currentAnalysisId)}/attachments`, {
+    const response = await fetch(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/attachments`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: formData
@@ -728,19 +778,26 @@ async function uploadScreenshots() {
       data = { raw: text };
     }
     if (!response.ok) throw { status: response.status, data, raw: text };
+    if (!isActiveDraftSession(draftSessionId)) return;
 
-    await loadAnalysis(data.analysis_id || state.currentAnalysisId);
+    const refreshedAnalysisId = data.analysis_id || currentAnalysisId;
+    await loadAnalysis(refreshedAnalysisId, { preserveSession: true, draftSessionId });
+    if (!isActiveDraftSession(draftSessionId)) return;
     await loadDashboardData();
+    if (!isActiveDraftSession(draftSessionId)) return;
     fields.files.value = "";
     setStatus(uploadStatus, "ok", `Uploaded ${(data.uploaded || []).length} screenshot(s). OCR previews are shown below.`);
   } catch (err) {
     const parsed = parseApiError(err);
-    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(uploadStatus, "This analysis is now locked because a quote draft was linked by another operator.")) {
+    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(uploadStatus, "This analysis is now locked because a quote draft was linked by another operator.", draftSessionId, currentAnalysisId)) {
       return;
     }
+    if (!isActiveDraftSession(draftSessionId)) return;
     setStatus(uploadStatus, "bad", `Upload failed. ${parsed.data?.detail || parsed.raw || "Please review the files and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   } finally {
-    setLoading(uploadScreenshotsBtn, false, "Uploading...");
+    if (isActiveDraftSession(draftSessionId)) {
+      setLoading(uploadScreenshotsBtn, false, "Uploading...");
+    }
   }
 }
 
@@ -754,29 +811,37 @@ async function createQuoteDraft() {
     return;
   }
 
+  const draftSessionId = state.draftSessionId;
+  const currentAnalysisId = state.currentAnalysisId;
   createQuoteDraftBtn.dataset.idleLabel = "Create Quote Draft";
   setLoading(createQuoteDraftBtn, true, "Creating...");
   setStatus(handoffStatus, "warn", "Creating a real quote draft from the reviewed analysis...");
 
   try {
-    const data = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(state.currentAnalysisId)}/quote-draft`, {
+    const data = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/quote-draft`, {
       method: "POST"
     });
-    state.currentAnalysis = data.analysis || null;
-    if (data.analysis?.analysis_id) state.currentAnalysisId = data.analysis.analysis_id;
-    updateDraftMeta(state.currentAnalysis);
-    renderQuoteGuidance(state.currentAnalysis);
-    setDraftLocked(isDraftLocked(state.currentAnalysis));
+    if (!isActiveDraftSession(draftSessionId)) return;
+    if (data.analysis) {
+      applyActiveAnalysisState(data.analysis);
+    } else {
+      await loadAnalysis(currentAnalysisId, { preserveSession: true, draftSessionId });
+      if (!isActiveDraftSession(draftSessionId)) return;
+    }
     await loadDashboardData();
+    if (!isActiveDraftSession(draftSessionId)) return;
     setStatus(handoffStatus, "ok", `Quote draft ${data.quote?.quote_id || "created"} linked. You can now prepare customer handoff.`);
   } catch (err) {
     const parsed = parseApiError(err);
-    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(handoffStatus, "This analysis is now locked because a quote draft was linked by another operator.")) {
+    if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(handoffStatus, "This analysis is now locked because a quote draft was linked by another operator.", draftSessionId, currentAnalysisId)) {
       return;
     }
+    if (!isActiveDraftSession(draftSessionId)) return;
     setStatus(handoffStatus, "bad", `Quote draft failed. ${parsed.data?.detail || parsed.raw || "Please review the draft and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
   } finally {
-    setLoading(createQuoteDraftBtn, false, "Creating...");
+    if (isActiveDraftSession(draftSessionId)) {
+      setLoading(createQuoteDraftBtn, false, "Creating...");
+    }
   }
 }
 
@@ -845,7 +910,7 @@ refreshHomeBtn.addEventListener("click", refreshAllData);
 refreshRequestsBtn.addEventListener("click", refreshAllData);
 refreshJobsBtn.addEventListener("click", refreshAllData);
 homeNewIntakeBtn.addEventListener("click", () => {
-  resetDraftState();
+  enterNewDraftState();
   showScreen("intakeScreen");
 });
 homeResumeLatestBtn.addEventListener("click", async () => {
@@ -855,7 +920,7 @@ homeResumeLatestBtn.addEventListener("click", async () => {
   }
   await loadAnalysis(state.analyses[0].analysis_id);
 });
-newDraftBtn.addEventListener("click", resetDraftState);
+newDraftBtn.addEventListener("click", enterNewDraftState);
 intakeForm.addEventListener("submit", saveDraftAnalysis);
 uploadScreenshotsBtn.addEventListener("click", uploadScreenshots);
 createQuoteDraftBtn.addEventListener("click", createQuoteDraft);
