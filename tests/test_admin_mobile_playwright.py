@@ -232,7 +232,18 @@ def _install_mock_admin_api(page: Page) -> None:
         _json_response(route, {"items": mock_state["jobs"]})
 
     def handle_analysis_detail(route: Route) -> None:
-        analysis_id = route.request.url.rstrip("/").rsplit("/", 1)[-1]
+        parsed = urlparse(route.request.url)
+        path_parts = [part for part in parsed.path.split("/") if part]
+        analysis_id = path_parts[-1] if path_parts else ""
+
+        if (
+            route.request.method != "GET"
+            or len(path_parts) != 5
+            or analysis_id in {"intake", "quote-draft"}
+        ):
+            route.fallback()
+            return
+
         payload = mock_state["analysis_by_id"].get(analysis_id)
         if payload is None:
             _json_response(route, {"detail": "Not found"}, status=404)
