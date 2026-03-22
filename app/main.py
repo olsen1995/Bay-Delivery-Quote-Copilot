@@ -1,6 +1,4 @@
-# Fix: __future__ import must be first
 from __future__ import annotations
-# (moved below app = FastAPI)
 import base64
 import hmac
 import json
