@@ -504,6 +504,9 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
   gap: 16px;
   margin: 20px 0;
 }
+.compactContactInfo{
+  margin-bottom: 14px;
+}
 @media (max-width: 720px){
   .contactInfo{ grid-template-columns: 1fr; }
 }
@@ -532,27 +535,16 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
 .contactLink:hover{
   color: var(--brand2);
 }
-.contactCTA{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 18px;
+.contactHelper{
+  margin: 0;
+  font-size: 14px;
 }
-@media (max-width: 720px){
-  .contactCTA{ grid-template-columns: 1fr; }
+.contactQuickLink{
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
 }
-.btnLarge{
-  margin-top: 0;
-  padding: 16px 20px;
-  font-size: 15px;
-}
-.btnSecondary{
-  background: rgba(255,255,255,0.1);
-  color: var(--text);
-  border: 1.5px solid var(--accent);
-  box-shadow: none;
-}
-.btnSecondary:hover{
-  background: rgba(168,22,44,0.15);
-  border-color: var(--brand2);
+.contactQuickLink:hover{
+  color: var(--brand2);
+  text-decoration: underline;
 }

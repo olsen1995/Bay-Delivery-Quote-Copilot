@@ -340,10 +340,19 @@ def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None
     expect(page.locator("#currentDraftMeta")).to_contain_text("analysis-mocked-1")
     expect(page.locator("#currentDraftMeta")).to_contain_text("Draft")
     expect(page.locator("#intakeDescription")).to_have_value("Mocked reviewed summary")
-    expect(page.locator("#quoteGuidanceBox")).to_contain_text("existing_quote_pricing_logic")
+    expect(page.locator("#quoteGuidanceSummary")).to_contain_text("existing_quote_pricing_logic")
+    expect(page.locator("#quoteGuidanceSummary")).to_contain_text("Recommended Target")
+    expect(page.locator("#quoteGuidanceDetails")).to_be_hidden()
+    expect(page.locator("#quoteGuidanceToggleBtn")).to_have_text("Show pricing details")
+    expect(page.locator("#attachmentReviewBody")).to_be_hidden()
+    expect(page.locator("#attachmentReviewToggleBtn")).to_have_text("Show details")
     expect(page.locator("#handoffStatus")).to_contain_text("Create a quote draft before preparing customer handoff.")
     expect(page.locator("#createQuoteDraftBtn")).to_be_enabled()
     expect(page.locator("#prepareHandoffBtn")).to_be_disabled()
+
+    page.locator("#quoteGuidanceToggleBtn").click()
+    expect(page.locator("#quoteGuidanceDetails")).to_be_visible()
+    expect(page.locator("#quoteGuidanceDetails")).to_contain_text("Minimum Safe")
 
     page.locator("#createQuoteDraftBtn").click()
     expect(page.locator("#handoffStatus")).to_contain_text("Quote draft q-mobile-1 linked")
@@ -355,7 +364,7 @@ def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None
 
     page.locator("#newDraftBtn").click()
     expect(page.locator("#draftLockNotice")).to_be_hidden()
-    expect(page.locator("#intakeStatus")).to_contain_text("Start a draft, paste the message, then save/analyze.")
+    expect(page.locator("#intakeStatus")).to_contain_text("Start a draft, paste the message, then save draft.")
 
     page.locator("#intakeMessage").fill("Race draft should not win")
     page.evaluate("() => document.getElementById('saveDraftBtn').click()")
@@ -366,7 +375,7 @@ def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None
 
     expect(page.locator("#currentDraftMeta")).to_have_text("No draft selected yet.")
     expect(page.locator("#intakeMessage")).to_have_value("Fresh draft should remain")
-    expect(page.locator("#intakeStatus")).to_contain_text("Start a draft, paste the message, then save/analyze.")
+    expect(page.locator("#intakeStatus")).to_contain_text("Start a draft, paste the message, then save draft.")
 
 
 def test_admin_mobile_real_backend_login_no_pageerror(page: Page, live_server: str) -> None:

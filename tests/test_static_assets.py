@@ -240,9 +240,9 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'Mobile Login' in mobile_html
     assert 'Home / Queue' in mobile_html
     assert 'New Intake' in mobile_html
-    assert 'OCR + Extracted Details Review' in mobile_html
+    assert 'Attachment Review' in mobile_html
     assert 'Quote Guidance' in mobile_html
-    assert 'Quote Draft + Handoff' in mobile_html
+    assert 'Quote Draft' in mobile_html
     assert 'Requests' in mobile_html
     assert 'Upcoming Jobs' in mobile_html
     assert 'data-screen="homeScreen"' in mobile_html
@@ -250,6 +250,10 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'data-screen="requestsScreen"' in mobile_html
     assert 'data-screen="jobsScreen"' in mobile_html
     assert 'No customer-facing flow changes.' in mobile_html
+    assert 'id="attachmentReviewToggleBtn"' in mobile_html
+    assert 'id="attachmentReviewBody" class="collapsibleBody" hidden' in mobile_html
+    assert 'id="quoteGuidanceToggleBtn"' in mobile_html
+    assert 'id="quoteGuidanceDetails" class="cardList collapsibleBody" hidden' in mobile_html
     assert '/admin/api/screenshot-assistant/analyses/intake' in mobile_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/attachments' in mobile_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/quote-draft' in mobile_js
@@ -266,6 +270,10 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'newDraftBtn.addEventListener("click", enterNewDraftState);' in mobile_js
     assert 'homeNewIntakeBtn.addEventListener("click", () => {' in mobile_js
     assert 'enterNewDraftState();' in mobile_js
+    assert 'configureExpandable(attachmentReviewToggleBtn, attachmentReviewBody, {' in mobile_js
+    assert 'configureExpandable(quoteGuidanceToggleBtn, quoteGuidanceDetails, {' in mobile_js
+    assert 'function collapseLowPrioritySections()' in mobile_js
+    assert 'renderAttachmentReviewSummary(null);' in mobile_js
     assert 'id="draftLockNotice"' in mobile_html
     assert 'This analysis is locked because a quote draft is already linked. Start a new draft to make changes.' in mobile_html
     assert 'function setDraftLocked(isLocked)' in mobile_js
@@ -273,6 +281,8 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'This analysis is locked because a quote draft is already linked.' in mobile_js
     assert 'function formatSuggestionValue(meta)' in mobile_js
     assert 'return meta.value ?? "";' in mobile_js
+    assert 'function renderAttachmentReviewSummary(analysis)' in mobile_js
+    assert 'Attachment review summary' in mobile_js
     assert 'function isQuoteLockConflict(parsed)' in mobile_js
     assert 'async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage, draftSessionId, analysisId = state.currentAnalysisId)' in mobile_js
     assert 'This analysis is now locked because quote draft ${linkedQuoteId} was linked by another operator.' in mobile_js
@@ -281,6 +291,9 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'operator_overrides: {}' in mobile_js
     assert 'const candidate = getReviewedCandidateInputs(analysis);' in mobile_js
     assert '.draftLockNotice' in mobile_css
+    assert '.sectionToggleButton' in mobile_css
+    assert '.collapsibleBody[hidden]' in mobile_css
+    assert '.summaryGrid' in mobile_css
     assert 'button:disabled,' in mobile_css
     assert 'function buildAnalysisPayload()' in mobile_js
     assert 'function renderQuoteGuidance(analysis)' in mobile_js
@@ -305,7 +318,20 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert '.metricGrid' in mobile_css
     assert '.stickyMetaBar' in mobile_css
     assert '.cardItem' in mobile_css
+    assert '.compactMetricCard' in mobile_css
     assert '@media (min-width: 760px)' in mobile_css
     assert '@app.get("/admin/mobile")' in main_py
     assert 'def admin_mobile_page():' in main_py
     assert 'return FileResponse(str(STATIC_DIR / "admin_mobile.html"))' in main_py
+
+
+def test_homepage_contact_section_avoids_duplicate_large_ctas() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+
+    assert 'Prefer to talk first?' in index_html
+    assert 'class="contactQuickLink"' in index_html
+    assert 'Get a Quote Online' not in index_html
+    assert 'contactCTA' not in index_html
+    assert '.contactQuickLink' in site_css
+    assert '.contactHelper' in site_css
