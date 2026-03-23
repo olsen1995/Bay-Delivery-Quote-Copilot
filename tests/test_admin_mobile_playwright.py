@@ -252,7 +252,8 @@ def _install_mock_admin_api(page: Page) -> None:
 
     def handle_intake(route: Route) -> None:
         mock_state["intake_call_count"] += 1
-        post_data = route.request.post_data_json() or {}
+        post_data_raw = route.request.post_data_json
+        post_data = post_data_raw() if callable(post_data_raw) else (post_data_raw or {})
         message = str(post_data.get("message") or "")
 
         if mock_state["intake_call_count"] == 2:
