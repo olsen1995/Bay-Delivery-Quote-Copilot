@@ -215,7 +215,8 @@ textarea {
 .cardList,
 .appScreen,
 .mobileMain,
-#authenticatedShell {
+#authenticatedShell,
+.collapsibleBody {
   display: grid;
   gap: 12px;
 }
@@ -224,15 +225,30 @@ textarea {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.compactMetrics {
+  gap: 10px;
+}
+
 .metricCard {
   padding: 14px;
   text-align: center;
+}
+
+.compactMetricCard {
+  padding: 12px 10px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .metricCard strong {
   display: block;
   margin-top: 6px;
   font-size: 1.4rem;
+}
+
+.compactMetricCard strong {
+  margin-top: 4px;
+  font-size: 1.2rem;
 }
 
 .metricLabel {
@@ -265,11 +281,40 @@ textarea {
   margin-top: 8px;
 }
 
-.inlineMeta {
+.inlineMeta,
+.summaryRow {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.summaryMetric {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(217, 225, 234, 0.95);
+}
+
+.summaryMetric span {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summaryMetric strong {
+  margin: 4px 0 0;
+  font-size: 1rem;
 }
 
 .pill {
@@ -290,18 +335,14 @@ textarea {
   margin: 10px 0;
 }
 
+.subduedSubsection {
+  background: rgba(247, 249, 252, 0.96);
+}
+
 .draftLockNotice {
   margin-bottom: 12px;
   border-color: rgba(180, 35, 24, 0.2);
   background: rgba(180, 35, 24, 0.08);
-}
-
-button:disabled,
-input:disabled,
-select:disabled,
-textarea:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .stickyMetaBar {
@@ -313,6 +354,43 @@ textarea:disabled {
   background: rgba(18, 32, 51, 0.05);
   border: 1px solid rgba(18, 32, 51, 0.08);
   margin-bottom: 12px;
+}
+
+.sectionToggleButton {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+}
+
+.sectionToggleButton:disabled {
+  opacity: 0.5;
+}
+
+.collapsibleBody[hidden] {
+  display: none;
+}
+
+.splitActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.homeActionStack {
+  margin-top: 2px;
+}
+
+.queueHint,
+.summaryText {
+  color: var(--ink-muted);
+  line-height: 1.45;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .okText {
@@ -333,6 +411,17 @@ textarea:disabled {
 
 .mt12 {
   margin-top: 12px;
+}
+
+@media (max-width: 520px) {
+  .splitActions,
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .compactMetricCard {
+    padding: 10px 8px;
+  }
 }
 
 @media (min-width: 760px) {

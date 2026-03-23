@@ -36,9 +36,14 @@ const draftLockNotice = document.getElementById("draftLockNotice");
 const recentDraftsList = document.getElementById("recentDraftsList");
 const requestsList = document.getElementById("requestsList");
 const jobsList = document.getElementById("jobsList");
+const attachmentReviewSummary = document.getElementById("attachmentReviewSummary");
+const attachmentReviewBody = document.getElementById("attachmentReviewBody");
+const attachmentReviewToggleBtn = document.getElementById("attachmentReviewToggleBtn");
 const ocrReviewBox = document.getElementById("ocrReviewBox");
 const extractedDetailsBox = document.getElementById("extractedDetailsBox");
-const quoteGuidanceBox = document.getElementById("quoteGuidanceBox");
+const quoteGuidanceSummary = document.getElementById("quoteGuidanceSummary");
+const quoteGuidanceDetails = document.getElementById("quoteGuidanceDetails");
+const quoteGuidanceToggleBtn = document.getElementById("quoteGuidanceToggleBtn");
 const draftCount = document.getElementById("draftCount");
 const requestCount = document.getElementById("requestCount");
 const upcomingCount = document.getElementById("upcomingCount");
@@ -142,6 +147,48 @@ function renderEmptyState(node, message) {
   node.appendChild(div);
 }
 
+function setExpandableState(button, body, expanded, collapsedLabel, expandedLabel) {
+  if (!button || !body) return;
+  const isExpanded = !!expanded;
+  body.hidden = !isExpanded;
+  button.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+  button.textContent = isExpanded ? expandedLabel : collapsedLabel;
+}
+
+function configureExpandable(button, body, options = {}) {
+  const collapsedLabel = options.collapsedLabel || "Show details";
+  const expandedLabel = options.expandedLabel || "Hide details";
+  button.dataset.collapsedLabel = collapsedLabel;
+  button.dataset.expandedLabel = expandedLabel;
+  setExpandableState(button, body, false, collapsedLabel, expandedLabel);
+  button.addEventListener("click", () => {
+    const nextExpanded = button.getAttribute("aria-expanded") !== "true";
+    setExpandableState(button, body, nextExpanded, collapsedLabel, expandedLabel);
+  });
+}
+
+function collapseLowPrioritySections() {
+  setExpandableState(
+    attachmentReviewToggleBtn,
+    attachmentReviewBody,
+    false,
+    attachmentReviewToggleBtn.dataset.collapsedLabel || "Show details",
+    attachmentReviewToggleBtn.dataset.expandedLabel || "Hide details"
+  );
+  setExpandableState(
+    quoteGuidanceToggleBtn,
+    quoteGuidanceDetails,
+    false,
+    quoteGuidanceToggleBtn.dataset.collapsedLabel || "Show pricing details",
+    quoteGuidanceToggleBtn.dataset.expandedLabel || "Hide pricing details"
+  );
+}
+
+function setToggleAvailability(button, isEnabled) {
+  if (!button) return;
+  button.disabled = !isEnabled;
+}
+
 async function fetchJSON(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -230,7 +277,7 @@ function isActiveDraftSession(draftSessionId) {
 }
 
 function resetDraftActionButtons() {
-  saveDraftBtn.dataset.idleLabel = "Save / Analyze Intake";
+  saveDraftBtn.dataset.idleLabel = "Save Draft";
   uploadScreenshotsBtn.dataset.idleLabel = "Upload Files";
   createQuoteDraftBtn.dataset.idleLabel = "Create Quote Draft";
   prepareHandoffBtn.dataset.idleLabel = "Prepare Customer Handoff";
@@ -263,13 +310,15 @@ function enterNewDraftState() {
   fields.files.value = "";
   fields.responseDraft.value = "";
   currentDraftMeta.textContent = "No draft selected yet.";
-  setStatus(intakeStatus, "warn", "Start a draft, paste the message, then save/analyze.");
-  setStatus(uploadStatus, "warn", "Upload screenshots after creating or selecting a draft.");
+  setStatus(intakeStatus, "warn", "Start a draft, paste the message, then save draft.");
+  setStatus(uploadStatus, "warn", "Upload screenshots after creating or selecting a draft. Details stay collapsed until needed.");
   setStatus(handoffStatus, "warn", "Create a quote draft before preparing customer handoff.");
+  renderAttachmentReviewSummary(null);
   renderEmptyState(ocrReviewBox, "No screenshot uploads yet.");
   renderEmptyState(extractedDetailsBox, "No extracted details yet.");
-  renderEmptyState(quoteGuidanceBox, "No quote guidance yet.");
+  renderQuoteGuidance(null);
   resetDraftActionButtons();
+  collapseLowPrioritySections();
   setDraftLocked(false);
 }
 
@@ -317,16 +366,18 @@ function applyActiveAnalysisState(analysis) {
   state.handoff = null;
   applyAnalysisToForm(analysis);
   updateDraftMeta(analysis);
+  renderAttachmentReviewSummary(analysis);
   renderAttachmentReview(analysis);
   renderExtractedDetails(analysis);
   renderQuoteGuidance(analysis);
+  collapseLowPrioritySections();
   setDraftLocked(isDraftLocked(analysis));
   setStatus(intakeStatus, "ok", isDraftLocked(analysis)
     ? "Draft loaded in locked view because a quote is already linked."
-    : "Draft loaded. Review fields and save again if you make edits.");
+    : "Draft loaded. Review fields, then save draft if you make edits.");
   setStatus(uploadStatus, "warn", isDraftLocked(analysis)
     ? "Screenshot uploads are locked because the linked quote draft already exists."
-    : "Upload more screenshots if needed, then re-run Save / Analyze Intake.");
+    : "Upload more screenshots if needed. Attachment details stay collapsed until you open them.");
   setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
   showScreen("intakeScreen");
 }
@@ -338,7 +389,7 @@ function renderRecentDrafts() {
   }
 
   clearNode(recentDraftsList);
-  state.analyses.slice(0, 8).forEach((item) => {
+  state.analyses.slice(0, 5).forEach((item) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "cardItem textButton";
@@ -425,6 +476,40 @@ function renderJobs() {
   });
 }
 
+function renderAttachmentReviewSummary(analysis) {
+  const attachments = Array.isArray(analysis?.attachments) ? analysis.attachments : [];
+  const suggestions = analysis?.autofill_suggestions || {};
+  const missingFields = Array.isArray(analysis?.autofill_missing_fields) ? analysis.autofill_missing_fields : [];
+  const warnings = Array.isArray(analysis?.autofill_warnings) ? analysis.autofill_warnings : [];
+  const populatedSuggestions = Object.entries(suggestions).filter(([, value]) => formatSuggestionValue(value) !== "");
+
+  clearNode(attachmentReviewSummary);
+  const card = document.createElement("article");
+  card.className = "cardItem";
+
+  if (!attachments.length && !populatedSuggestions.length && !missingFields.length && !warnings.length) {
+    card.innerHTML = `
+      <strong>Attachment review stays out of the way</strong>
+      <div class="summaryText">No uploads, extracted details, or warnings yet.</div>
+    `;
+    attachmentReviewSummary.appendChild(card);
+    setToggleAvailability(attachmentReviewToggleBtn, true);
+    return;
+  }
+
+  card.innerHTML = `
+    <strong>Attachment review summary</strong>
+    <div class="summaryRow">
+      <span class="pill">${escapeHtml(`${attachments.length} upload${attachments.length === 1 ? "" : "s"}`)}</span>
+      <span class="pill">${escapeHtml(`${populatedSuggestions.length} extracted`)}</span>
+      <span class="pill">${escapeHtml(`${missingFields.length} missing`)}</span>
+      <span class="pill">${escapeHtml(`${warnings.length} warning${warnings.length === 1 ? "" : "s"}`)}</span>
+    </div>
+  `;
+  attachmentReviewSummary.appendChild(card);
+  setToggleAvailability(attachmentReviewToggleBtn, true);
+}
+
 function renderAttachmentReview(analysis) {
   const attachments = Array.isArray(analysis?.attachments) ? analysis.attachments : [];
   if (!attachments.length) {
@@ -504,23 +589,47 @@ function renderExtractedDetails(analysis) {
 function renderQuoteGuidance(analysis) {
   const guidance = analysis?.quote_guidance || {};
   if (!Object.keys(guidance).length) {
-    renderEmptyState(quoteGuidanceBox, "No quote guidance yet.");
+    renderEmptyState(quoteGuidanceSummary, "No quote guidance yet.");
+    renderEmptyState(quoteGuidanceDetails, "No pricing details yet.");
+    setToggleAvailability(quoteGuidanceToggleBtn, false);
     return;
   }
 
-  clearNode(quoteGuidanceBox);
+  clearNode(quoteGuidanceSummary);
+  clearNode(quoteGuidanceDetails);
   const range = guidance.range || {};
-  const card = document.createElement("article");
-  card.className = "cardItem";
-  card.innerHTML = `
+  const recommendedTarget = range.recommended_target_cash_cad ?? guidance.cash_total_cad;
+  const summaryCard = document.createElement("article");
+  summaryCard.className = "cardItem";
+  summaryCard.innerHTML = `
     <strong>${escapeHtml(guidance.service_type || "Quote guidance")}</strong>
-    <div class="inlineMeta">
+    <div class="summaryRow">
       <span class="pill">${escapeHtml(guidance.confidence || "Unknown confidence")}</span>
       <span class="pill">${escapeHtml(guidance.source || "existing_quote_pricing_logic")}</span>
     </div>
+    <div class="summaryGrid">
+      <div class="summaryMetric">
+        <span>Recommended Target</span>
+        <strong>${escapeHtml(money(recommendedTarget))}</strong>
+      </div>
+      <div class="summaryMetric">
+        <span>Cash / EMT</span>
+        <strong>${escapeHtml(`${money(guidance.cash_total_cad)} • ${money(guidance.emt_total_cad)}`)}</strong>
+      </div>
+    </div>
+    <div class="subtleDivider"></div>
+    <div class="summaryText"><strong>Unknowns:</strong> ${escapeHtml((guidance.unknowns || []).join(", ") || "None")}</div>
+    <div class="summaryText"><strong>Risk Notes:</strong> ${escapeHtml((guidance.risk_notes || []).join(" • ") || "None")}</div>
+  `;
+  quoteGuidanceSummary.appendChild(summaryCard);
+
+  const detailCard = document.createElement("article");
+  detailCard.className = "cardItem";
+  detailCard.innerHTML = `
+    <strong>Pricing details</strong>
     <div class="subtleDivider"></div>
     <div><strong>Minimum Safe:</strong> ${escapeHtml(money(range.minimum_safe_cash_cad ?? guidance.cash_total_cad))}</div>
-    <div><strong>Recommended Target:</strong> ${escapeHtml(money(range.recommended_target_cash_cad ?? guidance.cash_total_cad))}</div>
+    <div><strong>Recommended Target:</strong> ${escapeHtml(money(recommendedTarget))}</div>
     <div><strong>Upper Reasonable:</strong> ${escapeHtml(money(range.upper_reasonable_cash_cad ?? guidance.cash_total_cad))}</div>
     <div><strong>Cash Total:</strong> ${escapeHtml(money(guidance.cash_total_cad))}</div>
     <div><strong>EMT Total:</strong> ${escapeHtml(money(guidance.emt_total_cad))}</div>
@@ -529,7 +638,8 @@ function renderQuoteGuidance(analysis) {
     <div><strong>Risk Notes:</strong> ${escapeHtml((guidance.risk_notes || []).join(" • ") || "None")}</div>
     <div class="small mt12">${escapeHtml(guidance.disclaimer || "")}</div>
   `;
-  quoteGuidanceBox.appendChild(card);
+  quoteGuidanceDetails.appendChild(detailCard);
+  setToggleAvailability(quoteGuidanceToggleBtn, true);
 }
 
 function updateQueueMetrics() {
@@ -700,7 +810,7 @@ async function saveDraftAnalysis(event) {
   }
   const draftSessionId = state.draftSessionId;
   const currentAnalysisId = state.currentAnalysisId;
-  saveDraftBtn.dataset.idleLabel = "Save / Analyze Intake";
+  saveDraftBtn.dataset.idleLabel = "Save Draft";
   setLoading(saveDraftBtn, true, "Saving...");
   setStatus(intakeStatus, "warn", "Saving reviewed intake and refreshing quote guidance...");
 
@@ -712,7 +822,7 @@ async function saveDraftAnalysis(event) {
     });
     if (!isActiveDraftSession(draftSessionId)) return;
     applyActiveAnalysisState(analysis);
-    setStatus(intakeStatus, "ok", "Draft analysis saved. Guidance still reuses the existing quote engine.");
+    setStatus(intakeStatus, "ok", "Draft saved. Guidance still reuses the existing quote engine.");
     setStatus(handoffStatus, "warn", analysis.quote_id ? "Quote draft already exists. You can prepare the customer handoff." : "Create a quote draft before preparing customer handoff.");
     await loadDashboardData();
   } catch (err) {
@@ -786,7 +896,7 @@ async function uploadScreenshots() {
     await loadDashboardData();
     if (!isActiveDraftSession(draftSessionId)) return;
     fields.files.value = "";
-    setStatus(uploadStatus, "ok", `Uploaded ${(data.uploaded || []).length} screenshot(s). OCR previews are shown below.`);
+    setStatus(uploadStatus, "ok", `Uploaded ${(data.uploaded || []).length} screenshot(s). OCR previews are available in Attachment Review.`);
   } catch (err) {
     const parsed = parseApiError(err);
     if (isQuoteLockConflict(parsed) && await syncLockedAnalysisFromConflict(uploadStatus, "This analysis is now locked because a quote draft was linked by another operator.", draftSessionId, currentAnalysisId)) {
@@ -874,7 +984,7 @@ async function prepareCustomerHandoff() {
       </div>
       <code>${escapeHtml(data.handoff_url || "")}</code>
     `;
-    quoteGuidanceBox.prepend(handoffCard);
+    quoteGuidanceSummary.prepend(handoffCard);
   } catch (err) {
     const parsed = parseApiError(err);
     setStatus(handoffStatus, "bad", `Handoff failed. ${parsed.data?.detail || parsed.raw || "Please review the quote draft and try again."}`, parsed.status ? `HTTP ${parsed.status}` : "");
@@ -900,6 +1010,15 @@ function logout() {
   setStatus(loginStatus, "warn", "Enter admin username/password, then log in.");
   showScreen("homeScreen");
 }
+
+configureExpandable(attachmentReviewToggleBtn, attachmentReviewBody, {
+  collapsedLabel: "Show details",
+  expandedLabel: "Hide details"
+});
+configureExpandable(quoteGuidanceToggleBtn, quoteGuidanceDetails, {
+  collapsedLabel: "Show pricing details",
+  expandedLabel: "Hide pricing details"
+});
 
 navButtons.forEach((button) => {
   button.addEventListener("click", () => showScreen(button.dataset.screen || "homeScreen"));
