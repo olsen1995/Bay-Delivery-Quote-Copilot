@@ -129,81 +129,6 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["request"]["status"], "admin_approved")
 
-    def test_admin_handoff_creates_customer_pending_request(self) -> None:
-        quote_id = "q_handoff_create"
-        self._seed_quote(quote_id, accept_token="handoff-token-1")
-
-        resp = self.client.post(
-            f"/admin/api/quotes/{quote_id}/handoff",
-            headers=self._admin_headers,
-        )
-        self.assertEqual(resp.status_code, 200)
-        body = resp.json()
-        self.assertTrue(body["ok"])
-        self.assertEqual(body["quote_id"], quote_id)
-        self.assertEqual(body["status"], "customer_pending")
-        self.assertFalse(body["already_existed"])
-        self.assertEqual(body["handoff_url"], f"/quote?quote_id={quote_id}&accept_token=handoff-token-1")
-
-        saved = storage.get_quote_request(body["request_id"])
-        self.assertIsNotNone(saved)
-        saved_typed = cast(Dict[str, Any], saved)
-        self.assertEqual(saved_typed["quote_id"], quote_id)
-        self.assertEqual(saved_typed["status"], "customer_pending")
-        self.assertEqual(saved_typed["accept_token"], "handoff-token-1")
-
-        audit_items = storage.list_admin_audit_log(limit=5)
-        self.assertEqual(audit_items[0]["action_type"], "prepare_customer_handoff")
-        self.assertEqual(audit_items[0]["entity_type"], "quote_request")
-        self.assertEqual(audit_items[0]["record_id"], body["request_id"])
-        self.assertTrue(audit_items[0]["success"])
-
-    def test_admin_handoff_is_idempotent_for_same_quote(self) -> None:
-        quote_id = "q_handoff_existing"
-        self._seed_quote(quote_id, accept_token="handoff-token-2")
-
-        first = self.client.post(
-            f"/admin/api/quotes/{quote_id}/handoff",
-            headers=self._admin_headers,
-        )
-        self.assertEqual(first.status_code, 200)
-        first_body = first.json()
-
-        second = self.client.post(
-            f"/admin/api/quotes/{quote_id}/handoff",
-            headers=self._admin_headers,
-        )
-        self.assertEqual(second.status_code, 200)
-        second_body = second.json()
-        self.assertTrue(second_body["already_existed"])
-        self.assertEqual(second_body["request_id"], first_body["request_id"])
-        self.assertEqual(second_body["status"], "customer_pending")
-
-        requests = storage.list_quote_requests(limit=10)
-        matching = [item for item in requests if item["quote_id"] == quote_id]
-        self.assertEqual(len(matching), 1)
-
-    def test_admin_handoff_requires_admin(self) -> None:
-        quote_id = "q_handoff_auth"
-        self._seed_quote(quote_id)
-
-        resp = self.client.post(f"/admin/api/quotes/{quote_id}/handoff")
-        self.assertIn(resp.status_code, {401, 403})
-
-    def test_admin_handoff_missing_quote_returns_404_and_logs_failure(self) -> None:
-        resp = self.client.post(
-            "/admin/api/quotes/missing-quote/handoff",
-            headers=self._admin_headers,
-        )
-        self.assertEqual(resp.status_code, 404)
-        self.assertEqual(resp.json(), {"detail": "Quote not found."})
-
-        audit_items = storage.list_admin_audit_log(limit=5)
-        self.assertEqual(audit_items[0]["action_type"], "prepare_customer_handoff")
-        self.assertEqual(audit_items[0]["entity_type"], "quote")
-        self.assertEqual(audit_items[0]["record_id"], "missing-quote")
-        self.assertFalse(audit_items[0]["success"])
-
     def test_allowed_accepted_to_rejected(self) -> None:
         request_id = "req_accept_reject"
         quote_id = "q_accept_reject"
@@ -445,45 +370,6 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(req_typed["requested_job_date"], "2026-03-10")
         self.assertEqual(req_typed["requested_time_window"], "morning")
         self.assertEqual(req_typed["notes"], "test notes")
-
-    def test_customer_accept_after_admin_handoff_updates_same_request(self) -> None:
-        quote_id = "q_handoff_customer_accept"
-        self._seed_quote(quote_id, accept_token="handoff-customer-token")
-
-        handoff_resp = self.client.post(
-            f"/admin/api/quotes/{quote_id}/handoff",
-            headers=self._admin_headers,
-        )
-        self.assertEqual(handoff_resp.status_code, 200)
-        handoff_request_id = handoff_resp.json()["request_id"]
-
-        decision_resp = self.client.post(
-            f"/quote/{quote_id}/decision",
-            json={"action": "accept", "accept_token": "handoff-customer-token"},
-        )
-        self.assertEqual(decision_resp.status_code, 200)
-        decision_body = decision_resp.json()
-        self.assertEqual(decision_body["request_id"], handoff_request_id)
-        self.assertEqual(decision_body["status"], "customer_accepted")
-        self.assertIn("booking_token", decision_body)
-
-        booking_resp = self.client.post(
-            f"/quote/{quote_id}/booking",
-            json={
-                "booking_token": decision_body["booking_token"],
-                "requested_job_date": "2026-03-10",
-                "requested_time_window": "afternoon",
-                "notes": "handoff flow booking",
-            },
-        )
-        self.assertEqual(booking_resp.status_code, 200)
-
-        updated = storage.get_quote_request(handoff_request_id)
-        self.assertIsNotNone(updated)
-        updated_typed = cast(Dict[str, Any], updated)
-        self.assertEqual(updated_typed["status"], "customer_accepted")
-        self.assertEqual(updated_typed["requested_job_date"], "2026-03-10")
-        self.assertEqual(updated_typed["requested_time_window"], "afternoon")
 
     def test_admin_jobs_include_linked_booking_preferences_after_approval(self) -> None:
         quote_resp = self.client.post("/quote/calculate", json={

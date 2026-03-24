@@ -80,8 +80,6 @@ This repo is the real operating system for Bay Delivery quoting and admin workfl
 ## What Has Been Completed
 
 ### Major merged work
-- **PR #119** — create quote drafts from screenshot analyses and persist the linkage
-- **PR #120** — prepare customer handoff flow and persisted quote review
 - **PR #121** — scheduling context and richer calendar handoff metadata
 - **PR #122** — job lifecycle (start / complete / cancel) with transition validation and close-out tracking
 - **PR #123** — message-based autofill suggestions for screenshot assistant plus dirty-state protection
@@ -99,8 +97,6 @@ This repo is the real operating system for Bay Delivery quoting and admin workfl
 - OCR extraction on screenshot upload
 - autofill suggestions with warnings / missing-field support
 - quote-range guidance anchored to the existing pricing engine
-- quote draft creation from screenshot assistant analysis
-- customer handoff flow from saved quote draft
 - customer accept / decline / booking flow
 - admin approval -> job creation
 - Google Calendar scheduling integration with minimized event payloads

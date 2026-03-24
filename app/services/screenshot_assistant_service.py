@@ -7,9 +7,8 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
-from app.services.quote_service import build_and_save_quote, build_quote_artifacts
+from app.services.quote_service import build_quote_artifacts
 from app.storage import (
-    assign_analysis_attachments_to_quote,
     assign_attachments_to_analysis,
     get_screenshot_assistant_analysis,
     list_attachments,
@@ -709,50 +708,3 @@ def get_analysis(analysis_id: str) -> dict[str, Any] | None:
     if not record:
         return None
     return _format_analysis(record, include_autofill=True)
-
-
-def create_quote_draft_from_analysis(*, analysis_id: str, now_iso: str) -> dict[str, Any]:
-    existing = get_screenshot_assistant_analysis(analysis_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Screenshot assistant analysis not found.")
-
-    existing_quote_id = str(existing.get("quote_id") or "").strip()
-    if existing_quote_id:
-        raise HTTPException(status_code=409, detail="Quote draft already exists for this analysis.")
-
-    normalized_candidate = existing.get("normalized_candidate_json") or {}
-    if not isinstance(normalized_candidate, dict):
-        raise HTTPException(status_code=409, detail="Analysis is missing a normalized candidate.")
-
-    created_quote = build_and_save_quote(normalized_candidate, now_iso=now_iso)
-    quote_id = created_quote["quote_id"]
-
-    save_screenshot_assistant_analysis(
-        {
-            "analysis_id": existing["analysis_id"],
-            "created_at": existing["created_at"],
-            "updated_at": now_iso,
-            "operator_username": existing["operator_username"],
-            "status": existing["status"],
-            "intake_json": existing.get("intake_json") or {},
-            "normalized_candidate_json": normalized_candidate,
-            "guidance_json": existing.get("guidance_json") or {},
-            "quote_id": quote_id,
-        }
-    )
-    assign_analysis_attachments_to_quote(analysis_id, quote_id)
-
-    updated = get_screenshot_assistant_analysis(analysis_id)
-    if not updated:
-        raise RuntimeError("Failed to load updated screenshot assistant analysis")
-
-    return {
-        "ok": True,
-        "analysis": _format_analysis(updated),
-        "quote": {
-            "quote_id": created_quote["quote_id"],
-            "created_at": created_quote["created_at"],
-            "request": created_quote["request"],
-            "response": created_quote["response"],
-        },
-    }
