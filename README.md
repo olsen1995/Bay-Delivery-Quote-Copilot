@@ -13,9 +13,11 @@ Current stable milestone: `0.10.0`.
 
 This project provides:
 
-- Customer-facing quote UI (served at `/`)
+- Homepage / marketing page (served at `/`)
+- Customer quote form (served at `/quote`)
 - Quote API (`POST /quote/calculate`)
 - Booking decision workflow + admin approval
+- Admin surfaces at `/admin`, `/admin/mobile`, and `/admin/uploads`
 - SQLite storage for ops review
 
 ---
@@ -76,12 +78,13 @@ For `small_move` and `item_delivery`, also required:
 
 ## Booking decision workflow (customer → admin approval)
 
-1) Customer generates an estimate on `/`
-2) Customer uses the decision endpoint to **Accept** or **Decline** the quote
-3) System stores/updates the `quote_requests` row with status:
+1) Customer lands on the homepage at `/` and opens the quote form at `/quote`
+2) Customer generates an estimate on `/quote`
+3) Customer uses the decision endpoint to **Accept** or **Decline** the quote
+4) System stores/updates the `quote_requests` row with status:
    - `customer_accepted` when accepted
    - `customer_declined` when declined
-4) Admin reviews accepted requests in `/admin` and either:
+5) Admin reviews accepted requests in `/admin` (or the mobile operator surface at `/admin/mobile`) and either:
    - Approves → status `admin_approved`
    - Rejects → status `rejected`
 
@@ -121,6 +124,7 @@ If your deployment is public, set admin Basic Auth credentials:
 Admin pages:
 
 - `/admin`
+- `/admin/mobile`
 - `/admin/uploads`
 
 Note: the HTML pages are intentionally viewable without admin auth so refresh/direct navigation never lock out. Protected actions remain on `/admin/api/*`.
