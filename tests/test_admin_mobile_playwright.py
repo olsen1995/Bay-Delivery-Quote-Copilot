@@ -8,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 import pytest
 import requests
@@ -135,58 +134,8 @@ def _json_response(route: Route, payload: Any, status: int = 200) -> None:
     )
 
 
-def _analysis_payload(*, analysis_id: str, message: str, quote_id: str | None = None) -> dict[str, Any]:
-    return {
-        "analysis_id": analysis_id,
-        "status": "draft",
-        "quote_id": quote_id,
-        "intake": {
-            "message": message,
-            "requested_job_date": "2026-03-25",
-            "requested_time_window": "morning",
-            "candidate_inputs": {
-                "customer_name": "Taylor Example",
-                "customer_phone": "555-0101",
-                "description": "Mocked reviewed summary",
-                "service_type": "haul_away",
-                "job_address": "123 Example St",
-                "estimated_hours": 1.5,
-                "crew_size": 2,
-            },
-            "operator_overrides": {},
-        },
-        "attachments": [],
-        "autofill_suggestions": {
-            "customer_name": {"value": "Taylor Example"},
-            "job_address": {"value": "123 Example St"},
-        },
-        "autofill_missing_fields": [],
-        "autofill_warnings": [],
-        "normalized_candidate": {
-            "service_type": "haul_away",
-        },
-        "quote_guidance": {
-            "service_type": "haul_away",
-            "confidence": "medium",
-            "source": "existing_quote_pricing_logic",
-            "cash_total_cad": 150,
-            "emt_total_cad": 169.5,
-            "range": {
-                "minimum_safe_cash_cad": 140,
-                "recommended_target_cash_cad": 150,
-                "upper_reasonable_cash_cad": 180,
-            },
-            "unknowns": ["final load volume"],
-            "risk_notes": ["Operator should confirm driveway access."],
-            "disclaimer": "Recommendation only. Review before creating a quote draft.",
-        },
-    }
-
-
 def _install_mock_admin_api(page: Page) -> None:
     mock_state: dict[str, Any] = {
-        "analyses": [],
-        "analysis_by_id": {},
         "requests": [
             {
                 "request_id": "req-mobile-1",
@@ -216,14 +165,10 @@ def _install_mock_admin_api(page: Page) -> None:
                 },
             }
         ],
-        "intake_call_count": 0,
     }
 
     def handle_quotes(route: Route) -> None:
         _json_response(route, {"items": []})
-
-    def handle_analyses_list(route: Route) -> None:
-        _json_response(route, {"items": mock_state["analyses"]})
 
     def handle_requests(route: Route) -> None:
         _json_response(route, {"items": mock_state["requests"]})
@@ -231,74 +176,9 @@ def _install_mock_admin_api(page: Page) -> None:
     def handle_jobs(route: Route) -> None:
         _json_response(route, {"items": mock_state["jobs"]})
 
-    def handle_analysis_detail(route: Route) -> None:
-        parsed = urlparse(route.request.url)
-        path_parts = [part for part in parsed.path.split("/") if part]
-        analysis_id = path_parts[-1] if path_parts else ""
-
-        if (
-            route.request.method != "GET"
-            or len(path_parts) != 5
-            or analysis_id in {"intake", "quote-draft"}
-        ):
-            route.fallback()
-            return
-
-        payload = mock_state["analysis_by_id"].get(analysis_id)
-        if payload is None:
-            _json_response(route, {"detail": "Not found"}, status=404)
-            return
-        _json_response(route, payload)
-
-    def handle_intake(route: Route) -> None:
-        mock_state["intake_call_count"] += 1
-        post_data_raw = route.request.post_data_json
-        post_data = post_data_raw() if callable(post_data_raw) else (post_data_raw or {})
-        message = str(post_data.get("message") or "")
-
-        if mock_state["intake_call_count"] == 2:
-            time.sleep(0.6)
-            stale_payload = _analysis_payload(
-                analysis_id="analysis-stale-response",
-                message=message or "Race draft should not win",
-            )
-            _json_response(route, stale_payload)
-            return
-
-        analysis = _analysis_payload(
-            analysis_id="analysis-mocked-1",
-            message=message or "Need help removing a loveseat and misc boxes.",
-        )
-        mock_state["analysis_by_id"][analysis["analysis_id"]] = analysis
-        mock_state["analyses"] = [analysis]
-        _json_response(route, analysis)
-
-    def handle_quote_draft(route: Route) -> None:
-        parsed = urlparse(route.request.url)
-        path_parts = [part for part in parsed.path.split("/") if part]
-        analysis_id = path_parts[-2]
-        base_analysis = mock_state["analysis_by_id"].get(analysis_id) or _analysis_payload(
-            analysis_id=analysis_id,
-            message="Need help removing a loveseat and misc boxes.",
-        )
-        linked = {**base_analysis, "quote_id": "q-mobile-1"}
-        mock_state["analysis_by_id"][analysis_id] = linked
-        mock_state["analyses"] = [linked]
-        _json_response(
-            route,
-            {
-                "quote": {"quote_id": "q-mobile-1"},
-                "analysis": linked,
-            },
-        )
-
     page.route("**/admin/api/quotes?limit=1", handle_quotes)
-    page.route("**/admin/api/screenshot-assistant/analyses?limit=20", handle_analyses_list)
     page.route("**/admin/api/quote-requests?limit=20", handle_requests)
     page.route("**/admin/api/jobs?limit=20", handle_jobs)
-    page.route("**/admin/api/screenshot-assistant/analyses/intake", handle_intake)
-    page.route("**/admin/api/screenshot-assistant/analyses/*/quote-draft", handle_quote_draft)
-    page.route("**/admin/api/screenshot-assistant/analyses/*", handle_analysis_detail)
 
 
 def _login(page: Page, base_url: str) -> None:
@@ -313,7 +193,6 @@ def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None
     _install_mock_admin_api(page)
     _login(page, live_server)
 
-    expect(page.locator("#draftCount")).to_have_text("0")
     expect(page.locator("#requestCount")).to_have_text("1")
     expect(page.locator("#upcomingCount")).to_have_text("1")
 
@@ -326,56 +205,10 @@ def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None
     expect(page.locator("#jobsList")).to_contain_text("synced")
 
     page.locator("button[data-screen='homeScreen']").click()
-    page.locator("#homeNewIntakeBtn").click()
-
-    expect(page.locator("#intakeScreen")).to_be_visible()
-    expect(page.locator("#currentDraftMeta")).to_have_text("No draft selected yet.")
-    expect(page.locator("#intakeMessage")).to_be_editable()
-    expect(page.locator("#intakeDescription")).to_be_editable()
-
-    sample_message = "Customer needs loveseat pickup plus a few loose boxes from the garage."
-    page.locator("#intakeMessage").fill(sample_message)
-    page.locator("#saveDraftBtn").click()
-
-    expect(page.locator("#currentDraftMeta")).to_contain_text("analysis-mocked-1")
-    expect(page.locator("#currentDraftMeta")).to_contain_text("Draft")
-    expect(page.locator("#intakeDescription")).to_have_value("Mocked reviewed summary")
-    expect(page.locator("#quoteGuidanceSummary")).to_contain_text("existing_quote_pricing_logic")
-    expect(page.locator("#quoteGuidanceSummary")).to_contain_text("Recommended Target")
-    expect(page.locator("#quoteGuidanceDetails")).to_be_hidden()
-    expect(page.locator("#quoteGuidanceToggleBtn")).to_have_text("Show pricing details")
-    expect(page.locator("#attachmentReviewBody")).to_be_hidden()
-    expect(page.locator("#attachmentReviewToggleBtn")).to_have_text("Show details")
-    expect(page.locator("#handoffStatus")).to_contain_text("Create a quote draft before preparing customer handoff.")
-    expect(page.locator("#createQuoteDraftBtn")).to_be_enabled()
-    expect(page.locator("#prepareHandoffBtn")).to_be_disabled()
-
-    page.locator("#quoteGuidanceToggleBtn").click()
-    expect(page.locator("#quoteGuidanceDetails")).to_be_visible()
-    expect(page.locator("#quoteGuidanceDetails")).to_contain_text("Minimum Safe")
-
-    page.locator("#createQuoteDraftBtn").click()
-    expect(page.locator("#handoffStatus")).to_contain_text("Quote draft q-mobile-1 linked")
-    expect(page.locator("#draftLockNotice")).to_be_visible()
-    expect(page.locator("#saveDraftBtn")).to_be_disabled()
-    expect(page.locator("#uploadScreenshotsBtn")).to_be_disabled()
-    expect(page.locator("#createQuoteDraftBtn")).to_be_disabled()
-    expect(page.locator("#prepareHandoffBtn")).to_be_enabled()
-
-    page.locator("#newDraftBtn").click()
-    expect(page.locator("#draftLockNotice")).to_be_hidden()
-    expect(page.locator("#intakeStatus")).to_contain_text("Start a draft, paste the message, then save draft.")
-
-    page.locator("#intakeMessage").fill("Race draft should not win")
-    page.evaluate("() => document.getElementById('saveDraftBtn').click()")
-    page.locator("#newDraftBtn").click()
-    page.locator("#intakeMessage").fill("Fresh draft should remain")
-
-    page.wait_for_timeout(900)
-
-    expect(page.locator("#currentDraftMeta")).to_have_text("No draft selected yet.")
-    expect(page.locator("#intakeMessage")).to_have_value("Fresh draft should remain")
-    expect(page.locator("#intakeStatus")).to_contain_text("Start a draft, paste the message, then save draft.")
+    expect(page.locator("#homeOpsSummary")).to_contain_text("Operational workflow")
+    expect(page.locator("#homeOpsSummary")).to_contain_text("No quote drafting")
+    expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
+    expect(page.locator("#authenticatedShell")).not_to_contain_text("Create Quote Draft")
 
 
 def test_admin_mobile_real_backend_login_no_pageerror(page: Page, live_server: str) -> None:
@@ -386,9 +219,9 @@ def test_admin_mobile_real_backend_login_no_pageerror(page: Page, live_server: s
 
     expect(page.locator("#logoutBtn")).to_be_visible()
     expect(page.locator("#homeScreen")).to_be_visible()
-    expect(page.locator("#draftCount")).to_be_visible()
     expect(page.locator("#requestCount")).to_be_visible()
     expect(page.locator("#upcomingCount")).to_be_visible()
+    expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
 
     page.wait_for_timeout(500)
     assert not page_errors, f"Unexpected pageerror/uncaught exception(s): {page_errors}"
