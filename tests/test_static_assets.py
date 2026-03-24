@@ -125,7 +125,6 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
 def test_admin_page_includes_screenshot_assistant_shell() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
-    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
 
     assert 'id="assistantAnalyzeBtn"' in admin_html
     assert 'id="assistantStartDraftBtn"' in admin_html
@@ -141,25 +140,20 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'id="assistantRequestedTimeWindow"' in admin_html
     assert 'Screenshot Quote Assistant' in admin_html
     assert 'Screenshot Assistant Drafts' in admin_html
-    assert 'optionally create a real quote draft from the saved analysis' in admin_html
+    assert 'Guidance stays non-binding and does not create customer quotes from admin.' in admin_html
     assert '/admin/api/screenshot-assistant/analyses/intake' in admin_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' in admin_js
-    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft' in admin_js
-    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' in admin_js
-    assert 'assistantCreateQuoteDraftBtn' in admin_js
-    assert 'assistantPrepareHandoffBtn' in admin_js
-    assert 'Create Quote Draft' in admin_js
-    assert 'Prepare Customer Handoff' in admin_js
-    assert 'Linked quote draft' in admin_js
-    assert 'Customer handoff' in admin_js
-    assert 'This analysis is locked because a quote draft has already been created.' in admin_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft' not in admin_js
+    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' not in admin_js
+    assert 'Create Quote Draft' not in admin_js
+    assert 'Prepare Customer Handoff' not in admin_js
+    assert 'createQuoteDraftFromAnalysis' not in admin_js
+    assert 'prepareCustomerHandoff' not in admin_js
     assert 'setAssistantDraftLocked' in admin_js
     assert 'beginNewScreenshotAssistantDraft' in admin_js
     assert '["Analysis", "Updated", "Service", "Cash", "Quote", "Attachments", "Mode"]' in admin_js
     assert 'submitScreenshotAssistantAnalysis' in admin_js
     assert 'uploadScreenshotAssistantFiles' in admin_js
-    assert 'createQuoteDraftFromAnalysis' in admin_js
-    assert 'prepareCustomerHandoff' in admin_js
     assert 'assistantSuggestionPanel' in admin_js
     assert 'assistantApplyAllSuggestionsBtn' in admin_js
     assert 'applyAllEmptyAssistantSuggestions' in admin_js
@@ -186,13 +180,8 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert '["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]' in admin_js
     assert 'Upload results include best-effort OCR status and a short preview for admin review.' in admin_html
     assert 'ocr_json' in admin_js
-    assert 'Click Analyze Intake to save reviewed fields before creating a quote draft.' in admin_js
-    assert 'assistantCreateQuoteDraftHelper' in admin_js
-    assert 'button.disabled = !adminSessionReady || assistantDraftDirty;' in admin_js
-    assert 'if (assistantDraftDirty) {' in admin_js
+    assert 'Click Analyze Intake to save reviewed fields.' in admin_js
     assert 'markAssistantDraftDirty(assistantUnsavedDraftWarning)' in admin_js
-    assert '.assistantUploadRow' in admin_css
-    assert '.assistantDraftBar' in admin_css
 
 
 def test_admin_schedule_modal_includes_scheduling_handoff_context() -> None:
@@ -239,84 +228,30 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert '<section id="loginScreen" class="screenCard">' in mobile_html
     assert 'Mobile Login' in mobile_html
     assert 'Home / Queue' in mobile_html
-    assert 'New Intake' in mobile_html
-    assert 'Attachment Review' in mobile_html
-    assert 'Quote Guidance' in mobile_html
-    assert 'Quote Draft' in mobile_html
     assert 'Requests' in mobile_html
     assert 'Upcoming Jobs' in mobile_html
     assert 'data-screen="homeScreen"' in mobile_html
-    assert 'data-screen="intakeScreen"' in mobile_html
     assert 'data-screen="requestsScreen"' in mobile_html
     assert 'data-screen="jobsScreen"' in mobile_html
+    assert 'New Intake' not in mobile_html
+    assert 'Quote Draft' not in mobile_html
+    assert 'Create Quote Draft' not in mobile_html
+    assert 'Prepare Customer Handoff' not in mobile_html
     assert 'No customer-facing flow changes.' in mobile_html
-    assert 'id="attachmentReviewToggleBtn"' in mobile_html
-    assert 'id="attachmentReviewBody" class="collapsibleBody" hidden' in mobile_html
-    assert 'id="quoteGuidanceToggleBtn"' in mobile_html
-    assert 'id="quoteGuidanceDetails" class="cardList collapsibleBody" hidden' in mobile_html
-    assert '/admin/api/screenshot-assistant/analyses/intake' in mobile_js
-    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/attachments' in mobile_js
-    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/quote-draft' in mobile_js
-    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' in mobile_js
     assert '/admin/api/quote-requests?limit=20' in mobile_js
     assert '/admin/api/jobs?limit=20' in mobile_js
     assert 'const state = {' in mobile_js
-    assert 'draftSessionId: 0,' in mobile_js
-    assert 'function startDraftSession(nextAnalysisId = "")' in mobile_js
-    assert 'function isActiveDraftSession(draftSessionId)' in mobile_js
-    assert 'function resetDraftActionButtons()' in mobile_js
-    assert 'function enterNewDraftState()' in mobile_js
-    assert 'resetDraftActionButtons();' in mobile_js
-    assert 'newDraftBtn.addEventListener("click", enterNewDraftState);' in mobile_js
-    assert 'homeNewIntakeBtn.addEventListener("click", () => {' in mobile_js
-    assert 'enterNewDraftState();' in mobile_js
-    assert 'configureExpandable(attachmentReviewToggleBtn, attachmentReviewBody, {' in mobile_js
-    assert 'configureExpandable(quoteGuidanceToggleBtn, quoteGuidanceDetails, {' in mobile_js
-    assert 'function collapseLowPrioritySections()' in mobile_js
-    assert 'renderAttachmentReviewSummary(null);' in mobile_js
-    assert 'id="draftLockNotice"' in mobile_html
-    assert 'This analysis is locked because a quote draft is already linked. Start a new draft to make changes.' in mobile_html
-    assert 'function setDraftLocked(isLocked)' in mobile_js
-    assert 'Draft loaded in locked view because a quote is already linked.' in mobile_js
-    assert 'This analysis is locked because a quote draft is already linked.' in mobile_js
-    assert 'function formatSuggestionValue(meta)' in mobile_js
-    assert 'return meta.value ?? "";' in mobile_js
-    assert 'function renderAttachmentReviewSummary(analysis)' in mobile_js
-    assert 'Attachment review summary' in mobile_js
-    assert 'function isQuoteLockConflict(parsed)' in mobile_js
-    assert 'async function syncLockedAnalysisFromConflict(statusEl, fallbackMessage, draftSessionId, analysisId = state.currentAnalysisId)' in mobile_js
-    assert 'This analysis is now locked because quote draft ${linkedQuoteId} was linked by another operator.' in mobile_js
-    assert 'if (!analysisId || !isActiveDraftSession(draftSessionId)) return false;' in mobile_js
-    assert 'candidate_inputs: buildCandidateInputs()' in mobile_js
-    assert 'operator_overrides: {}' in mobile_js
-    assert 'const candidate = getReviewedCandidateInputs(analysis);' in mobile_js
-    assert '.draftLockNotice' in mobile_css
-    assert '.sectionToggleButton' in mobile_css
-    assert '.collapsibleBody[hidden]' in mobile_css
-    assert '.summaryGrid' in mobile_css
+    assert '/admin/api/screenshot-assistant/analyses/intake' not in mobile_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAnalysisId)}/quote-draft' not in mobile_js
+    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' not in mobile_js
     assert 'button:disabled,' in mobile_css
-    assert 'function buildAnalysisPayload()' in mobile_js
-    assert 'function renderQuoteGuidance(analysis)' in mobile_js
-    assert 'function renderAttachmentReview(analysis)' in mobile_js
     assert 'function renderRequests()' in mobile_js
     assert 'function renderJobs()' in mobile_js
-    assert 'async function loadAnalysis(analysisId, options = {})' in mobile_js
-    assert 'const preserveSession = options.preserveSession === true;' in mobile_js
-    assert 'const draftSessionId = preserveSession ? (options.draftSessionId ?? state.draftSessionId) : startDraftSession(analysisId);' in mobile_js
-    assert 'if (!isActiveDraftSession(draftSessionId) || state.currentAnalysisId !== analysisId) return null;' in mobile_js
-    assert 'const draftSessionId = state.draftSessionId;' in mobile_js
-    assert 'if (!isActiveDraftSession(draftSessionId)) return;' in mobile_js
-    assert 'if (isActiveDraftSession(draftSessionId)) {' in mobile_js
-    assert 'await loadAnalysis(refreshedAnalysisId, { preserveSession: true, draftSessionId });' in mobile_js
-    assert 'await loadAnalysis(currentAnalysisId, { preserveSession: true, draftSessionId });' in mobile_js
-    assert 'async function refreshAllData()' in mobile_js
-    assert 'if (currentAnalysisId && isActiveDraftSession(draftSessionId) && state.currentAnalysisId === currentAnalysisId) {' in mobile_js
-    assert 'await loadAnalysis(currentAnalysisId, { preserveSession: true, draftSessionId });' in mobile_js
+    assert 'async function refreshAllData(statusTarget)' in mobile_js
     assert 'function logout()' in mobile_js
     assert 'localStorage' not in mobile_js
     assert '.mobileNav' in mobile_css
     assert '.metricGrid' in mobile_css
-    assert '.stickyMetaBar' in mobile_css
     assert '.cardItem' in mobile_css
     assert '.compactMetricCard' in mobile_css
     assert '@media (min-width: 760px)' in mobile_css

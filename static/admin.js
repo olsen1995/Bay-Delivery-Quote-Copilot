@@ -86,7 +86,7 @@ let currentAssistantLocked = false;
 let currentAssistantHandoff = null;
 let currentJobsById = {};
 let assistantDraftDirty = false;
-const assistantUnsavedDraftWarning = "Suggestions applied locally. Click Analyze Intake to save reviewed fields before creating a quote draft.";
+const assistantUnsavedDraftWarning = "Suggestions applied locally. Click Analyze Intake to save reviewed fields.";
 const assistantAutofillFieldConfig = {
   customer_name: { input: assistantCustomerNameInput, label: "Customer Name" },
   customer_phone: { input: assistantCustomerPhoneInput, label: "Customer Phone" },
@@ -161,15 +161,9 @@ function setLoading(isLoading) {
 }
 
 function syncAssistantDraftActionState() {
-  const createBtn = document.getElementById("assistantCreateQuoteDraftBtn");
-  const createHelper = document.getElementById("assistantCreateQuoteDraftHelper");
-  if (createBtn) {
-    createBtn.disabled = !adminSessionReady || assistantDraftDirty;
-  }
-  if (createHelper) {
-    createHelper.textContent = assistantDraftDirty
-      ? assistantUnsavedDraftWarning
-      : "Create a real quote draft only after reviewing the recommendation.";
+  if (!adminSessionReady) return;
+  if (assistantDraftDirty) {
+    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
   }
 }
 
@@ -1173,72 +1167,19 @@ function renderScreenshotAssistantResult(item) {
   const quoteWrap = document.createElement("div");
   quoteWrap.className = "assistantAttachmentList";
   const quoteTitle = document.createElement("strong");
-  quoteTitle.textContent = "Linked quote draft";
+  quoteTitle.textContent = "Linked quote context";
   quoteWrap.appendChild(quoteTitle);
   const quoteBody = document.createElement("div");
   quoteBody.className = "small";
-  quoteBody.textContent = item.quote_id || "No quote draft created yet.";
+  quoteBody.textContent = item.quote_id || "No linked quote.";
   quoteWrap.appendChild(quoteBody);
   panel.appendChild(quoteWrap);
 
   if (item.quote_id) {
     const lockNotice = document.createElement("div");
     lockNotice.className = "small muted";
-    lockNotice.textContent = "This analysis is locked because a quote draft has already been created.";
+    lockNotice.textContent = "Quote linkage is shown for operations context only. Quote drafting and handoff are not available in admin.";
     panel.appendChild(lockNotice);
-
-    const handoffRow = document.createElement("div");
-    handoffRow.className = "rowToken mt10 assistantActions";
-    const handoffHelper = document.createElement("div");
-    handoffHelper.className = "small";
-    handoffHelper.textContent = "Prepare a normal customer handoff only after the quote draft is final.";
-    const handoffBtn = document.createElement("button");
-    handoffBtn.id = "assistantPrepareHandoffBtn";
-    handoffBtn.className = "secondaryAction";
-    handoffBtn.type = "button";
-    handoffBtn.textContent = "Prepare Customer Handoff";
-    handoffBtn.disabled = !adminSessionReady;
-    handoffBtn.addEventListener("click", () => prepareCustomerHandoff(item.quote_id || ""));
-    handoffRow.append(handoffHelper, handoffBtn);
-    panel.appendChild(handoffRow);
-
-    if (currentAssistantHandoff && currentAssistantHandoff.quote_id === item.quote_id) {
-      const handoffWrap = document.createElement("div");
-      handoffWrap.className = "assistantAttachmentList";
-      const handoffTitle = document.createElement("strong");
-      handoffTitle.textContent = "Customer handoff";
-      handoffWrap.appendChild(handoffTitle);
-
-      const handoffMeta = document.createElement("div");
-      handoffMeta.className = "small";
-      handoffMeta.textContent = `Request ${currentAssistantHandoff.request_id} • ${currentAssistantHandoff.status}${currentAssistantHandoff.already_existed ? " • existing request reused" : ""}`;
-      handoffWrap.appendChild(handoffMeta);
-
-      const handoffUrl = document.createElement("code");
-      handoffUrl.textContent = currentAssistantHandoff.handoff_url || "";
-      handoffWrap.appendChild(handoffUrl);
-      panel.appendChild(handoffWrap);
-    }
-  }
-
-  if (!item.quote_id) {
-    const actionRow = document.createElement("div");
-    actionRow.className = "rowToken mt10 assistantActions";
-    const helper = document.createElement("div");
-    helper.id = "assistantCreateQuoteDraftHelper";
-    helper.className = "small";
-    helper.textContent = assistantDraftDirty
-      ? assistantUnsavedDraftWarning
-      : "Create a real quote draft only after reviewing the recommendation.";
-    const button = document.createElement("button");
-    button.id = "assistantCreateQuoteDraftBtn";
-    button.className = "secondaryAction";
-    button.type = "button";
-    button.textContent = "Create Quote Draft";
-    button.disabled = !adminSessionReady || assistantDraftDirty;
-    button.addEventListener("click", () => createQuoteDraftFromAnalysis(item.analysis_id || ""));
-    actionRow.append(helper, button);
-    panel.appendChild(actionRow);
   }
 
   box.appendChild(panel);
@@ -1388,92 +1329,6 @@ async function uploadScreenshotAssistantFiles() {
     const parsed = parseApiError(err);
     const detail = safeGet(parsed, "data.detail", "Please review the files and try again.");
     setLine(assistantStatusLine, "bad", "Screenshot upload failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
-  } finally {
-    setLoading(false);
-  }
-}
-
-async function createQuoteDraftFromAnalysis(analysisId) {
-  if (!adminSessionReady) {
-    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before creating a quote draft.");
-    return;
-  }
-  if (assistantDraftDirty) {
-    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
-    return;
-  }
-  if (!analysisId) {
-    setLine(assistantStatusLine, "bad", "Create or load a screenshot analysis before creating a quote draft.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    setLine(assistantStatusLine, "ok", "Creating quote draft from reviewed analysis...");
-
-    const resp = await fetch(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft`, {
-      method: "POST",
-      headers: authHeaders()
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
-
-    renderScreenshotAssistantResult(data.analysis || null);
-    renderScreenshotAssistantUploads((data.analysis && data.analysis.attachments) || []);
-
-    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
-    renderScreenshotAssistantHistory((analyses.items || []));
-
-    const quotes = await fetchJSON("/admin/api/quotes");
-    renderQuotes((quotes.items || []));
-
-    const createdQuoteId = safeGet(data, "quote.quote_id", "");
-    setLine(assistantStatusLine, "ok", `Quote draft ${createdQuoteId || "created"} linked to the current analysis.`);
-  } catch (err) {
-    const parsed = parseApiError(err);
-    const detail = safeGet(parsed, "data.detail", "Please review the draft and try again.");
-    setLine(assistantStatusLine, "bad", "Quote draft creation failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
-  } finally {
-    setLoading(false);
-  }
-}
-
-async function prepareCustomerHandoff(quoteId) {
-  if (!adminSessionReady) {
-    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before preparing customer handoff.");
-    return;
-  }
-  if (!quoteId) {
-    setLine(assistantStatusLine, "bad", "Create a linked quote draft before preparing customer handoff.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    setLine(assistantStatusLine, "ok", "Preparing customer handoff...");
-
-    const resp = await fetch(`/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff`, {
-      method: "POST",
-      headers: authHeaders()
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
-
-    currentAssistantHandoff = data;
-
-    if (currentAssistantAnalysisId) {
-      const refreshed = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(currentAssistantAnalysisId)}`);
-      renderScreenshotAssistantResult(refreshed);
-    }
-
-    const reqs = await fetchJSON("/admin/api/quote-requests");
-    renderRequests((reqs.items || []));
-
-    setLine(assistantStatusLine, "ok", `Customer handoff ready for request ${data.request_id}.`, data.handoff_url || undefined);
-  } catch (err) {
-    const parsed = parseApiError(err);
-    const detail = safeGet(parsed, "data.detail", "Please review the quote draft and try again.");
-    setLine(assistantStatusLine, "bad", "Customer handoff failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
   } finally {
     setLoading(false);
   }
