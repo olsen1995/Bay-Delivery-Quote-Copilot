@@ -1,5 +1,8 @@
 # Repository Audit — 2026-03-22
 
+> **Historical snapshot:** This document reflects repository state as of 2026-03-22 and may not match the current `main` branch. Verify live routes, tests, and docs before relying on it.
+
+
 ## Scope
 
 This audit covered repository health, test status, security-oriented guardrails, dependency integrity, and a light manual review of core backend flows. No pricing math or business rules were modified as part of this audit.
