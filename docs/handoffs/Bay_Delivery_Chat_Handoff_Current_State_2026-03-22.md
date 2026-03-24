@@ -1,6 +1,6 @@
 # Bay Delivery Quote Copilot — Chat Handoff / Current State / Next Steps
 
-> **Historical snapshot:** This document reflects repository state as of 2026-03-22 and may not match the current `main` branch. Verify live routes, tests, and docs before relying on it.
+> **Historical snapshot:** This document reflects repository state as of 2026-03-22. It is retained for history and may not match the current `main` branch.
 
 
 Generated: 2026-03-22

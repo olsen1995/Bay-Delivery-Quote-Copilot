@@ -13,8 +13,8 @@ Current stable milestone: `0.10.0`.
 
 This project provides:
 
-- Homepage / marketing page (served at `/`)
-- Customer quote form (served at `/quote`)
+- Homepage / marketing page (`/`)
+- Customer quote form (`/quote`)
 - Quote API (`POST /quote/calculate`)
 - Booking decision workflow + admin approval
 - Admin surfaces at `/admin`, `/admin/mobile`, and `/admin/uploads`
