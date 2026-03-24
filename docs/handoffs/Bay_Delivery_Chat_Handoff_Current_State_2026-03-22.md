@@ -1,6 +1,7 @@
 # Bay Delivery Quote Copilot — Chat Handoff / Current State / Next Steps
 
 > **Historical snapshot:** This document reflects repository state as of 2026-03-22. It is retained for history and may not match the current `main` branch.
+> **Direction correction (updated):** roadmap notes in this snapshot were corrected to match current direction while preserving historical context.
 
 
 Generated: 2026-03-22
@@ -60,7 +61,7 @@ This repo is the real operating system for Bay Delivery quoting and admin workfl
 2. **Screenshot Assistant is recommendation-first**
    - suggestions are non-binding
    - admin reviews/applies/edits
-   - quote draft creation comes from reviewed/saved data
+   - keep quote assistance separate from deeper admin quote authoring
 
 3. **Jobs are the operations anchor**
    - do not mirror ops state back into quote_request unnecessarily
@@ -135,21 +136,21 @@ These should be re-verified in a fresh chat rather than blindly assumed:
 ---
 
 ## Immediate Next Task
-**Next task:** rerun the live mobile smoke test on `/admin/mobile` now that PR #131 is merged.
+**Next task:** plan the removal of quote-authoring / quote-drafting functionality from admin surfaces (including `/admin/mobile`) while preserving the public customer quote flow.
 
 ### Why this is next
-- the core mobile admin shell exists
-- the first hardening pass landed
-- the stale async new-draft race fix landed in PR #131
-- the right next move is real operator validation, not another speculative feature
+- current direction keeps customer quote request/get-quote flow active
+- admin should stay focused on operational workflow (request review, approvals, jobs, scheduling)
+- quote-authoring inside admin is now out of scope for the next phase
+- the right next move is a narrow plan for clean removal without route or pricing-engine churn
 
 ### What should happen next
 - Start in **Plan mode**
-- Keep scope focused on live `/admin/mobile` validation
-- Use an iPhone / mobile browser
-- Record only real blockers and real soft failures
-- If the smoke test passes, move to Facebook Post Generator planning
-- If it fails, do a narrow hardening pass for the exact failing step only
+- Define exact admin/mobile quote-authoring and quote-drafting touchpoints to remove
+- Preserve public customer quote intake + quote delivery flow
+- Preserve admin operational capabilities (request review, approvals, jobs, scheduling)
+- Keep `quote_engine` as the only in-app pricing source of truth
+- Keep GPT recommendation-first and non-binding
 
 ---
 
@@ -158,16 +159,12 @@ Run this exact flow on iPhone/mobile:
 
 1. Open `/admin/mobile`
 2. Log in
-3. Start New Intake
-4. Confirm fields are editable
-5. Paste sample customer message
-6. Save / Analyze Intake
-7. Upload 1–2 screenshots/photos
-8. Verify OCR preview and extracted details
-9. Create Quote Draft
-10. Prepare Customer Handoff
-11. Check Requests
-12. Check Upcoming Jobs
+3. View Requests
+4. Open a request and review request details
+5. Confirm approve/reject flow visibility
+6. View Upcoming Jobs
+7. Confirm scheduling/job workflow visibility
+8. Confirm mobile layout supports core operations without desktop fallback
 
 ### Record results like this
 - PASS
@@ -178,34 +175,27 @@ Suggested format:
 
 1. Open /admin/mobile — PASS / SOFT FAIL / FAIL
 2. Log in — PASS / SOFT FAIL / FAIL
-3. Start New Intake — PASS / SOFT FAIL / FAIL
-4. Fields editable — PASS / SOFT FAIL / FAIL
-5. Paste sample message — PASS / SOFT FAIL / FAIL
-6. Save / Analyze — PASS / SOFT FAIL / FAIL
-7. Upload screenshots — PASS / SOFT FAIL / FAIL
-8. OCR / extracted details — PASS / SOFT FAIL / FAIL
-9. Create Quote Draft — PASS / SOFT FAIL / FAIL
-10. Prepare Customer Handoff — PASS / SOFT FAIL / FAIL
-11. Requests — PASS / SOFT FAIL / FAIL
-12. Upcoming Jobs — PASS / SOFT FAIL / FAIL
+3. Requests list visibility — PASS / SOFT FAIL / FAIL
+4. Request detail review — PASS / SOFT FAIL / FAIL
+5. Approve/reject flow visibility — PASS / SOFT FAIL / FAIL
+6. Upcoming Jobs visibility — PASS / SOFT FAIL / FAIL
+7. Scheduling/job workflow visibility — PASS / SOFT FAIL / FAIL
+8. Mobile layout supports core ops — PASS / SOFT FAIL / FAIL
 
 Add notes + screenshots for any FAIL or meaningful SOFT FAIL.
 
 ### What counts as a blocker
-Do **not** move to Facebook Post Generator yet if any of these fail:
+Treat any ops-critical failure as a blocker:
 - login
-- new draft / editable intake state
-- save / analyze
-- image upload
-- OCR / extracted details rendering
-- create quote draft
-- prepare handoff
 - requests visibility
+- request detail review visibility
+- approval/rejection workflow visibility
 - jobs visibility
-- major layout issues that force desktop use
+- scheduling/job workflow visibility
+- major layout issues that force desktop use for core ops
 
 ### What can wait
-These should not block the next module if the core flow works:
+These should not block the next module if the core ops flow works:
 - minor spacing polish
 - copy tweaks
 - nicer empty states
@@ -215,20 +205,16 @@ These should not block the next module if the core flow works:
 ---
 
 ## After That
-If the immediate next task passes / lands cleanly, the likely next item is:
+If the immediate next task lands cleanly, the likely next item is:
 
-**Next-up task:** Plan mode for **Facebook Post Generator V1**
+**Next-up task:** implement the scoped removal in admin/mobile and validate that operations workflows remain smooth while the public quote flow stays intact.
 
-### Likely shape of Facebook Post Generator V1
-- internal/admin-only tool
-- generate 2–4 Facebook post options
-- input: service type, job summary, before/after notes, optional photos, CTA preference
-- output: plain-language post options
-- recommendation-first, not auto-posting
-- keep it simple and useful before adding more marketing logic
-
-After Facebook Post Generator V1 is stable, the likely next module is:
-**Google Post Generator / rejection-helper module**
+### Likely shape of the follow-up pass
+- remove admin/mobile quote-authoring and quote-drafting UI/workflow paths
+- keep request review, approvals, jobs, scheduling, and operational workflow intact
+- keep customer-facing quote intake + quote response path available
+- keep `quote_engine` as the only in-app pricing source of truth
+- keep GPT recommendation-first and non-binding, with future internal quote assistance handled as a separate workflow
 
 ---
 
@@ -236,9 +222,10 @@ After Facebook Post Generator V1 is stable, the likely next module is:
 Do NOT:
 - create a second pricing engine
 - create AI-only pricing
+- expand quote creation deeper into admin or `/admin/mobile`
+- keep quote-authoring / quote-drafting as an admin roadmap priority
 - let OCR/autofill become quote truth without reviewed save
 - drift into big UI rewrites unless there is a real operational need
-- jump into Facebook/Google post tools before the mobile smoke test is actually rerun
 - rewrite auth right now
 - rebuild the app as native iOS right now
 - overcomplicate the frontend with unnecessary build tooling
@@ -289,11 +276,12 @@ Paste this into the new chat:
 “Do a fresh, complete, read-only audit of the current Bay Delivery Quote Copilot repo, current PR state, and live Render app. Verify current reality first instead of relying on prior chat memory. Then tell me:
 1. what is fully complete,
 2. what the real current risks are,
-3. whether `/admin/mobile` now looks ready after PR #131,
-4. and what the single best next task is.
+3. whether admin is cleanly focused on operations only (request review, approvals, jobs, scheduling),
+4. whether public customer quote flow remains intact,
+5. and what the single best next task is.
 Also keep our default workflow as: plan mode first, implementation second, PR review, merge, and live smoke test.”
 
 ---
 
 ## Short State Summary
-The repo is no longer in early build mode. It is in stable, feature-rich refinement / hardening / decision-support mode, with the newest focus being the mobile-first operator shell. The biggest value in the next chat will come from verifying current live state, rerunning the mobile smoke test after PR #131, and then choosing between more mobile hardening versus moving into Facebook Post Generator V1.
+The repo is no longer in early build mode. It is in stable, feature-rich refinement mode where the app should remain customer quote intake + ops backbone, admin should stay operations-first, and GPT quote help should move toward a separate recommendation workflow rather than deeper quote-building inside admin. The biggest value in the next chat will come from verifying current live state and planning/removing admin quote-authoring while preserving the public customer quote flow.
