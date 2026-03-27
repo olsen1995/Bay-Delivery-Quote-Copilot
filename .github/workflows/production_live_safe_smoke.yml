@@ -1,0 +1,43 @@
+name: Production Live-Safe Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+concurrency:
+  group: production-live-safe-smoke
+  cancel-in-progress: false
+
+jobs:
+  live-safe-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: ${{ secrets.BASE_URL }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate required smoke env vars
+        run: |
+          test -n "$BASE_URL" || (echo "Missing required secret: BASE_URL" && exit 1)
+          test -n "$ADMIN_USERNAME" || (echo "Missing required secret: ADMIN_USERNAME" && exit 1)
+          test -n "$ADMIN_PASSWORD" || (echo "Missing required secret: ADMIN_PASSWORD" && exit 1)
+
+      - name: Run production live-safe smoke
+        run: python scripts/smoke_test.py --mode live-safe
