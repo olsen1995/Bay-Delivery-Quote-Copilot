@@ -59,8 +59,8 @@ def process_customer_decision(
         raise HTTPException(status_code=400, detail="Invalid action (use accept|decline).")
 
     # Validate accept_token against server-persisted token.
-    server_token = quote.get("accept_token")
-    if not server_token or accept_token != server_token:
+    server_token = str(quote.get("accept_token") or "")
+    if not server_token or not hmac.compare_digest(str(accept_token or ""), server_token):
         raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
     if not existing:
@@ -156,7 +156,8 @@ def submit_booking_details(
     if existing["status"] != "customer_accepted":
         raise HTTPException(status_code=400, detail="Booking can only be submitted for accepted quotes.")
 
-    if existing.get("booking_token") != booking_token:
+    server_booking_token = str(existing.get("booking_token") or "")
+    if not server_booking_token or not hmac.compare_digest(str(booking_token or ""), server_booking_token):
         raise HTTPException(status_code=401, detail="Invalid or expired booking token.")
 
     if is_token_expired(existing.get("booking_token_created_at")):
