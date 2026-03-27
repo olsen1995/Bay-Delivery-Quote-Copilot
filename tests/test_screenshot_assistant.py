@@ -469,7 +469,7 @@ def test_screenshot_assistant_upload_over_12mb_returns_413(client: TestClient) -
     response = client.post(
         "/admin/api/screenshot-assistant/analyses/analysis-123/attachments",
         headers={"content-length": str((12 * 1024 * 1024) + 1), **admin_headers()},
-        data=b"",
+        content=b"",
     )
 
     assert response.status_code == 413
@@ -647,7 +647,6 @@ def test_screenshot_assistant_minimum_safe_respects_active_engine_floors(client:
     protected_floor = artifacts["engine_quote"]["_internal"]["item_delivery_protected_base_floor_cad"]
     assert protected_floor > 0
     assert guidance["range"]["minimum_safe_cash_cad"] >= protected_floor
-
 
 
 

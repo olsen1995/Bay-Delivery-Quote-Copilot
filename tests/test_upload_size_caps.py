@@ -10,7 +10,7 @@ def test_upload_over_12mb_returns_413():
         response = client.post(
             "/quote/upload-photos",
             headers={"content-length": str((12 * 1024 * 1024) + 1)},
-            data=b"",
+            content=b"",
         )
 
     assert response.status_code == 413
