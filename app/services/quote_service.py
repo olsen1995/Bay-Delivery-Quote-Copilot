@@ -26,6 +26,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         travel_zone=str(request_payload.get("travel_zone", "in_town")),
         access_difficulty=str(request_payload.get("access_difficulty", "normal")),
         has_dense_materials=bool(request_payload.get("has_dense_materials", False)),
+        load_mode=request_payload.get("load_mode"),
     )
 
     # Validate required route fields using normalized service type returned by the engine.
@@ -55,6 +56,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "travel_zone": request_payload.get("travel_zone", "in_town"),
         "access_difficulty": request_payload.get("access_difficulty", "normal"),
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
+        "load_mode": request_payload.get("load_mode"),
     }
 
     response = {

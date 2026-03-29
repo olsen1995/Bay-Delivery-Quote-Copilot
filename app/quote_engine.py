@@ -333,6 +333,47 @@ def _haul_away_trailer_class_fill_floor(
     return _haul_away_trailer_fill_floor(service_conf, trailer_fill_estimate)
 
 
+def _normalize_load_mode(load_mode: str | None) -> str:
+    mode = str(load_mode or "").strip().lower()
+    if mode == "space_fill":
+        return "space_fill"
+    return "standard"
+
+
+def _space_fill_class_from_trailer_fill(trailer_fill_estimate: str | None) -> int:
+    fill_key = str(trailer_fill_estimate or "").strip().lower()
+    if fill_key == "under_quarter":
+        return 0
+    if fill_key in {"quarter", "half"}:
+        return 1
+    if fill_key == "three_quarter":
+        return 2
+    if fill_key == "full":
+        return 3
+    return -1
+
+
+def _space_fill_class_from_bag_count(garbage_bag_count: int) -> int:
+    bags = int(garbage_bag_count)
+    if bags >= 16:
+        return 3
+    if bags >= 10:
+        return 2
+    if bags >= 5:
+        return 1
+    return 0
+
+
+def _space_fill_floor_for_class(size_class: int) -> float:
+    if size_class == 0:
+        return 225.0
+    if size_class == 1:
+        return 300.0
+    if size_class == 2:
+        return 375.0
+    return 0.0
+
+
 def calculate_quote(
     service_type: str,
     hours: float,
@@ -348,6 +389,7 @@ def calculate_quote(
     travel_zone: str = "in_town",
     access_difficulty: str = "normal",
     has_dense_materials: bool = False,
+    load_mode: str | None = "standard",
 ) -> Dict[str, Any]:
     """
     Customer-safe output:
@@ -361,6 +403,7 @@ def calculate_quote(
     tax = _get_tax_rates(config)
 
     normalized = _normalize_service_type(config, service_type)
+    normalized_load_mode = _normalize_load_mode(load_mode)
 
     # -------------------------
     # Scrap pickup (hard lock)
@@ -519,6 +562,15 @@ def calculate_quote(
         trailer_fill_floor = _haul_away_trailer_class_fill_floor(svc, trailer_class, trailer_fill_estimate)
         awkward_small_load_floor = _haul_away_access_difficulty_small_load_floor(svc, _ad, small_load_protected)
         cash_before_round = max(cash_before_round, bag_type_floor, trailer_fill_floor, awkward_small_load_floor)
+
+        if normalized_load_mode == "space_fill":
+            trailer_class_idx = _space_fill_class_from_trailer_fill(trailer_fill_estimate)
+            bag_class_idx = _space_fill_class_from_bag_count(int(garbage_bag_count))
+            inferred_size_class = max(trailer_class_idx, bag_class_idx)
+            if inferred_size_class < 3:
+                discounted_cash = float(cash_before_round) * 0.8
+                space_fill_floor = _space_fill_floor_for_class(inferred_size_class)
+                cash_before_round = max(discounted_cash, space_fill_floor)
 
     cash_total = _round_cash_to_nearest_5(cash_before_round)
     emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
