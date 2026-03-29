@@ -144,7 +144,7 @@ Investigate tuning when:
 
 ### Tuning Targets
 
-Common tuning targets in `app/pricing_engine.py`:
+Common tuning targets in `app/quote_engine.py`:
 
 - **`ACCESS_DIFFICULTY_ADDERS`**: Surcharges for difficult/extreme access
 - **`DENSE_MATERIAL_LABOUR_MULTIPLIER`**: Adjustment for heavy materials
@@ -160,7 +160,7 @@ Common tuning targets in `app/pricing_engine.py`:
 2. **Add scenarios** to `quote_calibration_dataset.json`
 3. **Run calibration**: `python analysis/run_quote_calibration.py`
 4. **Review results**: Identify systematic biases
-5. **Tune if needed**: Adjust `pricing_engine.py` based on findings
+5. **Tune if needed**: Adjust `quote_engine.py` based on findings
 6. **Validate**: Run calibration again to confirm improvements
 7. **Commit changes**: Document tuning in PR
 
