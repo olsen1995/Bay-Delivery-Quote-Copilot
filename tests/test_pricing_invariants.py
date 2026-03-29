@@ -268,6 +268,186 @@ def test_haul_away_large_volume_bag_steps_progressive() -> None:
     )
 
 
+def test_space_fill_default_unchanged_when_omitted_vs_standard() -> None:
+    standard_omitted = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    explicit_standard = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="standard",
+    )
+    assert float(standard_omitted["total_cash_cad"]) == float(explicit_standard["total_cash_cad"])
+    assert float(standard_omitted["total_emt_cad"]) == float(explicit_standard["total_emt_cad"])
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery", "demolition", "scrap_pickup"])
+def test_space_fill_ignored_for_non_haul_away(service_type: str) -> None:
+    baseline = calculate_quote(
+        service_type,
+        2.0,
+        crew_size=2,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    space_fill = calculate_quote(
+        service_type,
+        2.0,
+        crew_size=2,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="space_fill",
+    )
+    assert float(space_fill["total_cash_cad"]) == float(baseline["total_cash_cad"])
+    assert float(space_fill["total_emt_cad"]) == float(baseline["total_emt_cad"])
+
+
+def test_space_fill_discount_then_floor_protection_half_load() -> None:
+    standard = calculate_quote(
+        "haul_away",
+        3.0,
+        crew_size=2,
+        garbage_bag_count=8,
+        trailer_fill_estimate="half",
+        travel_zone="out_of_town",
+        access_difficulty="extreme",
+        has_dense_materials=False,
+    )
+    space_fill = calculate_quote(
+        "haul_away",
+        3.0,
+        crew_size=2,
+        garbage_bag_count=8,
+        trailer_fill_estimate="half",
+        travel_zone="out_of_town",
+        access_difficulty="extreme",
+        has_dense_materials=False,
+        load_mode="space_fill",
+    )
+    assert float(space_fill["total_cash_cad"]) <= float(standard["total_cash_cad"])
+    assert float(space_fill["total_cash_cad"]) >= 300.0
+
+
+@pytest.mark.parametrize(
+    ("trailer_fill_estimate", "bags", "expected_floor"),
+    [
+        ("under_quarter", 1, 225.0),
+        ("quarter", 4, 300.0),
+        ("half", 7, 300.0),
+        ("three_quarter", 10, 375.0),
+    ],
+)
+def test_space_fill_floor_by_inferred_load_band(trailer_fill_estimate: str, bags: int, expected_floor: float) -> None:
+    result = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=bags,
+        trailer_fill_estimate=trailer_fill_estimate,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="space_fill",
+    )
+    assert float(result["total_cash_cad"]) >= expected_floor
+
+
+def test_space_fill_full_load_ignored() -> None:
+    standard = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=18,
+        trailer_fill_estimate="full",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    space_fill = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=18,
+        trailer_fill_estimate="full",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="space_fill",
+    )
+    assert float(space_fill["total_cash_cad"]) == float(standard["total_cash_cad"])
+
+
+def test_space_fill_conflicting_signals_choose_larger_class() -> None:
+    under_quarter_signal = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=12,
+        trailer_fill_estimate="under_quarter",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="space_fill",
+    )
+    assert float(under_quarter_signal["total_cash_cad"]) >= 375.0
+
+
+def test_space_fill_unrecognized_or_blank_load_mode_treated_as_standard() -> None:
+    standard = calculate_quote(
+        "haul_away",
+        1.5,
+        crew_size=1,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    blank_mode = calculate_quote(
+        "haul_away",
+        1.5,
+        crew_size=1,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="",
+    )
+    unknown_mode = calculate_quote(
+        "haul_away",
+        1.5,
+        crew_size=1,
+        garbage_bag_count=6,
+        trailer_fill_estimate="half",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="SPACEFILL_X",
+    )
+    assert float(blank_mode["total_cash_cad"]) == float(standard["total_cash_cad"])
+    assert float(unknown_mode["total_cash_cad"]) == float(standard["total_cash_cad"])
+
+
 def test_haul_away_mattresses_count_monotonic_non_decreasing(client: TestClient) -> None:
     payload = _base_payload(service_type="haul_away")
 

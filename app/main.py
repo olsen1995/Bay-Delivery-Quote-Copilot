@@ -600,6 +600,7 @@ class QuoteRequestPayload(BaseModel):
     travel_zone: str = Field("in_town", max_length=50)
     access_difficulty: str = Field("normal", max_length=50)
     has_dense_materials: bool = Field(False)
+    load_mode: Optional[str] = Field("standard", max_length=20)
 
     @field_validator(
         "customer_name",
@@ -617,6 +618,7 @@ class QuoteRequestPayload(BaseModel):
         "scrap_pickup_location",
         "travel_zone",
         "access_difficulty",
+        "load_mode",
         mode="before",
     )
     @classmethod

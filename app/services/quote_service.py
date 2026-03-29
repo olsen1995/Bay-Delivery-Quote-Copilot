@@ -9,8 +9,16 @@ from app.quote_engine import calculate_quote
 from app.storage import save_quote
 
 
+def _normalize_load_mode(load_mode: Any) -> str:
+    mode = str(load_mode or "").strip().lower()
+    if mode == "space_fill":
+        return "space_fill"
+    return "standard"
+
+
 def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     requested_service_type = str(request_payload.get("service_type", "")).strip()
+    normalized_load_mode = _normalize_load_mode(request_payload.get("load_mode"))
 
     engine_quote = calculate_quote(
         service_type=requested_service_type,
@@ -26,6 +34,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         travel_zone=str(request_payload.get("travel_zone", "in_town")),
         access_difficulty=str(request_payload.get("access_difficulty", "normal")),
         has_dense_materials=bool(request_payload.get("has_dense_materials", False)),
+        load_mode=normalized_load_mode,
     )
 
     # Validate required route fields using normalized service type returned by the engine.
@@ -55,6 +64,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "travel_zone": request_payload.get("travel_zone", "in_town"),
         "access_difficulty": request_payload.get("access_difficulty", "normal"),
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
+        "load_mode": normalized_load_mode,
     }
 
     response = {
