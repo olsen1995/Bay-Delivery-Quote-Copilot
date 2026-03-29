@@ -71,7 +71,7 @@ label {
 
 .rowToken {
 	display: grid;
-	grid-template-columns: 1fr 240px;
+	grid-template-columns: minmax(0, 1fr) 240px;
 	gap: 16px;
 	margin-top: 10px;
 }
@@ -93,7 +93,9 @@ label {
 
 #quotesBox,
 #requestsBox,
-#jobsBox {
+#jobsBox,
+#auditLogBox,
+#assistantHistoryBox {
 	overflow-x: auto;
 }
 
@@ -211,8 +213,12 @@ label {
 
 .dashboardGrid {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 18px;
+}
+
+.dashboardGrid > .card {
+	min-width: 0;
 }
 
 .dataTable,
@@ -477,7 +483,6 @@ textarea:focus {
 
 
 #assistantResultBox,
-#assistantHistoryBox,
 #assistantUploadList {
 	overflow-x: auto;
 }
@@ -493,7 +498,7 @@ textarea:focus {
 
 .assistantDraftBar {
 	display: grid;
-	grid-template-columns: 1fr 180px;
+	grid-template-columns: minmax(0, 1fr) 180px;
 	gap: 12px;
 	align-items: center;
 	padding: 12px 14px;
@@ -519,8 +524,14 @@ textarea:focus {
 
 .assistantFieldRow {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 12px;
+}
+
+.assistantDraftBar > *,
+.assistantUploadRow > *,
+.assistantFieldRow > * {
+	min-width: 0;
 }
 
 .assistantActions {
