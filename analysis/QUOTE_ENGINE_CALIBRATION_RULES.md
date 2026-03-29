@@ -122,7 +122,7 @@ A pricing change is bad if it:
 
 ## Decision Checklist Before Merging a Pricing PR
 
-Before merging any change to `app/pricing_engine.py`, `app/quote_engine.py`,
+Before merging any change to `app/quote_engine.py`
 or related service/config files, confirm all of the following:
 
 - [ ] The change is backed by calibration data from `analysis/`
