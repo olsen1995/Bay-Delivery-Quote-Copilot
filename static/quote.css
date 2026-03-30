@@ -182,13 +182,13 @@
   border: 1px solid var(--line-soft);
   border-radius: 14px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(247, 249, 252, 0.86);
 }
 
 .detailPanel summary {
   cursor: pointer;
   font-weight: 700;
-  color: var(--ink-strong);
+  color: var(--ink-muted);
   margin-bottom: 8px;
 }
 
@@ -198,7 +198,7 @@
 
 .helperText {
   margin-top: 8px;
-  font-size: 0.9em;
+  font-size: 0.86em;
   color: var(--ink-muted);
   line-height: 1.45;
 }
@@ -322,6 +322,20 @@
   display: none;
 }
 
+.stepHelper {
+  margin: 10px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+#btnAccept {
+  box-shadow: 0 12px 24px rgba(193, 44, 39, 0.24);
+}
+
+#btnDecline {
+  opacity: 0.9;
+}
+
 .resultBox,
 .statusBox {
   padding: 20px;
@@ -416,6 +430,16 @@
   padding: 16px 18px;
   border-radius: 16px;
   background: rgba(11, 31, 58, 0.04);
+}
+
+.nextStepCallout {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(193, 44, 39, 0.22);
+  background: rgba(193, 44, 39, 0.08);
+  color: var(--ink-strong);
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .estimateDetails {

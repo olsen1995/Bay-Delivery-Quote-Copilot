@@ -28,9 +28,9 @@
     <div class="heroCard card">
       <p class="eyebrow">Bay Delivery</p>
       <h1>Get a Quote</h1>
-      <p class="muted heroCopy">Fill this out and we’ll calculate your quote instantly with a clear cash vs EMT breakdown.</p>
+      <p class="muted heroCopy">Get a fast estimate with clear cash vs EMT totals. No obligation to book.</p>
       <div class="heroHighlights" aria-hidden="true">
-        <span class="heroHighlight">Fast response</span>
+        <span class="heroHighlight">Fast estimate</span>
         <span class="heroHighlight">No obligation</span>
         <span class="heroHighlight">North Bay local</span>
       </div>
@@ -42,7 +42,7 @@
           <p class="sectionEyebrow">Quote Flow</p>
           <h2>What happens next</h2>
         </div>
-        <p class="muted sectionLead">You stay in control at every step. No booking is created unless you accept the estimate.</p>
+        <p class="muted sectionLead">Quick 5-step flow. No booking is created unless you accept the estimate.</p>
       </div>
       <ol class="flowProgress" id="flowProgress" aria-label="Quote progress">
         <li class="flowStep is-active" data-step="1"><span class="flowStepBadge">1</span><span class="flowStepLabel">Job details</span></li>
@@ -67,7 +67,7 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">1) Contact &amp; Job Location</h3>
-              <p class="firstStepHint">Start here. Your contact details stay attached to the quote and booking flow.</p>
+              <p class="firstStepHint">Step 1 of 5. Start here so we can attach your details to the estimate and booking flow.</p>
             </div>
           </div>
 
@@ -96,7 +96,7 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">2) Service Details</h3>
-              <p class="startIntro">Choose the job type first so we can show only the fields needed for your estimate.</p>
+              <p class="startIntro">Step 2 of 5. Choose the job type first so we can show only relevant fields.</p>
             </div>
           </div>
 
@@ -119,12 +119,12 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">3) Service-Specific Details</h3>
-              <p class="muted sectionLead">Add the job details that affect pricing. Route fields only appear when required.</p>
+              <p class="muted sectionLead">Step 3 of 5. Add details that affect pricing. Advanced fields are optional unless they apply.</p>
             </div>
           </div>
 
           <details id="serviceDetailsPanel" class="detailPanel">
-            <summary>Open detailed pricing fields</summary>
+            <summary>Optional: open advanced pricing details</summary>
 
             <div class="row">
               <div id="estimatedHoursGroup">
@@ -234,7 +234,7 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">4) Job Description</h3>
-              <p class="muted sectionLead">Give us the job context that a driver or crew needs before confirming the work.</p>
+              <p class="muted sectionLead">Step 4 of 5. Add context the driver or crew should know before confirming work.</p>
             </div>
           </div>
 
@@ -248,6 +248,7 @@
           <button class="btn" id="btnCalc" type="button">Get My Estimate</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
+        <p class="stepHelper">Step 5 of 5 starts after your estimate: review totals, then accept or decline with no pressure.</p>
         <div class="loadingState hidden" id="loadingState">
           <span class="spinner"></span>
           <span>Calculating your estimate...</span>
@@ -273,7 +274,7 @@
 
     <div class="card hidden stageCard" id="decisionCard">
       <h2>Quote Decision</h2>
-      <p class="muted sectionLead">If this estimate looks good, accept and we’ll move to booking preferences. If not, you can decline with no pressure.</p>
+      <p class="muted sectionLead">If this estimate looks good, accept and move to booking preferences. If not, decline with no pressure.</p>
       <p class="muted reassuranceLine">You stay in control at every step, and no booking is created unless you accept.</p>
 
       <div class="formWrap">
