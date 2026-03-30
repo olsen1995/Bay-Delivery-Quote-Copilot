@@ -259,7 +259,11 @@ function renderQuoteResult(data, quoteResponse) {
   noteBody.textContent = quoteResponse.disclaimer || "";
   note.append(noteTitle, noteBody);
 
-  wrapper.append(header, breakdown, estimateDetails, note);
+  const nextStep = document.createElement("div");
+  nextStep.className = "nextStepCallout";
+  nextStep.textContent = "Next step: review this estimate, then choose Accept Quote to continue to booking preferences (or Decline with no obligation).";
+
+  wrapper.append(header, breakdown, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
 }
 

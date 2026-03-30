@@ -72,9 +72,10 @@ a:hover { opacity: 0.9; }
   justify-content: center;
   margin: 12px 0 16px;
   padding: 12px 16px;
-  background: rgba(122,16,32,0.08);
-  border-top: 1px dashed var(--border);
-  border-bottom: 1px dashed var(--border);
+  background: linear-gradient(135deg, rgba(122,16,32,0.14), rgba(168,22,44,0.08));
+  border: 1px solid rgba(212,42,63,0.24);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(122,16,32,0.16);
 }
 .trustBadge{
   font-size: 13px;
@@ -293,12 +294,21 @@ a:hover { opacity: 0.9; }
   border-radius: 12px;
   background: rgba(255,255,255,0.03);
   border: 1px solid var(--border);
+  overflow: hidden;
 }
 .workItem img{
   width: 100%;
   height: auto;
   object-fit: contain;
   display: block;
+}
+.workCaption{
+  margin: 0;
+  padding: 10px 12px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  border-top: 1px solid rgba(255,255,255,0.08);
 }
 
 .formWrap{
@@ -399,6 +409,11 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
 }
 .btnLink:active{
   transform: translateY(0);
+}
+.ctaHelper{
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .result{
