@@ -33,3 +33,28 @@ jobs:
       - name: Run security audit (project dependencies only)
         run: |
           pip-audit -r requirements.txt
+
+  playwright-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies and Playwright
+        run: |
+          pip install -r requirements.txt
+          pip install pytest playwright
+
+      - name: Install Chromium browser for Playwright
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        run: |
+          python -m pytest -q tests/test_launch_smoke_playwright.py tests/test_admin_mobile_playwright.py
