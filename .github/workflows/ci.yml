@@ -55,6 +55,23 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
 
-      - name: Run Playwright smoke tests
+      - name: Run Playwright smoke tests (fail if any are skipped)
         run: |
-          python -m pytest -q tests/test_launch_smoke_playwright.py tests/test_admin_mobile_playwright.py
+          python -m pytest -q \
+            --junitxml=playwright-smoke-junit.xml \
+            tests/test_launch_smoke_playwright.py \
+            tests/test_admin_mobile_playwright.py
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("playwright-smoke-junit.xml").getroot()
+          suite = root.find("testsuite") if root.tag == "testsuites" else root
+          skipped = int(suite.attrib.get("skipped", "0"))
+          tests = int(suite.attrib.get("tests", "0"))
+          if tests == 0 or skipped > 0:
+              raise SystemExit(
+                  f"Playwright smoke must execute without skips (tests={tests}, skipped={skipped})."
+              )
+          print(f"Playwright smoke executed with no skips (tests={tests}, skipped={skipped}).")
+          PY
