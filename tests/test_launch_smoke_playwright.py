@@ -16,6 +16,10 @@ playwright = pytest.importorskip(
     "playwright.async_api",
     reason="Playwright is not installed. Install playwright to run launch smoke browser tests.",
 )
+pytest_asyncio = pytest.importorskip(
+    "pytest_asyncio",
+    reason="pytest-asyncio is required to run async Playwright smoke tests.",
+)
 
 Browser = playwright.Browser
 Error = playwright.Error
@@ -98,23 +102,28 @@ def live_server(tmp_path_factory: pytest.TempPathFactory) -> str:
             process.wait(timeout=5)
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture()
 async def browser() -> Browser:
     async with async_playwright() as p:
         try:
             browser = await p.chromium.launch()
         except Error as exc:
             pytest.skip(f"Playwright browser is not available: {exc}")
-        yield browser
-        await browser.close()
+        try:
+            yield browser
+        finally:
+            await browser.close()
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def page(browser: Browser) -> Page:
     context = await browser.new_context(viewport={"width": 1440, "height": 900})
     page = await context.new_page()
-    yield page
-    await context.close()
+    try:
+        yield page
+    finally:
+        await page.close()
+        await context.close()
 
 
 def _next_booking_date() -> str:
