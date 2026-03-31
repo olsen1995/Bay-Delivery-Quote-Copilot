@@ -33,3 +33,46 @@ jobs:
       - name: Run security audit (project dependencies only)
         run: |
           pip-audit -r requirements.txt
+
+  playwright-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies and Playwright
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio playwright
+
+      - name: Install Chromium browser for Playwright
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests (fail if any are skipped)
+        run: |
+          python -m pytest -q \
+            --asyncio-mode=auto \
+            --junitxml=playwright-smoke-junit.xml \
+            tests/test_launch_smoke_playwright.py \
+            tests/test_admin_mobile_playwright.py
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("playwright-smoke-junit.xml").getroot()
+          suite = root.find("testsuite") if root.tag == "testsuites" else root
+          skipped = int(suite.attrib.get("skipped", "0"))
+          tests = int(suite.attrib.get("tests", "0"))
+          if tests == 0 or skipped > 0:
+              raise SystemExit(
+                  f"Playwright smoke must execute without skips (tests={tests}, skipped={skipped})."
+              )
+          print(f"Playwright smoke executed with no skips (tests={tests}, skipped={skipped}).")
+          PY
