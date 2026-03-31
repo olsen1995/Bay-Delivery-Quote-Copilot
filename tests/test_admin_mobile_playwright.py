@@ -13,7 +13,7 @@ import pytest
 import requests
 
 playwright = pytest.importorskip(
-    "playwright.sync_api",
+    "playwright.async_api",
     reason="Playwright is not installed. Install playwright to run /admin/mobile browser tests.",
 )
 
@@ -22,7 +22,7 @@ Error = playwright.Error
 Page = playwright.Page
 Route = playwright.Route
 expect = playwright.expect
-sync_playwright = playwright.sync_playwright
+async_playwright = playwright.async_playwright
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ADMIN_USERNAME = "mobile-admin"
@@ -99,19 +99,19 @@ def live_server(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 
 @pytest.fixture(scope="session")
-def browser() -> Browser:
-    with sync_playwright() as p:
+async def browser() -> Browser:
+    async with async_playwright() as p:
         try:
-            browser = p.chromium.launch()
+            browser = await p.chromium.launch()
         except Error as exc:
             pytest.skip(f"Playwright browser is not available: {exc}")
         yield browser
-        browser.close()
+        await browser.close()
 
 
 @pytest.fixture()
-def page(browser: Browser) -> Page:
-    context = browser.new_context(
+async def page(browser: Browser) -> Page:
+    context = await browser.new_context(
         viewport={"width": 390, "height": 844},
         is_mobile=True,
         has_touch=True,
@@ -121,20 +121,20 @@ def page(browser: Browser) -> Page:
             "Mobile/15E148 Safari/604.1"
         ),
     )
-    page = context.new_page()
+    page = await context.new_page()
     yield page
-    context.close()
+    await context.close()
 
 
-def _json_response(route: Route, payload: Any, status: int = 200) -> None:
-    route.fulfill(
+async def _json_response(route: Route, payload: Any, status: int = 200) -> None:
+    await route.fulfill(
         status=status,
         content_type="application/json",
         body=json.dumps(payload),
     )
 
 
-def _install_mock_admin_api(page: Page) -> None:
+async def _install_mock_admin_api(page: Page) -> None:
     mock_state: dict[str, Any] = {
         "requests": [
             {
@@ -167,61 +167,63 @@ def _install_mock_admin_api(page: Page) -> None:
         ],
     }
 
-    def handle_quotes(route: Route) -> None:
-        _json_response(route, {"items": []})
+    async def handle_quotes(route: Route) -> None:
+        await _json_response(route, {"items": []})
 
-    def handle_requests(route: Route) -> None:
-        _json_response(route, {"items": mock_state["requests"]})
+    async def handle_requests(route: Route) -> None:
+        await _json_response(route, {"items": mock_state["requests"]})
 
-    def handle_jobs(route: Route) -> None:
-        _json_response(route, {"items": mock_state["jobs"]})
+    async def handle_jobs(route: Route) -> None:
+        await _json_response(route, {"items": mock_state["jobs"]})
 
-    page.route("**/admin/api/quotes?limit=1", handle_quotes)
-    page.route("**/admin/api/quote-requests?limit=20", handle_requests)
-    page.route("**/admin/api/jobs?limit=20", handle_jobs)
-
-
-def _login(page: Page, base_url: str) -> None:
-    page.goto(f"{base_url}/admin/mobile", wait_until="networkidle")
-    page.locator("#mobileAdminUsername").fill(ADMIN_USERNAME)
-    page.locator("#mobileAdminPassword").fill(ADMIN_PASSWORD)
-    page.locator("#loginBtn").click()
-    expect(page.locator("#authenticatedShell")).to_be_visible(timeout=10_000)
+    await page.route("**/admin/api/quotes?limit=1", handle_quotes)
+    await page.route("**/admin/api/quote-requests?limit=20", handle_requests)
+    await page.route("**/admin/api/jobs?limit=20", handle_jobs)
 
 
-def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None:
-    _install_mock_admin_api(page)
-    _login(page, live_server)
-
-    expect(page.locator("#requestCount")).to_have_text("1")
-    expect(page.locator("#upcomingCount")).to_have_text("1")
-
-    page.locator("button[data-screen='requestsScreen']").click()
-    expect(page.locator("#requestsList")).to_contain_text("Morgan Request")
-    expect(page.locator("#requestsList")).to_contain_text("Waiting for operator follow-up.")
-
-    page.locator("button[data-screen='jobsScreen']").click()
-    expect(page.locator("#jobsList")).to_contain_text("Jordan Job")
-    expect(page.locator("#jobsList")).to_contain_text("synced")
-
-    page.locator("button[data-screen='homeScreen']").click()
-    expect(page.locator("#homeOpsSummary")).to_contain_text("Operational workflow")
-    expect(page.locator("#homeOpsSummary")).to_contain_text("No quote drafting")
-    expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
-    expect(page.locator("#authenticatedShell")).not_to_contain_text("Create Quote Draft")
+async def _login(page: Page, base_url: str) -> None:
+    await page.goto(f"{base_url}/admin/mobile", wait_until="networkidle")
+    await page.locator("#mobileAdminUsername").fill(ADMIN_USERNAME)
+    await page.locator("#mobileAdminPassword").fill(ADMIN_PASSWORD)
+    await page.locator("#loginBtn").click()
+    await expect(page.locator("#authenticatedShell")).to_be_visible(timeout=10_000)
 
 
-def test_admin_mobile_real_backend_login_no_pageerror(page: Page, live_server: str) -> None:
+@pytest.mark.asyncio
+async def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -> None:
+    await _install_mock_admin_api(page)
+    await _login(page, live_server)
+
+    await expect(page.locator("#requestCount")).to_have_text("1")
+    await expect(page.locator("#upcomingCount")).to_have_text("1")
+
+    await page.locator("button[data-screen='requestsScreen']").click()
+    await expect(page.locator("#requestsList")).to_contain_text("Morgan Request")
+    await expect(page.locator("#requestsList")).to_contain_text("Waiting for operator follow-up.")
+
+    await page.locator("button[data-screen='jobsScreen']").click()
+    await expect(page.locator("#jobsList")).to_contain_text("Jordan Job")
+    await expect(page.locator("#jobsList")).to_contain_text("synced")
+
+    await page.locator("button[data-screen='homeScreen']").click()
+    await expect(page.locator("#homeOpsSummary")).to_contain_text("Operational workflow")
+    await expect(page.locator("#homeOpsSummary")).to_contain_text("No quote drafting")
+    await expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
+    await expect(page.locator("#authenticatedShell")).not_to_contain_text("Create Quote Draft")
+
+
+@pytest.mark.asyncio
+async def test_admin_mobile_real_backend_login_no_pageerror(page: Page, live_server: str) -> None:
     page_errors: list[str] = []
     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
 
-    _login(page, live_server)
+    await _login(page, live_server)
 
-    expect(page.locator("#logoutBtn")).to_be_visible()
-    expect(page.locator("#homeScreen")).to_be_visible()
-    expect(page.locator("#requestCount")).to_be_visible()
-    expect(page.locator("#upcomingCount")).to_be_visible()
-    expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
+    await expect(page.locator("#logoutBtn")).to_be_visible()
+    await expect(page.locator("#homeScreen")).to_be_visible()
+    await expect(page.locator("#requestCount")).to_be_visible()
+    await expect(page.locator("#upcomingCount")).to_be_visible()
+    await expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
 
-    page.wait_for_timeout(500)
+    await page.wait_for_timeout(500)
     assert not page_errors, f"Unexpected pageerror/uncaught exception(s): {page_errors}"

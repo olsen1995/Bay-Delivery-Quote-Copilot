@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies and Playwright
         run: |
           pip install -r requirements.txt
-          pip install pytest playwright
+          pip install pytest pytest-asyncio playwright
 
       - name: Install Chromium browser for Playwright
         run: |
@@ -58,11 +58,11 @@ jobs:
       - name: Run Playwright smoke tests (fail if any are skipped)
         run: |
           python -m pytest -q \
+            --asyncio-mode=auto \
             --junitxml=playwright-smoke-junit.xml \
             tests/test_launch_smoke_playwright.py \
             tests/test_admin_mobile_playwright.py
           python - <<'PY'
-          import sys
           import xml.etree.ElementTree as ET
 
           root = ET.parse("playwright-smoke-junit.xml").getroot()

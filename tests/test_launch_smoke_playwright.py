@@ -13,7 +13,7 @@ import pytest
 import requests
 
 playwright = pytest.importorskip(
-    "playwright.sync_api",
+    "playwright.async_api",
     reason="Playwright is not installed. Install playwright to run launch smoke browser tests.",
 )
 
@@ -21,7 +21,7 @@ Browser = playwright.Browser
 Error = playwright.Error
 Page = playwright.Page
 expect = playwright.expect
-sync_playwright = playwright.sync_playwright
+async_playwright = playwright.async_playwright
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ADMIN_USERNAME = "launch-admin"
@@ -99,77 +99,78 @@ def live_server(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 
 @pytest.fixture(scope="session")
-def browser() -> Browser:
-    with sync_playwright() as p:
+async def browser() -> Browser:
+    async with async_playwright() as p:
         try:
-            browser = p.chromium.launch()
+            browser = await p.chromium.launch()
         except Error as exc:
             pytest.skip(f"Playwright browser is not available: {exc}")
         yield browser
-        browser.close()
+        await browser.close()
 
 
 @pytest.fixture()
-def page(browser: Browser) -> Page:
-    context = browser.new_context(viewport={"width": 1440, "height": 900})
-    page = context.new_page()
+async def page(browser: Browser) -> Page:
+    context = await browser.new_context(viewport={"width": 1440, "height": 900})
+    page = await context.new_page()
     yield page
-    context.close()
+    await context.close()
 
 
 def _next_booking_date() -> str:
     return (dt.date.today() + dt.timedelta(days=2)).isoformat()
 
 
-def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page, live_server: str) -> None:
-    page.goto(f"{live_server}/", wait_until="networkidle")
-    expect(page).to_have_url(re.compile(r".*/$"))
-    expect(page.locator("a[href='/quote']").first).to_be_visible()
+@pytest.mark.asyncio
+async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page, live_server: str) -> None:
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    await expect(page).to_have_url(re.compile(r".*/$"))
+    await expect(page.locator("a[href='/quote']").first).to_be_visible()
 
-    page.locator("a[href='/quote']").first.click()
-    expect(page).to_have_url(re.compile(r".*/quote$"))
-    expect(page.locator("#quoteForm")).to_be_visible()
+    await page.locator("a[href='/quote']").first.click()
+    await expect(page).to_have_url(re.compile(r".*/quote$"))
+    await expect(page.locator("#quoteForm")).to_be_visible()
 
-    page.locator("#btnCalc").click()
-    expect(page.locator("#resultBox")).to_contain_text(
+    await page.locator("#btnCalc").click()
+    await expect(page.locator("#resultBox")).to_contain_text(
         "Please fill in all required fields (name, phone, address, and description)."
     )
 
-    page.locator("#customer_name").fill(CUSTOMER_NAME)
-    page.locator("#customer_phone").fill("705-555-0101")
-    page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
-    page.locator("#description").fill("Launch smoke validation for quote flow")
-    page.locator("#btnCalc").click()
+    await page.locator("#customer_name").fill(CUSTOMER_NAME)
+    await page.locator("#customer_phone").fill("705-555-0101")
+    await page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
+    await page.locator("#description").fill("Launch smoke validation for quote flow")
+    await page.locator("#btnCalc").click()
 
-    expect(page.locator("#resultBox")).to_contain_text("Your Estimate", timeout=20_000)
-    expect(page.locator("#resultBox")).to_contain_text("Quote ID:")
-    expect(page.locator("#decisionCard")).to_be_visible()
+    await expect(page.locator("#resultBox")).to_contain_text("Your Estimate", timeout=20_000)
+    await expect(page.locator("#resultBox")).to_contain_text("Quote ID:")
+    await expect(page.locator("#decisionCard")).to_be_visible()
 
-    page.locator("#btnAccept").click()
-    expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
-    expect(page.locator("#bookingCard")).to_be_visible()
+    await page.locator("#btnAccept").click()
+    await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
+    await expect(page.locator("#bookingCard")).to_be_visible()
 
-    page.locator("#bookingDate").fill(_next_booking_date())
-    page.locator("#bookingWindow").select_option("morning")
-    page.locator("#bookingNotes").fill("Please call when on the way.")
-    page.locator("#btnSubmitBooking").click()
+    await page.locator("#bookingDate").fill(_next_booking_date())
+    await page.locator("#bookingWindow").select_option("morning")
+    await page.locator("#bookingNotes").fill("Please call when on the way.")
+    await page.locator("#btnSubmitBooking").click()
 
-    expect(page.locator("#bookingStatus")).to_contain_text("Booking submitted successfully.", timeout=20_000)
-    booking_status_text = page.locator("#bookingStatus").inner_text()
+    await expect(page.locator("#bookingStatus")).to_contain_text("Booking submitted successfully.", timeout=20_000)
+    booking_status_text = await page.locator("#bookingStatus").inner_text()
     request_match = re.search(r"Request ID:\s*([^\s]+)", booking_status_text)
     assert request_match, f"Expected Request ID in booking status text: {booking_status_text}"
     request_id = request_match.group(1)
 
-    page.goto(f"{live_server}/admin", wait_until="networkidle")
-    expect(page.locator("#adminUsername")).to_be_visible()
-    expect(page.locator("#adminPassword")).to_be_visible()
-    expect(page.locator("#refreshBtn")).to_be_visible()
+    await page.goto(f"{live_server}/admin", wait_until="networkidle")
+    await expect(page.locator("#adminUsername")).to_be_visible()
+    await expect(page.locator("#adminPassword")).to_be_visible()
+    await expect(page.locator("#refreshBtn")).to_be_visible()
 
-    page.locator("#adminUsername").fill(ADMIN_USERNAME)
-    page.locator("#adminPassword").fill(ADMIN_PASSWORD)
-    page.locator("#refreshBtn").click()
+    await page.locator("#adminUsername").fill(ADMIN_USERNAME)
+    await page.locator("#adminPassword").fill(ADMIN_PASSWORD)
+    await page.locator("#refreshBtn").click()
 
-    expect(page.locator("#adminProtectedDashboard")).to_be_visible(timeout=20_000)
-    expect(page.locator("#requestsBox table")).to_be_visible(timeout=20_000)
-    expect(page.locator("#requestsBox")).to_contain_text(CUSTOMER_NAME)
-    expect(page.locator("#requestsBox")).to_contain_text(request_id)
+    await expect(page.locator("#adminProtectedDashboard")).to_be_visible(timeout=20_000)
+    await expect(page.locator("#requestsBox table")).to_be_visible(timeout=20_000)
+    await expect(page.locator("#requestsBox")).to_contain_text(CUSTOMER_NAME)
+    await expect(page.locator("#requestsBox")).to_contain_text(request_id)
