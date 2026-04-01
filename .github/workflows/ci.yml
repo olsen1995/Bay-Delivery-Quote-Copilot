@@ -22,6 +22,11 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+
+      - name: Check version marker parity
+        run: |
+          python tools/check_version_parity.py
+
       - name: Run tests
         run: |
           python -m pytest -q
