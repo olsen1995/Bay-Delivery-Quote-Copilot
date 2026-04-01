@@ -1,3 +1,6 @@
+> ⚠️ This is a template, not the current project state.
+> Refer to `docs/CURRENT_STATE.md` for the latest source of truth.
+
 # Bay Delivery Quote Copilot — Chat Handoff Template
 
 Use this template when starting a new chat for Bay Delivery Quote Copilot. Replace bracketed placeholders with the current state before pasting.

@@ -4,6 +4,9 @@ Local quote/estimate tool for Bay Delivery (North Bay, Ontario).
 
 Current stable milestone: `0.10.0`.
 
+## Current Project State
+See `docs/CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
+
 ## Render Parity and Release Signals (2026-03-14)
 
 - Live Render behavior was audited against current `main` before further pricing work.

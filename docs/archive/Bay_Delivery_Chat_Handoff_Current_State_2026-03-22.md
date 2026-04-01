@@ -1,3 +1,6 @@
+> ⚠️ Archived — This document reflects a previous state of the project and may no longer be accurate.
+> Refer to `docs/CURRENT_STATE.md` for the latest source of truth.
+
 # Bay Delivery Quote Copilot — Chat Handoff / Current State / Next Steps
 
 > **Historical snapshot:** This document reflects repository state as of 2026-03-22. It is retained for history and may not match the current `main` branch.

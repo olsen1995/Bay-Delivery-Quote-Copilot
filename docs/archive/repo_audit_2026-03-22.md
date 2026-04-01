@@ -1,3 +1,6 @@
+> ⚠️ Archived — This document reflects a previous state of the project and may no longer be accurate.
+> Refer to `docs/CURRENT_STATE.md` for the latest source of truth.
+
 # Repository Audit — 2026-03-22
 
 > **Historical snapshot:** This document reflects repository state as of 2026-03-22. It is retained for history and may not match the current `main` branch.
