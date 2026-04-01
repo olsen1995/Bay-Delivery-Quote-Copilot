@@ -31,7 +31,7 @@
       "trailer_fill_floor_anchors_cad": {
         "under_quarter": 0,
         "quarter": 175,
-        "half": 275,
+        "half": 300,
         "three_quarter": 400,
         "full": 500
       },
@@ -39,7 +39,7 @@
         "single_axle_open_aluminum": {
           "under_quarter": 0,
           "quarter": 150,
-          "half": 275,
+          "half": 300,
           "three_quarter": 400,
           "full": 500
         }
