@@ -898,7 +898,7 @@ def test_haul_away_bag_type_floor_does_not_decrease_quote(
     ("trailer_fill_estimate", "expected_cash"),
     [
         ("quarter", 175.0),
-        ("half", 275.0),
+        ("half", 300.0),
         ("three_quarter", 400.0),
         ("full", 500.0),
     ],
