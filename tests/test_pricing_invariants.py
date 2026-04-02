@@ -1032,7 +1032,7 @@ def test_haul_away_omitted_new_fields_preserve_existing_anchor_values_through_24
         5: 110.0,
         9: 140.0,
         15: 155.0,
-        16: 240.0,
+        16: 205.0,
         20: 250.0,
         24: 260.0,
     }

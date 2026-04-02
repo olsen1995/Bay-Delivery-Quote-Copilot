@@ -48,7 +48,7 @@
         "tiers": [
           { "max_bags": 5, "allowance": 50 },
           { "max_bags": 15, "allowance": 80 },
-          { "max_bags": 16, "allowance": 165 },
+          { "max_bags": 16, "allowance": 130 },
           { "max_bags": 20, "allowance": 175 },
           { "max_bags": 24, "allowance": 185 },
           { "max_bags": 30, "allowance": 230 },
