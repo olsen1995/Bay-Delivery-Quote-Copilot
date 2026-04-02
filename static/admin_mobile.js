@@ -133,6 +133,10 @@ function setAuthenticated(isAuthenticated) {
   logoutBtn.hidden = !isAuthenticated;
 }
 
+function hasAuthenticatedSession() {
+  return Boolean(state.authHeader) && loginScreen.hidden && !authenticatedShell.hidden;
+}
+
 function renderHomeSummary() {
   clearNode(homeOpsSummary);
   const card = document.createElement("article");
@@ -224,6 +228,10 @@ function updateQueueMetrics() {
 }
 
 async function loadDashboardData() {
+  if (!hasAuthenticatedSession()) {
+    return;
+  }
+
   const [requests, jobs] = await Promise.all([
     fetchJSON("/admin/api/quote-requests?limit=20"),
     fetchJSON("/admin/api/jobs?limit=20")
@@ -271,6 +279,13 @@ async function handleLogin(event) {
 }
 
 async function refreshAllData(statusTarget) {
+  if (!hasAuthenticatedSession()) {
+    if (statusTarget) {
+      setStatus(statusTarget, "warn", "Log in to refresh mobile admin data.");
+    }
+    return;
+  }
+
   try {
     await loadDashboardData();
     if (statusTarget) {

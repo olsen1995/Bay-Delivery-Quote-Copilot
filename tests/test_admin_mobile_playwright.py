@@ -222,6 +222,49 @@ async def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -
 
 
 @pytest.mark.asyncio
+async def test_admin_mobile_prelogin_refresh_guard_blocks_protected_calls(page: Page, live_server: str) -> None:
+    await _install_mock_admin_api(page)
+
+    request_counts = {"quote_requests": 0, "jobs": 0}
+
+    def track_request(request: Any) -> None:
+        url = request.url
+        if "/admin/api/quote-requests?limit=20" in url:
+            request_counts["quote_requests"] += 1
+        if "/admin/api/jobs?limit=20" in url:
+            request_counts["jobs"] += 1
+
+    page.on("request", track_request)
+
+    await page.goto(f"{live_server}/admin/mobile", wait_until="networkidle")
+    await page.evaluate(
+        """
+        async () => {
+            if (typeof window.refreshAllData === "function") {
+                await window.refreshAllData(document.getElementById("loginStatus"));
+            }
+        }
+        """
+    )
+    await page.wait_for_timeout(300)
+
+    assert request_counts["quote_requests"] == 0
+    assert request_counts["jobs"] == 0
+    await expect(page.locator("#loginStatus")).to_contain_text("Log in to refresh mobile admin data.")
+
+    await page.locator("#mobileAdminUsername").fill(ADMIN_USERNAME)
+    await page.locator("#mobileAdminPassword").fill(ADMIN_PASSWORD)
+    await page.locator("#loginBtn").click()
+
+    await expect(page.locator("#authenticatedShell")).to_be_visible(timeout=10_000)
+    await expect(page.locator("#requestCount")).to_have_text("1")
+    await expect(page.locator("#upcomingCount")).to_have_text("1")
+
+    assert request_counts["quote_requests"] >= 1
+    assert request_counts["jobs"] >= 1
+
+
+@pytest.mark.asyncio
 async def test_admin_mobile_real_backend_login_no_pageerror(page: Page, live_server: str) -> None:
     page_errors: list[str] = []
     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
