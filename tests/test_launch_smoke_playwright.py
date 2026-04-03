@@ -183,3 +183,36 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await expect(page.locator("#requestsBox table")).to_be_visible(timeout=20_000)
     await expect(page.locator("#requestsBox")).to_contain_text(CUSTOMER_NAME)
     await expect(page.locator("#requestsBox")).to_contain_text(request_id)
+
+
+@pytest.mark.asyncio
+async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server: str) -> None:
+    await page.goto(f"{live_server}/quote", wait_until="networkidle")
+    await expect(page.locator("#quoteForm")).to_be_visible()
+
+    await page.locator("#customer_name").fill("Playwright Decline Smoke")
+    await page.locator("#customer_phone").fill("705-555-0112")
+    await page.locator("#job_address").fill("456 Coverage Ave, North Bay")
+    await page.locator("#description").fill("Verify estimate transparency details and decline flow")
+
+    await page.locator("#serviceDetailsPanel summary").click()
+    assert await page.locator("#serviceDetailsPanel").evaluate("node => node.open") is True
+
+    await page.locator("#access_difficulty").select_option("difficult")
+    await page.locator("#has_dense_materials").check()
+    await page.locator("#garbage_bag_count").fill("8")
+
+    await page.locator("#btnCalc").click()
+
+    await expect(page.locator("#resultBox")).to_contain_text("Pricing Breakdown", timeout=20_000)
+    await expect(page.locator("#resultBox")).to_contain_text("Estimate Details")
+    await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
+    await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
+    await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
+    await expect(page.locator("#resultBox")).to_contain_text("No obligation estimate")
+    await expect(page.locator("#decisionCard")).to_be_visible()
+
+    await page.locator("#btnDecline").click()
+
+    await expect(page.locator("#decisionStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
+    await expect(page.locator("#decisionStatus")).to_contain_text("You declined this quote. No booking will be created.")
