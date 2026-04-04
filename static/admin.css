@@ -491,51 +491,8 @@ textarea:focus {
 	grid-column: 1 / -1;
 }
 
-.assistantFormGrid {
-	display: grid;
-	gap: 14px;
-}
-
-.assistantDraftBar {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 180px;
-	gap: 12px;
-	align-items: center;
-	padding: 12px 14px;
-	border: 1px solid rgba(18, 32, 51, 0.08);
-	border-radius: 14px;
-	background: rgba(18, 32, 51, 0.02);
-}
-
-.assistantFormBlock {
-	display: grid;
-}
-
-.assistantUploadRow {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 220px;
-	gap: 12px;
-	align-items: end;
-}
-
-.assistantUploadActions {
-	display: grid;
-}
-
-.assistantFieldRow {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 12px;
-}
-
-.assistantDraftBar > *,
-.assistantUploadRow > *,
-.assistantFieldRow > * {
-	min-width: 0;
-}
-
-.assistantActions {
-	align-items: center;
+.assistantReferenceIntro {
+	margin-top: 8px;
 }
 
 .assistantResultPanel {
@@ -568,9 +525,6 @@ textarea:focus {
 }
 
 @media (max-width: 980px) {
-	.assistantDraftBar,
-	.assistantUploadRow,
-	.assistantFieldRow,
 	.assistantKeyGrid {
 		grid-template-columns: 1fr;
 	}
