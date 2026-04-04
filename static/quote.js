@@ -25,6 +25,84 @@ function showBox(id, text, state) {
   setBoxState(box, state || inferBoxState(text));
   box.textContent = text;
 }
+
+const requiredFieldLabels = {
+  customer_name: "Customer name",
+  customer_phone: "Customer phone",
+  job_address: "Job address",
+  description: "Description",
+  pickup_address: "Pickup address",
+  dropoff_address: "Dropoff address"
+};
+
+function setInvalidState(field, isInvalid) {
+  if (!field) return;
+  if (isInvalid) {
+    field.setAttribute("aria-invalid", "true");
+  } else {
+    field.removeAttribute("aria-invalid");
+  }
+}
+
+function clearInvalidState(fieldId) {
+  setInvalidState(el(fieldId), false);
+}
+
+function clearQuoteValidationState() {
+  Object.keys(requiredFieldLabels).forEach((fieldId) => {
+    clearInvalidState(fieldId);
+  });
+}
+
+function validateRequiredFields(serviceType) {
+  const requiredIds = ["customer_name", "customer_phone", "job_address", "description"];
+  if (requiresRouteFields(serviceType)) {
+    requiredIds.push("pickup_address", "dropoff_address");
+  }
+
+  const missing = [];
+  requiredIds.forEach((fieldId) => {
+    const field = el(fieldId);
+    const value = ((field && field.value) || "").trim();
+    const isMissing = !value;
+    setInvalidState(field, isMissing);
+    if (isMissing) {
+      missing.push({ id: fieldId, label: requiredFieldLabels[fieldId] || fieldId });
+    }
+  });
+
+  return missing;
+}
+
+function missingFieldSummary(missing) {
+  if (!missing || missing.length === 0) return "";
+  return "Please fill in the required fields:\n- " + missing.map((field) => field.label).join("\n- ");
+}
+
+function focusFirstInvalidField(missing) {
+  if (!missing || missing.length === 0) return;
+  const first = el(missing[0].id);
+  if (first && typeof first.focus === "function") {
+    first.focus();
+  }
+}
+
+function attachValidationClearHandlers() {
+  Object.keys(requiredFieldLabels).forEach((fieldId) => {
+    const field = el(fieldId);
+    if (!field) return;
+
+    const maybeClear = () => {
+      if (((field.value || "").trim())) {
+        setInvalidState(field, false);
+      }
+    };
+
+    field.addEventListener("input", maybeClear);
+    field.addEventListener("change", maybeClear);
+  });
+}
+
 function hideBox(id) {
   const box = el(id);
   box.classList.add("hidden");
@@ -388,6 +466,8 @@ function syncRouteFields() {
   dropoff.required = needRoutes;
 
   if (!needRoutes) {
+    setInvalidState(pickup, false);
+    setInvalidState(dropoff, false);
     pickup.value = "";
     dropoff.value = "";
   }
@@ -579,6 +659,8 @@ el("service_type").addEventListener("change", () => {
   syncServiceFields();
 });
 
+attachValidationClearHandlers();
+
 el("btnCalc").addEventListener("click", async () => {
   if (persistedReviewMode) {
     showBox("flowStatus", persistedReviewHelperText, "info");
@@ -598,30 +680,32 @@ el("btnCalc").addEventListener("click", async () => {
   let timeoutId = null;
 
   try {
+    clearQuoteValidationState();
+
+    const serviceType = el("service_type").value;
+    const missing = validateRequiredFields(serviceType);
+    if (missing.length > 0) {
+      if (requiresRouteFields(serviceType) && missing.some((field) => field.id === "pickup_address" || field.id === "dropoff_address")) {
+        const servicePanel = el("serviceDetailsPanel");
+        if (servicePanel) servicePanel.open = true;
+      }
+      showBox("resultBox", missingFieldSummary(missing), "error");
+      scrollToElement("resultBox");
+      focusFirstInvalidField(missing);
+      return;
+    }
+
     const customerName = (el("customer_name").value || "").trim();
     const customerPhone = (el("customer_phone").value || "").trim();
     const jobAddress = (el("job_address").value || "").trim();
     const description = (el("description").value || "").trim();
 
-    if (!customerName || !customerPhone || !jobAddress || !description) {
-      showBox("resultBox", "Please fill in all required fields (name, phone, address, and description).");
-      return;
-    }
-
-    const serviceType = el("service_type").value;
     const isHaulAway = serviceType === "haul_away";
     const isScrap = serviceType === "scrap_pickup";
     const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
     const usesLabor = !isScrap;
     const pickupAddress = (el("pickup_address").value || "").trim();
     const dropoffAddress = (el("dropoff_address").value || "").trim();
-
-    if (requiresRouteFields(serviceType) && (!pickupAddress || !dropoffAddress)) {
-      const servicePanel = el("serviceDetailsPanel");
-      if (servicePanel) servicePanel.open = true;
-      showBox("resultBox", "Error:\nPickup and dropoff addresses are required for small moves and item delivery.");
-      return;
-    }
 
     const payload = {
       service_type: serviceType,

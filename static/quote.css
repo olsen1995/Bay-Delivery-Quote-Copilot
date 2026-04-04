@@ -203,6 +203,14 @@
   line-height: 1.45;
 }
 
+.quotePage input[aria-invalid="true"],
+.quotePage textarea[aria-invalid="true"],
+.quotePage select[aria-invalid="true"] {
+  border-color: #b42318;
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.16);
+  background: rgba(193, 44, 39, 0.07);
+}
+
 .checkboxWrap {
   width: 100%;
 }

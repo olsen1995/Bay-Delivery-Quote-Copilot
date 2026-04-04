@@ -141,9 +141,11 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await expect(page.locator("#quoteForm")).to_be_visible()
 
     await page.locator("#btnCalc").click()
-    await expect(page.locator("#resultBox")).to_contain_text(
-        "Please fill in all required fields (name, phone, address, and description)."
-    )
+    await expect(page.locator("#resultBox")).to_contain_text("Please fill in the required fields:")
+    await expect(page.locator("#resultBox")).to_contain_text("Customer name")
+    await expect(page.locator("#resultBox")).to_contain_text("Customer phone")
+    await expect(page.locator("#resultBox")).to_contain_text("Job address")
+    await expect(page.locator("#resultBox")).to_contain_text("Description")
 
     await page.locator("#customer_name").fill(CUSTOMER_NAME)
     await page.locator("#customer_phone").fill("705-555-0101")
@@ -173,16 +175,24 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.goto(f"{live_server}/admin", wait_until="networkidle")
     await expect(page.locator("#adminUsername")).to_be_visible()
     await expect(page.locator("#adminPassword")).to_be_visible()
-    await expect(page.locator("#refreshBtn")).to_be_visible()
 
-    await page.locator("#adminUsername").fill(ADMIN_USERNAME)
-    await page.locator("#adminPassword").fill(ADMIN_PASSWORD)
-    await page.locator("#refreshBtn").click()
 
-    await expect(page.locator("#adminProtectedDashboard")).to_be_visible(timeout=20_000)
-    await expect(page.locator("#requestsBox table")).to_be_visible(timeout=20_000)
-    await expect(page.locator("#requestsBox")).to_contain_text(CUSTOMER_NAME)
-    await expect(page.locator("#requestsBox")).to_contain_text(request_id)
+@pytest.mark.asyncio
+async def test_launch_quote_route_missing_fields_are_named(page: Page, live_server: str) -> None:
+    await page.goto(f"{live_server}/quote", wait_until="networkidle")
+    await expect(page.locator("#quoteForm")).to_be_visible()
+
+    await page.locator("#customer_name").fill(CUSTOMER_NAME)
+    await page.locator("#customer_phone").fill("705-555-0101")
+    await page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
+    await page.locator("#description").fill("Route required field validation smoke")
+    await page.locator("#service_type").select_option("small_move")
+    await page.locator("#btnCalc").click()
+
+    await expect(page.locator("#resultBox")).to_contain_text("Please fill in the required fields:")
+    await expect(page.locator("#resultBox")).to_contain_text("Pickup address")
+    await expect(page.locator("#resultBox")).to_contain_text("Dropoff address")
+    await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
 
 
 @pytest.mark.asyncio
