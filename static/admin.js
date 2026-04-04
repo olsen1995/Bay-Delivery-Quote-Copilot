@@ -86,7 +86,7 @@ let currentAssistantLocked = false;
 let currentAssistantHandoff = null;
 let currentJobsById = {};
 let assistantDraftDirty = false;
-const assistantUnsavedDraftWarning = "Suggestions applied locally. Click Analyze Intake to save reviewed fields.";
+const assistantUnsavedDraftWarning = "Desktop admin guidance is reference-only. Use request and job workflow actions for operational updates.";
 const assistantAutofillFieldConfig = {
   customer_name: { input: assistantCustomerNameInput, label: "Customer Name" },
   customer_phone: { input: assistantCustomerPhoneInput, label: "Customer Phone" },
@@ -254,14 +254,7 @@ function resetProtectedDashboard() {
   currentJobsById = {};
   setAssistantDraftDirty(false);
   setAssistantDraftLocked(false);
-  if (assistantDraftMeta) assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
-  if (assistantCustomerNameInput) assistantCustomerNameInput.value = "";
-  if (assistantCustomerPhoneInput) assistantCustomerPhoneInput.value = "";
-  if (assistantDescriptionInput) assistantDescriptionInput.value = "";
-  if (assistantRequestedJobDateInput) assistantRequestedJobDateInput.value = "";
-  if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = "";
-  if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
-  if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
+  if (assistantDraftMeta) assistantDraftMeta.textContent = "No screenshot intake guidance records yet.";
 }
 
 function createTable(headers) {
@@ -860,117 +853,17 @@ function updateAssistantDraftMeta(item) {
   }
   if (!assistantDraftMeta) return;
   if (!item) {
-    assistantDraftMeta.textContent = "No draft analysis yet. Uploading screenshots will create one automatically.";
+    assistantDraftMeta.textContent = "No screenshot intake guidance records yet.";
     return;
   }
   assistantDraftMeta.textContent = item.quote_id
-    ? `Analysis ${item.analysis_id} • locked to quote ${item.quote_id} • updated ${item.updated_at}`
+    ? `Analysis ${item.analysis_id} • linked quote ${item.quote_id} • updated ${item.updated_at}`
     : `Analysis ${item.analysis_id} • ${item.status} • updated ${item.updated_at}`;
-}
-
-function beginNewScreenshotAssistantDraft() {
-  currentAssistantAnalysisId = "";
-  currentAssistantHandoff = null;
-  setAssistantDraftDirty(false);
-  setAssistantDraftLocked(false);
-  updateAssistantDraftMeta(null);
-  if (assistantMessageInput) assistantMessageInput.value = "";
-  if (assistantCustomerNameInput) assistantCustomerNameInput.value = "";
-  if (assistantCustomerPhoneInput) assistantCustomerPhoneInput.value = "";
-  if (assistantDescriptionInput) assistantDescriptionInput.value = "";
-  if (assistantRequestedJobDateInput) assistantRequestedJobDateInput.value = "";
-  if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = "";
-  if (assistantAttachmentIdsInput) assistantAttachmentIdsInput.value = "";
-  if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
-  const resultBox = document.getElementById("assistantResultBox");
-  const uploadList = document.getElementById("assistantUploadList");
-  if (resultBox) clearNode(resultBox);
-  if (uploadList) clearNode(uploadList);
-  setLine(assistantStatusLine, "ok", "Fresh screenshot draft ready. Analyze intake or upload screenshots to create it.");
-}
-
-function collectAssistantPayload() {
-  const candidate = {};
-  const customerName = (assistantCustomerNameInput && assistantCustomerNameInput.value || "").trim();
-  const customerPhone = (assistantCustomerPhoneInput && assistantCustomerPhoneInput.value || "").trim();
-  const description = (assistantDescriptionInput && assistantDescriptionInput.value || "").trim();
-  const requestedJobDate = (assistantRequestedJobDateInput && assistantRequestedJobDateInput.value || "").trim();
-  const requestedTimeWindow = (assistantRequestedTimeWindowInput && assistantRequestedTimeWindowInput.value || "").trim();
-  const serviceType = (document.getElementById("assistantServiceType").value || "").trim();
-  const estimatedHours = (document.getElementById("assistantEstimatedHours").value || "").trim();
-  const crewSize = (document.getElementById("assistantCrewSize").value || "").trim();
-  const jobAddress = (document.getElementById("assistantJobAddress").value || "").trim();
-  const pickupAddress = (document.getElementById("assistantPickupAddress").value || "").trim();
-  const dropoffAddress = (document.getElementById("assistantDropoffAddress").value || "").trim();
-
-  if (customerName) candidate.customer_name = customerName;
-  if (customerPhone) candidate.customer_phone = customerPhone;
-  if (description) candidate.description = description;
-  if (serviceType) candidate.service_type = serviceType;
-  if (estimatedHours) candidate.estimated_hours = Number(estimatedHours);
-  if (crewSize) candidate.crew_size = Number(crewSize);
-  if (jobAddress) candidate.job_address = jobAddress;
-  if (pickupAddress) candidate.pickup_address = pickupAddress;
-  if (dropoffAddress) candidate.dropoff_address = dropoffAddress;
-
-  return {
-    analysis_id: currentAssistantAnalysisId || undefined,
-    message: (document.getElementById("assistantMessage").value || "").trim(),
-    requested_job_date: requestedJobDate || undefined,
-    requested_time_window: requestedTimeWindow || undefined,
-    screenshot_attachment_ids: parseAttachmentIds(assistantAttachmentIdsInput ? assistantAttachmentIdsInput.value : ""),
-    candidate_inputs: candidate,
-    operator_overrides: {}
-  };
 }
 
 function formatMoney(value) {
   if (typeof value !== "number") return "—";
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(value);
-}
-
-function getAutofillInputValue(fieldName) {
-  const config = assistantAutofillFieldConfig[fieldName];
-  if (!config || !config.input) return "";
-  return (config.input.value || "").trim();
-}
-
-function populateAssistantReviewedFields(item) {
-  const candidateInputs = safeGet(item, "intake.candidate_inputs", {});
-  if (assistantCustomerNameInput) assistantCustomerNameInput.value = safeGet(candidateInputs, "customer_name", "");
-  if (assistantCustomerPhoneInput) assistantCustomerPhoneInput.value = safeGet(candidateInputs, "customer_phone", "");
-  if (assistantDescriptionInput) assistantDescriptionInput.value = safeGet(candidateInputs, "description", "");
-  if (assistantRequestedJobDateInput) assistantRequestedJobDateInput.value = safeGet(item, "intake.requested_job_date", "");
-  if (assistantRequestedTimeWindowInput) assistantRequestedTimeWindowInput.value = safeGet(item, "intake.requested_time_window", "");
-}
-
-function applyAssistantSuggestion(fieldName, value, onlyIfEmpty = true, announceDirty = true) {
-  const config = assistantAutofillFieldConfig[fieldName];
-  if (!config || !config.input) return false;
-  const currentValue = getAutofillInputValue(fieldName);
-  if (onlyIfEmpty && currentValue) return false;
-  config.input.value = value || "";
-  if (announceDirty) {
-    markAssistantDraftDirty(assistantUnsavedDraftWarning);
-  }
-  return true;
-}
-
-function applyAllEmptyAssistantSuggestions(item) {
-  const suggestions = (item && item.autofill_suggestions) || {};
-  let appliedCount = 0;
-  Object.entries(suggestions).forEach(([fieldName, meta]) => {
-    if (applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true, false)) {
-      appliedCount += 1;
-    }
-  });
-
-  if (appliedCount > 0) {
-    markAssistantDraftDirty();
-    setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
-    return;
-  }
-  setLine(assistantStatusLine, "bad", "No empty draft fields were available for autofill suggestions.");
 }
 
 function renderAssistantAutofillPanel(item) {
@@ -987,22 +880,13 @@ function renderAssistantAutofillPanel(item) {
   if (suggestionEntries.length === 0) {
     const empty = document.createElement("div");
     empty.className = "small muted";
-    empty.textContent = "No message/OCR-based suggestions detected yet.";
+    empty.textContent = "No message/OCR-based intake suggestions detected.";
     wrap.appendChild(empty);
   } else {
     const helper = document.createElement("div");
     helper.className = "small muted";
-    helper.textContent = "Suggestions stay non-binding until you explicitly apply or edit them.";
+    helper.textContent = "Read-only recommendation context for ops review. Customer quote changes remain in the quote intake flow.";
     wrap.appendChild(helper);
-
-    const applyAllBtn = document.createElement("button");
-    applyAllBtn.id = "assistantApplyAllSuggestionsBtn";
-    applyAllBtn.className = "secondaryAction";
-    applyAllBtn.type = "button";
-    applyAllBtn.textContent = "Apply All Empty Fields";
-    applyAllBtn.disabled = !adminSessionReady;
-    applyAllBtn.addEventListener("click", () => applyAllEmptyAssistantSuggestions(item));
-    wrap.appendChild(applyAllBtn);
 
     suggestionEntries.forEach(([fieldName, meta]) => {
       const row = document.createElement("div");
@@ -1016,23 +900,7 @@ function renderAssistantAutofillPanel(item) {
       const detail = document.createElement("div");
       detail.className = "small muted";
       detail.textContent = `Confidence: ${safeGet(meta, "confidence", "low")} • Source: ${safeGet(meta, "source", "message")} • Review required`;
-
-      const applyBtn = document.createElement("button");
-      applyBtn.id = `assistantApplySuggestion-${fieldName}`;
-      applyBtn.className = "secondaryAction btnSpacer";
-      applyBtn.type = "button";
-      applyBtn.textContent = "Apply";
-      applyBtn.disabled = !adminSessionReady || !!getAutofillInputValue(fieldName);
-      applyBtn.addEventListener("click", () => {
-        const applied = applyAssistantSuggestion(fieldName, safeGet(meta, "value", ""), true);
-        if (applied) {
-          applyBtn.disabled = true;
-          return;
-        }
-        setLine(assistantStatusLine, "bad", `${safeGet(assistantAutofillFieldConfig[fieldName], "label", fieldName)} already has a reviewed value.`);
-      });
-
-      wrap.append(row, detail, applyBtn);
+      wrap.append(row, detail);
     });
   }
 
@@ -1062,19 +930,18 @@ function renderScreenshotAssistantResult(item) {
   const box = document.getElementById("assistantResultBox");
   if (!item) {
     setAssistantDraftDirty(false);
-    return addEmptyState(box, "No screenshot analysis yet.");
+    return addEmptyState(box, "No screenshot intake guidance record yet.");
   }
   clearNode(box);
   updateAssistantDraftMeta(item);
   syncAssistantAttachmentIds(item.attachments || []);
-  populateAssistantReviewedFields(item);
   setAssistantDraftDirty(false);
 
   const panel = document.createElement("div");
   panel.className = "assistantResultPanel";
 
   const title = document.createElement("h4");
-  title.textContent = "Latest draft analysis";
+  title.textContent = "Latest intake guidance snapshot";
   panel.appendChild(title);
 
   const meta = document.createElement("div");
@@ -1219,7 +1086,7 @@ function renderScreenshotAssistantUploads(attachments) {
 
 function renderScreenshotAssistantHistory(items) {
   const box = document.getElementById("assistantHistoryBox");
-  if (!items || items.length === 0) return addEmptyState(box, "No screenshot assistant drafts yet.");
+  if (!items || items.length === 0) return addEmptyState(box, "No screenshot intake analyses yet.");
   clearNode(box);
 
   const { table, tbody } = createTable(["Analysis", "Updated", "Service", "Cash", "Quote", "Attachments", "Mode"]);
@@ -1243,95 +1110,6 @@ function renderScreenshotAssistantHistory(items) {
   });
 
   box.appendChild(table);
-}
-
-async function saveScreenshotAssistantDraft() {
-  if (!adminSessionReady) {
-    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before using Screenshot Quote Assistant.");
-    throw new Error("admin auth required");
-  }
-
-  const resp = await fetch("/admin/api/screenshot-assistant/analyses/intake", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(collectAssistantPayload())
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
-  setAssistantDraftDirty(false);
-  renderScreenshotAssistantResult(data);
-  renderScreenshotAssistantUploads(data.attachments || []);
-  return data;
-}
-
-async function submitScreenshotAssistantAnalysis() {
-  try {
-    setLoading(true);
-    setLine(assistantStatusLine, "ok", "Analyzing intake draft...");
-    await saveScreenshotAssistantDraft();
-    setLine(assistantStatusLine, "ok", "Draft analysis saved. Pricing guidance reused the existing quote engine.");
-
-    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
-    renderScreenshotAssistantHistory((analyses.items || []));
-  } catch (err) {
-    const parsed = parseApiError(err);
-    const detail = safeGet(parsed, "data.detail", "Please review the intake fields and try again.");
-    setLine(assistantStatusLine, "bad", "Screenshot assistant error. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
-  } finally {
-    setLoading(false);
-  }
-}
-
-async function uploadScreenshotAssistantFiles() {
-  if (!adminSessionReady) {
-    setLine(assistantStatusLine, "bad", "Authenticate and load admin data before uploading screenshots.");
-    return;
-  }
-
-  const selectedFiles = Array.from((assistantScreenshotFilesInput && assistantScreenshotFilesInput.files) || []);
-  if (selectedFiles.length === 0) {
-    setLine(assistantStatusLine, "bad", "Choose at least one screenshot before uploading.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    setLine(assistantStatusLine, "ok", "Preparing screenshot upload...");
-
-    let analysisId = currentAssistantAnalysisId;
-    if (!analysisId) {
-      const draft = await saveScreenshotAssistantDraft();
-      analysisId = draft.analysis_id || "";
-    }
-
-    const formData = new FormData();
-    selectedFiles.forEach((file) => formData.append("files", file));
-
-    const resp = await fetch(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: formData
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw { status: resp.status, data, raw: JSON.stringify(data) };
-
-    syncAssistantAttachmentIds(data.attachments || []);
-    renderScreenshotAssistantUploads(data.attachments || []);
-    if (assistantScreenshotFilesInput) assistantScreenshotFilesInput.value = "";
-
-    const refreshed = await fetchJSON(`/admin/api/screenshot-assistant/analyses/${encodeURIComponent(data.analysis_id)}`);
-    renderScreenshotAssistantResult(refreshed);
-
-    const analyses = await fetchJSON("/admin/api/screenshot-assistant/analyses");
-    renderScreenshotAssistantHistory((analyses.items || []));
-    setLine(assistantStatusLine, "ok", `Uploaded ${Array.isArray(data.uploaded) ? data.uploaded.length : 0} screenshot(s) to the current draft.`);
-  } catch (err) {
-    const parsed = parseApiError(err);
-    const detail = safeGet(parsed, "data.detail", "Please review the files and try again.");
-    setLine(assistantStatusLine, "bad", "Screenshot upload failed. " + detail, parsed.status ? `HTTP ${parsed.status}` : undefined);
-  } finally {
-    setLoading(false);
-  }
 }
 
 async function refreshAll() {
@@ -1411,13 +1189,6 @@ adminUsernameInput.addEventListener("keydown", handleCredsKeydown);
 adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 if (scheduleCloseBtn) scheduleCloseBtn.addEventListener("click", closeScheduleModal);
 if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeScheduleModal);
-if (assistantStartDraftBtn) assistantStartDraftBtn.addEventListener("click", beginNewScreenshotAssistantDraft);
-if (assistantUploadBtn) assistantUploadBtn.addEventListener("click", uploadScreenshotAssistantFiles);
-if (assistantAnalyzeBtn) assistantAnalyzeBtn.addEventListener("click", submitScreenshotAssistantAnalysis);
-assistantReviewedDraftFields().forEach((field) => {
-  const eventName = field.tagName === "SELECT" ? "change" : "input";
-  field.addEventListener(eventName, () => markAssistantDraftDirty(assistantUnsavedDraftWarning));
-});
 
 resetProtectedDashboard();
 closeScheduleModal();

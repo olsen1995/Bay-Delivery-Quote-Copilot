@@ -80,105 +80,12 @@
       <div class="card dataCard assistantCard">
         <div class="sectionHeader compact">
           <div>
-            <h3>Screenshot Quote Assistant</h3>
-            <div class="muted">Admin-only recommendation tool for intake review. Guidance stays non-binding and does not create customer quotes from admin.</div>
+            <h3>Screenshot Intake Guidance (Read-Only)</h3>
+            <div class="muted">Admin-only recommendation reference for request triage and approvals. Guidance remains non-binding and pricing truth stays in the quote engine.</div>
           </div>
         </div>
-        <div class="assistantFormGrid">
-          <div class="assistantDraftBar">
-            <div>
-              <strong>Current Draft</strong>
-              <div id="assistantDraftMeta" class="small">No draft analysis yet. Uploading screenshots will create one automatically.</div>
-            </div>
-            <button id="assistantStartDraftBtn" class="secondaryAction" type="button">Start Draft</button>
-          </div>
-          <div class="assistantFormBlock">
-            <label for="assistantMessage">Customer Message / Intake Notes</label>
-            <textarea id="assistantMessage" rows="5" placeholder="Paste the customer message or operator summary here."></textarea>
-          </div>
-          <div class="assistantFieldRow">
-            <div>
-              <label for="assistantCustomerName">Customer Name</label>
-              <input id="assistantCustomerName" type="text" placeholder="Taylor Example" />
-            </div>
-            <div>
-              <label for="assistantCustomerPhone">Customer Phone</label>
-              <input id="assistantCustomerPhone" type="tel" placeholder="(555) 010-0101" />
-            </div>
-            <div>
-              <label for="assistantDescription">Description</label>
-              <input id="assistantDescription" type="text" placeholder="Short reviewed job summary" />
-            </div>
-          </div>
-          <div class="assistantFieldRow">
-            <div>
-              <label for="assistantRequestedJobDate">Requested Job Date</label>
-              <input id="assistantRequestedJobDate" type="date" />
-            </div>
-            <div>
-              <label for="assistantRequestedTimeWindow">Requested Time Window</label>
-              <select id="assistantRequestedTimeWindow">
-                <option value="">Select window</option>
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-                <option value="evening">Evening</option>
-                <option value="flexible">Flexible</option>
-              </select>
-            </div>
-            <div class="small assistantSuggestionHint">
-              Suggestions are admin-only and stay separate from pricing inputs until you explicitly apply or edit them.
-            </div>
-          </div>
-          <div class="assistantFormBlock">
-            <label for="assistantAttachmentIds">Linked Screenshot Attachment IDs</label>
-            <input id="assistantAttachmentIds" type="text" placeholder="Attachment IDs populate after upload" />
-            <div class="small">Uploads sync this field automatically. You can still paste IDs manually if needed.</div>
-          </div>
-          <div class="assistantUploadRow">
-            <div class="assistantFormBlock">
-              <label for="assistantScreenshotFiles">Screenshot Uploads</label>
-              <input id="assistantScreenshotFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
-              <div class="small">Supports JPG, PNG, WEBP, and GIF. Max 5 images, ~5MB each, ~10MB total.</div>
-              <div class="small">Upload results include best-effort OCR status and a short preview for admin review.</div>
-            </div>
-            <div class="assistantUploadActions">
-              <button id="assistantUploadBtn" class="secondaryAction" type="button">Upload Screenshots</button>
-            </div>
-          </div>
-          <div class="assistantFieldRow">
-            <div>
-              <label for="assistantServiceType">Service Type</label>
-              <input id="assistantServiceType" type="text" placeholder="haul_away" />
-            </div>
-            <div>
-              <label for="assistantEstimatedHours">Estimated Hours</label>
-              <input id="assistantEstimatedHours" type="number" min="0" step="0.25" placeholder="1.5" />
-            </div>
-            <div>
-              <label for="assistantCrewSize">Crew Size</label>
-              <input id="assistantCrewSize" type="number" min="1" step="1" placeholder="2" />
-            </div>
-          </div>
-          <div class="assistantFieldRow">
-            <div>
-              <label for="assistantJobAddress">Job Address</label>
-              <input id="assistantJobAddress" type="text" placeholder="123 Example St" />
-            </div>
-            <div>
-              <label for="assistantPickupAddress">Pickup Address</label>
-              <input id="assistantPickupAddress" type="text" placeholder="Optional for move/delivery" />
-            </div>
-            <div>
-              <label for="assistantDropoffAddress">Dropoff Address</label>
-              <input id="assistantDropoffAddress" type="text" placeholder="Optional for move/delivery" />
-            </div>
-          </div>
-        </div>
-        <div class="rowToken mt10 assistantActions">
-          <div class="small">This saves a draft analysis and routes pricing guidance through the existing quote engine before any quote draft is created.</div>
-          <button id="assistantAnalyzeBtn" class="primaryAction" type="button">Analyze Intake</button>
-        </div>
-        <div id="assistantStatusLine" class="statusNotice muted" role="status" aria-live="polite"></div>
+        <div id="assistantDraftMeta" class="small assistantReferenceIntro">Latest screenshot intake recommendation context from prior admin analyses.</div>
+        <div id="assistantStatusLine" class="statusNotice muted" role="status" aria-live="polite">Read-only desktop reference. Use request approvals and job actions for operational workflow changes.</div>
         <div id="assistantResultBox"></div>
         <div id="assistantUploadList"></div>
       </div>
@@ -207,8 +114,8 @@
     <div class="card dataCard adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
       <div class="sectionHeader compact">
         <div>
-          <h3>Screenshot Assistant Drafts</h3>
-          <div class="muted">Recent screenshot intake analyses for operator review.</div>
+          <h3>Screenshot Intake History (Read-Only)</h3>
+          <div class="muted">Recent screenshot intake analyses for operator context. No quote drafting actions are available on desktop admin.</div>
         </div>
       </div>
       <div id="assistantHistoryBox"></div>

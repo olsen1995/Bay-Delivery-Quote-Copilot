@@ -112,7 +112,7 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
 
     protected_block = protected_match.group(1)
     remainder = admin_html.replace(protected_block, "", 1)
-    for heading in ["Recent Estimates", "Booking Requests", "Jobs", "Screenshot Quote Assistant", "Screenshot Assistant Drafts"]:
+    for heading in ["Recent Estimates", "Booking Requests", "Jobs", "Screenshot Intake Guidance (Read-Only)", "Screenshot Intake History (Read-Only)"]:
         assert f"<h3>{heading}</h3>" in protected_block
         assert f"<h3>{heading}</h3>" not in remainder
 
@@ -126,23 +126,29 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
 
-    assert 'id="assistantAnalyzeBtn"' in admin_html
-    assert 'id="assistantStartDraftBtn"' in admin_html
-    assert 'id="assistantUploadBtn"' in admin_html
-    assert 'id="assistantScreenshotFiles"' in admin_html
+    assert 'id="assistantAnalyzeBtn"' not in admin_html
+    assert 'id="assistantStartDraftBtn"' not in admin_html
+    assert 'id="assistantUploadBtn"' not in admin_html
+    assert 'id="assistantScreenshotFiles"' not in admin_html
+    assert 'id="assistantMessage"' not in admin_html
+    assert 'id="assistantCustomerName"' not in admin_html
+    assert 'id="assistantCustomerPhone"' not in admin_html
+    assert 'id="assistantDescription"' not in admin_html
+    assert 'id="assistantRequestedJobDate"' not in admin_html
+    assert 'id="assistantRequestedTimeWindow"' not in admin_html
+    assert 'id="assistantAttachmentIds"' not in admin_html
     assert 'id="assistantUploadList"' in admin_html
     assert 'id="assistantResultBox"' in admin_html
     assert 'id="assistantHistoryBox"' in admin_html
-    assert 'id="assistantCustomerName"' in admin_html
-    assert 'id="assistantCustomerPhone"' in admin_html
-    assert 'id="assistantDescription"' in admin_html
-    assert 'id="assistantRequestedJobDate"' in admin_html
-    assert 'id="assistantRequestedTimeWindow"' in admin_html
-    assert 'Screenshot Quote Assistant' in admin_html
-    assert 'Screenshot Assistant Drafts' in admin_html
-    assert 'Guidance stays non-binding and does not create customer quotes from admin.' in admin_html
-    assert '/admin/api/screenshot-assistant/analyses/intake' in admin_js
-    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' in admin_js
+    assert 'id="assistantDraftMeta"' in admin_html
+    assert 'id="assistantStatusLine"' in admin_html
+    assert 'Screenshot Intake Guidance (Read-Only)' in admin_html
+    assert 'Screenshot Intake History (Read-Only)' in admin_html
+    assert 'Guidance remains non-binding and pricing truth stays in the quote engine.' in admin_html
+    assert 'No quote drafting actions are available on desktop admin.' in admin_html
+    assert '/admin/api/screenshot-assistant/analyses/intake' not in admin_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' not in admin_js
+    assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisItems[0].analysis_id)}' in admin_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/quote-draft' not in admin_js
     assert '/admin/api/quotes/${encodeURIComponent(quoteId)}/handoff' not in admin_js
     assert 'Create Quote Draft' not in admin_js
@@ -150,22 +156,21 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'createQuoteDraftFromAnalysis' not in admin_js
     assert 'prepareCustomerHandoff' not in admin_js
     assert 'setAssistantDraftLocked' in admin_js
-    assert 'beginNewScreenshotAssistantDraft' in admin_js
     assert '["Analysis", "Updated", "Service", "Cash", "Quote", "Attachments", "Mode"]' in admin_js
-    assert 'submitScreenshotAssistantAnalysis' in admin_js
-    assert 'uploadScreenshotAssistantFiles' in admin_js
+    assert 'submitScreenshotAssistantAnalysis' not in admin_js
+    assert 'uploadScreenshotAssistantFiles' not in admin_js
     assert 'assistantSuggestionPanel' in admin_js
-    assert 'assistantApplyAllSuggestionsBtn' in admin_js
-    assert 'applyAllEmptyAssistantSuggestions' in admin_js
-    assert 'applyAssistantSuggestion' in admin_js
+    assert 'assistantApplyAllSuggestionsBtn' not in admin_js
+    assert 'applyAllEmptyAssistantSuggestions' not in admin_js
+    assert 'applyAssistantSuggestion' not in admin_js
     assert 'let assistantDraftDirty = false;' in admin_js
     assert 'assistantUnsavedDraftWarning' in admin_js
     assert 'setAssistantDraftDirty' in admin_js
     assert 'markAssistantDraftDirty' in admin_js
     assert 'syncAssistantDraftActionState' in admin_js
     assert 'Autofill Suggestions' in admin_js
-    assert 'Apply All Empty Fields' in admin_js
-    assert 'Suggestions stay non-binding until you explicitly apply or edit them.' in admin_js
+    assert 'Apply All Empty Fields' not in admin_js
+    assert 'Read-only recommendation context for ops review.' in admin_js
     assert 'Quote Range Guidance' in admin_js
     assert 'Minimum Safe' in admin_js
     assert 'Recommended Target' in admin_js
@@ -176,12 +181,11 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'Minimum Safe is a protective lower bound, not the preferred quote.' in admin_js
     assert 'Missing fields:' in admin_js
     assert 'Warnings:' in admin_js
-    assert 'No message/OCR-based suggestions detected yet.' in admin_js
+    assert 'No message/OCR-based intake suggestions detected.' in admin_js
     assert '["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]' in admin_js
-    assert 'Upload results include best-effort OCR status and a short preview for admin review.' in admin_html
     assert 'ocr_json' in admin_js
-    assert 'Click Analyze Intake to save reviewed fields.' in admin_js
-    assert 'markAssistantDraftDirty(assistantUnsavedDraftWarning)' in admin_js
+    assert 'Click Analyze Intake to save reviewed fields.' not in admin_js
+    assert 'Desktop admin guidance is reference-only.' in admin_js
 
 
 def test_admin_schedule_modal_includes_scheduling_handoff_context() -> None:
