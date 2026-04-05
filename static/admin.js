@@ -60,86 +60,29 @@ const adminProtectedSections = Array.from(document.querySelectorAll("[data-admin
 const adminPageRoot = document.body;
 const scheduleCloseBtn = document.getElementById("scheduleCloseBtn");
 const scheduleCancelBtn = document.getElementById("scheduleCancelBtn");
-const assistantStartDraftBtn = document.getElementById("assistantStartDraftBtn");
-const assistantUploadBtn = document.getElementById("assistantUploadBtn");
-const assistantAnalyzeBtn = document.getElementById("assistantAnalyzeBtn");
 const assistantStatusLine = document.getElementById("assistantStatusLine");
 const assistantDraftMeta = document.getElementById("assistantDraftMeta");
 const assistantAttachmentIdsInput = document.getElementById("assistantAttachmentIds");
 const assistantScreenshotFilesInput = document.getElementById("assistantScreenshotFiles");
-const assistantMessageInput = document.getElementById("assistantMessage");
-const assistantCustomerNameInput = document.getElementById("assistantCustomerName");
-const assistantCustomerPhoneInput = document.getElementById("assistantCustomerPhone");
-const assistantDescriptionInput = document.getElementById("assistantDescription");
-const assistantRequestedJobDateInput = document.getElementById("assistantRequestedJobDate");
-const assistantRequestedTimeWindowInput = document.getElementById("assistantRequestedTimeWindow");
-const assistantServiceTypeInput = document.getElementById("assistantServiceType");
-const assistantEstimatedHoursInput = document.getElementById("assistantEstimatedHours");
-const assistantCrewSizeInput = document.getElementById("assistantCrewSize");
-const assistantJobAddressInput = document.getElementById("assistantJobAddress");
-const assistantPickupAddressInput = document.getElementById("assistantPickupAddress");
-const assistantDropoffAddressInput = document.getElementById("assistantDropoffAddress");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
-let currentAssistantLocked = false;
 let currentAssistantHandoff = null;
 let currentJobsById = {};
 let assistantDraftDirty = false;
 const assistantUnsavedDraftWarning = "Desktop admin guidance is reference-only. Use request and job workflow actions for operational updates.";
 const assistantAutofillFieldConfig = {
-  customer_name: { input: assistantCustomerNameInput, label: "Customer Name" },
-  customer_phone: { input: assistantCustomerPhoneInput, label: "Customer Phone" },
-  job_address: { input: assistantJobAddressInput, label: "Job Address" },
-  description: { input: assistantDescriptionInput, label: "Description" },
-  requested_job_date: { input: assistantRequestedJobDateInput, label: "Requested Job Date" },
-  requested_time_window: { input: assistantRequestedTimeWindowInput, label: "Requested Time Window" }
+  customer_name: { label: "Customer Name" },
+  customer_phone: { label: "Customer Phone" },
+  job_address: { label: "Job Address" },
+  description: { label: "Description" },
+  requested_job_date: { label: "Requested Job Date" },
+  requested_time_window: { label: "Requested Time Window" }
 };
 
-function assistantDraftFields() {
-  return [
-    assistantMessageInput,
-    assistantCustomerNameInput,
-    assistantCustomerPhoneInput,
-    assistantDescriptionInput,
-    assistantRequestedJobDateInput,
-    assistantRequestedTimeWindowInput,
-    assistantAttachmentIdsInput,
-    assistantScreenshotFilesInput,
-    assistantServiceTypeInput,
-    assistantEstimatedHoursInput,
-    assistantCrewSizeInput,
-    assistantJobAddressInput,
-    assistantPickupAddressInput,
-    assistantDropoffAddressInput
-  ].filter(Boolean);
-}
-
-function assistantReviewedDraftFields() {
-  return [
-    assistantMessageInput,
-    assistantCustomerNameInput,
-    assistantCustomerPhoneInput,
-    assistantDescriptionInput,
-    assistantRequestedJobDateInput,
-    assistantRequestedTimeWindowInput,
-    assistantAttachmentIdsInput,
-    assistantServiceTypeInput,
-    assistantEstimatedHoursInput,
-    assistantCrewSizeInput,
-    assistantJobAddressInput,
-    assistantPickupAddressInput,
-    assistantDropoffAddressInput
-  ].filter(Boolean);
-}
-
 function setAssistantDraftLocked(isLocked) {
-  currentAssistantLocked = !!isLocked;
-  if (assistantUploadBtn) assistantUploadBtn.disabled = currentAssistantLocked;
-  if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = currentAssistantLocked;
-  assistantDraftFields().forEach((field) => {
-    field.disabled = currentAssistantLocked;
-  });
+  // Desktop assistant is read-only; no draft controls to lock/unlock.
+  void isLocked;
 }
 
 function getAdminCreds() {
@@ -152,16 +95,10 @@ function getAdminCreds() {
 function setLoading(isLoading) {
   refreshBtn.disabled = isLoading;
   refreshBtn.textContent = isLoading ? "Loading..." : refreshButtonLabel;
-  if (assistantStartDraftBtn) assistantStartDraftBtn.disabled = isLoading;
-  if (assistantUploadBtn) assistantUploadBtn.disabled = isLoading || currentAssistantLocked;
-  if (assistantAnalyzeBtn) assistantAnalyzeBtn.disabled = isLoading || currentAssistantLocked;
-  assistantDraftFields().forEach((field) => {
-    field.disabled = isLoading || currentAssistantLocked;
-  });
 }
 
 function syncAssistantDraftActionState() {
-  if (!adminSessionReady) return;
+  if (!adminSessionReady || !assistantStatusLine) return;
   if (assistantDraftDirty) {
     setLine(assistantStatusLine, "bad", assistantUnsavedDraftWarning);
   }
@@ -173,7 +110,7 @@ function setAssistantDraftDirty(isDirty) {
 }
 
 function markAssistantDraftDirty(message) {
-  if (!currentAssistantAnalysisId || currentAssistantLocked) return;
+  if (!currentAssistantAnalysisId) return;
   const wasDirty = assistantDraftDirty;
   setAssistantDraftDirty(true);
   if (message && !wasDirty) {
@@ -252,7 +189,6 @@ function resetProtectedDashboard() {
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
   currentJobsById = {};
-  setAssistantDraftDirty(false);
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No screenshot intake guidance records yet.";
 }
@@ -929,13 +865,11 @@ function renderAssistantAutofillPanel(item) {
 function renderScreenshotAssistantResult(item) {
   const box = document.getElementById("assistantResultBox");
   if (!item) {
-    setAssistantDraftDirty(false);
     return addEmptyState(box, "No screenshot intake guidance record yet.");
   }
   clearNode(box);
   updateAssistantDraftMeta(item);
   syncAssistantAttachmentIds(item.attachments || []);
-  setAssistantDraftDirty(false);
 
   const panel = document.createElement("div");
   panel.className = "assistantResultPanel";

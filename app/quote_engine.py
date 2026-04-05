@@ -216,6 +216,7 @@ def _haul_away_disposal_allowance(service_conf: Dict[str, Any], bag_count: int) 
         return DEFAULT_BAG_TIER_SMALL_PRICE
     if bag_count <= DEFAULT_BAG_TIER_SMALL_MAX:
         return DEFAULT_BAG_TIER_SMALL_PRICE
+    if bag_count <= DEFAULT_BAG_TIER_MEDIUM_MAX:
         return DEFAULT_BAG_TIER_MEDIUM_PRICE
     if bag_count <= DEFAULT_BAG_TIER_LARGE_MAX:
         return DEFAULT_BAG_TIER_LARGE_PRICE
