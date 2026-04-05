@@ -144,7 +144,8 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'id="assistantStatusLine"' in admin_html
     assert 'Screenshot Intake Guidance (Read-Only)' in admin_html
     assert 'Screenshot Intake History (Read-Only)' in admin_html
-    assert 'Guidance remains non-binding and pricing truth stays in the quote engine.' in admin_html
+    assert 'Guidance is non-binding' in admin_html
+    assert 'pricing is always determined by the quote engine.' in admin_html
     assert 'No quote drafting actions are available on desktop admin.' in admin_html
     assert '/admin/api/screenshot-assistant/analyses/intake' not in admin_js
     assert '/admin/api/screenshot-assistant/analyses/${encodeURIComponent(analysisId)}/attachments' not in admin_js
@@ -241,7 +242,7 @@ def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     assert 'Quote Draft' not in mobile_html
     assert 'Create Quote Draft' not in mobile_html
     assert 'Prepare Customer Handoff' not in mobile_html
-    assert 'No customer-facing flow changes.' in mobile_html
+    assert 'No quote authoring on mobile admin.' in mobile_html
     assert '/admin/api/quote-requests?limit=20' in mobile_js
     assert '/admin/api/jobs?limit=20' in mobile_js
     assert 'const state = {' in mobile_js
