@@ -142,11 +142,11 @@ function renderHomeSummary() {
   const card = document.createElement("article");
   card.className = "cardItem";
   card.innerHTML = `
-    <strong>Operational workflow</strong>
-    <div class="muted">Use Requests for review context and Jobs for scheduling visibility/actions.</div>
+    <strong>Operations Overview</strong>
+    <div class="muted">Use Requests to review incoming bookings. Use Jobs to track and manage active work.</div>
     <div class="inlineMeta mt12">
-      <span class="pill">No quote drafting</span>
-      <span class="pill">No customer handoff authoring</span>
+      <span class="pill">No quote authoring</span>
+      <span class="pill">Review &amp; ops only</span>
     </div>
   `;
   homeOpsSummary.appendChild(card);
@@ -154,7 +154,7 @@ function renderHomeSummary() {
 
 function renderRequests() {
   if (!state.requests.length) {
-    renderEmptyState(requestsList, "No booking/customer handoff requests found.");
+    renderEmptyState(requestsList, "No open booking requests found.");
     return;
   }
 
