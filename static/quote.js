@@ -283,7 +283,7 @@ function renderQuoteResult(data, quoteResponse) {
   title.textContent = "Your Estimate";
   const subtitle = document.createElement("p");
   subtitle.className = "muted";
-  subtitle.textContent = "Review the totals below, then accept the quote to continue with booking.";
+  subtitle.textContent = "Review the totals below, then accept the estimate to continue with booking.";
   titleWrap.append(title, subtitle);
 
   const meta = document.createElement("div");
@@ -303,8 +303,8 @@ function renderQuoteResult(data, quoteResponse) {
   const amountGrid = document.createElement("div");
   amountGrid.className = "quoteAmountGrid";
   amountGrid.append(
-    createInfoBlock("Cash total (no HST)", "$" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD", "quoteAmountCard"),
-    createInfoBlock("EMT total (+13% HST)", "$" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD", "quoteAmountCard highlight")
+    createInfoBlock("Cash (no HST)", "$" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD", "quoteAmountCard"),
+    createInfoBlock("EMT (+13% HST)", "$" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD", "quoteAmountCard highlight")
   );
   breakdown.append(breakdownTitle, amountGrid);
 
@@ -322,11 +322,7 @@ function renderQuoteResult(data, quoteResponse) {
     estimateDetailsList.appendChild(item);
   });
 
-  const estimateDetailsReassurance = document.createElement("p");
-  estimateDetailsReassurance.className = "muted estimateDetailsReassurance";
-  estimateDetailsReassurance.textContent = "No obligation estimate. Final price is confirmed before work begins if conditions differ from the details provided.";
-
-  estimateDetails.append(estimateDetailsTitle, estimateDetailsList, estimateDetailsReassurance);
+  estimateDetails.append(estimateDetailsTitle, estimateDetailsList);
 
   const note = document.createElement("div");
   note.className = "quoteResultNote";
@@ -339,7 +335,7 @@ function renderQuoteResult(data, quoteResponse) {
 
   const nextStep = document.createElement("div");
   nextStep.className = "nextStepCallout";
-  nextStep.textContent = "Next step: review this estimate, then choose Accept Quote to continue to booking preferences (or Decline with no obligation).";
+  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate to continue to booking preferences (or Decline).";
 
   wrapper.append(header, breakdown, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
@@ -539,19 +535,19 @@ async function loadPersistedQuoteReview() {
   hideBox("resultBox");
   hideBox("decisionStatus");
   hideBox("bookingStatus");
-  showBox("flowStatus", "Loading your saved quote...", "info");
+  showBox("flowStatus", "Loading your saved estimate...", "info");
 
   try {
     const res = await fetch(`/quote/${encodeURIComponent(quoteId)}/view?accept_token=${encodeURIComponent(acceptToken)}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      showBox("resultBox", "Error:\n" + (data.detail || "Unable to load saved quote."));
+      showBox("resultBox", "Error:\n" + (data.detail || "Unable to load saved estimate."));
       return;
     }
 
     showPersistedQuoteReview(data, acceptToken);
   } catch (_err) {
-    showBox("resultBox", "Error:\nFailed to load saved quote.");
+    showBox("resultBox", "Error:\nFailed to load saved estimate.");
   }
 }
 
@@ -559,7 +555,7 @@ async function submitBooking() {
   hideBox("bookingStatus");
 
   if (!lastQuoteId || !lastBookingToken) {
-    showBox("bookingStatus", "No booking token available. Accept the quote first.");
+    showBox("bookingStatus", "No booking token available. Accept the estimate first.");
     return;
   }
 
@@ -597,7 +593,7 @@ async function submitDecision(action) {
   hideBox("flowStatus");
 
   if (!lastQuoteId || !lastAcceptToken) {
-    showBox("decisionStatus", "No quote or token available. Calculate quote first.");
+    showBox("decisionStatus", "No estimate or token available. Generate an estimate first.");
     return;
   }
 
@@ -635,7 +631,7 @@ async function submitDecision(action) {
       el("bookingNameDisplay").textContent = el("customer_name").value;
       el("bookingPhoneDisplay").textContent = el("customer_phone").value;
     } else {
-      showBox("decisionStatus", confirmation + "\n\nYou declined this quote. No booking will be created.");
+      showBox("decisionStatus", confirmation + "\n\nYou declined this estimate. No booking will be created.");
     }
   } catch (err) {
     showBox("decisionStatus", "Error:\nFailed to contact server.");
@@ -788,7 +784,7 @@ el("btnUpload").addEventListener("click", async () => {
   hideBox("uploadStatus");
 
   if (!lastQuoteId || !lastAcceptToken) {
-    showBox("uploadStatus", "No upload authorization available yet. Calculate quote first.");
+    showBox("uploadStatus", "No upload authorization available yet. Generate an estimate first.");
     return;
   }
 

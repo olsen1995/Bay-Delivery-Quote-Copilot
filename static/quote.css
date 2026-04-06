@@ -68,7 +68,7 @@
   border-radius: 12px;
   border: 1px solid rgba(11, 31, 58, 0.12);
   background: rgba(11, 31, 58, 0.03);
-  color: var(--ink-muted);
+  color: rgba(93, 107, 124, 0.92);
   font-size: 0.88rem;
   font-weight: 700;
 }
@@ -91,14 +91,20 @@
 
 .flowStep.is-active {
   color: var(--ink-strong);
-  border-color: rgba(193, 44, 39, 0.3);
+  border-color: rgba(193, 44, 39, 0.42);
   background: linear-gradient(180deg, rgba(193, 44, 39, 0.1), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 12px 20px rgba(193, 44, 39, 0.14);
+  transform: translateY(-1px);
 }
 
 .flowStep.is-complete {
   color: #216e4a;
   border-color: rgba(33, 110, 74, 0.24);
   background: rgba(33, 110, 74, 0.09);
+}
+
+.flowStep:not(.is-active):not(.is-complete) .flowStepBadge {
+  opacity: 0.72;
 }
 
 .sectionHeader {
@@ -122,7 +128,18 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 18px;
+  margin-top: 14px;
+}
+
+.quotePage .btn.secondary {
+  background: #ffffff;
+  color: var(--ink-strong);
+  border: 1px solid var(--line-soft);
+  box-shadow: none;
+}
+
+.quotePage .btn.secondary:hover {
+  background: #f5f8fc;
 }
 
 .resultBox,
@@ -154,7 +171,7 @@
   border: 1px solid var(--line-soft);
   border-radius: 18px;
   padding: 18px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 251, 0.98));
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
 }
@@ -175,7 +192,7 @@
 }
 
 .secondarySection {
-  background: linear-gradient(180deg, rgba(247, 249, 252, 1), rgba(255, 255, 255, 1));
+  background: linear-gradient(180deg, rgba(249, 251, 253, 1), rgba(255, 255, 255, 1));
 }
 
 .detailPanel {
@@ -189,7 +206,7 @@
   cursor: pointer;
   font-weight: 700;
   color: var(--ink-muted);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .detailPanel[open] summary {
@@ -197,8 +214,8 @@
 }
 
 .helperText {
-  margin-top: 8px;
-  font-size: 0.86em;
+  margin-top: 6px;
+  font-size: 0.84em;
   color: var(--ink-muted);
   line-height: 1.45;
 }
@@ -272,44 +289,17 @@
 }
 
 .firstStepSection {
-  border: 1px solid rgba(193, 44, 39, 0.22);
+  border: 1px solid rgba(193, 44, 39, 0.34);
   background: linear-gradient(180deg, rgba(193, 44, 39, 0.05), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 14px 26px rgba(193, 44, 39, 0.12);
 }
 
 .firstStepHint {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 0.88em;
   color: var(--brand-red);
   font-weight: 600;
   line-height: 1.45;
-}
-
-.reassuranceText {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-top: 16px;
-}
-
-.reassuranceItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(33, 110, 74, 0.09);
-  color: #216e4a;
-  font-size: 0.88em;
-  font-weight: 700;
-}
-
-.reassuranceItem::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: currentColor;
 }
 
 .loadingState {
@@ -331,9 +321,9 @@
 }
 
 .stepHelper {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--ink-muted);
-  font-size: 0.9rem;
+  font-size: 0.86rem;
 }
 
 #btnAccept {
@@ -473,11 +463,6 @@
   line-height: 1.45;
 }
 
-.estimateDetailsReassurance {
-  margin: 12px 0 0;
-  font-size: 0.92rem;
-}
-
 .estimateSummary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -542,13 +527,26 @@
     padding: 18px;
   }
 
+  .quotePage .container {
+    gap: 16px;
+  }
+
+  .formSection {
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .btnRow .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+
   .quoteSummaryGrid,
   .quoteAmountGrid,
   .estimateSummary {
     grid-template-columns: 1fr;
   }
 
-  .reassuranceText,
   .heroHighlights,
   .trustCueRow {
     gap: 8px;
