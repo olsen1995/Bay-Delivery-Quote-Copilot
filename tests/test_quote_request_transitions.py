@@ -1,14 +1,20 @@
 import base64
+from datetime import date, datetime, timedelta, timezone
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from typing import Optional, Any, Dict, cast
 
 from fastapi.testclient import TestClient
 
+from app.services import booking_service
 from app import storage
 from app.main import app
+
+
+FUTURE_BOOKING_DATE = (date.today() + timedelta(days=1)).isoformat()
 
 
 class QuoteRequestTransitionsTests(unittest.TestCase):
@@ -355,7 +361,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         # now submit booking
         resp = self.client.post(f"/quote/{quote_id}/booking", json={
             "booking_token": booking_token,
-            "requested_job_date": "2026-03-10",
+            "requested_job_date": FUTURE_BOOKING_DATE,
             "requested_time_window": "morning",
             "notes": "test notes",
         })
@@ -367,7 +373,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         req = storage.get_quote_request(request_id)
         self.assertIsNotNone(req)
         req_typed = cast(Dict[str, Any], req)
-        self.assertEqual(req_typed["requested_job_date"], "2026-03-10")
+        self.assertEqual(req_typed["requested_job_date"], FUTURE_BOOKING_DATE)
         self.assertEqual(req_typed["requested_time_window"], "morning")
         self.assertEqual(req_typed["notes"], "test notes")
 
@@ -427,7 +433,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             f"/quote/{quote_id}/booking",
             json={
                 "booking_token": booking_token,
-                "requested_job_date": "2026-03-10",
+                "requested_job_date": FUTURE_BOOKING_DATE,
                 "requested_time_window": "morning",
                 "notes": "Call when outside gate",
             },
@@ -443,7 +449,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
 
         job = approval_resp.json()["job"]
         self.assertEqual(job["scheduling_context"]["request_id"], request_id)
-        self.assertEqual(job["scheduling_context"]["requested_job_date"], "2026-03-10")
+        self.assertEqual(job["scheduling_context"]["requested_job_date"], FUTURE_BOOKING_DATE)
         self.assertEqual(job["scheduling_context"]["requested_time_window"], "morning")
         self.assertEqual(job["scheduling_context"]["notes"], "Call when outside gate")
         self.assertTrue(job["scheduling_context"]["scheduling_ready"])
@@ -456,6 +462,20 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "requested_time_window": "morning",
         })
         self.assertEqual(resp.status_code, 404)
+
+    def test_business_today_uses_local_timezone_env(self) -> None:
+        previous_timezone = os.environ.get("LOCAL_TIMEZONE")
+        os.environ["LOCAL_TIMEZONE"] = "America/Los_Angeles"
+        try:
+            fixed_utc = datetime(2026, 4, 6, 0, 30, tzinfo=timezone.utc)
+            with patch.object(booking_service, "ZoneInfo", lambda _name: timezone(timedelta(hours=-8))):
+                business_today = booking_service._business_today(now_utc=fixed_utc)
+            self.assertEqual(business_today, date(2026, 4, 5))
+        finally:
+            if previous_timezone is None:
+                os.environ.pop("LOCAL_TIMEZONE", None)
+            else:
+                os.environ["LOCAL_TIMEZONE"] = previous_timezone
 
     def test_submit_booking_wrong_status(self) -> None:
         request_id = "req_pending"
