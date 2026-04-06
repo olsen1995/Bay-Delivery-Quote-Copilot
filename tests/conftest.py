@@ -1,4 +1,5 @@
 import importlib.util
+import importlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,7 +17,9 @@ def _ensure_playwright_prerequisites() -> None:
     missing = []
     if importlib.util.find_spec("pytest_asyncio") is None:
         missing.append("pytest-asyncio")
-    if importlib.util.find_spec("playwright.async_api") is None:
+    try:
+        importlib.import_module("playwright.async_api")
+    except ModuleNotFoundError:
         missing.append("playwright")
 
     if missing:
@@ -71,13 +74,18 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     if not config.getoption("--require-playwright"):
         return
 
-    has_playwright_items = any(
-        any(test_file in item.nodeid for test_file in _PLAYWRIGHT_TEST_FILES) for item in items
-    )
-    if not has_playwright_items:
+    missing_files = [
+        test_file
+        for test_file in _PLAYWRIGHT_TEST_FILES
+        if not any(test_file in item.nodeid for item in items)
+    ]
+    if missing_files:
+        missing_text = ", ".join(missing_files)
         raise pytest.UsageError(
-            "--require-playwright was set, but no Playwright smoke tests were selected. "
-            "Include tests/test_launch_smoke_playwright.py and tests/test_admin_mobile_playwright.py."
+            "--require-playwright was set, but both Playwright smoke test files are required. "
+            "Missing selection for: "
+            f"{missing_text}. Required files: tests/test_launch_smoke_playwright.py, "
+            "tests/test_admin_mobile_playwright.py."
         )
 
 
