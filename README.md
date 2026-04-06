@@ -6,6 +6,7 @@ Current stable milestone: `0.10.0`.
 
 ## Current Project State
 See `docs/CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
+See `docs/GPT_SOURCE_OF_TRUTH.md` for GPT grounding precedence and boundary rules.
 
 ## Render Parity and Release Signals (2026-03-14)
 

@@ -64,6 +64,7 @@ This document is the single authoritative current-state source of truth for Bay 
 ## Active Docs Map
 
 - `README.md` = entry point
+- `docs/GPT_SOURCE_OF_TRUTH.md` = GPT grounding order, boundaries, and approval gates
 - `docs/CURRENT_STATE.md` = canonical state doc
 - `docs/MARKET_AND_PRICING_STRATEGY.md` = pricing/strategy guardrails
 - `docs/DEMO_CHECKLIST.md` = operational validation checklist
