@@ -12,7 +12,7 @@ from app.main import app
 
 BASE_PAYLOAD = {
     "customer_name": "Rate Tester",
-    "customer_phone": "555-0100",
+    "customer_phone": "705-555-0100",
     "job_address": "123 Main St",
     "job_description_customer": "desc",
     "description": "desc",

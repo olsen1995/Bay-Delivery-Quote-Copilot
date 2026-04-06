@@ -17,7 +17,7 @@ def client() -> TestClient:
 def _base_payload(service_type: str = "haul_away") -> dict:
     return {
         "customer_name": "Invariant Tester",
-        "customer_phone": "555-0100",
+        "customer_phone": "705-555-0100",
         "job_address": "123 Main St",
         "job_description_customer": "Regression invariant check",
         "description": "Regression invariant check",

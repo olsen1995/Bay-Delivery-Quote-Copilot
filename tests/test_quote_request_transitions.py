@@ -83,7 +83,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         # Get the quote first to retrieve accept_token and quote_id
         resp = self.client.post("/quote/calculate", json={
             "customer_name": "Test",
-            "customer_phone": "555-0101",
+            "customer_phone": "705-555-0101",
             "job_address": "Somewhere",
             "description": "desc",
             "service_type": "haul_away",
@@ -102,7 +102,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         # Get the quote first to retrieve accept_token and quote_id
         resp = self.client.post("/quote/calculate", json={
             "customer_name": "Test",
-            "customer_phone": "555-0101",
+            "customer_phone": "705-555-0101",
             "job_address": "Somewhere",
             "description": "desc",
             "service_type": "haul_away",
@@ -338,7 +338,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         # Get the quote first to retrieve accept_token and quote_id
         resp = self.client.post("/quote/calculate", json={
             "customer_name": "Test",
-            "customer_phone": "555-0101",
+            "customer_phone": "(705) 555-0101",
             "job_address": "Somewhere",
             "description": "desc",
             "service_type": "haul_away",
@@ -371,10 +371,41 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         self.assertEqual(req_typed["requested_time_window"], "morning")
         self.assertEqual(req_typed["notes"], "test notes")
 
+    def test_quote_calculate_normalizes_customer_phone(self) -> None:
+        resp = self.client.post("/quote/calculate", json={
+            "customer_name": "Test",
+            "customer_phone": "+1 (705) 555-0101",
+            "job_address": "Somewhere",
+            "description": "desc",
+            "service_type": "haul_away",
+            "estimated_hours": 1.0,
+            "crew_size": 1,
+        })
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["request"]["customer_phone"], "(705) 555-0101")
+
+    def test_quote_calculate_rejects_invalid_customer_phone(self) -> None:
+        resp = self.client.post("/quote/calculate", json={
+            "customer_name": "Test",
+            "customer_phone": "call me maybe",
+            "job_address": "Somewhere",
+            "description": "desc",
+            "service_type": "haul_away",
+            "estimated_hours": 1.0,
+            "crew_size": 1,
+        })
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(
+            resp.json(),
+            {"detail": "Please enter a valid 10-digit phone number. You can include spaces, dashes, parentheses, or +1."},
+        )
+
     def test_admin_jobs_include_linked_booking_preferences_after_approval(self) -> None:
         quote_resp = self.client.post("/quote/calculate", json={
             "customer_name": "Schedule Test",
-            "customer_phone": "555-0101",
+            "customer_phone": "+1 705 555 0101",
             "job_address": "123 Main St",
             "description": "desc",
             "service_type": "haul_away",
