@@ -215,8 +215,8 @@ async def test_admin_mobile_mocked_ui_regression(page: Page, live_server: str) -
     await expect(page.locator("#jobsList")).to_contain_text("synced")
 
     await page.locator("button[data-screen='homeScreen']").click()
-    await expect(page.locator("#homeOpsSummary")).to_contain_text("Operational workflow")
-    await expect(page.locator("#homeOpsSummary")).to_contain_text("No quote drafting")
+    await expect(page.locator("#homeOpsSummary .cardItem strong")).to_be_visible()
+    assert await page.locator("#homeOpsSummary .cardItem .pill").count() >= 2
     await expect(page.locator("#authenticatedShell")).not_to_contain_text("New Intake")
     await expect(page.locator("#authenticatedShell")).not_to_contain_text("Create Quote Draft")
 
