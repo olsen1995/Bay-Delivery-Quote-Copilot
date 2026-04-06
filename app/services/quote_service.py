@@ -1,13 +1,33 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException
 
-from app.phone_numbers import QUOTE_PHONE_VALIDATION_MESSAGE, normalize_north_american_phone
 from app.quote_engine import calculate_quote
 from app.storage import save_quote
+
+_PHONE_ALLOWED = re.compile(r"^[0-9().+\-\s]+$")
+_PHONE_VALIDATION_MSG = (
+    "Please enter a valid 10-digit phone number. "
+    "You can include spaces, dashes, parentheses, or +1."
+)
+
+
+def _normalize_customer_phone(value: str | None) -> str | None:
+    if not value:
+        return None
+    trimmed = value.strip()
+    if not _PHONE_ALLOWED.fullmatch(trimmed):
+        return None
+    digits = re.sub(r"\D", "", trimmed)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        return None
+    return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
 
 
 def _normalize_load_mode(load_mode: Any) -> str:
@@ -82,9 +102,9 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[str, Any]:
-    normalized_customer_phone = normalize_north_american_phone(request_payload.get("customer_phone"))
+    normalized_customer_phone = _normalize_customer_phone(request_payload.get("customer_phone"))
     if normalized_customer_phone is None:
-        raise HTTPException(status_code=400, detail=QUOTE_PHONE_VALIDATION_MESSAGE)
+        raise HTTPException(status_code=400, detail=_PHONE_VALIDATION_MSG)
 
     normalized_payload = dict(request_payload)
     normalized_payload["customer_phone"] = normalized_customer_phone

@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
-from app.phone_numbers import normalize_north_american_phone
 from app.services.quote_service import build_quote_artifacts
 from app.storage import (
     assign_attachments_to_analysis,
@@ -139,10 +138,14 @@ def _trim_suggestion_value(value: str) -> str:
 
 
 def _normalize_phone(value: str | None) -> str | None:
-    normalized = normalize_north_american_phone(value)
-    if normalized:
-        return normalized
-    return _trim_suggestion_value(value) or None
+    if not value:
+        return None
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        return _trim_suggestion_value(value) or None
+    return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
 
 
 def _extract_customer_name(message_text: str) -> str | None:
