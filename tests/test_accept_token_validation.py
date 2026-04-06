@@ -33,7 +33,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Alice",
-                "customer_phone": "555-0001",
+                "customer_phone": "705-555-0001",
                 "job_address": "123 Main St",
                 "description": "Move stuff",
                 "service_type": "junk_removal",
@@ -66,7 +66,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Bob",
-                "customer_phone": "555-0002",
+                "customer_phone": "705-555-0002",
                 "job_address": "456 Oak Ave",
                 "description": "Move stuff",
                 "service_type": "junk_removal",
@@ -97,7 +97,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Charlie",
-                "customer_phone": "555-0003",
+                "customer_phone": "705-555-0003",
                 "job_address": "789 Pine Rd",
                 "description": "Move stuff",
                 "service_type": "junk_removal",
@@ -138,7 +138,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Diana",
-                "customer_phone": "555-0004",
+                "customer_phone": "705-555-0004",
                 "job_address": "999 Elm St",
                 "description": "Move stuff",
                 "service_type": "junk_removal",
@@ -193,7 +193,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Eve",
-                "customer_phone": "555-0005",
+                "customer_phone": "705-555-0005",
                 "job_address": "321 Cedar Ln",
                 "description": "Move stuff",
                 "service_type": "junk_removal",
@@ -223,7 +223,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Frank",
-                "customer_phone": "555-0006",
+                "customer_phone": "705-555-0006",
                 "job_address": "111 Review St",
                 "description": "Saved quote review",
                 "service_type": "haul_away",
@@ -250,7 +250,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
             "/quote/calculate",
             json={
                 "customer_name": "Grace",
-                "customer_phone": "555-0007",
+                "customer_phone": "705-555-0007",
                 "job_address": "222 Review St",
                 "description": "Saved quote review",
                 "service_type": "haul_away",

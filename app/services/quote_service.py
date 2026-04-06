@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
+from app.phone_numbers import QUOTE_PHONE_VALIDATION_MESSAGE, normalize_north_american_phone
 from app.quote_engine import calculate_quote
 from app.storage import save_quote
 
@@ -81,7 +82,14 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[str, Any]:
-    quote_artifacts = build_quote_artifacts(request_payload)
+    normalized_customer_phone = normalize_north_american_phone(request_payload.get("customer_phone"))
+    if normalized_customer_phone is None:
+        raise HTTPException(status_code=400, detail=QUOTE_PHONE_VALIDATION_MESSAGE)
+
+    normalized_payload = dict(request_payload)
+    normalized_payload["customer_phone"] = normalized_customer_phone
+
+    quote_artifacts = build_quote_artifacts(normalized_payload)
 
     # Generate accept_token for this quote (before saving)
     accept_token = str(uuid4())

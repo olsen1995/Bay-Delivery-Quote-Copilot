@@ -758,15 +758,18 @@ el("btnCalc").addEventListener("click", async () => {
       return;
     }
 
+    const requestData = data.request || payload;
+
     lastQuoteId = data.quote_id;
     lastAcceptToken = data.accept_token;
     revealCard("uploadCard");
     revealCard("decisionCard");
     revealCard("quoteSummaryCard");
     setFlowStage(3);
+    populateQuoteFormFromRequest(requestData);
     el("summaryService").textContent = el("service_type").selectedOptions[0].textContent;
-    el("summaryCustomer").textContent = customerName + " • " + customerPhone;
-    el("summaryLocation").textContent = jobAddress;
+    el("summaryCustomer").textContent = `${requestData.customer_name || ""} • ${requestData.customer_phone || ""}`.trim();
+    el("summaryLocation").textContent = requestData.job_address || jobAddress;
 
     renderQuoteResult(data, quoteResponse);
     scrollToElement("resultBox");
