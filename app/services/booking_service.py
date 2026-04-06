@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import hmac
+import os
 from typing import Any, Optional
 from uuid import uuid4
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 
 from fastapi import HTTPException
 
@@ -21,13 +27,31 @@ from app.storage import (
 from app.update_fields import InvalidQuoteRequestTransition, validate_quote_request_transition
 
 
+def _business_today(*, now_utc: Optional[datetime] = None) -> date:
+    tz_name = os.getenv("LOCAL_TIMEZONE", "UTC")
+
+    try:
+        if ZoneInfo:
+            business_tz = ZoneInfo(tz_name)
+        else:
+            business_tz = timezone.utc
+    except Exception:
+        business_tz = timezone.utc
+
+    reference = now_utc or datetime.now(timezone.utc)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+
+    return reference.astimezone(business_tz).date()
+
+
 def _validate_requested_job_date(requested_job_date: str) -> None:
     try:
         parsed_date = datetime.strptime(str(requested_job_date or "").strip(), "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Please enter a valid booking date in YYYY-MM-DD format.")
 
-    if parsed_date < date.today():
+    if parsed_date < _business_today():
         raise HTTPException(status_code=400, detail="Please choose today or a future date for your booking.")
 
 

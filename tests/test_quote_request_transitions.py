@@ -1,13 +1,15 @@
 import base64
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from typing import Optional, Any, Dict, cast
 
 from fastapi.testclient import TestClient
 
+from app.services import booking_service
 from app import storage
 from app.main import app
 
@@ -460,6 +462,20 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "requested_time_window": "morning",
         })
         self.assertEqual(resp.status_code, 404)
+
+    def test_business_today_uses_local_timezone_env(self) -> None:
+        previous_timezone = os.environ.get("LOCAL_TIMEZONE")
+        os.environ["LOCAL_TIMEZONE"] = "America/Los_Angeles"
+        try:
+            fixed_utc = datetime(2026, 4, 6, 0, 30, tzinfo=timezone.utc)
+            with patch.object(booking_service, "ZoneInfo", lambda _name: timezone(timedelta(hours=-8))):
+                business_today = booking_service._business_today(now_utc=fixed_utc)
+            self.assertEqual(business_today, date(2026, 4, 5))
+        finally:
+            if previous_timezone is None:
+                os.environ.pop("LOCAL_TIMEZONE", None)
+            else:
+                os.environ["LOCAL_TIMEZONE"] = previous_timezone
 
     def test_submit_booking_wrong_status(self) -> None:
         request_id = "req_pending"
