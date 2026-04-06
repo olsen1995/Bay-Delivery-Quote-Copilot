@@ -1,4 +1,5 @@
 import base64
+from datetime import date, timedelta
 import os
 import tempfile
 import unittest
@@ -9,6 +10,9 @@ from fastapi.testclient import TestClient
 
 from app import storage
 from app.main import app
+
+
+FUTURE_BOOKING_DATE = (date.today() + timedelta(days=1)).isoformat()
 
 
 class QuoteRequestTransitionsTests(unittest.TestCase):
@@ -355,7 +359,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         # now submit booking
         resp = self.client.post(f"/quote/{quote_id}/booking", json={
             "booking_token": booking_token,
-            "requested_job_date": "2026-03-10",
+            "requested_job_date": FUTURE_BOOKING_DATE,
             "requested_time_window": "morning",
             "notes": "test notes",
         })
@@ -367,7 +371,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         req = storage.get_quote_request(request_id)
         self.assertIsNotNone(req)
         req_typed = cast(Dict[str, Any], req)
-        self.assertEqual(req_typed["requested_job_date"], "2026-03-10")
+        self.assertEqual(req_typed["requested_job_date"], FUTURE_BOOKING_DATE)
         self.assertEqual(req_typed["requested_time_window"], "morning")
         self.assertEqual(req_typed["notes"], "test notes")
 
@@ -427,7 +431,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             f"/quote/{quote_id}/booking",
             json={
                 "booking_token": booking_token,
-                "requested_job_date": "2026-03-10",
+                "requested_job_date": FUTURE_BOOKING_DATE,
                 "requested_time_window": "morning",
                 "notes": "Call when outside gate",
             },
@@ -443,7 +447,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
 
         job = approval_resp.json()["job"]
         self.assertEqual(job["scheduling_context"]["request_id"], request_id)
-        self.assertEqual(job["scheduling_context"]["requested_job_date"], "2026-03-10")
+        self.assertEqual(job["scheduling_context"]["requested_job_date"], FUTURE_BOOKING_DATE)
         self.assertEqual(job["scheduling_context"]["requested_time_window"], "morning")
         self.assertEqual(job["scheduling_context"]["notes"], "Call when outside gate")
         self.assertTrue(job["scheduling_context"]["scheduling_ready"])

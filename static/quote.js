@@ -116,6 +116,20 @@ function scrollToElement(id) {
   node.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 }
 
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function enforceBookingDateMin() {
+  const bookingDateInput = el("bookingDate");
+  if (!bookingDateInput) return;
+  bookingDateInput.min = getTodayDateString();
+}
+
 function revealCard(id, shouldScroll) {
   const card = el(id);
   if (!card) return;
@@ -553,15 +567,23 @@ async function loadPersistedQuoteReview() {
 
 async function submitBooking() {
   hideBox("bookingStatus");
+  enforceBookingDateMin();
 
   if (!lastQuoteId || !lastBookingToken) {
     showBox("bookingStatus", "No booking token available. Accept the estimate first.");
     return;
   }
 
+  const selectedDate = (el("bookingDate").value || "").trim();
+  const today = getTodayDateString();
+  if (selectedDate && selectedDate < today) {
+    showBox("bookingStatus", "Please choose today or a future date for your booking.");
+    return;
+  }
+
   const payload = {
     booking_token: lastBookingToken,
-    requested_job_date: el("bookingDate").value,
+    requested_job_date: selectedDate,
     requested_time_window: el("bookingWindow").value,
     notes: el("bookingNotes").value || null,
   };
@@ -627,6 +649,7 @@ async function submitDecision(action) {
       showBox("flowStatus", confirmation + "\n\nPlease provide your booking details below.");
       el("decisionCard").classList.add("hidden");
       revealCard("bookingCard", true);
+      enforceBookingDateMin();
       setFlowStage(4);
       el("bookingNameDisplay").textContent = el("customer_name").value;
       el("bookingPhoneDisplay").textContent = el("customer_phone").value;
@@ -656,6 +679,7 @@ el("service_type").addEventListener("change", () => {
 });
 
 attachValidationClearHandlers();
+enforceBookingDateMin();
 
 el("btnCalc").addEventListener("click", async () => {
   if (persistedReviewMode) {
