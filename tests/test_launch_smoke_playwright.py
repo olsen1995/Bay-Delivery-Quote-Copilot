@@ -219,10 +219,10 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("No obligation estimate")
+    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate")
     await expect(page.locator("#decisionCard")).to_be_visible()
 
     await page.locator("#btnDecline").click()
 
     await expect(page.locator("#decisionStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
-    await expect(page.locator("#decisionStatus")).to_contain_text("You declined this quote. No booking will be created.")
+    await expect(page.locator("#decisionStatus")).to_contain_text("You declined this estimate. No booking will be created.")
