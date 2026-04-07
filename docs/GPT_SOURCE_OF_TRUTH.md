@@ -1,5 +1,9 @@
 # GPT Source of Truth
 
+> Compatibility note: the focused grounding pack now lives under `docs/gpt/`.
+>
+> Start with `docs/gpt/GPT_SOURCE_OF_TRUTH.md`, then use the companion files in that folder for business rules, system boundaries, workflow rules, and current state.
+
 This document defines how GPT assistance should ground to the current repository state.
 
 ## Purpose
