@@ -1,3 +1,31 @@
+.quotePage {
+  --quote-bg: #0b0b10;
+  --quote-surface: #141722;
+  --quote-surface-alt: #191d2b;
+  --quote-surface-soft: #1f2434;
+  --quote-border: rgba(255, 255, 255, 0.16);
+  --quote-text: #f3f6fb;
+  --quote-muted: #bbc6d6;
+  --quote-shadow: 0 18px 34px rgba(0, 0, 0, 0.34);
+  --ink-strong: var(--quote-text);
+  --ink-muted: var(--quote-muted);
+  --line-soft: var(--quote-border);
+}
+
+body.quotePage {
+  color: var(--quote-text);
+  background:
+    radial-gradient(1200px 680px at 18% -10%, rgba(122, 16, 32, 0.35), transparent 62%),
+    radial-gradient(880px 520px at 82% 10%, rgba(168, 22, 44, 0.2), transparent 64%),
+    var(--quote-bg);
+}
+
+.quotePage .card {
+  border: 1px solid var(--quote-border);
+  background: linear-gradient(180deg, rgba(26, 30, 43, 0.96), rgba(20, 23, 34, 0.98));
+  box-shadow: var(--quote-shadow);
+}
+
 .quotePage .container {
   display: grid;
   gap: 20px;
@@ -150,9 +178,9 @@
   gap: 9px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(11, 31, 58, 0.12);
-  background: rgba(11, 31, 58, 0.03);
-  color: rgba(93, 107, 124, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(9, 13, 22, 0.78);
+  color: rgba(188, 199, 215, 0.92);
   font-size: 0.88rem;
   font-weight: 700;
 }
@@ -174,10 +202,10 @@
 }
 
 .flowStep.is-active {
-  color: var(--ink-strong);
+  color: #ffffff;
   border-color: rgba(193, 44, 39, 0.42);
-  background: linear-gradient(180deg, rgba(193, 44, 39, 0.1), rgba(255, 255, 255, 0.96));
-  box-shadow: 0 12px 20px rgba(193, 44, 39, 0.14);
+  background: linear-gradient(180deg, rgba(122, 16, 32, 0.66), rgba(42, 17, 28, 0.92));
+  box-shadow: 0 12px 20px rgba(122, 16, 32, 0.3);
   transform: translateY(-1px);
 }
 
@@ -226,14 +254,14 @@
 }
 
 .quotePage .btn.secondary {
-  background: #ffffff;
-  color: var(--ink-strong);
-  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--quote-text);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   box-shadow: none;
 }
 
 .quotePage .btn.secondary:hover {
-  background: #f5f8fc;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .resultBox,
@@ -253,9 +281,9 @@
 .hint {
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(11, 31, 58, 0.04);
-  border: 1px solid rgba(11, 31, 58, 0.08);
-  color: var(--ink-muted);
+  background: rgba(11, 18, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--quote-muted);
 }
 
 .bookingContactInfo {
@@ -263,16 +291,17 @@
   margin-bottom: 1em;
   padding: 14px 16px;
   border-radius: 14px;
-  background: rgba(11, 31, 58, 0.04);
+  background: rgba(12, 20, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .formSection {
-  border: 1px solid var(--line-soft);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 18px;
   padding: 18px;
   margin-bottom: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 251, 0.98));
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+  background: linear-gradient(180deg, rgba(20, 24, 36, 0.96), rgba(15, 18, 28, 0.98));
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
 }
 
 .formSectionTitle {
@@ -291,20 +320,20 @@
 }
 
 .secondarySection {
-  background: linear-gradient(180deg, rgba(249, 251, 253, 1), rgba(255, 255, 255, 1));
+  background: linear-gradient(180deg, rgba(24, 30, 44, 0.98), rgba(17, 21, 32, 0.98));
 }
 
 .detailPanel {
-  border: 1px solid var(--line-soft);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 14px;
   padding: 14px;
-  background: rgba(247, 249, 252, 0.86);
+  background: rgba(12, 18, 29, 0.78);
 }
 
 .detailPanel summary {
   cursor: pointer;
   font-weight: 700;
-  color: var(--ink-muted);
+  color: rgba(217, 224, 235, 0.9);
   margin-bottom: 6px;
 }
 
@@ -315,8 +344,28 @@
 .helperText {
   margin-top: 6px;
   font-size: 0.84em;
-  color: var(--ink-muted);
+  color: var(--quote-muted);
   line-height: 1.45;
+}
+
+.quotePage input,
+.quotePage select,
+.quotePage textarea {
+  background: rgba(9, 12, 20, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--quote-text);
+}
+
+.quotePage input::placeholder,
+.quotePage textarea::placeholder {
+  color: rgba(188, 199, 215, 0.8);
+}
+
+.quotePage input:focus,
+.quotePage select:focus,
+.quotePage textarea:focus {
+  outline: 3px solid rgba(193, 44, 39, 0.22);
+  border-color: rgba(193, 44, 39, 0.62);
 }
 
 .quotePage input[aria-invalid="true"],
@@ -353,8 +402,8 @@
 .quoteSummaryGrid > div {
   padding: 14px 16px;
   border-radius: 14px;
-  background: rgba(11, 31, 58, 0.04);
-  border: 1px solid rgba(11, 31, 58, 0.06);
+  background: rgba(12, 19, 32, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .trustCueRow {
@@ -369,9 +418,9 @@
   align-items: center;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(33, 110, 74, 0.09);
-  border: 1px solid rgba(33, 110, 74, 0.18);
-  color: #216e4a;
+  background: rgba(35, 116, 79, 0.2);
+  border: 1px solid rgba(98, 176, 139, 0.42);
+  color: #cdeedc;
   font-size: 0.86rem;
   font-weight: 700;
   line-height: 1.3;
@@ -389,8 +438,8 @@
 
 .firstStepSection {
   border: 1px solid rgba(193, 44, 39, 0.34);
-  background: linear-gradient(180deg, rgba(193, 44, 39, 0.05), rgba(255, 255, 255, 0.98));
-  box-shadow: 0 14px 26px rgba(193, 44, 39, 0.12);
+  background: linear-gradient(180deg, rgba(122, 16, 32, 0.3), rgba(19, 21, 33, 0.98));
+  box-shadow: 0 14px 26px rgba(122, 16, 32, 0.24);
 }
 
 .firstStepHint {
@@ -421,7 +470,7 @@
 
 .stepHelper {
   margin: 8px 0 0;
-  color: var(--ink-muted);
+  color: var(--quote-muted);
   font-size: 0.86rem;
 }
 
@@ -455,18 +504,18 @@
 }
 
 .boxInfo {
-  background: rgba(11, 31, 58, 0.04);
-  border: 1px solid rgba(11, 31, 58, 0.08);
+  background: rgba(15, 22, 36, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .boxSuccess {
-  background: rgba(33, 110, 74, 0.08);
-  border: 1px solid rgba(33, 110, 74, 0.16);
+  background: rgba(33, 110, 74, 0.2);
+  border: 1px solid rgba(98, 176, 139, 0.36);
 }
 
 .boxError {
-  background: rgba(193, 44, 39, 0.08);
-  border: 1px solid rgba(193, 44, 39, 0.16);
+  background: rgba(122, 16, 32, 0.26);
+  border: 1px solid rgba(193, 44, 39, 0.42);
 }
 
 .quoteResult {
@@ -500,12 +549,12 @@
 
 .quoteResultMeta {
   text-align: right;
-  color: var(--ink-muted);
+  color: var(--quote-muted);
   font-size: 0.92rem;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(11, 31, 58, 0.1);
-  background: rgba(11, 31, 58, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(9, 13, 22, 0.74);
 }
 
 .quoteAmountGrid {
@@ -517,13 +566,13 @@
 .quoteAmountCard {
   padding: 16px 18px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(11, 31, 58, 0.08);
+  background: rgba(11, 16, 27, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .quoteAmountCard span {
   display: block;
-  color: var(--ink-muted);
+  color: var(--quote-muted);
   font-size: 0.88rem;
   margin-bottom: 8px;
 }
@@ -531,22 +580,23 @@
 .quoteAmountCard strong {
   font-size: 1.5rem;
   line-height: 1.1;
+  color: #f5f8fd;
 }
 
 .quoteAmountCard.highlight {
   border-color: rgba(193, 44, 39, 0.24);
-  background: linear-gradient(180deg, rgba(193, 44, 39, 0.09), rgba(255, 255, 255, 0.95));
-  box-shadow: 0 12px 20px rgba(193, 44, 39, 0.14);
+  background: linear-gradient(180deg, rgba(122, 16, 32, 0.46), rgba(24, 14, 20, 0.92));
+  box-shadow: 0 12px 20px rgba(122, 16, 32, 0.28);
 }
 
 .quoteAmountCard.cashOption {
   border-color: rgba(33, 110, 74, 0.22);
-  background: linear-gradient(180deg, rgba(33, 110, 74, 0.1), rgba(255, 255, 255, 0.95));
-  box-shadow: 0 12px 20px rgba(33, 110, 74, 0.12);
+  background: linear-gradient(180deg, rgba(33, 110, 74, 0.36), rgba(12, 25, 18, 0.92));
+  box-shadow: 0 12px 20px rgba(33, 110, 74, 0.24);
 }
 
 .quoteAmountCard.emtOption {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(14, 19, 31, 0.92);
 }
 
 .quoteAmountHint {
@@ -558,15 +608,15 @@
 .quoteResultNote {
   padding: 16px 18px;
   border-radius: 16px;
-  background: rgba(11, 31, 58, 0.04);
+  background: rgba(11, 18, 30, 0.74);
 }
 
 .nextStepCallout {
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid rgba(193, 44, 39, 0.22);
-  background: rgba(193, 44, 39, 0.08);
-  color: var(--ink-strong);
+  background: rgba(122, 16, 32, 0.28);
+  color: var(--quote-text);
   font-weight: 600;
   line-height: 1.48;
 }
@@ -574,8 +624,8 @@
 .estimateDetails {
   padding: 16px 18px;
   border-radius: 16px;
-  border: 1px solid rgba(11, 31, 58, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(11, 18, 30, 0.78);
 }
 
 .estimateDetails h3 {
@@ -590,7 +640,7 @@
 }
 
 .estimateDetailsList li {
-  color: var(--ink-strong);
+  color: var(--quote-text);
   line-height: 1.45;
 }
 
@@ -603,14 +653,14 @@
 .estimateSummaryItem {
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(11, 31, 58, 0.08);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 20, 34, 0.76);
 }
 
 .estimateSummaryItem span {
   display: block;
   font-size: 0.82rem;
-  color: var(--ink-muted);
+  color: var(--quote-muted);
 }
 
 .estimateSummaryItem strong {
