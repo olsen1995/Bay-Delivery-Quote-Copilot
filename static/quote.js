@@ -297,7 +297,7 @@ function renderQuoteResult(data, quoteResponse) {
   title.textContent = "Your Estimate";
   const subtitle = document.createElement("p");
   subtitle.className = "muted";
-  subtitle.textContent = "Review the totals below, then accept the estimate to continue with booking.";
+  subtitle.textContent = "Review your totals below. If they work for you, accept to continue to booking preferences.";
   titleWrap.append(title, subtitle);
 
   const meta = document.createElement("div");
@@ -317,10 +317,13 @@ function renderQuoteResult(data, quoteResponse) {
   const amountGrid = document.createElement("div");
   amountGrid.className = "quoteAmountGrid";
   amountGrid.append(
-    createInfoBlock("Cash (no HST)", "$" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD", "quoteAmountCard"),
-    createInfoBlock("EMT (+13% HST)", "$" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD", "quoteAmountCard highlight")
+    createInfoBlock("Cash (no HST)", "$" + Number(quoteResponse.cash_total_cad).toFixed(2) + " CAD", "quoteAmountCard highlight cashOption"),
+    createInfoBlock("EMT / e-transfer (+13% HST)", "$" + Number(quoteResponse.emt_total_cad).toFixed(2) + " CAD", "quoteAmountCard emtOption")
   );
-  breakdown.append(breakdownTitle, amountGrid);
+  const amountHint = document.createElement("p");
+  amountHint.className = "quoteAmountHint muted";
+  amountHint.textContent = "Cash is tax-free. EMT / e-transfer includes 13% HST.";
+  breakdown.append(breakdownTitle, amountGrid, amountHint);
 
   const estimateDetails = document.createElement("div");
   estimateDetails.className = "estimateDetails";
@@ -349,7 +352,7 @@ function renderQuoteResult(data, quoteResponse) {
 
   const nextStep = document.createElement("div");
   nextStep.className = "nextStepCallout";
-  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate to continue to booking preferences (or Decline).";
+  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate to continue. You can also decline with no booking created.";
 
   wrapper.append(header, breakdown, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
@@ -440,9 +443,9 @@ function syncServiceFields() {
   } else if (showRoute) {
     help.textContent = "Route details are required for this service. Pickup/dropoff fields are now visible.";
   } else if (showLoadCounts) {
-    help.textContent = "Tell us your item counts and estimated labor for best pricing accuracy.";
+    help.textContent = "Add item counts and labor details for the most accurate estimate.";
   } else {
-    help.textContent = "Select a service to show only the fields needed for that job type.";
+    help.textContent = "Select a service to show only relevant fields.";
   }
 }
 

@@ -35,7 +35,7 @@
     <div class="heroCard card quoteHeroShell">
       <p class="eyebrow">Bay Delivery</p>
       <h1>Get an Estimate</h1>
-      <p class="muted heroCopy">Get a fast estimate with clear Cash (no HST) and EMT (+13% HST) totals.</p>
+      <p class="muted heroCopy">Get a fast estimate with clear Cash (no HST) and EMT (+13% HST) totals. No booking starts until you accept.</p>
       <div class="heroHighlights" aria-hidden="true">
         <span class="heroHighlight">Fast estimate</span>
         <span class="heroHighlight">North Bay local</span>
@@ -73,7 +73,7 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">1) Contact &amp; Job Location</h3>
-              <p class="firstStepHint">Step 1 of 5. Start here so we can connect your details to the estimate.</p>
+              <p class="firstStepHint">Step 1 of 5. Start here so we can send your estimate and booking updates.</p>
             </div>
           </div>
 
@@ -110,7 +110,7 @@
                 <option value="item_delivery">Item delivery</option>
                 <option value="demolition">Demolition</option>
               </select>
-              <div class="helperText" id="serviceHelp">Select a service to show only the fields needed for that job type.</div>
+              <div class="helperText" id="serviceHelp">Select a service to show only relevant fields.</div>
             </div>
           </div>
         </div>
@@ -158,7 +158,7 @@
                   <option value="difficult">Difficult access (stairs, basement carry-out, long walk)</option>
                   <option value="extreme">Extreme access (multiple flights, tight access, difficult parking)</option>
                 </select>
-                <div class="helperText">Choose the closest match so labor is priced accurately.</div>
+                <div class="helperText">Choose the closest match for accurate labor pricing.</div>
               </div>
             </div>
 
@@ -168,7 +168,7 @@
                   <input id="has_dense_materials" name="has_dense_materials" type="checkbox" />
                   <span>This job includes heavy or dense materials (drywall, concrete, tile, shingles, soil, wet debris, or similar).</span>
                 </label>
-                <div class="helperText">Dense materials usually increase labor and loading time.</div>
+                <div class="helperText">Dense materials usually increase loading and labor time.</div>
               </div>
             </div>
 
@@ -243,10 +243,10 @@
         </div>
 
         <div class="btnRow">
-          <button class="btn" id="btnCalc" type="button">Get My Estimate</button>
+          <button class="btn" id="btnCalc" type="button">Get Estimate Now</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
-        <p class="stepHelper">Step 5 of 5 starts after your estimate: review totals, then accept or decline.</p>
+        <p class="stepHelper">Step 5 starts after your estimate: review totals, then accept or decline.</p>
         <div class="loadingState hidden" id="loadingState">
           <span class="spinner"></span>
           <span>Calculating your estimate...</span>
@@ -271,7 +271,7 @@
 
     <div class="card hidden stageCard" id="decisionCard">
       <h2>Estimate Decision</h2>
-      <p class="muted sectionLead">If this estimate looks good, accept and move to booking preferences. If not, decline with no pressure.</p>
+      <p class="muted sectionLead">If this estimate works for you, accept and continue to booking preferences. Otherwise, decline with no pressure.</p>
 
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
