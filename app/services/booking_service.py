@@ -55,14 +55,20 @@ def _validate_requested_job_date(requested_job_date: str) -> None:
         raise HTTPException(status_code=400, detail="Please choose today or a future date for your booking.")
 
 
+def _validate_accept_token_for_quote(*, quote: dict[str, Any], accept_token: str) -> None:
+    server_token = str(quote.get("accept_token") or "")
+    if not server_token or not hmac.compare_digest(str(accept_token or ""), server_token):
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+    if is_token_expired(quote.get("created_at")):
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+
+
 def load_quote_for_customer_review(quote_id: str, *, accept_token: str) -> dict[str, Any]:
     quote = get_quote_record(quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found.")
 
-    server_token = str(quote.get("accept_token") or "")
-    if not server_token or not hmac.compare_digest(accept_token, server_token):
-        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+    _validate_accept_token_for_quote(quote=quote, accept_token=accept_token)
 
     existing = get_quote_request_by_quote_id(quote_id)
     return {
@@ -94,9 +100,8 @@ def process_customer_decision(
         raise HTTPException(status_code=400, detail="Invalid action (use accept|decline).")
 
     # Validate accept_token against server-persisted token.
+    _validate_accept_token_for_quote(quote=quote, accept_token=accept_token)
     server_token = str(quote.get("accept_token") or "")
-    if not server_token or not hmac.compare_digest(str(accept_token or ""), server_token):
-        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
     if not existing:
         initial_status = "customer_pending"

@@ -545,8 +545,9 @@ function showPersistedQuoteReview(data, acceptToken) {
 
 async function loadPersistedQuoteReview() {
   const params = new URLSearchParams(window.location.search);
-  const quoteId = (params.get("quote_id") || "").trim();
-  const acceptToken = (params.get("accept_token") || "").trim();
+  const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  const quoteId = (params.get("quote_id") || hashParams.get("quote_id") || "").trim();
+  const acceptToken = (hashParams.get("accept_token") || "").trim();
   if (!quoteId || !acceptToken) return;
 
   hideBox("resultBox");
@@ -555,7 +556,9 @@ async function loadPersistedQuoteReview() {
   showBox("flowStatus", "Loading your saved estimate...", "info");
 
   try {
-    const res = await fetch(`/quote/${encodeURIComponent(quoteId)}/view?accept_token=${encodeURIComponent(acceptToken)}`);
+    const res = await fetch(`/quote/${encodeURIComponent(quoteId)}/view`, {
+      headers: { Authorization: `Bearer ${acceptToken}` },
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       showBox("resultBox", "Error:\n" + (data.detail || "Unable to load saved estimate."));

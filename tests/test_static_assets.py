@@ -50,9 +50,11 @@ def test_quote_page_supports_persisted_review_mode() -> None:
     assert 'if (persistedReviewMode) {' in quote_js
     assert 'showBox("flowStatus", persistedReviewHelperText, "info");' in quote_js
     assert "new URLSearchParams(window.location.search)" in quote_js
+    assert "new URLSearchParams((window.location.hash || \"\").replace(/^#/, \"\"))" in quote_js
     assert 'params.get("quote_id")' in quote_js
-    assert 'params.get("accept_token")' in quote_js
-    assert '/view?accept_token=' in quote_js
+    assert 'hashParams.get("accept_token")' in quote_js
+    assert 'Authorization: `Bearer ${acceptToken}`' in quote_js
+    assert '/view?accept_token=' not in quote_js
     assert 'loadPersistedQuoteReview();' in quote_js
     assert 'showPersistedQuoteReview' in quote_js
     assert "You are reviewing a saved quote prepared for you. To request changes, contact Bay Delivery." in quote_js

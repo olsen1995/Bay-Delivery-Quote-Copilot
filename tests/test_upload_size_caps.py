@@ -18,7 +18,10 @@ def test_upload_over_12mb_returns_413():
 
 
 def test_normal_upload_succeeds(monkeypatch):
-    monkeypatch.setattr("app.main.get_quote_record", lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1"})
+    monkeypatch.setattr(
+        "app.main.get_quote_record",
+        lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1", "created_at": "2099-01-01T00:00:00+00:00"},
+    )
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
     monkeypatch.setattr("app.main._drive_call", lambda _desc, fn: fn())
     monkeypatch.setattr("app.main.save_attachment", lambda _payload: None)
@@ -63,7 +66,10 @@ def test_upload_missing_accept_token_returns_422_and_no_side_effects(monkeypatch
         nonlocal save_calls
         save_calls += 1
 
-    monkeypatch.setattr("app.main.get_quote_record", lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1"})
+    monkeypatch.setattr(
+        "app.main.get_quote_record",
+        lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1", "created_at": "2099-01-01T00:00:00+00:00"},
+    )
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
     monkeypatch.setattr("app.main._drive_call", lambda _desc, fn: fn())
     monkeypatch.setattr("app.main.save_attachment", _save_attachment)
@@ -95,7 +101,10 @@ def test_upload_invalid_accept_token_returns_401_and_no_side_effects(monkeypatch
         nonlocal save_calls
         save_calls += 1
 
-    monkeypatch.setattr("app.main.get_quote_record", lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1"})
+    monkeypatch.setattr(
+        "app.main.get_quote_record",
+        lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1", "created_at": "2099-01-01T00:00:00+00:00"},
+    )
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
     monkeypatch.setattr("app.main._drive_call", lambda _desc, fn: fn())
     monkeypatch.setattr("app.main.save_attachment", _save_attachment)
@@ -116,7 +125,10 @@ def test_upload_invalid_accept_token_returns_401_and_no_side_effects(monkeypatch
 
 
 def test_upload_valid_accept_token_returns_200_with_unchanged_response_shape(monkeypatch):
-    monkeypatch.setattr("app.main.get_quote_record", lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1"})
+    monkeypatch.setattr(
+        "app.main.get_quote_record",
+        lambda quote_id: {"quote_id": quote_id, "accept_token": "token-1", "created_at": "2099-01-01T00:00:00+00:00"},
+    )
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
     monkeypatch.setattr("app.main._drive_call", lambda _desc, fn: fn())
     monkeypatch.setattr("app.main.save_attachment", lambda _payload: None)
