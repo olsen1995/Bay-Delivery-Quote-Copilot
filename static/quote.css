@@ -210,9 +210,9 @@ body.quotePage {
 }
 
 .flowStep.is-complete {
-  color: #216e4a;
-  border-color: rgba(33, 110, 74, 0.24);
-  background: rgba(33, 110, 74, 0.09);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.30);
+  background: rgba(52, 211, 153, 0.08);
 }
 
 .flowStep:not(.is-active):not(.is-complete) .flowStepBadge {
