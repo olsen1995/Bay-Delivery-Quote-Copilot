@@ -11,6 +11,7 @@ CONFIG_PATH = Path("config/business_profile.json")
 DEFAULT_HST_EMT = 0.13
 DEFAULT_GAS = 20.0
 DEFAULT_WEAR = 20.0
+GLOBAL_MIN_TOTAL_CAD = 60.0
 
 # Scrap pickup (hard-locked business rule)
 SCRAP_CURBSIDE_PRICE = 0.0
@@ -410,7 +411,8 @@ def calculate_quote(
     # Scrap pickup (hard lock)
     # -------------------------
     if normalized == "scrap_pickup":
-        cash_total = SCRAP_INSIDE_PRICE if str(scrap_pickup_location) == "inside" else SCRAP_CURBSIDE_PRICE
+        scrap_total = SCRAP_INSIDE_PRICE if str(scrap_pickup_location) == "inside" else SCRAP_CURBSIDE_PRICE
+        cash_total = max(float(scrap_total), GLOBAL_MIN_TOTAL_CAD)
         emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
 
         return {
@@ -553,7 +555,7 @@ def calculate_quote(
     raw_cash = pre_access_subtotal + access_adder
 
     min_total = _get_min_total(svc)
-    cash_before_round = max(raw_cash, min_total)
+    cash_before_round = max(raw_cash, min_total, GLOBAL_MIN_TOTAL_CAD)
 
     bag_type_floor = 0.0
     trailer_fill_floor = 0.0

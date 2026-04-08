@@ -802,7 +802,68 @@ def test_small_load_above_minimum_total(client: TestClient, bag_count: int) -> N
     response = _post_quote(client, payload)
     assert response.status_code == 200
     cash, _ = _assert_success_schema_and_totals(response.json())
-    assert cash >= 50, f"Small-load quote must be >= minimum $50; got {cash}"
+    assert cash >= 60, f"Small-load quote must be >= minimum $60; got {cash}"
+
+
+def test_global_minimum_floor_applies_to_small_job() -> None:
+    """A low-value job path must be hard-floored to $60 cash."""
+    result = calculate_quote(
+        "scrap_pickup",
+        0.0,
+        scrap_pickup_location="curbside",
+    )
+    assert float(result["total_cash_cad"]) == 60.0
+
+
+def test_global_minimum_overrides_legacy_50_service_minimum(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even if a service minimum is set to $50, final cash must floor to $60."""
+    config = quote_engine.load_config()
+    item_delivery = config["services"]["item_delivery"]
+    item_delivery["minimum_total"] = 50
+    item_delivery["item_delivery_protected_base_floor_cad"] = 0
+    config["minimum_charges"] = {"gas": 0, "wear_and_tear": 0}
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "item_delivery",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+    )
+    assert float(result["total_cash_cad"]) == 60.0
+
+
+def test_demolition_minimum_75_remains_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Higher service minimums must remain intact under the global floor."""
+    config = quote_engine.load_config()
+    demolition = config["services"]["demolition"]
+    demolition["minimum_total"] = 75
+    demolition["minimum_hours"] = 0
+    demolition["hourly_rate_primary"] = 0
+    demolition["hourly_rate_helper"] = 0
+    config["minimum_charges"] = {"gas": 0, "wear_and_tear": 0}
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "demolition",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+    )
+    assert float(result["total_cash_cad"]) == 75.0
+
+
+def test_emt_total_still_correct_when_global_floor_applies() -> None:
+    """EMT should still be computed as cash * (1 + 13% HST) after floor."""
+    result = calculate_quote(
+        "scrap_pickup",
+        0.0,
+        scrap_pickup_location="inside",
+    )
+    assert float(result["total_cash_cad"]) == 60.0
+    assert float(result["total_emt_cad"]) == 67.8
 
 
 def test_small_load_dense_escapes_protection(client: TestClient) -> None:

@@ -17,6 +17,8 @@ This file documents current Bay Delivery business and pricing rules as grounded 
 
 - Service-level minimum hours and minimum totals are enforced by service configuration.
 - Quote outputs respect service minimums before final cash rounding.
+- A universal global minimum floor of $60 CAD is enforced in pricing authority for all quote outputs.
+- When service-level minimums are below $60, the final price is raised to $60.
 
 ## Labour Rules
 
