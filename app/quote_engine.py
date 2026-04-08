@@ -420,8 +420,8 @@ def calculate_quote(
             "total_cash_cad": round(cash_total, 2),
             "total_emt_cad": round(emt_total, 2),
             "disclaimer": (
-                "Scrap pickup is flat-rate: curbside is free (picked up next time we’re in the area); "
-                "inside removal is $30. Cash is tax-free; EMT/e-transfer adds 13% HST."
+                "Scrap pickup is included as part of the minimum service charge, covering labor, "
+                "travel, and handling. Cash is tax-free; EMT/e-transfer adds 13% HST."
             ),
             "_internal": {
                 "crew_size": 1,
