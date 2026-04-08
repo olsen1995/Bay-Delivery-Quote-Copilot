@@ -439,7 +439,7 @@ function syncServiceFields() {
 
   const help = el("serviceHelp");
   if (showScrap) {
-    help.textContent = "Scrap pickup uses location-based pricing. Labor and bulk-item fields are hidden.";
+    help.textContent = "Scrap pickup is included as part of the minimum service charge. Pricing reflects labor, travel, and handling.";
   } else if (showRoute) {
     help.textContent = "Route details are required for this service. Pickup/dropoff fields are now visible.";
   } else if (showLoadCounts) {
