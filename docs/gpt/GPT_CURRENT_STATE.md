@@ -10,6 +10,7 @@ The project is in a refinement/launch-readiness phase focused on drift preventio
 
 - Live customer quote flow is established on Render (`/` + `/quote`).
 - Single pricing authority is established in `app/quote_engine.py` with config-backed service rules.
+- Pricing authority enforces a universal $60 CAD minimum floor on final quote outputs.
 - Admin operations surfaces exist (`/admin`, `/admin/mobile`, `/admin/uploads`) with protected admin actions.
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
