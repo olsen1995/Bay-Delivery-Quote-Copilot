@@ -171,7 +171,7 @@ def test_haul_away_5_to_9_light_non_dense_strict_progression() -> None:
 
 def test_haul_away_1_to_5_light_non_dense_unchanged_contract() -> None:
     """1-5 light/non-dense jobs should preserve current business-minimum behavior."""
-    expected_cash = {1: 75.0, 2: 90.0, 3: 105.0, 4: 110.0, 5: 110.0}
+    expected_cash = {1: 80.0, 2: 95.0, 3: 105.0, 4: 110.0, 5: 110.0}
 
     for bags, expected in expected_cash.items():
         result = calculate_quote(
@@ -1089,10 +1089,10 @@ def test_non_haul_away_services_ignore_new_floor_inputs() -> None:
 
 def test_haul_away_omitted_new_fields_preserve_existing_anchor_values_through_24_bags() -> None:
     expected_cash = {
-        1: 75.0,
+        1: 80.0,
         5: 110.0,
         9: 140.0,
-        15: 155.0,
+        15: 170.0,
         16: 205.0,
         20: 250.0,
         24: 260.0,
@@ -1648,10 +1648,10 @@ def test_valid_trailer_class_accepted_and_persisted(client: TestClient) -> None:
 
 @pytest.mark.parametrize("bags,access_difficulty,expected_cash", [
     (1, "difficult", 115.0),
-    (2, "difficult", 115.0),
+    (2, "difficult", 120.0),
     (3, "difficult", 130.0),  # raw $130 already exceeds floor
     (1, "extreme",  145.0),
-    (2, "extreme",  150.0),  # raw total is $150 here; $145 floor does not bind
+    (2, "extreme",  155.0),  # raw total is $155 here; $145 floor does not bind
     (3, "extreme",  165.0),  # raw $165 already exceeds floor
 ])
 def test_haul_away_awkward_small_load_floor_exact_values(
@@ -1686,11 +1686,39 @@ def test_haul_away_awkward_small_load_floor_not_applied_for_normal_access() -> N
             has_dense_materials=False,
         )
         assert result["_internal"]["awkward_small_load_floor_cad"] == 0.0
-    # Spot-check 1-bag to confirm existing contract unchanged
+    # Spot-check 1-bag to confirm normal-access tiny-load contract is stable.
     assert float(
         calculate_quote("haul_away", 1.0, crew_size=1, garbage_bag_count=1,
                         travel_zone="in_town", access_difficulty="normal")["total_cash_cad"]
-    ) == 75.0
+    ) == 80.0
+
+
+def test_haul_away_mid_band_12_to_15_progression_meaningful_at_fixed_hours() -> None:
+    """12-15 light/non-dense difficult-access jobs should not flatten at fixed hours."""
+    quote_12 = calculate_quote(
+        "haul_away",
+        1.5,
+        crew_size=1,
+        garbage_bag_count=12,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+    )
+    quote_15 = calculate_quote(
+        "haul_away",
+        1.5,
+        crew_size=1,
+        garbage_bag_count=15,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+    )
+
+    cash_12 = float(quote_12["total_cash_cad"])
+    cash_15 = float(quote_15["total_cash_cad"])
+    assert cash_15 >= cash_12 + 10.0, (
+        f"expected meaningful 12->15 progression (>= +$10) at fixed hours; got 12={cash_12}, 15={cash_15}"
+    )
 
 
 def test_haul_away_awkward_small_load_floor_not_applied_for_4_bags() -> None:

@@ -64,6 +64,14 @@ HAUL_AWAY_HELPER_BAG_THRESHOLD = 10
 # Dense materials always bypass this protection so margin is preserved.
 SMALL_LOAD_MAX_BAGS = 3
 SMALL_LOAD_DISPOSAL_PER_BAG = 15.0  # $15 per bag for 1–3 light bags
+SMALL_LOAD_DISPOSAL_SINGLE_BAG = 20.0
+SMALL_LOAD_DISPOSAL_TWO_BAGS = 35.0
+
+# Mid-band haul-away progression adder for 10-15 bag light jobs.
+# This avoids flat pricing in the 12-15 range while leaving heavy tiers unchanged.
+MID_BAND_START_BAGS = 10
+MID_BAND_END_BAGS = 15
+MID_BAND_ADDER_PER_BAG = 3.0
 
 
 def load_config() -> Dict[str, Any]:
@@ -521,7 +529,12 @@ def calculate_quote(
         if 1 <= _bag_count <= SMALL_LOAD_MAX_BAGS and not bool(has_dense_materials):
             # Small-load protection: scale disposal proportionally for tiny light loads.
             # Dense materials always fall through to the full tier (margin preserved).
-            disposal_allowance = float(_bag_count) * SMALL_LOAD_DISPOSAL_PER_BAG
+            if _bag_count == 1:
+                disposal_allowance = SMALL_LOAD_DISPOSAL_SINGLE_BAG
+            elif _bag_count == 2:
+                disposal_allowance = SMALL_LOAD_DISPOSAL_TWO_BAGS
+            else:
+                disposal_allowance = float(_bag_count) * SMALL_LOAD_DISPOSAL_PER_BAG
             small_load_protected = True
         else:
             disposal_allowance = _haul_away_disposal_allowance(svc, _bag_count)
@@ -533,6 +546,11 @@ def calculate_quote(
                 # Narrow calibration band for light 6-8 bag jobs only.
                 # Keeps 9+ tier anchor unchanged and avoids affecting hard/dense work.
                 disposal_allowance = max(0.0, disposal_allowance - float(9 - _bag_count) * 5.0)
+            if (
+                not bool(has_dense_materials)
+                and MID_BAND_START_BAGS <= _bag_count <= MID_BAND_END_BAGS
+            ):
+                disposal_allowance += float(_bag_count - MID_BAND_START_BAGS) * MID_BAND_ADDER_PER_BAG
         if bool(has_dense_materials) and _bag_count > 24:
             disposal_allowance = disposal_allowance * _get_haul_away_dense_disposal_multiplier(svc)
 
