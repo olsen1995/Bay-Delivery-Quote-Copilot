@@ -18,7 +18,8 @@ QUOTE_REQUEST_INITIAL_ALLOWED: list[str] = [
 ]
 
 JOB_ALLOWED_TRANSITIONS: dict[str, list[str]] = {
-    "approved": ["in_progress", "cancelled"],
+    "approved": ["scheduled", "in_progress", "cancelled"],
+    "scheduled": ["in_progress", "cancelled"],
     "in_progress": ["completed", "cancelled"],
     "completed": [],
     "cancelled": [],

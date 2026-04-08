@@ -69,11 +69,15 @@ def schedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job:
     if job.get("status") not in {"approved", "scheduled"}:
         raise ValueError("Job must be approved or scheduled before scheduling")
 
+    if job.get("status") != "scheduled":
+        _ensure_transition(job, "scheduled")
+
     _validate_datetime_range(scheduled_start, scheduled_end)
 
     # DB first: update job with schedule and pending sync status
     updated = update_job(
         job_id,
+        status="scheduled",
         scheduled_start=scheduled_start,
         scheduled_end=scheduled_end,
         calendar_sync_status="pending",
@@ -124,6 +128,9 @@ def reschedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job
     if job.get("status") not in {"approved", "scheduled"}:
         raise ValueError("Job must be approved or scheduled before scheduling")
 
+    if job.get("status") != "scheduled":
+        _ensure_transition(job, "scheduled")
+
     if not job.get("google_calendar_event_id"):
         raise ValueError("Job not scheduled")
 
@@ -132,6 +139,7 @@ def reschedule_job(job_id: str, scheduled_start: str, scheduled_end: str) -> Job
     # DB first
     updated = update_job(
         job_id,
+        status="scheduled",
         scheduled_start=scheduled_start,
         scheduled_end=scheduled_end,
         calendar_sync_status="pending",
