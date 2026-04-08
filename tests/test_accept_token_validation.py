@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -236,7 +237,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
 
         view_resp = self.client.get(
             f"/quote/{quote_data['quote_id']}/view",
-            params={"accept_token": quote_data["accept_token"]},
+            headers={"Authorization": f"Bearer {quote_data['accept_token']}"},
         )
         self.assertEqual(200, view_resp.status_code)
         body = view_resp.json()
@@ -263,10 +264,74 @@ class AcceptTokenValidationTests(unittest.TestCase):
 
         view_resp = self.client.get(
             f"/quote/{quote_data['quote_id']}/view",
-            params={"accept_token": "wrong-token"},
+            headers={"Authorization": "Bearer wrong-token"},
         )
         self.assertEqual(401, view_resp.status_code)
         self.assertEqual(view_resp.json(), {"detail": "Invalid or expired accept token."})
+
+    def test_quote_review_view_rejects_expired_accept_token(self) -> None:
+        quote_id = "expired-review-quote"
+        expired_created_at = (datetime.now(timezone.utc) - timedelta(days=storage.TOKEN_VALIDITY_DAYS + 1)).isoformat()
+
+        storage.save_quote(
+            {
+                "quote_id": quote_id,
+                "created_at": expired_created_at,
+                "request": {
+                    "customer_name": "Expired",
+                    "customer_phone": "7055550000",
+                    "job_address": "Expired St",
+                    "service_type": "haul_away",
+                },
+                "response": {
+                    "cash_total_cad": 100.0,
+                    "emt_total_cad": 113.0,
+                    "disclaimer": "test",
+                },
+                "accept_token": "expired-review-token",
+            }
+        )
+
+        view_resp = self.client.get(
+            f"/quote/{quote_id}/view",
+            headers={"Authorization": "Bearer expired-review-token"},
+        )
+        self.assertEqual(401, view_resp.status_code)
+        self.assertEqual(view_resp.json(), {"detail": "Invalid or expired accept token."})
+
+    def test_decision_rejects_expired_accept_token(self) -> None:
+        quote_id = "expired-decision-quote"
+        expired_created_at = (datetime.now(timezone.utc) - timedelta(days=storage.TOKEN_VALIDITY_DAYS + 1)).isoformat()
+
+        storage.save_quote(
+            {
+                "quote_id": quote_id,
+                "created_at": expired_created_at,
+                "request": {
+                    "customer_name": "Expired",
+                    "customer_phone": "7055550000",
+                    "job_address": "Expired St",
+                    "service_type": "haul_away",
+                },
+                "response": {
+                    "cash_total_cad": 100.0,
+                    "emt_total_cad": 113.0,
+                    "disclaimer": "test",
+                },
+                "accept_token": "expired-decision-token",
+            }
+        )
+
+        decision_resp = self.client.post(
+            f"/quote/{quote_id}/decision",
+            json={
+                "action": "accept",
+                "accept_token": "expired-decision-token",
+                "notes": None,
+            },
+        )
+        self.assertEqual(401, decision_resp.status_code)
+        self.assertEqual(decision_resp.json(), {"detail": "Invalid or expired accept token."})
 
 
 if __name__ == "__main__":

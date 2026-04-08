@@ -53,6 +53,7 @@ from app.storage import (
     get_quote_record,
     import_db_from_json,
     init_db,
+    is_token_expired,
     Job,
     list_attachments,
     list_admin_audit_log,
@@ -865,7 +866,15 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
 
 
 @app.get("/quote/{quote_id}/view")
-def quote_review_view(quote_id: str, accept_token: str):
+def quote_review_view(quote_id: str, request: Request):
+    header = request.headers.get("authorization") or ""
+    if not header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+
+    accept_token = header.split(" ", 1)[1].strip()
+    if not accept_token:
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+
     return booking_service.load_quote_for_customer_review(quote_id, accept_token=accept_token)
 
 
@@ -893,6 +902,8 @@ async def quote_upload_photos(
 
     server_token = record.get("accept_token")
     if not server_token or not hmac.compare_digest(accept_token, str(server_token)):
+        raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
+    if is_token_expired(record.get("created_at")):
         raise HTTPException(status_code=401, detail="Invalid or expired accept token.")
 
     uploaded_items = await _store_image_attachments(
