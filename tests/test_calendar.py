@@ -90,6 +90,7 @@ class CalendarIntegrationTests(unittest.TestCase):
             resp = self.client.post("/admin/api/jobs/j123/schedule", json=payload, headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
             job = storage.require_job("j123")
+            self.assertEqual(job["status"], "scheduled")
             self.assertEqual(job["calendar_sync_status"], "synced")
             self.assertEqual(job["google_calendar_event_id"], "event123")
             mock_create.assert_called_once()
@@ -170,8 +171,20 @@ class CalendarIntegrationTests(unittest.TestCase):
             resp = self.client.post("/admin/api/jobs/j123/reschedule", json=payload, headers=self._admin_headers)
             self.assertEqual(resp.status_code, 200)
             job = storage.require_job("j123")
+            self.assertEqual(job["status"], "scheduled")
             self.assertEqual(job["calendar_sync_status"], "synced")
             mock_update.assert_called_once()
+
+    def test_start_job_success_from_scheduled(self):
+        self._seed_job("j123")
+        storage.update_job("j123", status="scheduled")
+
+        resp = self.client.post("/admin/api/jobs/j123/start", headers=self._admin_headers)
+        self.assertEqual(resp.status_code, 200)
+
+        job = storage.require_job("j123")
+        self.assertEqual(job["status"], "in_progress")
+        self.assertIsNotNone(job["started_at"])
 
     def test_reschedule_job_not_scheduled(self):
         self._seed_job("j123")
@@ -355,7 +368,7 @@ class CalendarIntegrationTests(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 200)
         scheduled_job = storage.require_job(created_job["job_id"])
-        self.assertEqual(scheduled_job["status"], "approved")
+        self.assertEqual(scheduled_job["status"], "scheduled")
         self.assertEqual(scheduled_job["calendar_sync_status"], "not_configured")
         self.assertIsNotNone(scheduled_job["scheduled_start"])
         self.assertIsNotNone(scheduled_job["scheduled_end"])
