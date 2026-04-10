@@ -160,6 +160,9 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#btnAccept").click()
     await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
     await expect(page.locator("#bookingCard")).to_be_visible()
+    await page.locator("#btnAccept").click()
+    await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
+    await expect(page.locator("#bookingCard")).to_be_visible()
 
     await page.locator("#bookingDate").fill(_next_booking_date())
     await page.locator("#bookingWindow").select_option("morning")
