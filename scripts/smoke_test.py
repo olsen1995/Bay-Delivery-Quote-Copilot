@@ -137,6 +137,20 @@ def _run_health_check() -> Dict[str, Any]:
     return health
 
 
+def _run_public_customer_page_checks() -> None:
+    status, homepage = api("GET", "/")
+    require(status == 200, f"GET / expected 200, got {status}")
+    require(isinstance(homepage, str), "GET / expected HTML response")
+    require("Get a Quote" in homepage, "GET / missing homepage quote CTA marker")
+    print("[ok] / page marker checks")
+
+    status, quote_page = api("GET", "/quote")
+    require(status == 200, f"GET /quote expected 200, got {status}")
+    require(isinstance(quote_page, str), "GET /quote expected HTML response")
+    require("id=\"quoteForm\"" in quote_page, "GET /quote missing quote form marker")
+    print("[ok] /quote page marker checks")
+
+
 def _run_admin_read_checks(health: Dict[str, Any]) -> None:
     # --- Admin page and auth behavior ---
     creds_configured = _admin_creds_configured()
@@ -225,6 +239,7 @@ def _run_admin_read_checks(health: Dict[str, Any]) -> None:
 def _run_live_safe_smoke() -> int:
     print(f"Smoke test target: {base_url()} (mode=live-safe)")
     health = _run_health_check()
+    _run_public_customer_page_checks()
     _run_admin_read_checks(health)
     print("Live-safe smoke test passed.")
     return 0
@@ -234,6 +249,7 @@ def _run_stateful_workflow_smoke() -> int:
     print(f"Smoke test target: {base_url()} (mode=stateful)")
 
     health = _run_health_check()
+    _run_public_customer_page_checks()
 
     quote_payload = {
         "service_type": "haul_away",
