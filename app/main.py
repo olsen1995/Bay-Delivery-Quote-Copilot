@@ -263,6 +263,18 @@ def _drive_enabled() -> bool:
     return gdrive.is_configured()
 
 
+def _enforce_admin_post_origin(request: Request) -> None:
+    if request.method != "POST" or not request.url.path.startswith("/admin/api/"):
+        return
+
+    origin = (request.headers.get("origin") or "").strip()
+    if not origin:
+        return
+
+    if origin not in allow_list:
+        raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
+
+
 def _require_admin(request: Request) -> None:
     """
     Admin auth: Basic Auth using ADMIN_USERNAME / ADMIN_PASSWORD.
@@ -305,6 +317,7 @@ def _require_admin(request: Request) -> None:
 
     # Success - reset attempts
     _reset_admin_attempts(client_ip)
+    _enforce_admin_post_origin(request)
 
 
 # =========================
