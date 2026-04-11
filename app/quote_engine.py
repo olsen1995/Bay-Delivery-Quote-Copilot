@@ -13,9 +13,9 @@ DEFAULT_GAS = 20.0
 DEFAULT_WEAR = 20.0
 GLOBAL_MIN_TOTAL_CAD = 60.0
 
-# Scrap pickup (hard-locked business rule)
-SCRAP_CURBSIDE_PRICE = 0.0
-SCRAP_INSIDE_PRICE = 30.0
+# Scrap pickup base amounts before the universal minimum floor is applied.
+SCRAP_CURBSIDE_BASE_CAD = 0.0
+SCRAP_INSIDE_BASE_CAD = 30.0
 
 # Mattress/box spring (included in total; customer sees note only)
 DEFAULT_MATTRESS_FEE_EACH = 50.0
@@ -415,12 +415,13 @@ def calculate_quote(
     normalized = _normalize_service_type(config, service_type)
     normalized_load_mode = _normalize_load_mode(load_mode)
 
-    # -------------------------
-    # Scrap pickup (hard lock)
-    # -------------------------
+    # ------------------------------------------------------------
+    # Scrap pickup uses location-specific base inputs, but the
+    # quoted customer total still respects the universal minimum.
+    # ------------------------------------------------------------
     if normalized == "scrap_pickup":
-        scrap_total = SCRAP_INSIDE_PRICE if str(scrap_pickup_location) == "inside" else SCRAP_CURBSIDE_PRICE
-        cash_total = max(float(scrap_total), GLOBAL_MIN_TOTAL_CAD)
+        scrap_base = SCRAP_INSIDE_BASE_CAD if str(scrap_pickup_location) == "inside" else SCRAP_CURBSIDE_BASE_CAD
+        cash_total = max(float(scrap_base), GLOBAL_MIN_TOTAL_CAD)
         emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
 
         return {
