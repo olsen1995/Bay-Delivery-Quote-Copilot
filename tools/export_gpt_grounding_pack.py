@@ -66,7 +66,9 @@ def main() -> int:
     repo_root = Path(args.repo_root).resolve() if args.repo_root else tools_dir.parent
 
     output_dir = Path(args.output_dir).resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True)
 
     manifest = []
     missing = []
