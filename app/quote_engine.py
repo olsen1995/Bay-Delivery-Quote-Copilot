@@ -441,7 +441,6 @@ def calculate_quote(
                 "labor_cad": 0.0,
                 "disposal_allowance_cad": 0.0,
                 "mattress_boxspring_cad": 0.0,
-                "scrap_base_cad": round(float(scrap_base), 2),
                 "scrap_cad": round(cash_total, 2),
             },
         }
