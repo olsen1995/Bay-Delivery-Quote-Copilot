@@ -50,7 +50,7 @@ In the **Knowledge** section:
 - Remove all previously uploaded grounding files.
 - Upload exactly the files listed in `docs/gpt/GPT_KNOWLEDGE_PACK.md` — use the local copies from `dist/gpt_grounding_pack/`.
 
-Do not upload extra files. Do not upload the export script or any `dist/` output.
+Upload only the `.md` files from `dist/gpt_grounding_pack/`. Do not upload `tools/export_gpt_grounding_pack.py` or `manifest.json`.
 
 ### 5. Update Builder instructions if needed
 

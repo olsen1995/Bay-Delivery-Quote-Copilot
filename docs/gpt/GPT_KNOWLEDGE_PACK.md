@@ -24,7 +24,7 @@ The following files form the complete grounding pack for a GPT Builder refresh:
 | `PROJECT_RULES.md` | Core repo rules (structural changes, pricing, admin, booking) |
 | `docs/CURRENT_STATE.md` | Live authoritative system status |
 
-> **Do not upload** `tools/export_gpt_grounding_pack.py` or any generated `dist/` output — the export script is a local helper only.
+> **Upload only** the exported `.md` files from `dist/gpt_grounding_pack/`. Do **not** upload `tools/export_gpt_grounding_pack.py` or `manifest.json` — those are local helpers only.
 
 ---
 
