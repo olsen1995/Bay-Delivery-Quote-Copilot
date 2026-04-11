@@ -642,7 +642,7 @@ def test_has_dense_materials_increases_haul_away_price(client: TestClient) -> No
 
 
 def test_has_dense_materials_does_not_affect_scrap_pickup(client: TestClient) -> None:
-    """Dense materials flag must not change scrap pickup (flat-rate service)."""
+    """Dense materials flag must not change scrap pickup under the current minimum-floor path."""
     payload = _base_payload(service_type="scrap_pickup")
 
     resp_normal = _post_quote(client, {**payload, "has_dense_materials": False})
@@ -655,7 +655,7 @@ def test_has_dense_materials_does_not_affect_scrap_pickup(client: TestClient) ->
     cash_dense, _ = _assert_success_schema_and_totals(resp_dense.json())
 
     assert cash_normal == cash_dense, (
-        "Scrap pickup is flat-rate; dense materials should not affect its price"
+        "Scrap pickup stays on the current minimum-service-charge path; dense materials should not affect its price"
     )
 
 
@@ -806,7 +806,7 @@ def test_small_load_above_minimum_total(client: TestClient, bag_count: int) -> N
 
 
 def test_global_minimum_floor_applies_to_small_job() -> None:
-    """A low-value job path must be hard-floored to $60 cash."""
+    """The curbside scrap path must still be hard-floored to $60 cash."""
     result = calculate_quote(
         "scrap_pickup",
         0.0,
@@ -856,7 +856,7 @@ def test_demolition_minimum_75_remains_unchanged(monkeypatch: pytest.MonkeyPatch
 
 
 def test_emt_total_still_correct_when_global_floor_applies() -> None:
-    """EMT should still be computed as cash * (1 + 13% HST) after floor."""
+    """Inside scrap must still compute EMT from the same $60 floor-protected cash total."""
     result = calculate_quote(
         "scrap_pickup",
         0.0,

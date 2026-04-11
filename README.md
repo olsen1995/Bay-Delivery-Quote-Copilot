@@ -6,7 +6,7 @@ Current stable milestone: `0.10.0`.
 
 ## Current Project State
 See `docs/CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
-See `docs/GPT_SOURCE_OF_TRUTH.md` for GPT grounding precedence and boundary rules.
+See `docs/gpt/GPT_SOURCE_OF_TRUTH.md` for GPT grounding precedence and boundary rules.
 
 ## Render Parity and Release Signals (2026-03-14)
 
@@ -70,9 +70,9 @@ For `small_move` and `item_delivery`, also required:
   - This adder is specific to `small_move` and is separate from haul-away trailer-class fill-floor behavior
 
 - **Scrap Pickup**
-  - Curbside/outside: **$0**
-  - Inside removal: **$30 flat**
-  - Scrap bypasses labour/travel/disposal logic completely
+  - Scrap pickup uses a dedicated scrap path in `app/quote_engine.py`, then the universal **$60 CAD** minimum floor is applied
+  - Effective current customer quote outcome is the minimum service charge for both curbside and inside scrap pickup
+  - Customer-facing scrap wording should describe the quote as covering labor, travel, and handling
 
 - **Item Delivery**
   - A protected floor of **$100 CAD** is enforced against the full pre-access subtotal (travel + labour + other pre-access components) before any access-based adjustments

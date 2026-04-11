@@ -1,15 +1,5 @@
 # System Boundaries
 
-- One pricing engine (quote_engine)
-- GPT does NOT replace pricing logic
-- Admin is operations only
-- Customers use /quote
-- GPT is internal tool only
-- Jobs are the system anchor
-- SQLite is source of truth
+Canonical GPT system-boundary grounding lives in `docs/gpt/GPT_SYSTEM_BOUNDARIES.md`.
 
-## Do NOT
-
-- Create second pricing system
-- Override repo pricing
-- Expand admin into quoting
+This top-level file is a compatibility pointer only. Do not maintain duplicate GPT boundary rules here.

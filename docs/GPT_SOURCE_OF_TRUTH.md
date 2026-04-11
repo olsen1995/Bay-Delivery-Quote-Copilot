@@ -1,22 +1,12 @@
 # GPT Source of Truth
 
-This document defines the authoritative grounding layer for the Bay Delivery Quote Assistant.
+Canonical GPT grounding lives in `docs/gpt/`.
 
-## Authority Order
+Use these files as the maintained source:
 
-1. quote_engine (repo pricing logic)
-2. Approved grounding docs
-3. Workflow rules
-4. Everything else
+1. `docs/gpt/GPT_SOURCE_OF_TRUTH.md`
+2. `docs/gpt/GPT_BUSINESS_RULES.md`
+3. `docs/gpt/GPT_SYSTEM_BOUNDARIES.md`
+4. `docs/gpt/GPT_WORKFLOW_RULES.md`
 
-If conflict exists:
-
-- repo pricing wins
-- GPT must NOT override pricing logic
-
-## Non-Negotiables
-
-- One pricing engine only
-- No second pricing system
-- No undocumented assumptions
-- GPT is internal only
+This top-level file is a compatibility pointer only. Do not maintain it as a parallel grounding source.

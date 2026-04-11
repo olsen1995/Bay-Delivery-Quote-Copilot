@@ -1,18 +1,5 @@
 # Workflow Rules
 
-## Process
+Canonical GPT workflow grounding lives in `docs/gpt/GPT_WORKFLOW_RULES.md`.
 
-1. Plan
-2. Implement
-3. PR Review
-4. Merge
-5. Deploy
-6. Smoke test
-
-## Rules
-
-- Full-file replacements only
-- No line edits
-- Keep changes small
-- Protect pricing integrity
-- One pricing engine always
+This top-level file is a compatibility pointer only. Do not maintain duplicate GPT workflow rules here.
