@@ -46,3 +46,17 @@ The GPT must not propose, imply, or create a second pricing logic path.
 - Preserve DB-first operational truth.
 - Preserve one-pricing-engine policy.
 - Escalate ambiguity rather than guessing.
+
+## Grounding Workflow Artifacts
+
+The following documents operationalize the grounding refresh cycle:
+
+| Document | Purpose |
+|----------|---------|
+| `docs/gpt/GPT_KNOWLEDGE_PACK.md` | Canonical upload-set reference — defines exactly which files to upload to GPT Builder |
+| `docs/gpt/GPT_BUILDER_INSTRUCTIONS.md` | Copy-paste Builder instruction block |
+| `docs/gpt/GPT_REFRESH_WORKFLOW.md` | Manual-on-release refresh runbook |
+| `docs/gpt/GPT_ACCEPTANCE_TESTS.md` | Fixed acceptance question set for verifying a fresh grounding |
+| `tools/export_gpt_grounding_pack.py` | Export script — generates the local upload pack with manifest |
+
+Refresh grounding on every release that changes `PROJECT_RULES.md`, any file in `docs/gpt/`, `docs/CURRENT_STATE.md`, or pricing rules in `app/quote_engine.py` / `config/business_profile.json`.
