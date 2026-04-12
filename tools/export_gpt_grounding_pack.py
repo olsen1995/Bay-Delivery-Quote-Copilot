@@ -45,6 +45,26 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def validate_output_dir_for_cleanup(repo_root: Path, output_dir: Path) -> None:
+    """
+    Allow cleanup only for subdirectories inside <repo>/dist/.
+    """
+    dist_dir = (repo_root / "dist").resolve()
+
+    if output_dir == repo_root:
+        raise ValueError("Refusing to clean repo root.")
+    if output_dir == dist_dir:
+        raise ValueError("Refusing to clean dist/ root.")
+
+    try:
+        relative_to_dist = output_dir.relative_to(dist_dir)
+    except ValueError as exc:
+        raise ValueError("Output dir must be inside <repo>/dist/.") from exc
+
+    if not relative_to_dist.parts:
+        raise ValueError("Output dir must be a subdirectory inside <repo>/dist/.")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Export the Bay Delivery GPT grounding pack."
@@ -66,6 +86,12 @@ def main() -> int:
     repo_root = Path(args.repo_root).resolve() if args.repo_root else tools_dir.parent
 
     output_dir = Path(args.output_dir).resolve()
+    try:
+        validate_output_dir_for_cleanup(repo_root=repo_root, output_dir=output_dir)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
