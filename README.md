@@ -8,6 +8,18 @@ Current stable milestone: `0.10.0`.
 See `docs/CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
 See `docs/gpt/GPT_SOURCE_OF_TRUTH.md` for GPT grounding precedence and boundary rules.
 
+## GPT Grounding Workflow
+The internal advisor GPT grounding workflow is documented in `docs/gpt/`:
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/gpt/GPT_KNOWLEDGE_PACK.md`](docs/gpt/GPT_KNOWLEDGE_PACK.md) | Canonical upload-set reference |
+| [`docs/gpt/GPT_BUILDER_INSTRUCTIONS.md`](docs/gpt/GPT_BUILDER_INSTRUCTIONS.md) | Copy-paste Builder instruction block |
+| [`docs/gpt/GPT_REFRESH_WORKFLOW.md`](docs/gpt/GPT_REFRESH_WORKFLOW.md) | Manual-on-release refresh runbook |
+| [`docs/gpt/GPT_ACCEPTANCE_TESTS.md`](docs/gpt/GPT_ACCEPTANCE_TESTS.md) | Acceptance verification checklist |
+
+Export script: `tools/export_gpt_grounding_pack.py`
+
 ## Render Parity and Release Signals (2026-03-14)
 
 - Live Render behavior was audited against current `main` before further pricing work.
