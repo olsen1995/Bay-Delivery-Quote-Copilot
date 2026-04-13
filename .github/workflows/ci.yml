@@ -23,7 +23,7 @@ jobs:
           pip install pytest
 
 
-      - name: Check version marker parity
+      - name: Check version marker alignment
         run: |
           python tools/check_version_parity.py
 

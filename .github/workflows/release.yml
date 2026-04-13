@@ -12,9 +12,15 @@ on:
           - patch
           - minor
           - major
+          - explicit
+      version:
+        description: "Explicit version in X.Y.Z format (required only when bump=explicit)"
+        required: false
+        type: string
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
@@ -30,56 +36,62 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Bump VERSION
-        id: bump
-        run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
-
-          bump = "${{ github.event.inputs.bump }}".strip().lower()
-          version_file = Path("VERSION")
-          raw = version_file.read_text(encoding="utf-8").strip().lstrip("v")
-          parts = raw.split(".")
-          if len(parts) != 3 or not all(p.isdigit() for p in parts):
-              raise SystemExit(f"Unsupported VERSION format: {raw!r}; expected X.Y.Z")
-
-          major, minor, patch = map(int, parts)
-          if bump == "major":
-              major += 1
-              minor = 0
-              patch = 0
-          elif bump == "minor":
-              minor += 1
-              patch = 0
-          else:
-              patch += 1
-
-          new_version = f"{major}.{minor}.{patch}"
-          version_file.write_text(new_version + "\n", encoding="utf-8")
-          Path("canon_versions.txt").write_text(new_version + "\n", encoding="utf-8")
-
-          out = Path(os.environ["GITHUB_OUTPUT"])
-          with out.open("a", encoding="utf-8") as f:
-              f.write(f"version={new_version}\n")
-          print(f"Bumped VERSION to {new_version}")
-          PY
-
-      - name: Commit and tag
+      - name: Validate workflow inputs
         env:
-          VERSION: ${{ steps.bump.outputs.version }}
+          BUMP: ${{ github.event.inputs.bump }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION canon_versions.txt
-          git commit -m "chore(release): v${VERSION}"
-          git tag "v${VERSION}"
-          git push origin HEAD:main
-          git push origin "v${VERSION}"
+          if [[ "$BUMP" == "explicit" && -z "$INPUT_VERSION" ]]; then
+            echo "Input error: version is required when bump=explicit." >&2
+            exit 1
+          fi
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+          if [[ "$BUMP" != "explicit" && -n "$INPUT_VERSION" ]]; then
+            echo "Input error: version must be empty unless bump=explicit." >&2
+            exit 1
+          fi
+
+      - name: Bump tracked version markers
+        id: bump
+        env:
+          BUMP: ${{ github.event.inputs.bump }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ "$BUMP" == "explicit" ]]; then
+            RESOLVED_VERSION="$(python tools/bump_version.py --version "$INPUT_VERSION")"
+          else
+            RESOLVED_VERSION="$(python tools/bump_version.py --bump "$BUMP")"
+          fi
+          echo "version=$RESOLVED_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check version marker alignment
+        run: |
+          python tools/check_version_parity.py
+
+      - name: Fail on empty release change
+        run: |
+          if git diff --quiet -- VERSION README.md canon_versions.txt; then
+            echo "No version marker changes were produced; refusing to create an empty PR." >&2
+            exit 1
+          fi
+
+      - name: Open or update release PR
+        uses: peter-evans/create-pull-request@v8
         with:
-          tag_name: v${{ steps.bump.outputs.version }}
-          name: v${{ steps.bump.outputs.version }}
-          generate_release_notes: true
+          branch: automation/version-alignment
+          delete-branch: false
+          commit-message: "chore(release): v${{ steps.bump.outputs.version }}"
+          title: "chore(release): v${{ steps.bump.outputs.version }}"
+          body: |
+            ## Summary
+            Manual version-alignment release PR generated from `workflow_dispatch`.
+
+            ## Included changes
+            - Updated `VERSION`
+            - Updated `README.md` tracked version markers
+            - Updated `canon_versions.txt`
+          base: main
+          add-paths: |
+            VERSION
+            README.md
+            canon_versions.txt

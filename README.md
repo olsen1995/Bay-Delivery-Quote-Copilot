@@ -25,7 +25,17 @@ Export script: `tools/export_gpt_grounding_pack.py`
 - Live Render behavior was audited against current `main` before further pricing work.
 - For current `item_delivery` protected-floor behavior, see [Pricing rules](#pricing-rules-canonical).
 - For smoke-test `/health` `"drive_configured"` semantics, see [Smoke test usage](#smoke-test-usage).
-- Release markers are aligned to the current public version: `VERSION` = `0.10.0` and `canon_versions.txt` = `0.10.0`.
+
+Release markers are aligned: `VERSION` = `0.10.0` and `canon_versions.txt` = `0.10.0`.
+
+## Version Alignment Maintenance
+
+`VERSION` is the single source of truth for tracked release markers.
+
+```powershell
+python tools/check_version_parity.py
+python tools/bump_version.py --version (Get-Content VERSION) --dry-run
+```
 
 This project provides:
 
