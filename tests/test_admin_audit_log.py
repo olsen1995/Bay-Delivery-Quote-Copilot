@@ -48,6 +48,10 @@ def make_basic_auth(username: str, password: str) -> dict[str, str]:
     return {"Authorization": f"Basic {token}"}
 
 
+def latest_audit_entry() -> dict[str, object]:
+    return storage.list_admin_audit_log(limit=1)[0]
+
+
 def test_unauthenticated_access_denied(client: TestClient) -> None:
     resp = client.get("/admin/api/audit-log")
     assert resp.status_code in {401, 403}
@@ -97,3 +101,114 @@ def test_fixed_limit(client: TestClient, admin_creds: tuple[str, str]) -> None:
     resp = client.get("/admin/api/audit-log", headers=make_basic_auth(username, password))
     items = resp.json()["items"]
     assert len(items) == 50
+
+
+def test_db_export_writes_admin_audit_log(
+    client: TestClient,
+    admin_creds: tuple[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    username, password = admin_creds
+    monkeypatch.setattr("app.main.export_db_to_json", lambda: {"meta": {}, "tables": {}})
+
+    resp = client.get("/admin/api/db/export", headers=make_basic_auth(username, password))
+
+    assert resp.status_code == 200
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == username
+    assert entry["action_type"] == "export_db"
+    assert entry["entity_type"] == "database"
+    assert entry["record_id"] == "primary"
+    assert entry["success"] is True
+    assert entry["error_summary"] is None
+
+
+def test_db_import_success_writes_admin_audit_log(
+    client: TestClient,
+    admin_creds: tuple[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    username, password = admin_creds
+    monkeypatch.setattr("app.main.import_db_from_json", lambda payload: {"ok": True, "restored": {"quotes": 0}})
+    monkeypatch.setattr("app.main._maybe_auto_snapshot", lambda background_tasks: None)
+
+    resp = client.post(
+        "/admin/api/db/import",
+        headers=make_basic_auth(username, password),
+        json={"payload": {"tables": {}}},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "restored": {"quotes": 0}}
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == username
+    assert entry["action_type"] == "import_db"
+    assert entry["entity_type"] == "database"
+    assert entry["record_id"] == "primary"
+    assert entry["success"] is True
+    assert entry["error_summary"] is None
+
+
+def test_db_import_failure_writes_failed_admin_audit_log(
+    client: TestClient,
+    admin_creds: tuple[str, str],
+) -> None:
+    username, password = admin_creds
+
+    with pytest.raises(ValueError, match="Backup payload missing 'tables' object"):
+        client.post(
+            "/admin/api/db/import",
+            headers=make_basic_auth(username, password),
+            json={"payload": {"tables": []}},
+        )
+
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == username
+    assert entry["action_type"] == "import_db"
+    assert entry["entity_type"] == "database"
+    assert entry["record_id"] == "primary"
+    assert entry["success"] is False
+    assert entry["error_summary"] == "Backup payload missing 'tables' object"
+
+
+def test_drive_snapshot_writes_admin_audit_log(
+    client: TestClient,
+    admin_creds: tuple[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    username, password = admin_creds
+    monkeypatch.setattr("app.main._drive_enabled", lambda: True)
+    monkeypatch.setattr(
+        "app.main._drive_snapshot_db",
+        lambda: {
+            "ok": True,
+            "file_id": "snapshot-file-123",
+            "web_view_link": "https://example.test/snapshot",
+            "name": "bay_delivery_backup_test.json",
+        },
+    )
+
+    resp = client.post("/admin/api/drive/snapshot", headers=make_basic_auth(username, password))
+
+    assert resp.status_code == 200
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == username
+    assert entry["action_type"] == "drive_snapshot"
+    assert entry["entity_type"] == "drive_backup"
+    assert entry["record_id"] == "snapshot-file-123"
+    assert entry["success"] is True
+    assert entry["error_summary"] is None
+
+
+def test_admin_audit_logging_is_best_effort_for_db_export(
+    client: TestClient,
+    admin_creds: tuple[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    username, password = admin_creds
+    monkeypatch.setattr("app.main.export_db_to_json", lambda: {"meta": {}, "tables": {}})
+    monkeypatch.setattr("app.main.log_admin_audit", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("audit write failed")))
+
+    resp = client.get("/admin/api/db/export", headers=make_basic_auth(username, password))
+
+    assert resp.status_code == 200
