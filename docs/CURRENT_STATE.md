@@ -2,6 +2,8 @@
 
 This document is the authoritative current system status summary referenced by `README.md`.
 
+Last reviewed: 2026-04-13
+
 For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_TRUTH.md` and the maintained grounding pack in `docs/gpt/`.
 
 ## Project Status
@@ -12,7 +14,7 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 
 ## Current Operating Phase
 
-- The project remains in a refinement/launch-readiness phase.
+- The project is production-usable and stable, in refinement / hardening / operational-confidence mode.
 - The goal is to preserve alignment between repository truth, current documented workflow, and maintained GPT grounding.
 - Documentation should describe current documented system state conservatively and should not present unverified live behavior as guaranteed fact.
 
@@ -24,6 +26,12 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - EMT / e-transfer quotes add 13% HST.
 - A universal $60 CAD minimum floor is enforced in pricing authority.
 
+## Customer-Facing Reality
+
+- Customers continue to use the live Render customer quote flow at `/` and `/quote`.
+- Customer-facing quote behavior remains the live quote flow, not GPT.
+- Admin surfaces support operations and review; they are not customer quote intake surfaces.
+
 ## Architecture Boundaries
 
 - SQLite is the source of truth.
@@ -32,6 +40,12 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - Admin surfaces (`/admin`, `/admin/mobile`, `/admin/uploads`) are operations tools, not customer quote intake surfaces.
 - Route handlers must remain thin orchestration layers.
 - Business logic belongs in `app/services/`, SQL and persistence logic belong in `app/storage/`, and external API wrappers belong in `app/integrations/`.
+
+## Internal GPT Boundary
+
+- The Bay Delivery GPT is internal-only for Austin + Dan.
+- GPT grounding exists to keep outputs aligned to repository truth, project rules, and current operating boundaries.
+- GPT may explain, summarize, and guide process, but it must not override repo pricing logic, workflow state, auth, token, or persistence rules.
 
 ## Workflow Expectations
 
@@ -50,6 +64,16 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
 
+## Active Docs Map
+
+- `PROJECT_RULES.md`: architecture invariants, security rules, pricing and business guardrails, and change-scope rules
+- `docs/gpt/GPT_SOURCE_OF_TRUTH.md`: GPT grounding precedence
+- `docs/gpt/GPT_CURRENT_STATE.md`: GPT-oriented current-state summary
+- `docs/gpt/GPT_BUSINESS_RULES.md`: maintained business-rule grounding
+- `docs/gpt/GPT_SYSTEM_BOUNDARIES.md`: system-boundary grounding
+- `docs/gpt/GPT_WORKFLOW_RULES.md`: repo-safe GPT working method
+- `README.md`: operator-facing overview, release markers, and canonical reference links
+
 ## Current Priorities
 
 - Keep repository behavior aligned with docs and deployment reality.
@@ -57,6 +81,13 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - Make narrow, auditable refinements only.
 - Preserve one-pricing-engine discipline.
 - Maintain clear customer/admin operational boundaries.
+
+## Drift-Control Rules
+
+- When current state is ambiguous, verify against `PROJECT_RULES.md`, `docs/gpt/`, `README.md`, and current repository code instead of guessing.
+- Do not create a parallel GPT grounding source outside `docs/gpt/`.
+- Do not invent undocumented assumptions or undocumented capabilities.
+- Keep documentation aligned to current documented workflow and repo-approved behavior.
 
 ## What Should Not Happen Next
 
