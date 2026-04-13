@@ -346,6 +346,18 @@ def _drive_call(desc: str, fn):
         raise HTTPException(status_code=502, detail="Google Drive service unavailable.")
 
 
+def _try_log_admin_audit(**kwargs: Any) -> None:
+    try:
+        log_admin_audit(**kwargs)
+    except Exception:
+        logger.exception(
+            "Best-effort admin audit logging failed for action_type=%s entity_type=%s record_id=%s",
+            kwargs.get("action_type"),
+            kwargs.get("entity_type"),
+            kwargs.get("record_id"),
+        )
+
+
 def _safe_upload_filename(filename: str | None) -> str:
     safe_name = (filename or "upload.jpg").replace("/", "_").replace("\\", "_").strip()
     return safe_name or "upload.jpg"
@@ -1354,19 +1366,38 @@ def admin_cancel_job(request: Request, job_id: str, body: Optional[JobCloseoutPa
 @app.get("/admin/api/db/export")
 def admin_db_export(request: Request):
     _require_admin(request)
+    operator_username = _admin_operator_username(request)
 
-    payload = export_db_to_json()
-    payload["meta"]["exported_at"] = _now_local_iso()
-    payload["meta"]["db_path"] = "app/data/bay_delivery.sqlite3"
+    try:
+        payload = export_db_to_json()
+        payload["meta"]["exported_at"] = _now_local_iso()
+        payload["meta"]["db_path"] = "app/data/bay_delivery.sqlite3"
 
-    filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"',
-        "Content-Type": "application/json; charset=utf-8",
-    }
-    return Response(content=body, headers=headers, media_type="application/json")
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="export_db",
+            entity_type="database",
+            record_id="primary",
+            success=True,
+        )
+        return Response(content=body, headers=headers, media_type="application/json")
+    except Exception as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="export_db",
+            entity_type="database",
+            record_id="primary",
+            success=False,
+            error_summary=str(exc.detail) if isinstance(exc, HTTPException) else str(exc),
+        )
+        raise
 
 
 class ImportPayload(BaseModel):
@@ -1391,9 +1422,28 @@ class DriveRestorePayload(BaseModel):
 @app.post("/admin/api/db/import")
 def admin_db_import(request: Request, body: ImportPayload, background_tasks: BackgroundTasks):
     _require_admin(request)
-    result = import_db_from_json(body.payload)
-    _maybe_auto_snapshot(background_tasks)
-    return result
+    operator_username = _admin_operator_username(request)
+    try:
+        result = import_db_from_json(body.payload)
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="import_db",
+            entity_type="database",
+            record_id="primary",
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        return result
+    except Exception as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="import_db",
+            entity_type="database",
+            record_id="primary",
+            success=False,
+            error_summary=str(exc.detail) if isinstance(exc, HTTPException) else str(exc),
+        )
+        raise
 
 
 # =========================
@@ -1409,9 +1459,29 @@ def admin_drive_status(request: Request):
 @app.post("/admin/api/drive/snapshot")
 def admin_drive_snapshot(request: Request):
     _require_admin(request)
-    if not _drive_enabled():
-        raise HTTPException(status_code=501, detail="Google Drive not configured.")
-    return _drive_snapshot_db()
+    operator_username = _admin_operator_username(request)
+    try:
+        if not _drive_enabled():
+            raise HTTPException(status_code=501, detail="Google Drive not configured.")
+        result = _drive_snapshot_db()
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="drive_snapshot",
+            entity_type="drive_backup",
+            record_id=str(result.get("file_id") or "pending"),
+            success=True,
+        )
+        return result
+    except Exception as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="drive_snapshot",
+            entity_type="drive_backup",
+            record_id="pending",
+            success=False,
+            error_summary=str(exc.detail) if isinstance(exc, HTTPException) else str(exc),
+        )
+        raise
 
 
 @app.get("/admin/api/drive/backups")
@@ -1441,42 +1511,61 @@ def admin_drive_backups(request: Request, limit: int = 20):
 @app.post("/admin/api/drive/restore")
 def admin_drive_restore(request: Request, body: DriveRestorePayload, background_tasks: BackgroundTasks):
     _require_admin(request)
-    if not _drive_enabled():
-        raise HTTPException(status_code=501, detail="Google Drive not configured.")
-
-    logger.info("Starting Drive DB restore from file_id=%s", body.file_id)
-
-    backup_bytes = _drive_call("download backup", lambda: gdrive.download_file(body.file_id))
+    operator_username = _admin_operator_username(request)
     try:
-        payload = json.loads(backup_bytes.decode("utf-8"))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid backup JSON.")
+        if not _drive_enabled():
+            raise HTTPException(status_code=501, detail="Google Drive not configured.")
 
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="Backup payload must be a JSON object.")
+        logger.info("Starting Drive DB restore from file_id=%s", body.file_id)
 
-    tables = payload.get("tables")
-    if not isinstance(tables, dict):
-        raise HTTPException(status_code=400, detail="Backup payload missing 'tables' object.")
+        backup_bytes = _drive_call("download backup", lambda: gdrive.download_file(body.file_id))
+        try:
+            payload = json.loads(backup_bytes.decode("utf-8"))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid backup JSON.")
 
-    meta = payload.get("meta")
-    if isinstance(meta, dict):
-        backup_format = meta.get("format")
-        if backup_format is not None and backup_format != "bay-delivery-sqlite-backup":
-            raise HTTPException(status_code=400, detail="Unsupported backup format.")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Backup payload must be a JSON object.")
 
-    try:
-        result = import_db_from_json(payload)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        tables = payload.get("tables")
+        if not isinstance(tables, dict):
+            raise HTTPException(status_code=400, detail="Backup payload missing 'tables' object.")
 
-    _maybe_auto_snapshot(background_tasks)
-    logger.info("Drive DB restore completed for file_id=%s", body.file_id)
-    return {
-        "ok": bool(result.get("ok", True)),
-        "restored": result.get("restored", {}),
-        "restored_from_file_id": body.file_id,
-    }
+        meta = payload.get("meta")
+        if isinstance(meta, dict):
+            backup_format = meta.get("format")
+            if backup_format is not None and backup_format != "bay-delivery-sqlite-backup":
+                raise HTTPException(status_code=400, detail="Unsupported backup format.")
+
+        try:
+            result = import_db_from_json(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="drive_restore",
+            entity_type="drive_backup",
+            record_id=body.file_id,
+            success=True,
+        )
+        _maybe_auto_snapshot(background_tasks)
+        logger.info("Drive DB restore completed for file_id=%s", body.file_id)
+        return {
+            "ok": bool(result.get("ok", True)),
+            "restored": result.get("restored", {}),
+            "restored_from_file_id": body.file_id,
+        }
+    except Exception as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="drive_restore",
+            entity_type="drive_backup",
+            record_id=body.file_id,
+            success=False,
+            error_summary=str(exc.detail) if isinstance(exc, HTTPException) else str(exc),
+        )
+        raise
 
 
 # =========================

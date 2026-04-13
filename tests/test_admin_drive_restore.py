@@ -4,6 +4,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from app import storage
 from app.main import app
 
 
@@ -15,9 +16,24 @@ def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactor
     monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(tmp_path / "test-drive-restore.sqlite3"))
 
 
+@pytest.fixture(autouse=True)
+def setup_audit_log(isolated_db: None) -> None:
+    storage.init_db()
+    conn = storage._connect()
+    try:
+        conn.execute("DELETE FROM admin_audit_log")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _admin_headers() -> dict[str, str]:
     token = base64.b64encode(b"admin:secret").decode("utf-8")
     return {"Authorization": f"Basic {token}"}
+
+
+def latest_audit_entry() -> dict[str, object]:
+    return storage.list_admin_audit_log(limit=1)[0]
 
 
 def test_drive_restore_requires_admin(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
@@ -53,6 +69,13 @@ def test_drive_restore_happy_path(monkeypatch: pytest.MonkeyPatch, isolated_db: 
         "restored": {"quotes": 2, "jobs": 1},
         "restored_from_file_id": VALID_FILE_ID,
     }
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == "admin"
+    assert entry["action_type"] == "drive_restore"
+    assert entry["entity_type"] == "drive_backup"
+    assert entry["record_id"] == VALID_FILE_ID
+    assert entry["success"] is True
+    assert entry["error_summary"] is None
 
 
 def test_drive_restore_invalid_structure(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
@@ -68,6 +91,13 @@ def test_drive_restore_invalid_structure(monkeypatch: pytest.MonkeyPatch, isolat
 
     assert resp.status_code == 400
     assert "tables" in resp.json()["detail"]
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == "admin"
+    assert entry["action_type"] == "drive_restore"
+    assert entry["entity_type"] == "drive_backup"
+    assert entry["record_id"] == VALID_FILE_ID
+    assert entry["success"] is False
+    assert entry["error_summary"] == "Backup payload missing 'tables' object."
 
 
 def test_drive_restore_malformed_json(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
