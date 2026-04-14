@@ -26,6 +26,8 @@ from fastapi import (
     Request,
     UploadFile,
 )
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -77,6 +79,19 @@ _admin_failed_attempts: dict[str, list[float]] = {}
 _admin_lockout_threshold = 5
 _admin_lockout_window = 300  # seconds
 _admin_list_limit_cap = 500
+_ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH = 240
+_ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
+    ("POST", "/admin/api/db/import"): {
+        "action_type": "import_db",
+        "entity_type": "database",
+        "record_id": "primary",
+    },
+    ("POST", "/admin/api/drive/restore"): {
+        "action_type": "drive_restore",
+        "entity_type": "drive_backup",
+        "record_id": "pending",
+    },
+}
 
 
 def _check_admin_lockout(client_ip: str) -> bool:
@@ -109,17 +124,36 @@ def _cap_admin_list_limit(limit: int) -> int:
     return min(int(limit), _admin_list_limit_cap)
 
 
+def _parse_basic_auth_credentials(header: str) -> tuple[str, str] | None:
+    if not header.lower().startswith("basic "):
+        return None
+    try:
+        decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
+        user, pw = decoded.split(":", 1)
+    except Exception:
+        return None
+    return user, pw
+
+
+def _configured_admin_credentials() -> tuple[str, str] | None:
+    expected_user = os.getenv("ADMIN_USERNAME", "").strip()
+    expected_pass = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not expected_user or not expected_pass:
+        return None
+    return expected_user, expected_pass
+
+
 def _admin_operator_username(request: Request) -> str:
     header = request.headers.get("authorization") or ""
-    if header.lower().startswith("basic "):
-        try:
-            decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
-            user, _pw = decoded.split(":", 1)
-            if user:
-                return user
-        except Exception:
-            pass
-    return os.getenv("ADMIN_USERNAME", "").strip() or "unknown"
+    credentials = _parse_basic_auth_credentials(header)
+    if credentials is not None:
+        user, _pw = credentials
+        if user:
+            return user
+    configured_credentials = _configured_admin_credentials()
+    if configured_credentials is not None:
+        return configured_credentials[0]
+    return "unknown"
 
 
 def _local_iso_to_utc_iso(local_iso: str) -> str:
@@ -275,6 +309,31 @@ def _enforce_admin_post_origin(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
 
 
+def _resolve_authenticated_admin_username(request: Request) -> str | None:
+    configured_credentials = _configured_admin_credentials()
+    if configured_credentials is None:
+        return None
+
+    if _check_admin_lockout(extract_client_ip(request)):
+        return None
+
+    credentials = _parse_basic_auth_credentials(request.headers.get("authorization") or "")
+    if credentials is None:
+        return None
+
+    user, pw = credentials
+    expected_user, expected_pass = configured_credentials
+    if not hmac.compare_digest(user, expected_user) or not hmac.compare_digest(pw, expected_pass):
+        return None
+
+    try:
+        _enforce_admin_post_origin(request)
+    except HTTPException:
+        return None
+
+    return user
+
+
 def _require_admin(request: Request) -> None:
     """
     Admin auth: Basic Auth using ADMIN_USERNAME / ADMIN_PASSWORD.
@@ -291,10 +350,8 @@ def _require_admin(request: Request) -> None:
     if _check_admin_lockout(client_ip):
         raise HTTPException(status_code=429, detail="Too many failed login attempts. Try again later.")
 
-    expected_user = os.getenv("ADMIN_USERNAME", "").strip()
-    expected_pass = os.getenv("ADMIN_PASSWORD", "").strip()
-
-    if not expected_user or not expected_pass:
+    configured_credentials = _configured_admin_credentials()
+    if configured_credentials is None:
         raise HTTPException(status_code=401, detail="Admin credentials are not configured.")
 
     header = request.headers.get("authorization") or ""
@@ -302,13 +359,13 @@ def _require_admin(request: Request) -> None:
         _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Missing Basic auth.")
 
-    try:
-        decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
-        user, pw = decoded.split(":", 1)
-    except Exception:
+    credentials = _parse_basic_auth_credentials(header)
+    if credentials is None:
         _record_admin_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid Basic auth header.")
 
+    user, pw = credentials
+    expected_user, expected_pass = configured_credentials
     user_ok = hmac.compare_digest(user, expected_user)
     pass_ok = hmac.compare_digest(pw, expected_pass)
     if not user_ok or not pass_ok:
@@ -356,6 +413,36 @@ def _try_log_admin_audit(**kwargs: Any) -> None:
             kwargs.get("entity_type"),
             kwargs.get("record_id"),
         )
+
+
+def _summarize_validation_error(exc: RequestValidationError) -> str:
+    errors = exc.errors()
+    if not errors:
+        return "Validation failed."
+
+    first_error = errors[0]
+    location = ".".join(str(part) for part in first_error.get("loc") or () if part is not None)
+    message = str(first_error.get("msg") or "Validation failed.")
+    summary = f"{location}: {message}" if location else message
+    summary = " ".join(summary.split())
+    if len(summary) <= _ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH:
+        return summary
+    return summary[: _ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH - 3].rstrip() + "..."
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_audit_handler(request: Request, exc: RequestValidationError):
+    audit_metadata = _ADMIN_VALIDATION_AUDIT_ROUTES.get((request.method.upper(), request.url.path))
+    if audit_metadata is not None:
+        operator_username = _resolve_authenticated_admin_username(request)
+        if operator_username is not None:
+            _try_log_admin_audit(
+                operator_username=operator_username,
+                success=False,
+                error_summary=_summarize_validation_error(exc),
+                **audit_metadata,
+            )
+    return await request_validation_exception_handler(request, exc)
 
 
 def _safe_upload_filename(filename: str | None) -> str:

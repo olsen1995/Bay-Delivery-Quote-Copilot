@@ -52,6 +52,10 @@ def latest_audit_entry() -> dict[str, object]:
     return storage.list_admin_audit_log(limit=1)[0]
 
 
+def audit_log_count() -> int:
+    return len(storage.list_admin_audit_log(limit=50))
+
+
 def test_unauthenticated_access_denied(client: TestClient) -> None:
     resp = client.get("/admin/api/audit-log")
     assert resp.status_code in {401, 403}
@@ -169,6 +173,68 @@ def test_db_import_failure_writes_failed_admin_audit_log(
     assert entry["record_id"] == "primary"
     assert entry["success"] is False
     assert entry["error_summary"] == "Backup payload missing 'tables' object"
+
+
+def test_db_import_validation_failure_writes_failed_admin_audit_log(
+    client: TestClient,
+    admin_creds: tuple[str, str],
+) -> None:
+    username, password = admin_creds
+
+    resp = client.post(
+        "/admin/api/db/import",
+        headers=make_basic_auth(username, password),
+        json={},
+    )
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == [
+        {
+            "type": "missing",
+            "loc": ["body", "payload"],
+            "msg": "Field required",
+            "input": {},
+        }
+    ]
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == username
+    assert entry["action_type"] == "import_db"
+    assert entry["entity_type"] == "database"
+    assert entry["record_id"] == "primary"
+    assert entry["success"] is False
+    assert entry["error_summary"] == "body.payload: Field required"
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        make_basic_auth("wrong-admin", "wrong-pass"),
+    ],
+)
+def test_db_import_validation_failure_without_valid_admin_does_not_write_audit_log(
+    client: TestClient,
+    headers: dict[str, str],
+) -> None:
+    before_count = audit_log_count()
+
+    resp = client.post(
+        "/admin/api/db/import",
+        headers=headers,
+        json={},
+    )
+
+    assert resp.status_code == 422
+    assert audit_log_count() == before_count
+
+
+def test_unrelated_validation_failure_does_not_write_admin_audit_log(client: TestClient) -> None:
+    before_count = audit_log_count()
+
+    resp = client.post("/quote/calculate", json={})
+
+    assert resp.status_code == 422
+    assert audit_log_count() == before_count
 
 
 def test_drive_snapshot_writes_admin_audit_log(
