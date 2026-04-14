@@ -61,6 +61,27 @@ def test_quote_page_supports_persisted_review_mode() -> None:
     assert 'const res = await fetch("/quote/calculate"' in quote_js
 
 
+def test_quote_page_phase_a_guidance_copy_is_present() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    assert "You complete 4 quick estimate steps first." in quote_html
+    assert "Share the job details needed for an accurate estimate." in quote_html
+    assert 'id="serviceDetailsSummary"' in quote_html
+    assert 'id="serviceDetailsLead"' in quote_html
+    assert "Required for moves and deliveries." in quote_html
+    assert "Photos are optional and come after your estimate." in quote_html
+    assert "After your estimate: review what is included, compare Cash vs EMT totals" in quote_html
+    assert "friendlyQuoteErrorMessage" in quote_js
+    assert "What this estimate includes" in quote_js
+    assert "What happens next" in quote_js
+    assert "Estimate Confidence" in quote_js
+    assert "Optional photos can help confirm volume, access, or materials" in quote_js
+    assert "quoteResultIncluded" in quote_css
+    assert "quoteInfoCard" in quote_css
+
+
 def test_quote_page_includes_haul_away_floor_fields() -> None:
     """Ensure haul-away-only floor-detail fields are present with backend-compatible values."""
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")

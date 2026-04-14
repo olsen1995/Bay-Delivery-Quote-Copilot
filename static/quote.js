@@ -35,6 +35,11 @@ const requiredFieldLabels = {
   dropoff_address: "Dropoff address"
 };
 
+function serviceTypeLabel(serviceType) {
+  const option = el("service_type")?.querySelector(`option[value="${serviceType}"]`);
+  return option ? option.textContent : "this service";
+}
+
 function setInvalidState(field, isInvalid) {
   if (!field) return;
   if (isInvalid) {
@@ -76,7 +81,28 @@ function validateRequiredFields(serviceType) {
 
 function missingFieldSummary(missing) {
   if (!missing || missing.length === 0) return "";
-  return "Please fill in the required fields:\n- " + missing.map((field) => field.label).join("\n- ");
+  const missingIds = missing.map((field) => field.id);
+  const routeMissing = missingIds.includes("pickup_address") || missingIds.includes("dropoff_address");
+  const lines = ["Please fill in the required fields:"];
+  missing.forEach((field) => {
+    lines.push("- " + field.label);
+  });
+  if (routeMissing) {
+    lines.push("");
+    lines.push("Pickup and dropoff addresses are required for moves and deliveries so the estimate can reflect the route.");
+  }
+  return lines.join("\n");
+}
+
+function friendlyQuoteErrorMessage(detail) {
+  if (!detail) return "Unknown error";
+  if (detail === "pickup_address and dropoff_address are required") {
+    return "Pickup address and dropoff address are required for moves and deliveries. Add both locations in Service-Specific Details and try again.";
+  }
+  if (detail === "Please enter a valid 10-digit phone number. You can include spaces, dashes, parentheses, or +1.") {
+    return detail + " We use it for estimate and booking follow-up only.";
+  }
+  return detail;
 }
 
 function focusFirstInvalidField(missing) {
@@ -165,6 +191,21 @@ function createInfoBlock(label, value, extraClass) {
   strong.textContent = value;
 
   block.append(heading, strong);
+  return block;
+}
+
+function createTextBlock(title, body, className) {
+  const block = document.createElement("div");
+  block.className = className || "";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+
+  const paragraph = document.createElement("p");
+  paragraph.className = "muted";
+  paragraph.textContent = body;
+
+  block.append(heading, paragraph);
   return block;
 }
 
@@ -297,7 +338,7 @@ function renderQuoteResult(data, quoteResponse) {
   title.textContent = "Your Estimate";
   const subtitle = document.createElement("p");
   subtitle.className = "muted";
-  subtitle.textContent = "Review your totals below. If they work for you, accept to continue to booking preferences.";
+  subtitle.textContent = "Review your estimate, see what is included, and compare Cash vs EMT totals before deciding whether to continue.";
   titleWrap.append(title, subtitle);
 
   const meta = document.createElement("div");
@@ -322,8 +363,15 @@ function renderQuoteResult(data, quoteResponse) {
   );
   const amountHint = document.createElement("p");
   amountHint.className = "quoteAmountHint muted";
-  amountHint.textContent = "Cash is tax-free. EMT / e-transfer includes 13% HST.";
+  amountHint.textContent = "Cash is tax-free. EMT / e-transfer includes 13% HST. The estimate reflects the job details you entered here.";
   breakdown.append(breakdownTitle, amountGrid, amountHint);
+
+  const included = document.createElement("div");
+  included.className = "quoteResultIncluded";
+  included.append(
+    createTextBlock("What this estimate includes", "Your estimate reflects the service details you provided, including local travel, labor, and any handling or disposal already captured by this form.", "quoteInfoCard"),
+    createTextBlock("What happens next", "If the estimate works for you, choose Accept Estimate to share booking preferences. If you decline, no booking is created.", "quoteInfoCard")
+  );
 
   const estimateDetails = document.createElement("div");
   estimateDetails.className = "estimateDetails";
@@ -344,17 +392,17 @@ function renderQuoteResult(data, quoteResponse) {
   const note = document.createElement("div");
   note.className = "quoteResultNote";
   const noteTitle = document.createElement("h3");
-  noteTitle.textContent = "Important Note";
+  noteTitle.textContent = "Estimate Confidence";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = quoteResponse.disclaimer || "";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Optional photos can help confirm volume, access, or materials if you want extra accuracy before scheduling.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
   nextStep.className = "nextStepCallout";
-  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate to continue. You can also decline with no booking created.";
+  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate if you want to continue. You can also decline with no booking created.";
 
-  wrapper.append(header, breakdown, nextStep, estimateDetails, note);
+  wrapper.append(header, breakdown, included, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
 }
 
@@ -438,14 +486,24 @@ function syncServiceFields() {
   }
 
   const help = el("serviceHelp");
+  const detailsSummary = el("serviceDetailsSummary");
+  const detailsLead = el("serviceDetailsLead");
   if (showScrap) {
-    help.textContent = "Scrap pickup is included as part of the minimum service charge. Pricing reflects labor, travel, and handling.";
+    help.textContent = "Scrap pickup keeps the form short. Confirm whether the scrap is curbside or inside/on-property so the estimate reflects the handling effort.";
+    detailsSummary.textContent = "Scrap pickup details for estimate accuracy";
+    detailsLead.textContent = "Scrap pickup usually needs only location and access details. Photos are optional after the estimate if they help clarify the pile.";
   } else if (showRoute) {
-    help.textContent = "Route details are required for this service. Pickup/dropoff fields are now visible.";
+    help.textContent = "Pickup and dropoff addresses are required for this service. Open the details section below if you need to confirm the full route.";
+    detailsSummary.textContent = "Required route details for moves and deliveries";
+    detailsLead.textContent = "Enter both the pickup address and dropoff address. These fields are required for " + serviceTypeLabel(serviceType).toLowerCase() + " estimates.";
   } else if (showLoadCounts) {
-    help.textContent = "Add item counts and labor details for the most accurate estimate.";
+    help.textContent = "Bag counts, bulky-item counts, access, and labor details improve estimate accuracy for this service.";
+    detailsSummary.textContent = "Load and access details for estimate accuracy";
+    detailsLead.textContent = "Add the details that best match the load, access, and materials. This helps keep the estimate aligned with the job scope you described.";
   } else {
-    help.textContent = "Select a service to show only relevant fields.";
+    help.textContent = "Select a service to show only relevant fields and guidance.";
+    detailsSummary.textContent = "Service-specific details for estimate accuracy";
+    detailsLead.textContent = "Open this section to complete the details that apply to your service.";
   }
 }
 
@@ -774,7 +832,7 @@ el("btnCalc").addEventListener("click", async () => {
     }
 
     if (!res.ok) {
-      showBox("resultBox", "Error:\n" + (data.detail || "Unknown error"));
+      showBox("resultBox", "Error:\n" + friendlyQuoteErrorMessage(data.detail), "error");
       return;
     }
 
