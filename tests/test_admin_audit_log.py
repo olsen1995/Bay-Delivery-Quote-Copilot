@@ -156,24 +156,28 @@ def test_admin_audit_log_survives_round_trip_backup_restore(tmp_path: pytest.Tem
         for row in audit_rows
     )
 
-    storage.DB_PATH = tmp_path / "restored-admin-audit.sqlite3"
-    storage.init_db()
-    result = storage.import_db_from_json(payload)
+    original_db_path = storage.DB_PATH
+    try:
+        storage.DB_PATH = tmp_path / "restored-admin-audit.sqlite3"
+        storage.init_db()
+        result = storage.import_db_from_json(payload)
 
-    assert result["ok"] is True
-    assert result["restored"]["admin_audit_log"] == 4
+        assert result["ok"] is True
+        assert result["restored"]["admin_audit_log"] == 4
 
-    restored_items = storage.list_admin_audit_log(limit=10)
-    assert len(restored_items) == 4
-    assert any(
-        item["operator_username"] == "restore-admin"
-        and item["action_type"] == "restore_test"
-        and item["entity_type"] == "database"
-        and item["record_id"] == "rec-restore"
-        and item["success"] is False
-        and item["error_summary"] == "expected failure"
-        for item in restored_items
-    )
+        restored_items = storage.list_admin_audit_log(limit=10)
+        assert len(restored_items) == 4
+        assert any(
+            item["operator_username"] == "restore-admin"
+            and item["action_type"] == "restore_test"
+            and item["entity_type"] == "database"
+            and item["record_id"] == "rec-restore"
+            and item["success"] is False
+            and item["error_summary"] == "expected failure"
+            for item in restored_items
+        )
+    finally:
+        storage.DB_PATH = original_db_path
 
 
 def test_db_export_uses_resolved_runtime_db_path_in_metadata(
