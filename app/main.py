@@ -70,6 +70,8 @@ from app.audit_log import init_audit_table, log_admin_audit
 
 APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").exists() else "0.0.0")
 logger = logging.getLogger(__name__)
+_DEFAULT_LOCAL_TIMEZONE = "UTC"
+_DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8000"
 
 # Initialize audit table at startup
 init_audit_table()
@@ -167,7 +169,7 @@ def _local_iso_to_utc_iso(local_iso: str) -> str:
         raise ValueError("Datetime should be naive (local time)")
 
     # Get timezone from environment or default to UTC
-    tz_name = os.getenv("LOCAL_TIMEZONE", "UTC")
+    tz_name = os.getenv("LOCAL_TIMEZONE", _DEFAULT_LOCAL_TIMEZONE)
 
     try:
         if ZoneInfo:
@@ -182,6 +184,28 @@ def _local_iso_to_utc_iso(local_iso: str) -> str:
     local_dt = local_dt.replace(tzinfo=local_tz)
     utc_dt = local_dt.astimezone(timezone.utc)
     return utc_dt.isoformat()
+
+
+def _warn_on_env_fallbacks() -> None:
+    tz_name = os.getenv("LOCAL_TIMEZONE")
+    if not tz_name:
+        logger.warning("LOCAL_TIMEZONE is unset; falling back to UTC.")
+    elif ZoneInfo is not None:
+        try:
+            ZoneInfo(tz_name)
+        except Exception:
+            logger.warning("LOCAL_TIMEZONE=%r is invalid; falling back to UTC.", tz_name)
+
+    cors_env = os.getenv("BAYDELIVERY_CORS_ORIGINS")
+    if cors_env is not None:
+        return
+
+    legacy_cors_env = os.getenv("CORS_ORIGINS")
+    if legacy_cors_env is not None:
+        logger.warning("BAYDELIVERY_CORS_ORIGINS is unset; using legacy CORS_ORIGINS.")
+        return
+
+    logger.warning("BAYDELIVERY_CORS_ORIGINS is unset; falling back to localhost CORS defaults.")
 
 
 def ensure_schedulable(job: Job) -> None:
@@ -234,11 +258,13 @@ RATE_LIMIT_RULES = [
     RateLimitRule(rule_id="admin_api", prefix_path="/admin/api/", limit=120),
 ]
 
+_warn_on_env_fallbacks()
+
 # configure CORS origins via environment variable; allowlist is required in prod.
 # fall back to the old CORS_ORIGINS name for backwards compatibility.
 cors_env = os.getenv("BAYDELIVERY_CORS_ORIGINS")
 if cors_env is None:
-    cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+    cors_env = os.getenv("CORS_ORIGINS", _DEFAULT_CORS_ORIGINS)
 allow_list = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
 if "*" in allow_list:
     raise ValueError("CORS wildcard origin '*' is not allowed when credentials authentication is enabled.")
