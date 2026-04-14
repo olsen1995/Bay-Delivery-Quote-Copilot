@@ -1,6 +1,7 @@
 import importlib
-import os
 import builtins
+import logging
+import os
 import pytest
 
 from fastapi.testclient import TestClient
@@ -10,13 +11,55 @@ from fastapi.testclient import TestClient
 
 def _reload_main_with_env(env_vars: dict[str, str]) -> object:
     # clear both envs then set provided ones
-    for var in ("BAYDELIVERY_CORS_ORIGINS", "CORS_ORIGINS"):
+    for var in ("BAYDELIVERY_CORS_ORIGINS", "CORS_ORIGINS", "LOCAL_TIMEZONE"):
         os.environ.pop(var, None)
     os.environ.update(env_vars)
     # reload module so CORS middleware is reconfigured
     import app.main as main
     importlib.reload(main)
     return main
+
+
+def test_warns_when_local_timezone_missing(caplog):
+    caplog.set_level(logging.WARNING)
+
+    _reload_main_with_env({"BAYDELIVERY_CORS_ORIGINS": "https://foo"})
+
+    assert "LOCAL_TIMEZONE is unset; falling back to UTC." in caplog.text
+
+
+def test_warns_when_local_timezone_invalid(caplog):
+    caplog.set_level(logging.WARNING)
+
+    _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "LOCAL_TIMEZONE": "Mars/Olympus",
+        }
+    )
+
+    assert "LOCAL_TIMEZONE='Mars/Olympus' is invalid; falling back to UTC." in caplog.text
+
+
+def test_warns_when_using_legacy_cors_env(caplog):
+    caplog.set_level(logging.WARNING)
+
+    _reload_main_with_env(
+        {
+            "CORS_ORIGINS": "https://bar",
+            "LOCAL_TIMEZONE": "America/Toronto",
+        }
+    )
+
+    assert "BAYDELIVERY_CORS_ORIGINS is unset; using legacy CORS_ORIGINS." in caplog.text
+
+
+def test_warns_when_using_localhost_cors_defaults(caplog):
+    caplog.set_level(logging.WARNING)
+
+    _reload_main_with_env({"LOCAL_TIMEZONE": "America/Toronto"})
+
+    assert "BAYDELIVERY_CORS_ORIGINS is unset; falling back to localhost CORS defaults." in caplog.text
 
 
 def test_cors_from_new_env(monkeypatch):

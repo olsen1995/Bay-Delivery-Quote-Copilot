@@ -17,3 +17,7 @@ services:
         value: 3.11
       - key: BAYDELIVERY_DB_PATH
         value: /var/data/bay_delivery.sqlite3
+      - key: LOCAL_TIMEZONE
+        value: America/Toronto
+      - key: BAYDELIVERY_CORS_ORIGINS
+        value: https://bay-delivery-quote-copilot.onrender.com
