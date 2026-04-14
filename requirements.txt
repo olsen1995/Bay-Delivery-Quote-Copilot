@@ -7,4 +7,5 @@ httpx==0.27.2
 requests>=2.33.0
 google-auth==2.48.0
 google-api-python-client==2.149.0
+pytest==9.0.3
 pytest-asyncio>=0.23,<1
