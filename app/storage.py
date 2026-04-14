@@ -160,7 +160,7 @@ def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY
         return True
 
 # Explicit table list keeps backup/restore deterministic and safe.
-KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments", "screenshot_assistant_analyses"]
+KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments", "screenshot_assistant_analyses", "admin_audit_log"]
 
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}

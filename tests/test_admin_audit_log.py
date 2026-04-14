@@ -129,6 +129,57 @@ def test_db_export_writes_admin_audit_log(
     assert entry["error_summary"] is None
 
 
+def test_admin_audit_log_survives_round_trip_backup_restore(tmp_path: pytest.TempPathFactory) -> None:
+    conn = storage._connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO admin_audit_log (timestamp, operator_username, action_type, entity_type, record_id, success, error_summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("2026-03-16T12:30:00", "restore-admin", "restore_test", "database", "rec-restore", 0, "expected failure"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    payload = storage.export_db_to_json()
+    audit_rows = payload["tables"]["admin_audit_log"]
+    assert len(audit_rows) == 4
+    assert any(
+        row["operator_username"] == "restore-admin"
+        and row["action_type"] == "restore_test"
+        and row["entity_type"] == "database"
+        and row["record_id"] == "rec-restore"
+        and row["success"] == 0
+        and row["error_summary"] == "expected failure"
+        for row in audit_rows
+    )
+
+    original_db_path = storage.DB_PATH
+    try:
+        storage.DB_PATH = tmp_path / "restored-admin-audit.sqlite3"
+        storage.init_db()
+        result = storage.import_db_from_json(payload)
+
+        assert result["ok"] is True
+        assert result["restored"]["admin_audit_log"] == 4
+
+        restored_items = storage.list_admin_audit_log(limit=10)
+        assert len(restored_items) == 4
+        assert any(
+            item["operator_username"] == "restore-admin"
+            and item["action_type"] == "restore_test"
+            and item["entity_type"] == "database"
+            and item["record_id"] == "rec-restore"
+            and item["success"] is False
+            and item["error_summary"] == "expected failure"
+            for item in restored_items
+        )
+    finally:
+        storage.DB_PATH = original_db_path
+
+
 def test_db_export_uses_resolved_runtime_db_path_in_metadata(
     client: TestClient,
     admin_creds: tuple[str, str],
