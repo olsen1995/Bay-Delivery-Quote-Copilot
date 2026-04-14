@@ -36,6 +36,10 @@ def latest_audit_entry() -> dict[str, object]:
     return storage.list_admin_audit_log(limit=1)[0]
 
 
+def audit_log_count() -> int:
+    return len(storage.list_admin_audit_log(limit=50))
+
+
 def test_drive_restore_requires_admin(monkeypatch: pytest.MonkeyPatch, isolated_db: None) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
@@ -129,3 +133,36 @@ def test_drive_restore_rejects_malformed_file_id(monkeypatch: pytest.MonkeyPatch
     detail = resp.json()["detail"]
     assert isinstance(detail, list)
     assert any("file ID" in str(item.get("msg", "")) for item in detail if isinstance(item, dict))
+    entry = latest_audit_entry()
+    assert entry["operator_username"] == "admin"
+    assert entry["action_type"] == "drive_restore"
+    assert entry["entity_type"] == "drive_backup"
+    assert entry["record_id"] == "pending"
+    assert entry["success"] is False
+    assert entry["error_summary"] == "body.file_id: Value error, Drive file ID has invalid length"
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"Authorization": f"Basic {base64.b64encode(b'wrong:creds').decode('utf-8')}"},
+    ],
+)
+def test_drive_restore_validation_failure_without_valid_admin_does_not_write_audit_log(
+    monkeypatch: pytest.MonkeyPatch,
+    isolated_db: None,
+    headers: dict[str, str],
+) -> None:
+    monkeypatch.setenv("ADMIN_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret")
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers=headers,
+            json={"file_id": "bad<script>"},
+        )
+
+    assert resp.status_code == 422
+    assert audit_log_count() == 0
