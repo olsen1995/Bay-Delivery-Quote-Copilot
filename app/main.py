@@ -41,7 +41,7 @@ from app.abuse_controls import (
     SizeLimitRule,
     extract_client_ip,
 )
-from app import gcalendar, gdrive
+from app import gcalendar, gdrive, storage
 from app.services import (
     booking_service,
     job_scheduling_service,
@@ -603,7 +603,7 @@ def _drive_snapshot_db() -> dict:
 
     payload = export_db_to_json()
     payload["meta"]["exported_at"] = _now_local_iso()
-    payload["meta"]["db_path"] = "app/data/bay_delivery.sqlite3"
+    payload["meta"]["db_path"] = str(storage._resolve_db_path())
 
     filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -1458,7 +1458,7 @@ def admin_db_export(request: Request):
     try:
         payload = export_db_to_json()
         payload["meta"]["exported_at"] = _now_local_iso()
-        payload["meta"]["db_path"] = "app/data/bay_delivery.sqlite3"
+        payload["meta"]["db_path"] = str(storage._resolve_db_path())
 
         filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
