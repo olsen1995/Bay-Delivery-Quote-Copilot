@@ -66,21 +66,22 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     quote_js = Path("static/quote.js").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
 
-    assert "You complete 4 quick estimate steps first." in quote_html
-    assert "Share the job details needed for an accurate estimate." in quote_html
+    assert "Start with the estimate." in quote_html
+    assert "Share the job details used for your estimate." in quote_html
     assert 'id="serviceDetailsSummary"' in quote_html
     assert 'id="serviceDetailsLead"' in quote_html
-    assert "Required for moves and deliveries." in quote_html
-    assert "Photos are optional and come after your estimate." in quote_html
-    assert "After your estimate: review what is included, compare Cash vs EMT totals" in quote_html
-    assert "before admin review and final confirmation" in quote_html
+    assert "Required for moves and deliveries so the estimate reflects the actual route." in quote_html
+    assert "Photos are optional after your estimate." in quote_html
+    assert "After you see your estimate, review what is included and compare Cash vs EMT totals." in quote_html
+    assert "admin review and final confirmation" in quote_html
     assert "friendlyQuoteErrorMessage" in quote_js
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
     assert "Estimate Confidence" in quote_js
     assert "Optional photos can help confirm volume, access, or materials" in quote_js
-    assert "before Bay Delivery reviews and confirms the job" in quote_js
-    assert "admin review and final scheduling confirmation" in quote_js
+    assert "Accept Estimate & Continue" in quote_js
+    assert "Your job is not booked until Bay Delivery reviews and confirms it." in quote_js
+    assert "during admin review before final scheduling confirmation" in quote_js
     assert "quoteResultIncluded" in quote_css
     assert "quoteInfoCard" in quote_css
 
