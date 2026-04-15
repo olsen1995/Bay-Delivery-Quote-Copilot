@@ -70,18 +70,23 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Share the job details used for your estimate." in quote_html
     assert 'id="serviceDetailsSummary"' in quote_html
     assert 'id="serviceDetailsLead"' in quote_html
+    assert "Not sure? Give your best estimate" in quote_html
     assert "Required for moves and deliveries so the estimate reflects the actual route." in quote_html
-    assert "Photos are optional after your estimate." in quote_html
+    assert "A full kitchen garbage bag = 1. If unsure, estimate slightly higher." in quote_html
+    assert "Most jobs are 5–10 bags. Adjust if needed." in quote_html
+    assert "Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more." in quote_html
+    assert "Easy = curbside / garage" in quote_html
+    assert "You can add photos after your estimate to help confirm accuracy." in quote_html
+    assert "Adding photos now helps lock in your price and avoid changes later." in quote_html
     assert "After you see your estimate, review what is included and compare Cash vs EMT totals." in quote_html
-    assert "admin review and final confirmation" in quote_html
     assert "friendlyQuoteErrorMessage" in quote_js
+    assert "syncBagCountNudge" in quote_js
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
     assert "Estimate Confidence" in quote_js
-    assert "Optional photos can help confirm volume, access, or materials" in quote_js
+    assert "Adding photos now helps lock in your price and avoid changes later." in quote_js
     assert "Accept Estimate & Continue" in quote_js
     assert "Your job is not booked until Bay Delivery reviews and confirms it." in quote_js
-    assert "during admin review before final scheduling confirmation" in quote_js
     assert "quoteResultIncluded" in quote_css
     assert "quoteInfoCard" in quote_css
 
