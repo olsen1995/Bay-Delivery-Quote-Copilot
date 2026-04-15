@@ -295,6 +295,10 @@ body.quotePage {
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
+.bookingPreferenceHelper {
+  margin: 0 0 14px;
+}
+
 .formSection {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 18px;

@@ -591,7 +591,7 @@ function renderScheduleContext(job) {
 
   clearNode(fields);
   if (!job) {
-    summary.textContent = "Load a job to view customer booking preferences and calendar sync details.";
+    summary.textContent = "Load a job to view customer booking preferences, any missing readiness details, and calendar sync context.";
     return;
   }
 
@@ -599,7 +599,7 @@ function renderScheduleContext(job) {
   const missingFields = Array.isArray(schedulingContext.missing_fields) ? schedulingContext.missing_fields : [];
   const syncStatus = job.calendar_sync_status || "not_configured";
   const readinessLabel = schedulingContext.scheduling_ready ? "Scheduling-ready" : "Review booking preferences";
-  summary.textContent = `${readinessLabel} • Calendar sync: ${syncStatus}`;
+  summary.textContent = `${readinessLabel} • Customer preferences captured for ops review • Calendar sync: ${syncStatus}`;
 
   const rows = [
     ["Customer", job.customer_name || "—"],
@@ -626,7 +626,7 @@ function renderScheduleContext(job) {
   if (missingFields.length > 0) {
     const missing = document.createElement("div");
     missing.className = "small muted";
-    missing.textContent = `Missing booking preference fields: ${missingFields.join(", ")}`;
+    missing.textContent = `Missing booking preference fields: ${missingFields.join(", ")}. Follow up with the customer if needed before scheduling.`;
     fields.appendChild(missing);
   }
 

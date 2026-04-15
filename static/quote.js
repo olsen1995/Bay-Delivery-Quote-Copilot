@@ -4,7 +4,7 @@ let lastAcceptToken = null;
 let lastBookingToken = null;
 let persistedReviewMode = false;
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const persistedReviewHelperText = "You are reviewing a saved quote prepared for you. To request changes, contact Bay Delivery.";
+const persistedReviewHelperText = "You are reviewing a saved estimate prepared for you. Review the pricing and request details here, and contact Bay Delivery if anything needs to be updated.";
 
 function setBoxState(box, state) {
   box.classList.remove("boxInfo", "boxSuccess", "boxError");
@@ -370,7 +370,7 @@ function renderQuoteResult(data, quoteResponse) {
   included.className = "quoteResultIncluded";
   included.append(
     createTextBlock("What this estimate includes", "Your estimate reflects the service details you provided, including local travel, labor, and any handling or disposal already captured by this form.", "quoteInfoCard"),
-    createTextBlock("What happens next", "If the estimate works for you, choose Accept Estimate to share booking preferences. If you decline, no booking is created.", "quoteInfoCard")
+    createTextBlock("What happens next", "If the estimate works for you, choose Accept Estimate to move into the booking request step. You will be able to share your preferred date, time window, and notes before Bay Delivery reviews and confirms the job.", "quoteInfoCard")
   );
 
   const estimateDetails = document.createElement("div");
@@ -395,12 +395,12 @@ function renderQuoteResult(data, quoteResponse) {
   noteTitle.textContent = "Estimate Confidence";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = (quoteResponse.disclaimer || "") + " Optional photos can help confirm volume, access, or materials if you want extra accuracy before scheduling.";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Optional photos can help confirm volume, access, or materials if you want extra accuracy before admin review and final scheduling confirmation.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
   nextStep.className = "nextStepCallout";
-  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate if you want to continue. You can also decline with no booking created.";
+  nextStep.textContent = "Next step: review this estimate, then choose Accept Estimate if you want to continue into the booking request form. You can also decline with no booking request created.";
 
   wrapper.append(header, breakdown, included, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
@@ -597,7 +597,8 @@ function showPersistedQuoteReview(data, acceptToken) {
   );
 
   const statusText = data.quote_request_status ? ` Current status: ${data.quote_request_status}.` : "";
-  showBox("flowStatus", persistedReviewHelperText + statusText, "info");
+  const followupText = " Booking preferences remain subject to admin review and final confirmation.";
+  showBox("flowStatus", persistedReviewHelperText + statusText + followupText, "info");
   scrollToElement("resultBox");
 }
 
@@ -634,7 +635,7 @@ async function submitBooking() {
   enforceBookingDateMin();
 
   if (!lastQuoteId || !lastBookingToken) {
-    showBox("bookingStatus", "No booking token available. Accept the estimate first.");
+    showBox("bookingStatus", "No booking token available. Accept the estimate first to open the booking request form.");
     return;
   }
 
@@ -652,7 +653,7 @@ async function submitBooking() {
     notes: el("bookingNotes").value || null,
   };
 
-  showBox("bookingStatus", "Submitting booking...");
+  showBox("bookingStatus", "Submitting booking request...");
 
   try {
     const res = await fetch("/quote/" + encodeURIComponent(lastQuoteId) + "/booking", {
@@ -666,7 +667,7 @@ async function submitBooking() {
       return;
     }
 
-    showBox("bookingStatus", "Booking submitted successfully.\nRequest ID: " + data.request_id + "\n\nWe will follow up to confirm scheduling.");
+    showBox("bookingStatus", "Booking submitted successfully.\nRequest ID: " + data.request_id + "\n\nYour preferred timing has been sent for admin review. Bay Delivery will follow up to confirm the final schedule.");
     setFlowStage(5);
     revealCard("uploadCard", true);
   } catch (err) {
@@ -710,7 +711,7 @@ async function submitDecision(action) {
 
     if (action === "accept") {
       lastBookingToken = data.booking_token;
-      showBox("flowStatus", confirmation + "\n\nPlease provide your booking details below.");
+      showBox("flowStatus", confirmation + "\n\nYour estimate is marked accepted. Please provide your booking preferences below so Bay Delivery can review and confirm the final booking details.");
       el("decisionCard").classList.add("hidden");
       revealCard("bookingCard", true);
       enforceBookingDateMin();
@@ -718,7 +719,7 @@ async function submitDecision(action) {
       el("bookingNameDisplay").textContent = el("customer_name").value;
       el("bookingPhoneDisplay").textContent = el("customer_phone").value;
     } else {
-      showBox("decisionStatus", confirmation + "\n\nYou declined this estimate. No booking will be created.");
+      showBox("decisionStatus", confirmation + "\n\nYou declined this estimate. No booking request will be created.");
     }
   } catch (err) {
     showBox("decisionStatus", "Error:\nFailed to contact server.");
