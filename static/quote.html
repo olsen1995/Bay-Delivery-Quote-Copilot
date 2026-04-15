@@ -35,7 +35,7 @@
     <div class="heroCard card quoteHeroShell">
       <p class="eyebrow">Bay Delivery</p>
       <h1>Get an Estimate</h1>
-      <p class="muted heroCopy">Get a fast estimate with clear Cash (no HST) and EMT (+13% HST) totals. Share as much detail as you can for accuracy. Booking starts only if you accept.</p>
+      <p class="muted heroCopy">Get a fast estimate with clear Cash (no HST) and EMT (+13% HST) totals. Share as much detail as you can for accuracy. Accepting sends a booking request with your preferences for admin review and final confirmation.</p>
       <div class="heroHighlights" aria-hidden="true">
         <span class="heroHighlight">Fast estimate</span>
         <span class="heroHighlight">North Bay local</span>
@@ -48,7 +48,7 @@
           <p class="sectionEyebrow">Quote Flow</p>
           <h2>What happens next</h2>
         </div>
-        <p class="muted sectionLead">You complete 4 quick estimate steps first. Booking preferences and optional photos come after you review and accept.</p>
+        <p class="muted sectionLead">You complete 4 quick estimate steps first. Booking preferences and optional photos come after you review and accept, and Bay Delivery still confirms the final booking details with you.</p>
       </div>
       <ol class="flowProgress" id="flowProgress" aria-label="Quote progress">
         <li class="flowStep is-active" data-step="1"><span class="flowStepBadge">1</span><span class="flowStepLabel">Job details</span></li>
@@ -254,7 +254,7 @@
           <button class="btn" id="btnCalc" type="button">Get Estimate Now</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
-        <p class="stepHelper">After your estimate: review what is included, compare Cash vs EMT totals, then accept or decline. Booking preferences and optional photos come later.</p>
+        <p class="stepHelper">After your estimate: review what is included, compare Cash vs EMT totals, then accept or decline. Booking preferences and optional photos come later, before admin review and final confirmation.</p>
         <div class="loadingState hidden" id="loadingState">
           <span class="spinner"></span>
           <span>Calculating your estimate...</span>
@@ -279,11 +279,12 @@
 
     <div class="card hidden stageCard" id="decisionCard">
       <h2>Estimate Decision</h2>
-      <p class="muted sectionLead">If this estimate works for you, accept to share your booking preferences. If not, you can decline with no booking created.</p>
+      <p class="muted sectionLead">If this estimate works for you, accept to continue into the booking request form. If not, you can decline with no booking request created.</p>
 
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
         <textarea id="decisionNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
+        <p class="helperText">Accepting does not self-schedule the job. It saves your decision and opens the next step so you can submit your preferred date, time window, and notes for review.</p>
 
         <div class="btnRow">
           <button class="btn" id="btnAccept" type="button">Accept Estimate</button>
@@ -298,7 +299,7 @@
 
     <div class="card hidden stageCard" id="bookingCard">
       <h2>Booking Details</h2>
-      <p class="muted sectionLead">Share your preferred timing and we’ll follow up to confirm the best available slot.</p>
+      <p class="muted sectionLead">Share your preferred timing and any notes that will help with planning. These are booking preferences, not a confirmed appointment, and Bay Delivery will follow up to confirm the final schedule.</p>
 
       <div class="formWrap">
         <p class="muted bookingContactInfo">
@@ -306,6 +307,7 @@
           Name: <span id="bookingNameDisplay"></span><br/>
           Phone: <span id="bookingPhoneDisplay"></span>
         </p>
+        <p class="helperText bookingPreferenceHelper">Your preferred date and time window help us review readiness and contact you with the final confirmation.</p>
 
         <div class="row">
           <div>
@@ -328,7 +330,7 @@
         <textarea id="bookingNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
 
         <div class="btnRow">
-          <button class="btn" id="btnSubmitBooking" type="button">Submit Booking</button>
+          <button class="btn" id="btnSubmitBooking" type="button">Submit Booking Request</button>
         </div>
 
         <div class="statusBox hidden" id="bookingStatus"></div>
@@ -337,7 +339,7 @@
 
     <div class="card hidden stageCard" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
-      <p class="muted sectionLead">Photos are optional. They help us confirm access, volume, and materials so the job scope is clearer before scheduling.</p>
+      <p class="muted sectionLead">Photos are optional. They help us confirm access, volume, and materials so the job scope is clearer during admin review before final scheduling confirmation.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>

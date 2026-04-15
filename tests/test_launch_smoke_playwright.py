@@ -159,6 +159,7 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
 
     await page.locator("#btnAccept").click()
     await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
+    await expect(page.locator("#flowStatus")).to_contain_text("Please provide your booking preferences below")
     await expect(page.locator("#bookingCard")).to_be_visible()
     await expect(page.locator("#decisionCard")).to_be_hidden()
 
@@ -168,6 +169,7 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#btnSubmitBooking").click()
 
     await expect(page.locator("#bookingStatus")).to_contain_text("Booking submitted successfully.", timeout=20_000)
+    await expect(page.locator("#bookingStatus")).to_contain_text("admin review")
     booking_status_text = await page.locator("#bookingStatus").inner_text()
     request_match = re.search(r"Request ID:\s*([^\s]+)", booking_status_text)
     assert request_match, f"Expected Request ID in booking status text: {booking_status_text}"
@@ -224,10 +226,10 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate, then choose Accept Estimate if you want to continue.")
+    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate, then choose Accept Estimate if you want to continue into the booking request form.")
     await expect(page.locator("#decisionCard")).to_be_visible()
 
     await page.locator("#btnDecline").click()
 
     await expect(page.locator("#decisionStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
-    await expect(page.locator("#decisionStatus")).to_contain_text("You declined this estimate. No booking will be created.")
+    await expect(page.locator("#decisionStatus")).to_contain_text("You declined this estimate. No booking request will be created.")

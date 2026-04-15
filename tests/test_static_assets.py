@@ -57,7 +57,7 @@ def test_quote_page_supports_persisted_review_mode() -> None:
     assert '/view?accept_token=' not in quote_js
     assert 'loadPersistedQuoteReview();' in quote_js
     assert 'showPersistedQuoteReview' in quote_js
-    assert "You are reviewing a saved quote prepared for you. To request changes, contact Bay Delivery." in quote_js
+    assert "You are reviewing a saved estimate prepared for you. Review the pricing and request details here, and contact Bay Delivery if anything needs to be updated." in quote_js
     assert 'const res = await fetch("/quote/calculate"' in quote_js
 
 
@@ -73,11 +73,14 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Required for moves and deliveries." in quote_html
     assert "Photos are optional and come after your estimate." in quote_html
     assert "After your estimate: review what is included, compare Cash vs EMT totals" in quote_html
+    assert "before admin review and final confirmation" in quote_html
     assert "friendlyQuoteErrorMessage" in quote_js
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
     assert "Estimate Confidence" in quote_js
     assert "Optional photos can help confirm volume, access, or materials" in quote_js
+    assert "before Bay Delivery reviews and confirms the job" in quote_js
+    assert "admin review and final scheduling confirmation" in quote_js
     assert "quoteResultIncluded" in quote_css
     assert "quoteInfoCard" in quote_css
 
@@ -230,6 +233,8 @@ def test_admin_schedule_modal_includes_scheduling_handoff_context() -> None:
         "Last calendar error:",
     ]:
         assert label in admin_js
+    assert "Customer preferences captured for ops review" in admin_js
+    assert "Follow up with the customer if needed before scheduling." in admin_js
 
 
 def test_admin_page_includes_job_lifecycle_controls() -> None:
