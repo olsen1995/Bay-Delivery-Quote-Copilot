@@ -19,6 +19,28 @@ UNSET = object()
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
 
+ALLOWED_DEPOSIT_STATUSES = (
+    "not_required",
+    "required",
+    "pending",
+    "paid",
+    "failed",
+)
+ALLOWED_PAYMENT_ATTEMPT_STATUSES = (
+    "created",
+    "pending",
+    "succeeded",
+    "failed",
+    "expired",
+)
+DEPOSIT_STATUS_CHECK_SQL = (
+    "deposit_status IS NULL OR deposit_status IN "
+    "('not_required', 'required', 'pending', 'paid', 'failed')"
+)
+PAYMENT_ATTEMPT_STATUS_CHECK_SQL = (
+    "status IN ('created', 'pending', 'succeeded', 'failed', 'expired')"
+)
+
 
 class Job(TypedDict):
     job_id: str
@@ -82,6 +104,15 @@ class QuoteRequest(TypedDict):
     booking_token_created_at: Optional[str]
 
 
+class QuoteRequestRecord(QuoteRequest, total=False):
+    deposit_required_cad: Optional[float]
+    deposit_status: Optional[str]
+    deposit_paid_at: Optional[str]
+    deposit_refund_status: Optional[str]
+    deposit_refunded_at: Optional[str]
+    deposit_last_error: Optional[str]
+
+
 class ScreenshotAssistantAnalysis(TypedDict):
     analysis_id: str
     created_at: str
@@ -107,6 +138,44 @@ class AttachmentRecord(TypedDict):
     drive_file_id: str
     drive_web_view_link: Optional[str]
     ocr_json: NotRequired[Dict[str, Any]]
+
+
+class PaymentAttempt(TypedDict):
+    payment_attempt_id: str
+    request_id: str
+    provider: str
+    amount_cad: float
+    checkout_session_id: Optional[str]
+    payment_intent_id: Optional[str]
+    status: str
+    created_at: str
+    updated_at: str
+    refund_id: Optional[str]
+    last_error: Optional[str]
+
+
+class WebhookEventRecord(TypedDict):
+    provider_event_id: str
+    provider: str
+    event_type: str
+    received_at: str
+    processed_at: Optional[str]
+    payload_json: Any
+
+
+def _validate_deposit_status(value: Any) -> None:
+    if value is None:
+        return
+    if not isinstance(value, str) or value not in ALLOWED_DEPOSIT_STATUSES:
+        allowed = ", ".join(repr(item) for item in ALLOWED_DEPOSIT_STATUSES)
+        raise ValueError(f"deposit_status must be None or one of: {allowed}")
+
+
+def _validate_payment_attempt_status(value: Any) -> str:
+    if not isinstance(value, str) or value not in ALLOWED_PAYMENT_ATTEMPT_STATUSES:
+        allowed = ", ".join(repr(item) for item in ALLOWED_PAYMENT_ATTEMPT_STATUSES)
+        raise ValueError(f"payment_attempt.status must be one of: {allowed}")
+    return value
 
 
 def _clean_missing_field(value: Any) -> bool:
@@ -160,7 +229,16 @@ def is_token_expired(token_created_at: Optional[str], days: int = TOKEN_VALIDITY
         return True
 
 # Explicit table list keeps backup/restore deterministic and safe.
-KNOWN_TABLES = ["quotes", "quote_requests", "jobs", "attachments", "screenshot_assistant_analyses", "admin_audit_log"]
+KNOWN_TABLES = [
+    "quotes",
+    "quote_requests",
+    "jobs",
+    "attachments",
+    "screenshot_assistant_analyses",
+    "admin_audit_log",
+    "payment_attempts",
+    "webhook_events",
+]
 
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
@@ -331,7 +409,13 @@ def init_db() -> None:
                 admin_approved_at TEXT,
                 accept_token TEXT,
                 booking_token TEXT,
-                booking_token_created_at TEXT
+                booking_token_created_at TEXT,
+                deposit_required_cad REAL,
+                deposit_status TEXT CHECK (deposit_status IS NULL OR deposit_status IN ('not_required', 'required', 'pending', 'paid', 'failed')),
+                deposit_paid_at TEXT,
+                deposit_refund_status TEXT,
+                deposit_refunded_at TEXT,
+                deposit_last_error TEXT
             )
             """
         )
@@ -393,6 +477,38 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS payment_attempts (
+                payment_attempt_id TEXT PRIMARY KEY,
+                request_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                amount_cad REAL NOT NULL,
+                checkout_session_id TEXT,
+                payment_intent_id TEXT,
+                status TEXT NOT NULL CHECK ({PAYMENT_ATTEMPT_STATUS_CHECK_SQL}),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                refund_id TEXT,
+                last_error TEXT
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                provider_event_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                processed_at TEXT,
+                payload_json TEXT NOT NULL,
+                UNIQUE(provider, provider_event_id)
+            )
+            """
+        )
+
         # Backfill: add missing columns if older DB is present
         _try_add_column(conn, "quotes", "accept_token TEXT")
         _try_add_column(conn, "quote_requests", "notes TEXT")
@@ -403,6 +519,12 @@ def init_db() -> None:
         _try_add_column(conn, "quote_requests", "accept_token TEXT")
         _try_add_column(conn, "quote_requests", "booking_token TEXT")
         _try_add_column(conn, "quote_requests", "booking_token_created_at TEXT")
+        _try_add_column(conn, "quote_requests", "deposit_required_cad REAL")
+        _try_add_column(conn, "quote_requests", f"deposit_status TEXT CHECK ({DEPOSIT_STATUS_CHECK_SQL})")
+        _try_add_column(conn, "quote_requests", "deposit_paid_at TEXT")
+        _try_add_column(conn, "quote_requests", "deposit_refund_status TEXT")
+        _try_add_column(conn, "quote_requests", "deposit_refunded_at TEXT")
+        _try_add_column(conn, "quote_requests", "deposit_last_error TEXT")
 
         # Add scheduling columns to jobs table
         _try_add_column(conn, "jobs", "scheduled_start TEXT")
@@ -667,7 +789,61 @@ def list_quotes(limit: int = 50) -> List[QuoteRecord]:
 # Quote requests
 # =========================
 
+def _quote_request_from_row(
+    row: sqlite3.Row,
+    *,
+    include_payment_fields: bool = False,
+) -> QuoteRequest | QuoteRequestRecord:
+    row_dict = dict(row)
+
+    try:
+        req = json.loads(row_dict["request_json"])
+    except Exception:
+        req = row_dict["request_json"]
+
+    out: Dict[str, Any] = {
+        "request_id": row_dict["request_id"],
+        "created_at": row_dict["created_at"],
+        "status": row_dict["status"],
+        "quote_id": row_dict["quote_id"],
+        "customer_name": row_dict["customer_name"],
+        "customer_phone": row_dict["customer_phone"],
+        "job_address": row_dict["job_address"],
+        "job_description_customer": row_dict["job_description_customer"],
+        "job_description_internal": row_dict["job_description_internal"],
+        "service_type": row_dict["service_type"],
+        "cash_total_cad": row_dict["cash_total_cad"],
+        "emt_total_cad": row_dict["emt_total_cad"],
+        "request_json": req,
+        "notes": row_dict["notes"],
+        "requested_job_date": row_dict["requested_job_date"],
+        "requested_time_window": row_dict["requested_time_window"],
+        "customer_accepted_at": row_dict["customer_accepted_at"],
+        "admin_approved_at": row_dict["admin_approved_at"],
+        "accept_token": row_dict["accept_token"],
+        "booking_token": row_dict["booking_token"],
+        "booking_token_created_at": row_dict["booking_token_created_at"],
+    }
+
+    if include_payment_fields:
+        out.update(
+            {
+                "deposit_required_cad": row_dict.get("deposit_required_cad"),
+                "deposit_status": row_dict.get("deposit_status"),
+                "deposit_paid_at": row_dict.get("deposit_paid_at"),
+                "deposit_refund_status": row_dict.get("deposit_refund_status"),
+                "deposit_refunded_at": row_dict.get("deposit_refunded_at"),
+                "deposit_last_error": row_dict.get("deposit_last_error"),
+            }
+        )
+        return cast(QuoteRequestRecord, out)
+
+    return cast(QuoteRequest, out)
+
+
 def save_quote_request(record: Dict[str, Any]) -> None:
+    _validate_deposit_status(record.get("deposit_status"))
+
     conn = _connect()
     try:
         conn.execute(
@@ -678,8 +854,10 @@ def save_quote_request(record: Dict[str, Any]) -> None:
              job_description_customer, job_description_internal,
              service_type, cash_total_cad, emt_total_cad,
              request_json, notes, requested_job_date, requested_time_window,
-             customer_accepted_at, admin_approved_at, accept_token, booking_token, booking_token_created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             customer_accepted_at, admin_approved_at, accept_token, booking_token, booking_token_created_at,
+             deposit_required_cad, deposit_status, deposit_paid_at, deposit_refund_status,
+             deposit_refunded_at, deposit_last_error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["request_id"],
@@ -703,6 +881,12 @@ def save_quote_request(record: Dict[str, Any]) -> None:
                 record.get("accept_token"),
                 record.get("booking_token"),
                 record.get("booking_token_created_at"),
+                record.get("deposit_required_cad"),
+                record.get("deposit_status"),
+                record.get("deposit_paid_at"),
+                record.get("deposit_refund_status"),
+                record.get("deposit_refunded_at"),
+                record.get("deposit_last_error"),
             ),
         )
         conn.commit()
@@ -720,36 +904,20 @@ def get_quote_request(request_id: str) -> Optional[QuoteRequest]:
     if not row:
         return None
 
-    row_dict = dict(row)
+    return cast(QuoteRequest, _quote_request_from_row(row))
 
+
+def get_quote_request_record(request_id: str) -> Optional[QuoteRequestRecord]:
+    conn = _connect()
     try:
-        req = json.loads(row_dict["request_json"])
-    except Exception:
-        req = row_dict["request_json"]
+        row = conn.execute("SELECT * FROM quote_requests WHERE request_id = ?", (request_id,)).fetchone()
+    finally:
+        conn.close()
 
-    return {
-        "request_id": row_dict["request_id"],
-        "created_at": row_dict["created_at"],
-        "status": row_dict["status"],
-        "quote_id": row_dict["quote_id"],
-        "customer_name": row_dict["customer_name"],
-        "customer_phone": row_dict["customer_phone"],
-        "job_address": row_dict["job_address"],
-        "job_description_customer": row_dict["job_description_customer"],
-        "job_description_internal": row_dict["job_description_internal"],
-        "service_type": row_dict["service_type"],
-        "cash_total_cad": row_dict["cash_total_cad"],
-        "emt_total_cad": row_dict["emt_total_cad"],
-        "request_json": req,
-        "notes": row_dict["notes"],
-        "requested_job_date": row_dict["requested_job_date"],
-        "requested_time_window": row_dict["requested_time_window"],
-        "customer_accepted_at": row_dict["customer_accepted_at"],
-        "admin_approved_at": row_dict["admin_approved_at"],
-        "accept_token": row_dict["accept_token"],
-        "booking_token": row_dict["booking_token"],
-        "booking_token_created_at": row_dict["booking_token_created_at"],
-    }
+    if not row:
+        return None
+
+    return cast(QuoteRequestRecord, _quote_request_from_row(row, include_payment_fields=True))
 
 
 def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
@@ -798,8 +966,14 @@ def update_quote_request(
     admin_approved_at: Any = UNSET,
     booking_token: Any = UNSET,
     booking_token_created_at: Any = UNSET,
+    deposit_required_cad: Any = UNSET,
+    deposit_status: Any = UNSET,
+    deposit_paid_at: Any = UNSET,
+    deposit_refund_status: Any = UNSET,
+    deposit_refunded_at: Any = UNSET,
+    deposit_last_error: Any = UNSET,
 ) -> Optional[QuoteRequest]:
-    existing = get_quote_request(request_id)
+    existing = get_quote_request_record(request_id)
     if not existing:
         return None
 
@@ -825,6 +999,19 @@ def update_quote_request(
         updated["booking_token"] = booking_token
     if booking_token_created_at is not UNSET:
         updated["booking_token_created_at"] = booking_token_created_at
+    if deposit_required_cad is not UNSET:
+        updated["deposit_required_cad"] = deposit_required_cad
+    if deposit_status is not UNSET:
+        _validate_deposit_status(deposit_status)
+        updated["deposit_status"] = deposit_status
+    if deposit_paid_at is not UNSET:
+        updated["deposit_paid_at"] = deposit_paid_at
+    if deposit_refund_status is not UNSET:
+        updated["deposit_refund_status"] = deposit_refund_status
+    if deposit_refunded_at is not UNSET:
+        updated["deposit_refunded_at"] = deposit_refunded_at
+    if deposit_last_error is not UNSET:
+        updated["deposit_last_error"] = deposit_last_error
 
     save_quote_request(
         {
@@ -849,9 +1036,226 @@ def update_quote_request(
             "accept_token": updated.get("accept_token"),
             "booking_token": updated.get("booking_token"),
             "booking_token_created_at": updated.get("booking_token_created_at"),
+            "deposit_required_cad": updated.get("deposit_required_cad"),
+            "deposit_status": updated.get("deposit_status"),
+            "deposit_paid_at": updated.get("deposit_paid_at"),
+            "deposit_refund_status": updated.get("deposit_refund_status"),
+            "deposit_refunded_at": updated.get("deposit_refunded_at"),
+            "deposit_last_error": updated.get("deposit_last_error"),
         }
     )
-    return cast(QuoteRequest, updated)
+    return get_quote_request(request_id)
+
+
+# =========================
+# Payment attempts
+# =========================
+
+def _payment_attempt_from_row(row: sqlite3.Row) -> PaymentAttempt:
+    return {
+        "payment_attempt_id": row["payment_attempt_id"],
+        "request_id": row["request_id"],
+        "provider": row["provider"],
+        "amount_cad": row["amount_cad"],
+        "checkout_session_id": row["checkout_session_id"],
+        "payment_intent_id": row["payment_intent_id"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "refund_id": row["refund_id"],
+        "last_error": row["last_error"],
+    }
+
+
+def save_payment_attempt(record: Dict[str, Any]) -> None:
+    status = _validate_payment_attempt_status(record.get("status"))
+
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO payment_attempts
+            (payment_attempt_id, request_id, provider, amount_cad, checkout_session_id,
+             payment_intent_id, status, created_at, updated_at, refund_id, last_error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["payment_attempt_id"],
+                record["request_id"],
+                record["provider"],
+                float(record["amount_cad"]),
+                record.get("checkout_session_id"),
+                record.get("payment_intent_id"),
+                status,
+                record["created_at"],
+                record["updated_at"],
+                record.get("refund_id"),
+                record.get("last_error"),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_payment_attempt(payment_attempt_id: str) -> Optional[PaymentAttempt]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM payment_attempts WHERE payment_attempt_id = ?",
+            (payment_attempt_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+
+    return _payment_attempt_from_row(row)
+
+
+def list_payment_attempts_for_request(request_id: str, limit: int = 50) -> List[PaymentAttempt]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM payment_attempts
+            WHERE request_id = ?
+            ORDER BY datetime(created_at) DESC, payment_attempt_id DESC
+            LIMIT ?
+            """,
+            (request_id, int(limit)),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [_payment_attempt_from_row(row) for row in rows]
+
+
+def update_payment_attempt(
+    payment_attempt_id: str,
+    *,
+    checkout_session_id: Any = UNSET,
+    payment_intent_id: Any = UNSET,
+    status: Any = UNSET,
+    updated_at: Any = UNSET,
+    refund_id: Any = UNSET,
+    last_error: Any = UNSET,
+) -> Optional[PaymentAttempt]:
+    existing = get_payment_attempt(payment_attempt_id)
+    if not existing:
+        return None
+
+    updated: Dict[str, Any] = dict(existing)
+
+    if checkout_session_id is not UNSET:
+        updated["checkout_session_id"] = checkout_session_id
+    if payment_intent_id is not UNSET:
+        updated["payment_intent_id"] = payment_intent_id
+    if status is not UNSET:
+        updated["status"] = _validate_payment_attempt_status(status)
+    if updated_at is not UNSET:
+        updated["updated_at"] = updated_at
+    if refund_id is not UNSET:
+        updated["refund_id"] = refund_id
+    if last_error is not UNSET:
+        updated["last_error"] = last_error
+
+    save_payment_attempt(updated)
+    return get_payment_attempt(payment_attempt_id)
+
+
+# =========================
+# Webhook events
+# =========================
+
+def _webhook_event_from_row(row: sqlite3.Row) -> WebhookEventRecord:
+    payload: Any = row["payload_json"]
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except Exception:
+            pass
+
+    return {
+        "provider_event_id": row["provider_event_id"],
+        "provider": row["provider"],
+        "event_type": row["event_type"],
+        "received_at": row["received_at"],
+        "processed_at": row["processed_at"],
+        "payload_json": payload,
+    }
+
+
+def save_webhook_event(record: Dict[str, Any]) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO webhook_events
+            (provider_event_id, provider, event_type, received_at, processed_at, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["provider_event_id"],
+                record["provider"],
+                record["event_type"],
+                record["received_at"],
+                record.get("processed_at"),
+                json.dumps(record.get("payload_json"), ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_webhook_event(provider: str, provider_event_id: str) -> Optional[WebhookEventRecord]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM webhook_events
+            WHERE provider = ? AND provider_event_id = ?
+            """,
+            (provider, provider_event_id),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+
+    return _webhook_event_from_row(row)
+
+
+def mark_webhook_event_processed(
+    provider: str,
+    provider_event_id: str,
+    *,
+    processed_at: Optional[str],
+) -> Optional[WebhookEventRecord]:
+    existing = get_webhook_event(provider, provider_event_id)
+    if not existing:
+        return None
+
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            UPDATE webhook_events
+            SET processed_at = ?
+            WHERE provider = ? AND provider_event_id = ?
+            """,
+            (processed_at, provider, provider_event_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_webhook_event(provider, provider_event_id)
 
 
 # =========================
