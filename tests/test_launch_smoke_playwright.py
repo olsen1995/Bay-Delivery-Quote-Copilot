@@ -193,6 +193,7 @@ async def test_launch_quote_route_missing_fields_are_named(page: Page, live_serv
     await expect(page.locator("#resultBox")).to_contain_text("Please fill in the required fields:")
     await expect(page.locator("#resultBox")).to_contain_text("Pickup address")
     await expect(page.locator("#resultBox")).to_contain_text("Dropoff address")
+    await expect(page.locator("#resultBox")).to_contain_text("Pickup and dropoff addresses are required for moves and deliveries")
     await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
 
 
@@ -216,11 +217,14 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await page.locator("#btnCalc").click()
 
     await expect(page.locator("#resultBox")).to_contain_text("Pricing Breakdown", timeout=20_000)
+    await expect(page.locator("#resultBox")).to_contain_text("What this estimate includes")
+    await expect(page.locator("#resultBox")).to_contain_text("What happens next")
     await expect(page.locator("#resultBox")).to_contain_text("Estimate Details")
+    await expect(page.locator("#resultBox")).to_contain_text("Estimate Confidence")
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate")
+    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate, then choose Accept Estimate if you want to continue.")
     await expect(page.locator("#decisionCard")).to_be_visible()
 
     await page.locator("#btnDecline").click()

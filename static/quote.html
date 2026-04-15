@@ -35,7 +35,7 @@
     <div class="heroCard card quoteHeroShell">
       <p class="eyebrow">Bay Delivery</p>
       <h1>Get an Estimate</h1>
-      <p class="muted heroCopy">Get a fast estimate with clear Cash (no HST) and EMT (+13% HST) totals. No booking starts until you accept.</p>
+      <p class="muted heroCopy">Get a fast estimate with clear Cash (no HST) and EMT (+13% HST) totals. Share as much detail as you can for accuracy. Booking starts only if you accept.</p>
       <div class="heroHighlights" aria-hidden="true">
         <span class="heroHighlight">Fast estimate</span>
         <span class="heroHighlight">North Bay local</span>
@@ -48,7 +48,7 @@
           <p class="sectionEyebrow">Quote Flow</p>
           <h2>What happens next</h2>
         </div>
-        <p class="muted sectionLead">5 quick steps. Booking starts only if you accept the estimate.</p>
+        <p class="muted sectionLead">You complete 4 quick estimate steps first. Booking preferences and optional photos come after you review and accept.</p>
       </div>
       <ol class="flowProgress" id="flowProgress" aria-label="Quote progress">
         <li class="flowStep is-active" data-step="1"><span class="flowStepBadge">1</span><span class="flowStepLabel">Job details</span></li>
@@ -65,7 +65,7 @@
           <p class="sectionEyebrow">Customer Estimate</p>
           <h2>Tell us about the job</h2>
         </div>
-        <p class="muted sectionLead">Share the details needed for an accurate estimate.</p>
+        <p class="muted sectionLead">Share the job details needed for an accurate estimate. We only ask for the information already used in our current estimate flow.</p>
       </div>
 
       <form id="quoteForm" class="formWrap" novalidate>
@@ -73,7 +73,7 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">1) Contact &amp; Job Location</h3>
-              <p class="firstStepHint">Step 1 of 5. Start here so we can send your estimate and booking updates.</p>
+              <p class="firstStepHint">Step 1 of 4 before your estimate. Start here so we can send your estimate and any follow-up booking updates.</p>
             </div>
           </div>
 
@@ -110,7 +110,7 @@
                 <option value="item_delivery">Item delivery</option>
                 <option value="demolition">Demolition</option>
               </select>
-              <div class="helperText" id="serviceHelp">Select a service to show only relevant fields.</div>
+              <div class="helperText" id="serviceHelp">Select a service to show only relevant fields and guidance.</div>
             </div>
           </div>
         </div>
@@ -119,17 +119,19 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">3) Service-Specific Details</h3>
-              <p class="muted sectionLead">Step 3 of 5. Add details that affect pricing.</p>
+              <p class="muted sectionLead">Step 3 of 4 before your estimate. Add the details that affect estimate accuracy.</p>
             </div>
           </div>
 
           <details id="serviceDetailsPanel" class="detailPanel">
-            <summary>Optional details for pricing accuracy</summary>
+            <summary id="serviceDetailsSummary">Service-specific details for estimate accuracy</summary>
+            <p class="panelLead" id="serviceDetailsLead">Open this section to complete the details that apply to your service.</p>
 
             <div class="row">
               <div id="estimatedHoursGroup">
                 <label for="estimated_hours">Estimated hours</label>
                 <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
+                <div class="helperText">Use your best estimate. If you are unsure, include more detail in the job description below.</div>
               </div>
             </div>
 
@@ -147,6 +149,7 @@
                   <option value="curbside">Curbside / outside pickup</option>
                   <option value="inside">Inside / on-property pickup</option>
                 </select>
+                <div class="helperText">Choose where the scrap is located so the estimate reflects the correct handling effort.</div>
               </div>
             </div>
 
@@ -176,10 +179,12 @@
               <div>
                 <label for="pickup_address">Pickup address</label>
                 <input id="pickup_address" name="pickup_address" placeholder="Pickup location" />
+                <div class="helperText">Required for moves and deliveries.</div>
               </div>
               <div>
                 <label for="dropoff_address">Dropoff address</label>
                 <input id="dropoff_address" name="dropoff_address" placeholder="Dropoff location" />
+                <div class="helperText">Required for moves and deliveries.</div>
               </div>
             </div>
 
@@ -187,10 +192,12 @@
               <div>
                 <label for="garbage_bag_count">Garbage bag count (bag-equivalent)</label>
                 <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
+                <div class="helperText">Use your closest bag-equivalent count. This helps keep load sizing consistent.</div>
               </div>
               <div>
                 <label for="mattresses_count">Mattresses</label>
                 <input id="mattresses_count" name="mattresses_count" type="number" min="0" step="1" value="0" />
+                <div class="helperText">Include bulky items here so the estimate reflects handling and disposal properly.</div>
               </div>
             </div>
 
@@ -222,7 +229,7 @@
               </div>
               <div>
                 <label class="muted">Photo tip</label>
-                <div class="hint">After your estimate, you can upload photos to help confirm scope before scheduling.</div>
+                <div class="hint">Photos are optional and come after your estimate. They help confirm volume, access, and materials for better accuracy before scheduling.</div>
               </div>
             </div>
           </details>
@@ -232,7 +239,7 @@
           <div class="sectionHeader compact">
             <div>
               <h3 class="formSectionTitle">4) Job Description</h3>
-              <p class="muted sectionLead">Step 4 of 5. Add details your driver or crew should know.</p>
+              <p class="muted sectionLead">Step 4 of 4 before your estimate. Add the details your driver or crew should know.</p>
             </div>
           </div>
 
@@ -240,13 +247,14 @@
           <textarea id="description" name="description" rows="4"
             placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
             required></textarea>
+          <p class="helperText">Helpful details: quantity, item type, access notes, stairs, parking, distance to truck, and anything unusual.</p>
         </div>
 
         <div class="btnRow">
           <button class="btn" id="btnCalc" type="button">Get Estimate Now</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
-        <p class="stepHelper">Step 5 starts after your estimate: review totals, then accept or decline.</p>
+        <p class="stepHelper">After your estimate: review what is included, compare Cash vs EMT totals, then accept or decline. Booking preferences and optional photos come later.</p>
         <div class="loadingState hidden" id="loadingState">
           <span class="spinner"></span>
           <span>Calculating your estimate...</span>
@@ -257,7 +265,7 @@
     <div class="card resultBox hidden" id="resultBox" aria-live="polite"></div>
     <div class="card hidden stageCard" id="quoteSummaryCard">
       <h2>Estimate Summary</h2>
-      <p class="muted sectionLead">Your estimate is generated from the job details you provided and follows our standard North Bay pricing structure.</p>
+      <p class="muted sectionLead">Your estimate is based on the job details you provided and follows our current North Bay pricing structure. Final on-site scope can still be confirmed before work begins if conditions differ.</p>
       <div class="quoteSummaryGrid">
         <div><strong>Service:</strong> <span id="summaryService"></span></div>
         <div><strong>Customer:</strong> <span id="summaryCustomer"></span></div>
@@ -271,7 +279,7 @@
 
     <div class="card hidden stageCard" id="decisionCard">
       <h2>Estimate Decision</h2>
-      <p class="muted sectionLead">If this estimate works for you, accept and continue to booking preferences. Otherwise, decline with no pressure.</p>
+      <p class="muted sectionLead">If this estimate works for you, accept to share your booking preferences. If not, you can decline with no booking created.</p>
 
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
@@ -329,12 +337,12 @@
 
     <div class="card hidden stageCard" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
-      <p class="muted sectionLead">Photos help us confirm access, volume, and materials so your final on-site workflow is smoother.</p>
+      <p class="muted sectionLead">Photos are optional. They help us confirm access, volume, and materials so the job scope is clearer before scheduling.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>
         <input id="photos" name="photos" type="file" accept="image/*" multiple />
-        <p class="helperText">Tip: wide-angle photos from multiple corners are most useful. Maximum 5 images.</p>
+        <p class="helperText">Tip: wide-angle photos from multiple corners are most useful. Maximum 5 images. Upload only if they will help explain the job more clearly.</p>
 
         <div class="btnRow">
           <button class="btn secondary" id="btnUpload" type="button">Upload Photos</button>
