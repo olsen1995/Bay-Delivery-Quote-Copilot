@@ -3,4 +3,42 @@ version = 1
 name = "Bay-Delivery-Quote-Copilot"
 
 [setup]
-script = ""
+script = '''
+$ErrorActionPreference = "Stop"
+
+Set-Location "$env:CODEX_WORKTREE_PATH"
+
+Write-Host "==> Working directory: $(Get-Location)"
+
+if (Test-Path ".\.venv\Scripts\Activate.ps1") {
+    Write-Host "==> Activating .venv"
+    . .\.venv\Scripts\Activate.ps1
+} else {
+    Write-Host "==> No .venv found, continuing without activation"
+}
+
+Write-Host "==> Python version"
+python --version
+
+Write-Host "==> Pip version"
+pip --version
+
+if (Test-Path ".\requirements.txt") {
+    Write-Host "==> Installing requirements.txt"
+    pip install -r requirements.txt
+} else {
+    Write-Host "==> No requirements.txt found"
+}
+
+if (Test-Path ".\requirements-dev.txt") {
+    Write-Host "==> Installing requirements-dev.txt"
+    pip install -r requirements-dev.txt
+} else {
+    Write-Host "==> No requirements-dev.txt found"
+}
+
+Write-Host "==> Ensuring Playwright browsers are installed"
+python -m playwright install
+
+Write-Host "==> Environment setup complete"
+'''
