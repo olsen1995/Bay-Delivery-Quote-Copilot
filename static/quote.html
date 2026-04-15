@@ -126,6 +126,7 @@
           <details id="serviceDetailsPanel" class="detailPanel">
             <summary id="serviceDetailsSummary">Service details that affect your estimate</summary>
             <p class="panelLead" id="serviceDetailsLead">Open this section to fill in the service details that affect estimate accuracy for this job.</p>
+            <p class="helperText">Not sure? Give your best estimate — we’ll confirm details before finalizing the job.</p>
 
             <div class="row">
               <div id="estimatedHoursGroup">
@@ -162,6 +163,7 @@
                   <option value="extreme">Extreme access (multiple flights, tight access, difficult parking)</option>
                 </select>
                 <div class="helperText">Choose the closest match. Think about stairs, carry distance, and parking.</div>
+                <div class="helperText">Easy = curbside / garage  Medium = short walk / a few stairs  Hard = basement / long carry / tight access</div>
               </div>
             </div>
 
@@ -171,7 +173,7 @@
                   <input id="has_dense_materials" name="has_dense_materials" type="checkbox" />
                   <span>This job includes heavy or dense materials (for example drywall, concrete, tile, shingles, soil, wet debris, or similar).</span>
                 </label>
-                <div class="helperText">These materials usually make loading slower and heavier.</div>
+                <div class="helperText">Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.</div>
               </div>
             </div>
 
@@ -192,7 +194,8 @@
               <div>
                 <label for="garbage_bag_count">Bag-equivalent count</label>
                 <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
-                <div class="helperText">Use the number of regular kitchen garbage bags the loose junk would roughly fill. Example: a small loose pile might equal 6 to 8 bags.</div>
+                <div class="helperText">A full kitchen garbage bag = 1. If unsure, estimate slightly higher.</div>
+                <div class="helperText hidden" id="bagCountNudge">Most jobs are 5–10 bags. Adjust if needed.</div>
               </div>
               <div>
                 <label for="mattresses_count">Mattresses</label>
@@ -229,7 +232,7 @@
               </div>
               <div>
                 <label class="muted">Photo tip</label>
-                <div class="hint">Photos are optional after your estimate. They can help confirm volume, access, and materials so there are fewer surprises if you continue.</div>
+                <div class="hint">You can add photos after your estimate to help confirm accuracy.</div>
               </div>
             </div>
           </details>
@@ -339,7 +342,7 @@
 
     <div class="card hidden stageCard" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
-      <p class="muted sectionLead">Photos are optional. They can help confirm volume, access, and materials so your estimate stays accurate and there are fewer surprises during admin review before final scheduling confirmation.</p>
+      <p class="muted sectionLead">Adding photos now helps lock in your price and avoid changes later.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>

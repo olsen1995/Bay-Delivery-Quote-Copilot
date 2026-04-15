@@ -204,6 +204,11 @@ async def test_launch_quote_route_missing_fields_are_named(page: Page, live_serv
 async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server: str) -> None:
     await page.goto(f"{live_server}/quote", wait_until="networkidle")
     await expect(page.locator("#quoteForm")).to_be_visible()
+    await expect(page.locator("#quoteForm")).to_contain_text("Not sure? Give your best estimate")
+    await expect(page.locator("#quoteForm")).to_contain_text("A full kitchen garbage bag = 1. If unsure, estimate slightly higher.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Easy = curbside / garage")
+    await expect(page.locator("#quoteForm")).to_contain_text("You can add photos after your estimate to help confirm accuracy.")
 
     await page.locator("#customer_name").fill("Playwright Decline Smoke")
     await page.locator("#customer_phone").fill("705-555-0112")
@@ -215,7 +220,10 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
 
     await page.locator("#access_difficulty").select_option("difficult")
     await page.locator("#has_dense_materials").check()
+    await page.locator("#garbage_bag_count").fill("3")
+    await expect(page.locator("#bagCountNudge")).to_be_visible()
     await page.locator("#garbage_bag_count").fill("8")
+    await expect(page.locator("#bagCountNudge")).to_be_hidden()
 
     await page.locator("#btnCalc").click()
 
@@ -227,9 +235,11 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
+    await expect(page.locator("#resultBox")).to_contain_text("Adding photos now helps lock in your price and avoid changes later.")
     await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate. If you want to continue, choose Accept Estimate & Continue to open the booking request form.")
     await expect(page.locator("#resultBox")).to_contain_text("Your job is not booked until Bay Delivery reviews and confirms it.")
     await expect(page.locator("#decisionCard")).to_be_visible()
+    await expect(page.locator("#uploadCard")).to_contain_text("Adding photos now helps lock in your price and avoid changes later.")
 
     await page.locator("#btnDecline").click()
 

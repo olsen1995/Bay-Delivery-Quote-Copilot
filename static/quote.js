@@ -264,6 +264,14 @@ function pluralize(count, singular, plural) {
   return count === 1 ? singular : plural;
 }
 
+function syncBagCountNudge() {
+  const serviceType = el("service_type").value;
+  const showLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
+  const nudge = el("bagCountNudge");
+  const bagCount = parseInt(el("garbage_bag_count").value || "0", 10);
+  nudge.classList.toggle("hidden", !showLoadCounts || Number.isNaN(bagCount) || bagCount > 3);
+}
+
 function buildEstimateDetails() {
   const serviceType = el("service_type").value;
   const serviceLabel = el("service_type").selectedOptions[0].textContent;
@@ -395,7 +403,7 @@ function renderQuoteResult(data, quoteResponse) {
   noteTitle.textContent = "Estimate Confidence";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = (quoteResponse.disclaimer || "") + " Optional photos can help confirm volume, access, or materials if you want extra accuracy and fewer surprises during admin review before final scheduling confirmation.";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Adding photos now helps lock in your price and avoid changes later.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
@@ -432,6 +440,7 @@ function clearForm() {
   el("bookingDate").value = "";
   el("bookingWindow").value = "";
   el("bookingNotes").value = "";
+  syncBagCountNudge();
 }
 
 function resetInapplicableServiceFields(serviceType) {
@@ -505,6 +514,8 @@ function syncServiceFields() {
     detailsSummary.textContent = "Service details that affect your estimate";
     detailsLead.textContent = "Open this section to fill in the service details that affect estimate accuracy for your service.";
   }
+
+  syncBagCountNudge();
 }
 
 function requiresRouteFields(serviceType) {
@@ -742,6 +753,8 @@ el("service_type").addEventListener("change", () => {
   syncRouteFields();
   syncServiceFields();
 });
+el("garbage_bag_count").addEventListener("input", syncBagCountNudge);
+el("garbage_bag_count").addEventListener("change", syncBagCountNudge);
 
 attachValidationClearHandlers();
 enforceBookingDateMin();
@@ -910,6 +923,7 @@ el("btnUpload").addEventListener("click", async () => {
 
 syncRouteFields();
 syncServiceFields();
+syncBagCountNudge();
 setPersistedReviewMode(false);
 setFlowStage(1);
 loadPersistedQuoteReview();
