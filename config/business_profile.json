@@ -111,6 +111,21 @@
     "gas": 20,
     "wear_and_tear": 20
   },
+  "booking": {
+    "payments": {
+      "enabled": false,
+      "provider": "stripe",
+      "deposit_basis": "emt_total_cad",
+      "deposit_policy": {
+        "mode": "planning_only",
+        "percentage": null,
+        "flat_amount_cad": null
+      },
+      "approval_requires_paid_deposit": false,
+      "webhook_authoritative": true,
+      "auto_refund_on_reject": false
+    }
+  },
   "customer_disclaimer": {
     "base": "This estimate is based on the information provided and may change after an in-person view (stairs, heavy items, access, actual load size, multiple trips, etc.).",
     "include_removal_disposal": true
