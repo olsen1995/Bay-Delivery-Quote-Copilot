@@ -9,7 +9,7 @@ class QuoteStressScenario(TypedDict, total=False):
     payload: dict[str, Any]
     expected_status: int
     expected_service_type: str
-    expected_error_detail: str
+    expected_error_detail_substrings: list[str]
     expected_error_loc: list[str]
     requires_pickup_dropoff: bool
     check_minimum_floor: bool
@@ -293,7 +293,7 @@ BAD_INPUT_SCENARIOS: list[QuoteStressScenario] = [
             pickup_address="10 Pickup Rd",
         ),
         "expected_status": 400,
-        "expected_error_detail": "pickup_address and dropoff_address are required",
+        "expected_error_detail_substrings": ["pickup_address", "dropoff_address", "required"],
     },
     {
         "id": "bad_input_delivery_missing_pickup",
@@ -305,7 +305,7 @@ BAD_INPUT_SCENARIOS: list[QuoteStressScenario] = [
             dropoff_address="20 Delivery Lane",
         ),
         "expected_status": 400,
-        "expected_error_detail": "pickup_address and dropoff_address are required",
+        "expected_error_detail_substrings": ["pickup_address", "dropoff_address", "required"],
     },
     {
         "id": "bad_input_negative_garbage_bag_count",

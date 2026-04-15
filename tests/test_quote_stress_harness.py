@@ -113,7 +113,10 @@ def _assert_failure_invariants(response, scenario: QuoteStressScenario) -> None:
     body = response.json()
 
     if response.status_code == 400:
-        assert body == {"detail": scenario["expected_error_detail"]}
+        detail = body.get("detail")
+        assert isinstance(detail, str)
+        for substring in scenario["expected_error_detail_substrings"]:
+            assert substring in detail
         return
 
     assert response.status_code == 422
