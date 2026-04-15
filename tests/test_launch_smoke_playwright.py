@@ -160,6 +160,7 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#btnAccept").click()
     await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
     await expect(page.locator("#flowStatus")).to_contain_text("Please provide your booking preferences below")
+    await expect(page.locator("#flowStatus")).to_contain_text("The job is not booked yet.")
     await expect(page.locator("#bookingCard")).to_be_visible()
     await expect(page.locator("#decisionCard")).to_be_hidden()
 
@@ -226,7 +227,8 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate, then choose Accept Estimate if you want to continue into the booking request form.")
+    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate. If you want to continue, choose Accept Estimate & Continue to open the booking request form.")
+    await expect(page.locator("#resultBox")).to_contain_text("Your job is not booked until Bay Delivery reviews and confirms it.")
     await expect(page.locator("#decisionCard")).to_be_visible()
 
     await page.locator("#btnDecline").click()
