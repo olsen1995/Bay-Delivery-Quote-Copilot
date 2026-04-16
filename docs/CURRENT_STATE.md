@@ -2,19 +2,19 @@
 
 This document is the authoritative current system status summary referenced by `README.md`.
 
-Last reviewed: 2026-04-13
+Last reviewed: 2026-04-16
 
 For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_TRUTH.md` and the maintained grounding pack in `docs/gpt/`.
 
 ## Project Status
 
 - Bay Delivery Quote Copilot is stable and production-usable.
-- Current work is focused on drift prevention, operational clarity, reliability, and narrow, auditable refinements rather than broad feature expansion.
+- Current work is focused on hardening, controlled expansion, operational clarity, reliability, and narrow, auditable refinements rather than broad feature expansion.
 - When system state is unclear, verify against `PROJECT_RULES.md`, `docs/gpt/`, `README.md`, and current repository code instead of relying on memory or undocumented assumptions.
 
 ## Current Operating Phase
 
-- The project is production-usable and stable, in refinement / hardening / operational-confidence mode.
+- The project is production-usable and stable, in hardening / controlled-expansion / operational-confidence mode.
 - The goal is to preserve alignment between repository truth, current documented workflow, and maintained GPT grounding.
 - Documentation should describe current documented system state conservatively and should not present unverified live behavior as guaranteed fact.
 
@@ -47,6 +47,14 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - GPT grounding exists to keep outputs aligned to repository truth, project rules, and current operating boundaries.
 - GPT may explain, summarize, and guide process, but it must not override repo pricing logic, workflow state, auth, token, or persistence rules.
 
+## Recent Completed Hardening
+
+- C1.5a internal quote risk scoring is complete.
+- Internal quote artifacts now include `confidence_level` and `risk_flags`.
+- The assessment is internal-only, artifact-pipeline-only, and is not customer-facing or persisted.
+- Haul-away risk scoring only counts supported `bag_type` and `trailer_fill_estimate` values; unsupported raw strings are ignored so they do not inflate confidence.
+- `python-multipart` is now pinned to `0.0.26`, closing the related CI/security unblock that shipped with PR #197.
+
 ## Workflow Expectations
 
 - Plan first.
@@ -63,6 +71,7 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - Admin operations surfaces exist with protected admin actions.
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
+- Internal quote risk scoring is implemented in the artifact pipeline without changing pricing, API, UI, DB, or booking behavior.
 
 ## Active Docs Map
 
