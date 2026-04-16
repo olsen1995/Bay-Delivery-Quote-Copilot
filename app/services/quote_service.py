@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.quote_engine import calculate_quote
+from app.services.quote_risk_scoring import build_quote_risk_assessment
 from app.storage import save_quote
 
 _PHONE_ALLOWED = re.compile(r"^[0-9().+\-\s]+$")
@@ -93,11 +94,16 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "emt_total_cad": float(engine_quote["total_emt_cad"]),
         "disclaimer": str(engine_quote["disclaimer"]),
     }
+    internal_risk_assessment = build_quote_risk_assessment(
+        normalized_request=normalized_request,
+        engine_quote=engine_quote,
+    )
 
     return {
         "normalized_request": normalized_request,
         "response": response,
         "engine_quote": engine_quote,
+        "internal_risk_assessment": internal_risk_assessment,
     }
 
 
