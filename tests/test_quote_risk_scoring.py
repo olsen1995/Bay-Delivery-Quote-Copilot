@@ -100,6 +100,17 @@ def test_mixed_bulky_load_risk_uses_structured_load_signals() -> None:
     assert "mixed_bulky_load_risk" in assessment["risk_flags"]
 
 
+def test_invalid_access_and_travel_inputs_do_not_count_as_scope_signals() -> None:
+    assessment = _assessment_for(
+        service_type="demolition",
+        access_difficulty="stairs",
+        travel_zone="rural",
+    )
+
+    assert assessment["confidence"] == "medium"
+    assert assessment["risk_flags"] == ["low_input_signal"]
+
+
 def test_build_quote_artifacts_keeps_internal_assessment_out_of_public_quote(temp_quote_db) -> None:
     payload = _base_payload()
     payload["garbage_bag_count"] = 3

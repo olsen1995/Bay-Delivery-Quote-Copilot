@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 _ROUTE_REQUIRED_SERVICE_TYPES = {"small_move", "item_delivery"}
+_ALLOWED_ACCESS_DIFFICULTIES = {"normal", "difficult", "extreme"}
+_ALLOWED_TRAVEL_ZONES = {"in_town", "surrounding", "out_of_town"}
 _RISK_FLAG_ORDER = (
     "low_input_signal",
     "missing_structured_scope",
@@ -35,6 +37,18 @@ def _ordered_flags(flags: set[str]) -> list[str]:
     return [flag for flag in _RISK_FLAG_ORDER if flag in flags]
 
 
+def _normalized_enum(
+    *candidates: Any,
+    allowed: set[str],
+    default: str,
+) -> str:
+    for candidate in candidates:
+        value = str(candidate or "").strip().lower()
+        if value in allowed:
+            return value
+    return default
+
+
 def build_quote_risk_assessment(
     *,
     normalized_request: dict[str, Any],
@@ -55,10 +69,18 @@ def build_quote_risk_assessment(
     trailer_class = request.get("trailer_class")
     bag_type = request.get("bag_type")
     has_dense_materials = bool(request.get("has_dense_materials") or internal.get("dense_materials"))
-    access_difficulty = str(
-        request.get("access_difficulty") or internal.get("access_difficulty") or "normal"
-    ).strip().lower()
-    travel_zone = str(request.get("travel_zone") or internal.get("travel_zone") or "in_town").strip().lower()
+    access_difficulty = _normalized_enum(
+        internal.get("access_difficulty"),
+        request.get("access_difficulty"),
+        allowed=_ALLOWED_ACCESS_DIFFICULTIES,
+        default="normal",
+    )
+    travel_zone = _normalized_enum(
+        internal.get("travel_zone"),
+        request.get("travel_zone"),
+        allowed=_ALLOWED_TRAVEL_ZONES,
+        default="in_town",
+    )
     route_complete = _has_text(request.get("pickup_address")) and _has_text(request.get("dropoff_address"))
 
     flags: set[str] = set()
