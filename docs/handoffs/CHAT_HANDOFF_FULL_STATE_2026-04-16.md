@@ -118,6 +118,7 @@ Hardening + margin protection + controlled expansion
 * Stress-test harness
 * Quote UX copy improvements
 * Input guidance + margin hints
+* C1.5a internal quote risk scoring
 
 ---
 
@@ -130,25 +131,20 @@ Customer input underestimation → margin loss
 
 ## 🔷 NEXT TASK
 
-### C1.5a — Internal Quote Risk Scoring
+Next immediate step:
 
-Goal:
-Add internal-only:
+* docs/state cleanup + sanity verification after PR #197
 
-* confidence level
-* risk flags
+Next likely candidate:
 
-Without changing:
-
-* pricing
-* API
-* UI
-* DB
-* booking flow
+* C1.5d — admin visibility for internal quote risk assessment
 
 ---
 
 ## 🔷 C1.5a DESIGN
+
+Status:
+Completed in PR #197.
 
 Confidence:
 
@@ -174,6 +170,7 @@ Rules:
 * never modify pricing
 * never recalculate totals
 * only read normalized input + engine output
+* unsupported raw `bag_type` / `trailer_fill_estimate` strings must not count as structured scope signals
 
 Example (internal only):
 
@@ -226,10 +223,8 @@ C1.5a = High
 
 System is stable.
 
-Next step is NOT expansion —
-it is intelligence.
-
-👉 Implement C1.5a only.
+Next step is docs/state cleanup + sanity verification,
+then the likely candidate is C1.5d admin visibility.
 
 ---
 

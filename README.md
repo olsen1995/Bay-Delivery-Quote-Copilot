@@ -2,7 +2,7 @@
 
 Local quote/estimate tool for Bay Delivery (North Bay, Ontario).
 
-Current stable milestone: `0.10.0`.
+Current stable milestone: `0.10.1`.
 
 ## Current Project State
 See `docs/CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
@@ -26,7 +26,9 @@ Export script: `tools/export_gpt_grounding_pack.py`
 - For current `item_delivery` protected-floor behavior, see [Pricing rules](#pricing-rules-canonical).
 - For smoke-test `/health` `"drive_configured"` semantics, see [Smoke test usage](#smoke-test-usage).
 
-Release markers are aligned: `VERSION` = `0.10.0` and `canon_versions.txt` = `0.10.0`.
+Release markers are aligned: `VERSION` = `0.10.1` and `canon_versions.txt` = `0.10.1`.
+
+Internal-only quote risk scoring is now part of the quote artifact pipeline; it does not change customer-facing pricing or workflow behavior.
 
 ## Version Alignment Maintenance
 
