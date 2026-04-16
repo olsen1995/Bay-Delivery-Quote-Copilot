@@ -166,6 +166,6 @@ def build_quote_risk_assessment(
         confidence = "medium"
 
     return {
-        "confidence": confidence,
+        "confidence_level": confidence,
         "risk_flags": ordered_flags,
     }

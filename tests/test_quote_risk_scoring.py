@@ -61,7 +61,7 @@ def temp_quote_db():
 def test_sparse_haul_away_inputs_score_low_confidence() -> None:
     assessment = _assessment_for()
 
-    assert assessment["confidence"] == "low"
+    assert assessment["confidence_level"] == "low"
     assert assessment["risk_flags"] == ["low_input_signal", "missing_structured_scope"]
 
 
@@ -72,7 +72,7 @@ def test_dense_material_inputs_set_dense_material_risk() -> None:
         has_dense_materials=True,
     )
 
-    assert assessment["confidence"] == "medium"
+    assert assessment["confidence_level"] == "medium"
     assert "dense_material_risk" in assessment["risk_flags"]
 
 
@@ -84,7 +84,7 @@ def test_access_volume_and_underestimated_volume_rules_are_structured() -> None:
         access_difficulty="difficult",
     )
 
-    assert assessment["confidence"] == "low"
+    assert assessment["confidence_level"] == "low"
     assert "access_volume_risk" in assessment["risk_flags"]
     assert "likely_underestimated_volume" in assessment["risk_flags"]
 
@@ -96,7 +96,7 @@ def test_mixed_bulky_load_risk_uses_structured_load_signals() -> None:
         crew_size=2,
     )
 
-    assert assessment["confidence"] == "medium"
+    assert assessment["confidence_level"] == "medium"
     assert "mixed_bulky_load_risk" in assessment["risk_flags"]
 
 
@@ -107,7 +107,7 @@ def test_invalid_access_and_travel_inputs_do_not_count_as_scope_signals() -> Non
         travel_zone="rural",
     )
 
-    assert assessment["confidence"] == "medium"
+    assert assessment["confidence_level"] == "medium"
     assert assessment["risk_flags"] == ["low_input_signal"]
 
 
@@ -116,7 +116,7 @@ def test_build_quote_artifacts_keeps_internal_assessment_out_of_public_quote(tem
     payload["garbage_bag_count"] = 3
     artifacts = build_quote_artifacts(payload)
 
-    assert artifacts["internal_risk_assessment"]["confidence"] in {"high", "medium", "low"}
+    assert artifacts["internal_risk_assessment"]["confidence_level"] in {"high", "medium", "low"}
     assert isinstance(artifacts["internal_risk_assessment"]["risk_flags"], list)
 
     saved = build_and_save_quote(payload, now_iso="2026-04-16T12:00:00-04:00")
