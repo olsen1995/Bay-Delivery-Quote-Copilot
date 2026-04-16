@@ -5,6 +5,14 @@ from typing import Any
 _ROUTE_REQUIRED_SERVICE_TYPES = {"small_move", "item_delivery"}
 _ALLOWED_ACCESS_DIFFICULTIES = {"normal", "difficult", "extreme"}
 _ALLOWED_TRAVEL_ZONES = {"in_town", "surrounding", "out_of_town"}
+_ALLOWED_HAUL_AWAY_BAG_TYPES = {"light", "heavy_mixed", "construction_debris"}
+_ALLOWED_HAUL_AWAY_TRAILER_FILL_ESTIMATES = {
+    "under_quarter",
+    "quarter",
+    "half",
+    "three_quarter",
+    "full",
+}
 _RISK_FLAG_ORDER = (
     "low_input_signal",
     "missing_structured_scope",
@@ -31,6 +39,13 @@ def _as_int(value: Any, default: int = 0) -> int:
 
 def _has_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _normalized_allowed_value(value: Any, allowed: set[str]) -> str | None:
+    candidate = str(value or "").strip().lower()
+    if candidate in allowed:
+        return candidate
+    return None
 
 
 def _ordered_flags(flags: set[str]) -> list[str]:
@@ -68,6 +83,11 @@ def build_quote_risk_assessment(
     trailer_fill_estimate = request.get("trailer_fill_estimate")
     trailer_class = request.get("trailer_class")
     bag_type = request.get("bag_type")
+    valid_bag_type = _normalized_allowed_value(bag_type, _ALLOWED_HAUL_AWAY_BAG_TYPES)
+    valid_trailer_fill_estimate = _normalized_allowed_value(
+        trailer_fill_estimate,
+        _ALLOWED_HAUL_AWAY_TRAILER_FILL_ESTIMATES,
+    )
     has_dense_materials = bool(request.get("has_dense_materials") or internal.get("dense_materials"))
     access_difficulty = _normalized_enum(
         internal.get("access_difficulty"),
@@ -88,8 +108,8 @@ def build_quote_risk_assessment(
     scope_signal_count = 0
     for is_present in (
         garbage_bag_count > 0,
-        _has_text(bag_type),
-        _has_text(trailer_fill_estimate),
+        valid_bag_type is not None,
+        valid_trailer_fill_estimate is not None,
         _has_text(trailer_class),
         bulky_item_count > 0,
         has_dense_materials,
@@ -104,8 +124,8 @@ def build_quote_risk_assessment(
     has_haul_away_scope = any(
         (
             garbage_bag_count > 0,
-            _has_text(bag_type),
-            _has_text(trailer_fill_estimate),
+            valid_bag_type is not None,
+            valid_trailer_fill_estimate is not None,
             bulky_item_count > 0,
         )
     )

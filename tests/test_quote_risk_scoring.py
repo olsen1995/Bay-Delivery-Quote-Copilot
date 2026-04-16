@@ -111,6 +111,27 @@ def test_invalid_access_and_travel_inputs_do_not_count_as_scope_signals() -> Non
     assert assessment["risk_flags"] == ["low_input_signal"]
 
 
+def test_invalid_haul_away_scope_strings_do_not_count_as_structured_scope() -> None:
+    assessment = _assessment_for(
+        bag_type="foo",
+        trailer_fill_estimate="bar",
+    )
+
+    assert assessment["confidence_level"] == "low"
+    assert assessment["risk_flags"] == ["low_input_signal", "missing_structured_scope"]
+
+
+def test_valid_haul_away_scope_values_still_count_as_structured_scope() -> None:
+    assessment = _assessment_for(
+        bag_type="light",
+        trailer_fill_estimate="quarter",
+    )
+
+    assert assessment["confidence_level"] == "medium"
+    assert "missing_structured_scope" not in assessment["risk_flags"]
+    assert "low_input_signal" not in assessment["risk_flags"]
+
+
 def test_build_quote_artifacts_keeps_internal_assessment_out_of_public_quote(temp_quote_db) -> None:
     payload = _base_payload()
     payload["garbage_bag_count"] = 3
