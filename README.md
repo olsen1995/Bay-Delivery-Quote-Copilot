@@ -28,7 +28,7 @@ Export script: `tools/export_gpt_grounding_pack.py`
 
 Release markers are aligned: `VERSION` = `0.10.1` and `canon_versions.txt` = `0.10.1`.
 
-Internal-only quote risk scoring is now part of the quote artifact pipeline; it does not change customer-facing pricing or workflow behavior.
+Internal quote risk scoring is now part of the quote artifact pipeline and feeds a narrow risk-based margin protection layer for likely underestimated jobs without changing the public response shape or workflow behavior.
 
 ## Version Alignment Maintenance
 

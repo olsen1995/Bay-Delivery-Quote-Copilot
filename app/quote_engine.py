@@ -73,6 +73,15 @@ MID_BAND_START_BAGS = 10
 MID_BAND_END_BAGS = 15
 MID_BAND_ADDER_PER_BAG = 3.0
 
+RISK_MARGIN_PROTECTION_STRONG_FLAGS = frozenset(
+    {
+        "likely_underestimated_volume",
+        "dense_material_risk",
+        "mixed_bulky_load_risk",
+        "access_volume_risk",
+    }
+)
+
 
 def load_config() -> Dict[str, Any]:
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -384,6 +393,36 @@ def _space_fill_floor_for_class(size_class: int) -> float:
     return 0.0
 
 
+def _risk_margin_protection(assessment: dict[str, Any] | None) -> tuple[float, list[str]]:
+    if not isinstance(assessment, dict):
+        return 0.0, []
+
+    raw_flags = assessment.get("risk_flags")
+    if not isinstance(raw_flags, list):
+        return 0.0, []
+
+    contributing_flags: list[str] = []
+    seen_flags: set[str] = set()
+    for raw_flag in raw_flags:
+        if not isinstance(raw_flag, str):
+            continue
+        if raw_flag not in RISK_MARGIN_PROTECTION_STRONG_FLAGS:
+            continue
+        if raw_flag in seen_flags:
+            continue
+        contributing_flags.append(raw_flag)
+        seen_flags.add(raw_flag)
+
+    strong_flag_count = len(contributing_flags)
+    if strong_flag_count == 1:
+        return 50.0, contributing_flags
+    if strong_flag_count == 2:
+        return 75.0, contributing_flags
+    if strong_flag_count >= 3:
+        return 100.0, contributing_flags
+    return 0.0, []
+
+
 def calculate_quote(
     service_type: str,
     hours: float,
@@ -400,6 +439,7 @@ def calculate_quote(
     access_difficulty: str = "normal",
     has_dense_materials: bool = False,
     load_mode: str | None = "standard",
+    internal_risk_assessment: dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """
     Customer-safe output:
@@ -442,6 +482,8 @@ def calculate_quote(
                 "disposal_allowance_cad": 0.0,
                 "mattress_boxspring_cad": 0.0,
                 "scrap_cad": round(cash_total, 2),
+                "risk_margin_protection_cad": 0.0,
+                "risk_margin_protection_flags": [],
             },
         }
 
@@ -594,6 +636,8 @@ def calculate_quote(
                 space_fill_floor = _space_fill_floor_for_class(inferred_size_class)
                 cash_before_round = max(discounted_cash, space_fill_floor)
 
+    risk_margin_protection_cad, risk_margin_protection_flags = _risk_margin_protection(internal_risk_assessment)
+    cash_before_round += risk_margin_protection_cad
     cash_total = _round_cash_to_nearest_5(cash_before_round)
     emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
 
@@ -649,5 +693,7 @@ def calculate_quote(
             "awkward_small_load_floor_cad": round(float(awkward_small_load_floor), 2),
             "access_difficulty": _ad,
             "access_difficulty_adder_cad": round(float(access_adder), 2),
+            "risk_margin_protection_cad": round(float(risk_margin_protection_cad), 2),
+            "risk_margin_protection_flags": risk_margin_protection_flags,
         },
     }

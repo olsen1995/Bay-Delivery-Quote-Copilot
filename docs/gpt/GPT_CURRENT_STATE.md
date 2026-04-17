@@ -14,7 +14,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Admin operations surfaces exist (`/admin`, `/admin/mobile`, `/admin/uploads`) with protected admin actions.
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
-- Internal quote risk scoring now exists in the quote artifact pipeline and exposes internal `confidence_level` / `risk_flags` metadata without changing customer-facing outputs.
+- Internal quote risk scoring now exists in the quote artifact pipeline and exposes internal `confidence_level` / `risk_flags` metadata while feeding a narrow pricing-engine margin-protection layer that preserves the customer-facing response shape.
 
 ## Current Priorities
 
@@ -23,7 +23,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Make narrow, auditable refinements only.
 - Preserve margin-protection direction and one-pricing-engine discipline.
 - Maintain clear customer/admin operational boundaries.
-- Keep internal risk assessment recommendation-only and downstream to pricing authority.
+- Keep internal risk assessment downstream to pricing authority and limited to narrow repo-approved margin protection inside `app/quote_engine.py`.
 
 ## What Should Not Happen Next
 

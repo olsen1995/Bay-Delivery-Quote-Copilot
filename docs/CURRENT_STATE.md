@@ -51,7 +51,7 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 
 - C1.5a internal quote risk scoring is complete.
 - Internal quote artifacts now include `confidence_level` and `risk_flags`.
-- The assessment is internal-only, artifact-pipeline-only, and is not customer-facing or persisted.
+- The assessment remains internal-only and not persisted, but it now feeds a narrow pricing-engine margin-protection layer for selected likely underestimated jobs without changing the public response shape or workflow behavior.
 - Haul-away risk scoring only counts supported `bag_type` and `trailer_fill_estimate` values; unsupported raw strings are ignored so they do not inflate confidence.
 - `python-multipart` is now pinned to `0.0.26`, closing the related CI/security unblock that shipped with PR #197.
 
@@ -71,7 +71,7 @@ For GPT grounding precedence and companion detail, use `docs/gpt/GPT_SOURCE_OF_T
 - Admin operations surfaces exist with protected admin actions.
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
-- Internal quote risk scoring is implemented in the artifact pipeline without changing pricing, API, UI, DB, or booking behavior.
+- Internal quote risk scoring is implemented in the artifact pipeline and now feeds a narrow pricing-engine margin-protection layer without changing public response shape, API surface, UI, DB, or booking behavior.
 
 ## Active Docs Map
 

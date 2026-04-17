@@ -41,29 +41,43 @@ def _normalize_load_mode(load_mode: Any) -> str:
     return "standard"
 
 
+def _quote_engine_inputs(
+    request_payload: dict[str, Any],
+    *,
+    service_type: str,
+    load_mode: str,
+) -> dict[str, Any]:
+    return {
+        "service_type": service_type,
+        "hours": float(request_payload.get("estimated_hours", 0.0)),
+        "crew_size": int(request_payload.get("crew_size", 1)),
+        "garbage_bag_count": int(request_payload.get("garbage_bag_count", 0)),
+        "bag_type": request_payload.get("bag_type"),
+        "trailer_fill_estimate": request_payload.get("trailer_fill_estimate"),
+        "trailer_class": request_payload.get("trailer_class"),
+        "mattresses_count": int(request_payload.get("mattresses_count", 0)),
+        "box_springs_count": int(request_payload.get("box_springs_count", 0)),
+        "scrap_pickup_location": str(request_payload.get("scrap_pickup_location", "curbside")),
+        "travel_zone": str(request_payload.get("travel_zone", "in_town")),
+        "access_difficulty": str(request_payload.get("access_difficulty", "normal")),
+        "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
+        "load_mode": load_mode,
+    }
+
+
 def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     requested_service_type = str(request_payload.get("service_type", "")).strip()
     normalized_load_mode = _normalize_load_mode(request_payload.get("load_mode"))
-
-    engine_quote = calculate_quote(
-        service_type=requested_service_type,
-        hours=float(request_payload.get("estimated_hours", 0.0)),
-        crew_size=int(request_payload.get("crew_size", 1)),
-        garbage_bag_count=int(request_payload.get("garbage_bag_count", 0)),
-        bag_type=request_payload.get("bag_type"),
-        trailer_fill_estimate=request_payload.get("trailer_fill_estimate"),
-        trailer_class=request_payload.get("trailer_class"),
-        mattresses_count=int(request_payload.get("mattresses_count", 0)),
-        box_springs_count=int(request_payload.get("box_springs_count", 0)),
-        scrap_pickup_location=str(request_payload.get("scrap_pickup_location", "curbside")),
-        travel_zone=str(request_payload.get("travel_zone", "in_town")),
-        access_difficulty=str(request_payload.get("access_difficulty", "normal")),
-        has_dense_materials=bool(request_payload.get("has_dense_materials", False)),
-        load_mode=normalized_load_mode,
+    baseline_engine_quote = calculate_quote(
+        **_quote_engine_inputs(
+            request_payload,
+            service_type=requested_service_type,
+            load_mode=normalized_load_mode,
+        )
     )
 
     # Validate required route fields using normalized service type returned by the engine.
-    engine_service_type = str(engine_quote.get("service_type", "")).strip().lower()
+    engine_service_type = str(baseline_engine_quote.get("service_type", "")).strip().lower()
     if engine_service_type in {"small_move", "item_delivery"}:
         if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
             raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
@@ -73,7 +87,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "customer_phone": request_payload.get("customer_phone"),
         "job_address": request_payload.get("job_address"),
         "job_description_customer": request_payload.get("job_description_customer") or request_payload.get("description"),
-        "service_type": engine_quote["service_type"],
+        "service_type": baseline_engine_quote["service_type"],
         "payment_method": request_payload.get("payment_method"),
         "pickup_address": request_payload.get("pickup_address"),
         "dropoff_address": request_payload.get("dropoff_address"),
@@ -92,15 +106,23 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "load_mode": normalized_load_mode,
     }
 
+    internal_risk_assessment = build_quote_risk_assessment(
+        normalized_request=normalized_request,
+        engine_quote=baseline_engine_quote,
+    )
+    engine_quote = calculate_quote(
+        **_quote_engine_inputs(
+            normalized_request,
+            service_type=normalized_request["service_type"],
+            load_mode=normalized_request["load_mode"],
+        ),
+        internal_risk_assessment=internal_risk_assessment,
+    )
     response = {
         "cash_total_cad": float(engine_quote["total_cash_cad"]),
         "emt_total_cad": float(engine_quote["total_emt_cad"]),
         "disclaimer": str(engine_quote["disclaimer"]),
     }
-    internal_risk_assessment = build_quote_risk_assessment(
-        normalized_request=normalized_request,
-        engine_quote=engine_quote,
-    )
 
     return {
         "normalized_request": normalized_request,

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from app import storage
+from app.quote_engine import calculate_quote
 from app.storage import get_quote_record
 from app.services.quote_service import build_and_save_quote, build_quote_artifacts
 from app.services.quote_risk_scoring import build_quote_risk_assessment
@@ -132,6 +133,78 @@ def test_valid_haul_away_scope_values_still_count_as_structured_scope() -> None:
     assert "low_input_signal" not in assessment["risk_flags"]
 
 
+def test_low_risk_structured_quote_artifacts_do_not_add_margin_protection() -> None:
+    payload = _base_payload()
+    payload.update(
+        {
+            "garbage_bag_count": 2,
+            "bag_type": "light",
+        }
+    )
+    baseline = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=2,
+        bag_type="light",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="standard",
+    )
+
+    artifacts = build_quote_artifacts(payload)
+
+    assert artifacts["internal_risk_assessment"] == {"confidence_level": "high", "risk_flags": []}
+    assert artifacts["response"] == {
+        "cash_total_cad": float(baseline["total_cash_cad"]),
+        "emt_total_cad": float(baseline["total_emt_cad"]),
+        "disclaimer": str(baseline["disclaimer"]),
+    }
+    assert artifacts["engine_quote"]["_internal"]["risk_margin_protection_cad"] == 0.0
+    assert artifacts["engine_quote"]["_internal"]["risk_margin_protection_flags"] == []
+
+
+def test_quote_artifacts_apply_expected_margin_protection_for_strong_flags() -> None:
+    payload = _base_payload()
+    payload.update(
+        {
+            "garbage_bag_count": 4,
+            "estimated_hours": 2.0,
+            "crew_size": 2,
+        }
+    )
+    baseline = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=4,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        load_mode="standard",
+    )
+
+    artifacts = build_quote_artifacts(payload)
+
+    assert artifacts["internal_risk_assessment"] == {
+        "confidence_level": "medium",
+        "risk_flags": ["mixed_bulky_load_risk", "likely_underestimated_volume"],
+    }
+    assert set(artifacts["response"].keys()) == {"cash_total_cad", "emt_total_cad", "disclaimer"}
+    assert artifacts["response"]["disclaimer"] == baseline["disclaimer"]
+    assert artifacts["engine_quote"]["_internal"]["risk_margin_protection_cad"] == 75.0
+    assert artifacts["engine_quote"]["_internal"]["risk_margin_protection_flags"] == [
+        "mixed_bulky_load_risk",
+        "likely_underestimated_volume",
+    ]
+    assert artifacts["engine_quote"]["_internal"]["cash_before_round_cad"] == (
+        baseline["_internal"]["cash_before_round_cad"] + 75.0
+    )
+    assert artifacts["response"]["cash_total_cad"] == 235.0
+    assert artifacts["response"]["emt_total_cad"] == 265.55
+
+
 def test_build_quote_artifacts_keeps_internal_assessment_out_of_public_quote(temp_quote_db) -> None:
     payload = _base_payload()
     payload["garbage_bag_count"] = 3
@@ -139,6 +212,9 @@ def test_build_quote_artifacts_keeps_internal_assessment_out_of_public_quote(tem
 
     assert artifacts["internal_risk_assessment"]["confidence_level"] in {"high", "medium", "low"}
     assert isinstance(artifacts["internal_risk_assessment"]["risk_flags"], list)
+    assert set(artifacts["response"].keys()) == {"cash_total_cad", "emt_total_cad", "disclaimer"}
+    assert "risk_margin_protection_cad" not in artifacts["response"]
+    assert "risk_margin_protection_flags" not in artifacts["response"]
 
     saved = build_and_save_quote(payload, now_iso="2026-04-16T12:00:00-04:00")
     assert set(saved.keys()) == {"quote_id", "created_at", "request", "response", "accept_token"}
