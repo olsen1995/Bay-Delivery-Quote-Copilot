@@ -1,0 +1,23 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - heading "Admin Access" [level=2] [ref=e6]
+    - paragraph [ref=e7]: Use your Basic Auth credentials to load the live admin data.
+  - generic [ref=e8]:
+    - text: Admin access uses
+    - strong [ref=e9]: Basic Auth
+    - text: "with your Render environment variables:"
+    - code [ref=e10]: ADMIN_USERNAME
+    - text: +
+    - code [ref=e11]: ADMIN_PASSWORD
+    - text: .
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]: Username
+      - textbox "Username" [ref=e15]:
+        - /placeholder: Admin username
+    - generic [ref=e16]:
+      - generic [ref=e17]: Password
+      - textbox "Password" [ref=e18]:
+        - /placeholder: Admin password
+  - button "Log In & Load Data" [ref=e21] [cursor=pointer]
+  - status [ref=e22]: Enter admin username/password, then press Enter or click Log In & Load Data.
