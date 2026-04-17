@@ -271,6 +271,9 @@ function money(n) {
   return "$" + x.toFixed(2);
 }
 
+const formatMoneyOrDash = (value) =>
+  value == null || value === "" ? "-" : money(value);
+
 function normalizeStatusKey(status) {
   const key = (status || "").toLowerCase();
   if (key === "customer_pending") return "pending";
@@ -344,8 +347,8 @@ function createQuoteDetailPanel(detail) {
     ["Phone", safeRequest.customer_phone || "—"],
     ["Service", safeRequest.service_type || "—"],
     ["Address", safeRequest.job_address || "—"],
-    ["Cash", safeResponse.cash_total_cad === undefined ? "—" : money(safeResponse.cash_total_cad)],
-    ["EMT", safeResponse.emt_total_cad === undefined ? "—" : money(safeResponse.emt_total_cad)],
+    ["Cash", formatMoneyOrDash(safeResponse.cash_total_cad)],
+    ["EMT", formatMoneyOrDash(safeResponse.emt_total_cad)],
     ["Description", safeRequest.job_description_customer || "—"],
   ].forEach(([label, value]) => {
     meta.appendChild(createQuoteMetaRow(label, value));
