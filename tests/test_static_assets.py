@@ -159,6 +159,28 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     assert "setProtectedDashboardVisible(false);" in admin_js
 
 
+def test_admin_page_includes_quote_detail_risk_panel() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+
+    assert "Open a quote to review internal ops-only detail" in admin_html
+    assert '["Quote", "Status", "Customer", "Service", "Address", "Estimated", "Actions"]' in admin_js
+    assert "View Details" in admin_js
+    assert "Hide Details" in admin_js
+    assert "Quote Details" in admin_js
+    assert "Quote Risk Assessment" in admin_js
+    assert 'const assessment = detail.internal_risk_assessment || null;' in admin_js
+    assert 'Array.isArray(safeGet(assessment, "risk_flags", null))' in admin_js
+    assert 'if (assessment && (assessment.confidence_level || riskFlags.length)) {' in admin_js
+    assert '/admin/api/quotes/${encodeURIComponent(quoteId)}' in admin_js
+    assert ".quoteDetailToggle" in admin_css
+    assert ".quoteDetailPanel" in admin_css
+    assert ".quoteRiskSection" in admin_css
+    assert ".quoteRiskFlags" in admin_css
+    assert ".risk-confidence-medium" in admin_css
+
+
 def test_admin_page_includes_screenshot_assistant_shell() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
