@@ -332,19 +332,21 @@ function createQuoteDetailPanel(detail) {
 
   const meta = document.createElement("div");
   meta.className = "quoteDetailMeta";
-  const request = detail && typeof detail.request === "object" ? detail.request : {};
-  const response = detail && typeof detail.response === "object" ? detail.response : {};
+  const request = detail?.request ?? {};
+  const response = detail?.response ?? {};
+  const safeRequest = typeof request === "object" && request !== null ? request : {};
+  const safeResponse = typeof response === "object" && response !== null ? response : {};
 
   [
     ["Quote", detail.quote_id || "—"],
     ["Created", detail.created_at || "—"],
-    ["Customer", request.customer_name || "—"],
-    ["Phone", request.customer_phone || "—"],
-    ["Service", request.service_type || "—"],
-    ["Address", request.job_address || "—"],
-    ["Cash", response.cash_total_cad === undefined ? "—" : money(response.cash_total_cad)],
-    ["EMT", response.emt_total_cad === undefined ? "—" : money(response.emt_total_cad)],
-    ["Description", request.job_description_customer || "—"],
+    ["Customer", safeRequest.customer_name || "—"],
+    ["Phone", safeRequest.customer_phone || "—"],
+    ["Service", safeRequest.service_type || "—"],
+    ["Address", safeRequest.job_address || "—"],
+    ["Cash", safeResponse.cash_total_cad === undefined ? "—" : money(safeResponse.cash_total_cad)],
+    ["EMT", safeResponse.emt_total_cad === undefined ? "—" : money(safeResponse.emt_total_cad)],
+    ["Description", safeRequest.job_description_customer || "—"],
   ].forEach(([label, value]) => {
     meta.appendChild(createQuoteMetaRow(label, value));
   });
