@@ -151,6 +151,8 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#customer_phone").fill("705-555-0101")
     await page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
     await page.locator("#description").fill("Launch smoke validation for quote flow")
+    await page.locator("#serviceDetailsPanel summary").click()
+    await page.locator("#trailer_fill_estimate").select_option("under_quarter")
     await page.locator("#btnCalc").click()
 
     await expect(page.locator("#resultBox")).to_contain_text("Your Estimate", timeout=20_000)
@@ -245,3 +247,26 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
 
     await expect(page.locator("#decisionStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
     await expect(page.locator("#decisionStatus")).to_contain_text("You declined this estimate. No booking request will be created.")
+
+
+@pytest.mark.asyncio
+async def test_haul_away_requires_structured_load_detail(page: Page, live_server: str) -> None:
+    await page.goto(f"{live_server}/quote", wait_until="networkidle")
+    await expect(page.locator("#quoteForm")).to_be_visible()
+
+    await page.locator("#customer_name").fill("Playwright Vague Scope")
+    await page.locator("#customer_phone").fill("705-555-0113")
+    await page.locator("#job_address").fill("789 Scope Ave, North Bay")
+    await page.locator("#description").fill("Need help with some stuff.")
+    await page.locator("#btnCalc").click()
+
+    await expect(page.locator("#resultBox")).to_contain_text("Please add at least one load detail so we can estimate your junk removal properly.")
+    await expect(page.locator("#resultBox")).to_contain_text("Examples: bags, trailer space used, mattresses, box springs, or dense materials.")
+    await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
+
+    await page.locator("#trailer_fill_estimate").select_option("under_quarter")
+    await page.locator("#btnCalc").click()
+
+    await expect(page.locator("#resultBox")).to_contain_text("Pricing Breakdown", timeout=20_000)
+    await expect(page.locator("#resultBox")).to_contain_text("Estimated junk load (Under 1/4 trailer (few items or a small pile))")
+    await expect(page.locator("#resultBox")).not_to_contain_text("Estimated junk load (0 bags)")

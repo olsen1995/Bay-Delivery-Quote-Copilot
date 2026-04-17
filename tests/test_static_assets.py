@@ -105,6 +105,11 @@ def test_quote_page_includes_haul_away_floor_fields() -> None:
     for option_value in ["under_quarter", "quarter", "half", "three_quarter", "full"]:
         assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
 
+    assert '<option value="" selected>Select bag type if known</option>' in quote_html
+    assert '<option value="" selected>Select trailer space used if known</option>' in quote_html
+    assert '<option value="light" selected>' not in quote_html
+    assert '<option value="under_quarter" selected>' not in quote_html
+
 
 def test_admin_uploads_page_uses_external_script_for_csp():
     """Ensure admin uploads JS executes under CSP by avoiding inline script blocks."""

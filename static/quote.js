@@ -79,6 +79,35 @@ function validateRequiredFields(serviceType) {
   return missing;
 }
 
+function getSelectedTrailerFillEstimate() {
+  return (el("trailer_fill_estimate").value || "").trim();
+}
+
+function getSelectedBagType() {
+  return (el("bag_type").value || "").trim();
+}
+
+function hasHaulAwayStructuredLoadDetail() {
+  return (
+    parseInt(el("garbage_bag_count").value || "0", 10) > 0 ||
+    parseInt(el("mattresses_count").value || "0", 10) > 0 ||
+    parseInt(el("box_springs_count").value || "0", 10) > 0 ||
+    el("has_dense_materials").checked ||
+    Boolean(getSelectedTrailerFillEstimate())
+  );
+}
+
+function haulAwayLoadDetailMessage() {
+  return "Please add at least one load detail so we can estimate your junk removal properly. Examples: bags, trailer space used, mattresses, box springs, or dense materials.";
+}
+
+function trailerFillLabel(value) {
+  const select = el("trailer_fill_estimate");
+  if (!select) return "";
+  const option = Array.from(select.options).find((candidate) => candidate.value === value);
+  return option ? option.textContent : "";
+}
+
 function missingFieldSummary(missing) {
   if (!missing || missing.length === 0) return "";
   const missingIds = missing.map((field) => field.id);
@@ -278,14 +307,21 @@ function buildEstimateDetails() {
   const access = el("access_difficulty").value;
   const hasDenseMaterials = el("has_dense_materials").checked;
   const bagCount = parseInt(el("garbage_bag_count").value || "0", 10);
+  const trailerFillEstimate = getSelectedTrailerFillEstimate();
   const mattresses = parseInt(el("mattresses_count").value || "0", 10);
   const boxSprings = parseInt(el("box_springs_count").value || "0", 10);
   const details = [];
 
   if (serviceType === "haul_away" || serviceType === "demolition") {
     const loadType = serviceType === "demolition" ? "demolition debris load" : "junk load";
-    const loadSize = getLoadSizeLabel(bagCount);
-    details.push(loadSize + " " + loadType + " (" + bagCount + " " + pluralize(bagCount, "bag", "bags") + ")");
+    if (bagCount > 0) {
+      const loadSize = getLoadSizeLabel(bagCount);
+      details.push(loadSize + " " + loadType + " (" + bagCount + " " + pluralize(bagCount, "bag", "bags") + ")");
+    } else if (serviceType === "haul_away" && trailerFillEstimate) {
+      details.push("Estimated junk load (" + trailerFillLabel(trailerFillEstimate) + ")");
+    } else if (serviceType === "haul_away") {
+      details.push("Load size not specified in structured detail");
+    }
 
     if (mattresses > 0 || boxSprings > 0) {
       const pieces = [];
@@ -464,8 +500,8 @@ function resetInapplicableServiceFields(serviceType) {
   }
 
   if (!isHaulAway) {
-    el("bag_type").value = "light";
-    el("trailer_fill_estimate").value = "under_quarter";
+    el("bag_type").value = "";
+    el("trailer_fill_estimate").value = "";
   }
 }
 
@@ -572,8 +608,8 @@ function populateQuoteFormFromRequest(requestData) {
   setFieldValue("mattresses_count", requestData.mattresses_count ?? 0);
   setFieldValue("box_springs_count", requestData.box_springs_count ?? 0);
   setFieldValue("scrap_pickup_location", requestData.scrap_pickup_location || "curbside");
-  setFieldValue("bag_type", requestData.bag_type || "light");
-  setFieldValue("trailer_fill_estimate", requestData.trailer_fill_estimate || "under_quarter");
+  setFieldValue("bag_type", requestData.bag_type || "");
+  setFieldValue("trailer_fill_estimate", requestData.trailer_fill_estimate || "");
   setFieldValue("has_dense_materials", Boolean(requestData.has_dense_materials));
   syncRouteFields();
   syncServiceFields();
@@ -793,6 +829,15 @@ el("btnCalc").addEventListener("click", async () => {
       return;
     }
 
+    if (serviceType === "haul_away" && !hasHaulAwayStructuredLoadDetail()) {
+      const servicePanel = el("serviceDetailsPanel");
+      if (servicePanel) servicePanel.open = true;
+      showBox("resultBox", haulAwayLoadDetailMessage(), "error");
+      scrollToElement("resultBox");
+      el("garbage_bag_count").focus();
+      return;
+    }
+
     const customerName = (el("customer_name").value || "").trim();
     const customerPhone = (el("customer_phone").value || "").trim();
     const jobAddress = (el("job_address").value || "").trim();
@@ -824,8 +869,14 @@ el("btnCalc").addEventListener("click", async () => {
     };
 
     if (isHaulAway) {
-      payload.bag_type = el("bag_type").value;
-      payload.trailer_fill_estimate = el("trailer_fill_estimate").value;
+      const bagType = getSelectedBagType();
+      const trailerFillEstimate = getSelectedTrailerFillEstimate();
+      if (bagType) {
+        payload.bag_type = bagType;
+      }
+      if (trailerFillEstimate) {
+        payload.trailer_fill_estimate = trailerFillEstimate;
+      }
     }
 
     const controller = new AbortController();
