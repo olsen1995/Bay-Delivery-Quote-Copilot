@@ -93,6 +93,34 @@ def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails
     assert body["internal_risk_assessment"] is None
 
 
+def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quote_db: None) -> None:
+    storage.save_quote(
+        {
+            "quote_id": "legacy-null-payload-quote",
+            "created_at": "2026-04-16T12:00:00-04:00",
+            "request": None,
+            "response": None,
+            "accept_token": "legacy-null-token",
+        }
+    )
+
+    with TestClient(app) as client:
+        resp = client.get("/admin/api/quotes/legacy-null-payload-quote", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["quote_id"] == "legacy-null-payload-quote"
+    assert body["request"] is None
+    assert body["response"] is None
+    assert body["internal_risk_assessment"] is None
+
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    assert "const request = detail?.request ?? {};" in admin_js
+    assert "const response = detail?.response ?? {};" in admin_js
+    assert 'const safeRequest = typeof request === "object" && request !== null ? request : {};' in admin_js
+    assert 'const safeResponse = typeof response === "object" && response !== null ? response : {};' in admin_js
+
+
 def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quote_db: None) -> None:
     with TestClient(app) as client:
         quote_resp = client.post("/quote/calculate", json=_quote_payload())
