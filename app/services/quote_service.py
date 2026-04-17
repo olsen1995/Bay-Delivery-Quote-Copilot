@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from uuid import uuid4
@@ -8,7 +9,9 @@ from fastapi import HTTPException
 
 from app.quote_engine import calculate_quote
 from app.services.quote_risk_scoring import build_quote_risk_assessment
-from app.storage import save_quote
+from app.storage import get_quote_record, save_quote
+
+logger = logging.getLogger(__name__)
 
 _PHONE_ALLOWED = re.compile(r"^[0-9().+\-\s]+$")
 _PHONE_VALIDATION_MSG = (
@@ -140,4 +143,31 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
     return {
         **quote,
         "accept_token": accept_token,
+    }
+
+
+def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
+    quote = get_quote_record(quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found.")
+
+    internal_risk_assessment: dict[str, Any] | None = None
+    try:
+        request_payload = quote.get("request")
+        if not isinstance(request_payload, dict):
+            raise TypeError("Saved quote request is not a structured object.")
+        artifacts = build_quote_artifacts(dict(request_payload))
+        assessment = artifacts.get("internal_risk_assessment")
+        if isinstance(assessment, dict):
+            internal_risk_assessment = assessment
+    except Exception:
+        logger.warning(
+            "Failed to re-derive internal risk assessment for admin quote detail %s",
+            quote_id,
+            exc_info=True,
+        )
+
+    return {
+        **quote,
+        "internal_risk_assessment": internal_risk_assessment,
     }

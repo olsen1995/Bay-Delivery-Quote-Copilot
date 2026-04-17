@@ -299,6 +299,10 @@ button:disabled {
 	background: rgba(18, 32, 51, 0.14);
 }
 
+.quoteDetailToggle {
+	width: auto;
+}
+
 .danger {
 	background: #a52824;
 	color: white;
@@ -343,6 +347,29 @@ button:disabled {
 	color: #991b1b;
 }
 
+.quoteRiskConfidence {
+	margin-left: 6px;
+}
+
+.risk-confidence-high {
+	background: #dcfce7;
+	border-color: #86efac;
+	color: #166534;
+}
+
+.risk-confidence-medium {
+	background: #fff4ce;
+	border-color: #f8d88f;
+	color: #7a4b00;
+}
+
+.risk-confidence-low,
+.risk-confidence-unknown {
+	background: #fee2e2;
+	border-color: #fca5a5;
+	color: #991b1b;
+}
+
 .ok {
 	color: #166534;
 	font-weight: 700;
@@ -360,6 +387,57 @@ button:disabled {
 	border-radius: 14px;
 	background: rgba(18, 32, 51, 0.02);
 	color: var(--ink-muted);
+}
+
+.quoteDetailRow td {
+	background: rgba(18, 32, 51, 0.02);
+}
+
+.quoteDetailPanel {
+	display: grid;
+	gap: 14px;
+	padding: 16px;
+	border: 1px solid rgba(18, 32, 51, 0.08);
+	border-radius: 16px;
+	background: rgba(255, 255, 255, 0.98);
+}
+
+.quoteDetailTitle {
+	font-size: 0.95rem;
+	font-weight: 800;
+	color: var(--ink-strong);
+}
+
+.quoteDetailMeta {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px 18px;
+}
+
+.quoteDetailMetaRow {
+	font-size: 0.92rem;
+	color: var(--ink-muted);
+	line-height: 1.45;
+}
+
+.quoteDetailMetaRow strong {
+	color: var(--ink-strong);
+}
+
+.quoteRiskSection {
+	display: grid;
+	gap: 10px;
+	padding-top: 12px;
+	border-top: 1px solid rgba(18, 32, 51, 0.08);
+}
+
+.quoteRiskFlags {
+	margin: 8px 0 0 18px;
+	padding: 0;
+}
+
+.quoteRiskFlags li + li {
+	margin-top: 4px;
 }
 
 input,
@@ -473,6 +551,10 @@ textarea:focus {
 	.loginCard,
 	.dataCard {
 		padding: 18px;
+	}
+
+	.quoteDetailMeta {
+		grid-template-columns: 1fr;
 	}
 
 	.dataTable,

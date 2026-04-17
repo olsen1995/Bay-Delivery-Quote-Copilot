@@ -69,6 +69,11 @@ let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
 let currentAssistantHandoff = null;
 let currentJobsById = {};
+let currentQuoteItems = [];
+let currentQuoteDetailId = "";
+let currentQuoteDetailLoading = false;
+let currentQuoteDetailError = "";
+let currentQuoteDetailsById = {};
 let assistantDraftDirty = false;
 const assistantUnsavedDraftWarning = "Desktop admin guidance is reference-only. Use request and job workflow actions for operational updates.";
 const assistantAutofillFieldConfig = {
@@ -189,6 +194,11 @@ function resetProtectedDashboard() {
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
   currentJobsById = {};
+  currentQuoteItems = [];
+  currentQuoteDetailId = "";
+  currentQuoteDetailLoading = false;
+  currentQuoteDetailError = "";
+  currentQuoteDetailsById = {};
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No screenshot intake guidance records yet.";
 }
@@ -261,6 +271,9 @@ function money(n) {
   return "$" + x.toFixed(2);
 }
 
+const formatMoneyOrDash = (value) =>
+  value == null || value === "" ? "-" : money(value);
+
 function normalizeStatusKey(status) {
   const key = (status || "").toLowerCase();
   if (key === "customer_pending") return "pending";
@@ -275,15 +288,199 @@ function makeStatusBadge(status) {
   return badge;
 }
 
+function formatConfidenceLevel(level) {
+  const normalized = String(level || "").trim().toLowerCase();
+  if (!normalized) return "Unknown";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function makeRiskConfidenceBadge(level) {
+  const normalized = String(level || "").trim().toLowerCase() || "unknown";
+  const badge = document.createElement("span");
+  badge.className = "statusBadge quoteRiskConfidence risk-confidence-" + normalized;
+  badge.textContent = formatConfidenceLevel(normalized);
+  return badge;
+}
+
+function createQuoteMetaRow(label, value, extraNode) {
+  const row = document.createElement("div");
+  row.className = "quoteDetailMetaRow";
+
+  const labelEl = document.createElement("strong");
+  labelEl.textContent = `${label}:`;
+  row.appendChild(labelEl);
+
+  if (value !== null && value !== undefined && value !== "") {
+    row.appendChild(document.createTextNode(` ${value}`));
+  } else if (!extraNode) {
+    row.appendChild(document.createTextNode(" —"));
+  }
+
+  if (extraNode) {
+    row.appendChild(document.createTextNode(" "));
+    row.appendChild(extraNode);
+  }
+
+  return row;
+}
+
+function createQuoteDetailPanel(detail) {
+  const panel = document.createElement("div");
+  panel.className = "quoteDetailPanel";
+
+  const title = document.createElement("div");
+  title.className = "quoteDetailTitle";
+  title.textContent = "Quote Details";
+  panel.appendChild(title);
+
+  const meta = document.createElement("div");
+  meta.className = "quoteDetailMeta";
+  const request = detail?.request ?? {};
+  const response = detail?.response ?? {};
+  const safeRequest = typeof request === "object" && request !== null ? request : {};
+  const safeResponse = typeof response === "object" && response !== null ? response : {};
+
+  [
+    ["Quote", detail.quote_id || "—"],
+    ["Created", detail.created_at || "—"],
+    ["Customer", safeRequest.customer_name || "—"],
+    ["Phone", safeRequest.customer_phone || "—"],
+    ["Service", safeRequest.service_type || "—"],
+    ["Address", safeRequest.job_address || "—"],
+    ["Cash", formatMoneyOrDash(safeResponse.cash_total_cad)],
+    ["EMT", formatMoneyOrDash(safeResponse.emt_total_cad)],
+    ["Description", safeRequest.job_description_customer || "—"],
+  ].forEach(([label, value]) => {
+    meta.appendChild(createQuoteMetaRow(label, value));
+  });
+  panel.appendChild(meta);
+
+  const assessment = detail.internal_risk_assessment || null;
+  const riskFlags = Array.isArray(safeGet(assessment, "risk_flags", null))
+    ? assessment.risk_flags.filter((flag) => String(flag || "").trim())
+    : [];
+
+  if (assessment && (assessment.confidence_level || riskFlags.length)) {
+    const riskSection = document.createElement("section");
+    riskSection.className = "quoteRiskSection";
+
+    const riskTitle = document.createElement("div");
+    riskTitle.className = "quoteDetailTitle";
+    riskTitle.textContent = "Quote Risk Assessment";
+    riskSection.appendChild(riskTitle);
+
+    riskSection.appendChild(
+      createQuoteMetaRow(
+        "Confidence",
+        null,
+        makeRiskConfidenceBadge(assessment.confidence_level)
+      )
+    );
+
+    const flagsRow = document.createElement("div");
+    flagsRow.className = "quoteDetailMetaRow";
+    const flagsLabel = document.createElement("strong");
+    flagsLabel.textContent = "Flags:";
+    flagsRow.appendChild(flagsLabel);
+
+    if (riskFlags.length) {
+      const list = document.createElement("ul");
+      list.className = "quoteRiskFlags";
+      riskFlags.forEach((flag) => {
+        const item = document.createElement("li");
+        item.textContent = flag;
+        list.appendChild(item);
+      });
+      flagsRow.appendChild(list);
+    } else {
+      flagsRow.appendChild(document.createTextNode(" none"));
+    }
+
+    riskSection.appendChild(flagsRow);
+    panel.appendChild(riskSection);
+  }
+
+  return panel;
+}
+
+function createQuoteDetailRow(quoteId) {
+  const tr = document.createElement("tr");
+  tr.className = "quoteDetailRow";
+
+  const td = document.createElement("td");
+  td.colSpan = 7;
+
+  if (currentQuoteDetailLoading && currentQuoteDetailId === quoteId) {
+    td.appendChild(createQuoteMetaRow("Loading", "Retrieving quote details..."));
+    tr.appendChild(td);
+    return tr;
+  }
+
+  if (currentQuoteDetailError && currentQuoteDetailId === quoteId) {
+    const error = document.createElement("div");
+    error.className = "quoteDetailPanel";
+    const message = document.createElement("div");
+    message.className = "bad";
+    message.textContent = currentQuoteDetailError;
+    error.appendChild(message);
+    td.appendChild(error);
+    tr.appendChild(td);
+    return tr;
+  }
+
+  const detail = currentQuoteDetailsById[quoteId];
+  if (detail) {
+    td.appendChild(createQuoteDetailPanel(detail));
+  }
+
+  tr.appendChild(td);
+  return tr;
+}
+
+async function toggleQuoteDetails(quoteId) {
+  if (!quoteId) return;
+
+  if (currentQuoteDetailId === quoteId) {
+    currentQuoteDetailId = "";
+    currentQuoteDetailLoading = false;
+    currentQuoteDetailError = "";
+    renderQuotes(currentQuoteItems);
+    return;
+  }
+
+  currentQuoteDetailId = quoteId;
+  currentQuoteDetailLoading = true;
+  currentQuoteDetailError = "";
+  renderQuotes(currentQuoteItems);
+
+  try {
+    const detail = await fetchJSON(`/admin/api/quotes/${encodeURIComponent(quoteId)}`);
+    if (currentQuoteDetailId !== quoteId) return;
+    currentQuoteDetailsById[quoteId] = detail;
+    currentQuoteDetailLoading = false;
+    renderQuotes(currentQuoteItems);
+  } catch (err) {
+    if (currentQuoteDetailId !== quoteId) return;
+    const parsed = parseApiError(err);
+    currentQuoteDetailLoading = false;
+    currentQuoteDetailError = parsed.status
+      ? `Quote details failed to load. ${safeGet(parsed, "data.detail", parsed.raw || "")}`.trim()
+      : `Quote details failed to load. ${parsed.raw}`;
+    renderQuotes(currentQuoteItems);
+  }
+}
+
 function renderQuotes(items) {
+  currentQuoteItems = items || [];
   const box = document.getElementById("quotesBox");
   if (!items || items.length === 0) return addEmptyState(box, "No quotes yet.");
   clearNode(box);
 
-  const { table, tbody } = createTable(["Quote", "Status", "Customer", "Service", "Address", "Estimated"]);
+  const { table, tbody } = createTable(["Quote", "Status", "Customer", "Service", "Address", "Estimated", "Actions"]);
 
   items.forEach((q) => {
     const tr = document.createElement("tr");
+    const isDetailOpen = currentQuoteDetailId === (q.quote_id || "");
 
     const tdId = document.createElement("td");
     const code = document.createElement("code");
@@ -314,8 +511,21 @@ function renderQuotes(items) {
     const tdTotal = document.createElement("td");
     const estimate = safeGet(q, "response.cash_total_cad", null);
     tdTotal.textContent = estimate === null || estimate === undefined || estimate === "" ? "-" : money(estimate);
-    tr.append(tdId, tdStatus, tdCustomer, tdSvc, tdAddress, tdTotal);
+
+    const tdActions = document.createElement("td");
+    const detailBtn = document.createElement("button");
+    detailBtn.type = "button";
+    detailBtn.className = "secondaryAction quoteDetailToggle";
+    detailBtn.textContent = isDetailOpen ? "Hide Details" : "View Details";
+    detailBtn.disabled = !q.quote_id;
+    detailBtn.addEventListener("click", () => toggleQuoteDetails(q.quote_id || ""));
+    tdActions.appendChild(detailBtn);
+
+    tr.append(tdId, tdStatus, tdCustomer, tdSvc, tdAddress, tdTotal, tdActions);
     tbody.appendChild(tr);
+    if (isDetailOpen) {
+      tbody.appendChild(createQuoteDetailRow(q.quote_id || ""));
+    }
   });
 
   box.appendChild(table);

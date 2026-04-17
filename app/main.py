@@ -1089,6 +1089,12 @@ def admin_list_quotes(request: Request, limit: int = 50):
     return {"items": list_quotes(limit=_cap_admin_list_limit(limit))}
 
 
+@app.get("/admin/api/quotes/{quote_id}")
+def admin_get_quote_detail(request: Request, quote_id: str):
+    _require_admin(request)
+    return quote_service.load_admin_quote_detail(quote_id)
+
+
 @app.get("/admin/api/quote-requests")
 def admin_list_quote_requests(request: Request, limit: int = 50):
     _require_admin(request)
