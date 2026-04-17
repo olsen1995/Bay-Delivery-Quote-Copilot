@@ -1766,3 +1766,104 @@ def test_haul_away_awkward_floor_raises_extreme_above_difficult() -> None:
             f"bags={bags}: extreme ({q_ext['total_cash_cad']}) must exceed "
             f"difficult ({q_diff['total_cash_cad']})"
         )
+
+
+def test_risk_margin_protection_ignores_missing_and_qualifier_only_flags() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        bag_type="light",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    qualifier_only = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        bag_type="light",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        internal_risk_assessment={
+            "confidence_level": "low",
+            "risk_flags": ["low_input_signal", "missing_structured_scope"],
+        },
+    )
+
+    assert qualifier_only["total_cash_cad"] == baseline["total_cash_cad"]
+    assert qualifier_only["total_emt_cad"] == baseline["total_emt_cad"]
+    assert qualifier_only["disclaimer"] == baseline["disclaimer"]
+    assert qualifier_only["_internal"]["risk_margin_protection_cad"] == 0.0
+    assert qualifier_only["_internal"]["risk_margin_protection_flags"] == []
+
+
+@pytest.mark.parametrize(
+    ("risk_flags", "expected_buffer", "expected_cash"),
+    [
+        (["dense_material_risk"], 50.0, 160.0),
+        (["dense_material_risk", "access_volume_risk"], 75.0, 185.0),
+        (
+            [
+                "dense_material_risk",
+                "access_volume_risk",
+                "mixed_bulky_load_risk",
+                "likely_underestimated_volume",
+            ],
+            100.0,
+            210.0,
+        ),
+    ],
+)
+def test_risk_margin_protection_adds_expected_fixed_buffers(
+    risk_flags: list[str],
+    expected_buffer: float,
+    expected_cash: float,
+) -> None:
+    buffered = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        bag_type="light",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        internal_risk_assessment={
+            "confidence_level": "low",
+            "risk_flags": risk_flags,
+        },
+    )
+
+    assert buffered["total_cash_cad"] == expected_cash
+    assert buffered["_internal"]["risk_margin_protection_cad"] == expected_buffer
+    assert buffered["_internal"]["risk_margin_protection_flags"] == risk_flags
+
+
+def test_risk_margin_protection_keeps_rounding_tax_and_disclaimer_structure() -> None:
+    baseline = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+    )
+    buffered = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        internal_risk_assessment={
+            "confidence_level": "medium",
+            "risk_flags": ["dense_material_risk"],
+        },
+    )
+
+    assert buffered["_internal"]["cash_before_round_cad"] == baseline["_internal"]["cash_before_round_cad"] + 50.0
+    assert buffered["total_cash_cad"] == 160.0
+    assert buffered["total_emt_cad"] == 180.8
+    assert buffered["disclaimer"] == baseline["disclaimer"]
