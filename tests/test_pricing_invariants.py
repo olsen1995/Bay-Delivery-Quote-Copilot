@@ -1973,6 +1973,22 @@ def test_disassembly_wording_triggers_operational_protection() -> None:
     assert result["_internal"]["operational_complexity_adder_cad"] == 50.0
 
 
+def test_disassembly_nouns_alone_do_not_trigger_operational_protection() -> None:
+    result = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Sectional and bed frame removal.",
+    )
+
+    assert result["_internal"]["disassembly_complexity_adder_cad"] == 0.0
+    assert result["_internal"]["operational_complexity_adder_cad"] == 0.0
+
+
 def test_normal_three_bag_job_does_not_receive_new_bulky_protection() -> None:
     baseline = calculate_quote(
         "haul_away",

@@ -155,13 +155,11 @@ _MULTI_STOP_REMOVAL_PHRASES = (
 )
 _DISASSEMBLY_PHRASES = (
     "take apart",
+    "break down",
     "disassemble",
     "disassembly",
-    "bed frame",
-    "sectional",
     "remove legs",
     "remove doors",
-    "frame",
     "won t fit as is",
     "wont fit as is",
     "won t fit",
