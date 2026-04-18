@@ -170,8 +170,8 @@ def test_haul_away_5_to_9_light_non_dense_strict_progression() -> None:
 
 
 def test_haul_away_1_to_5_light_non_dense_unchanged_contract() -> None:
-    """1-5 light/non-dense jobs should preserve current business-minimum behavior."""
-    expected_cash = {1: 80.0, 2: 95.0, 3: 105.0, 4: 110.0, 5: 110.0}
+    """1-5 light/non-dense jobs should preserve the calibrated small-job hierarchy."""
+    expected_cash = {1: 80.0, 2: 95.0, 3: 95.0, 4: 110.0, 5: 110.0}
 
     for bags, expected in expected_cash.items():
         result = calculate_quote(
@@ -2010,10 +2010,29 @@ def test_normal_three_bag_job_does_not_receive_new_bulky_protection() -> None:
         description="Three garbage bags from the garage.",
     )
 
+    assert baseline["total_cash_cad"] == 95.0
     assert described["total_cash_cad"] == baseline["total_cash_cad"]
+    assert described["_internal"]["cash_before_round_cad"] == 95.0
     assert described["_internal"]["fixed_bulky_floor_cad"] == 0.0
     assert described["_internal"]["small_load_bulky_trap_adder_cad"] == 0.0
     assert described["_internal"]["operational_complexity_adder_cad"] == 0.0
+
+
+def test_minimum_billed_zero_hour_three_bag_job_still_uses_small_job_ceiling() -> None:
+    result = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three garbage bags from the garage.",
+    )
+
+    assert result["_internal"]["billable_hours"] == 1.0
+    assert result["_internal"]["cash_before_round_cad"] == 95.0
+    assert result["total_cash_cad"] == 95.0
 
 
 def test_small_load_mixed_bulky_wording_gets_protection() -> None:
@@ -2043,6 +2062,23 @@ def test_small_load_mixed_bulky_wording_gets_protection() -> None:
     assert protected["_internal"]["small_load_bulky_trap_adder_cad"] == 60.0
 
 
+def test_heavy_small_load_not_capped_by_small_job_ceiling() -> None:
+    result = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        bag_type="heavy_mixed",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three heavy mixed bags.",
+    )
+
+    assert result["_internal"]["cash_before_round_cad"] == 105.0
+    assert result["total_cash_cad"] == 105.0
+
+
 def test_small_load_bulky_matching_uses_token_boundaries() -> None:
     result = calculate_quote(
         "haul_away",
@@ -2057,6 +2093,24 @@ def test_small_load_bulky_matching_uses_token_boundaries() -> None:
 
     assert result["_internal"]["fixed_bulky_floor_cad"] == 100.0
     assert result["_internal"]["small_load_bulky_trap_adder_cad"] == 0.0
+
+
+def test_routed_haul_away_three_bag_job_not_capped_by_small_job_ceiling() -> None:
+    result = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three garbage bags for pickup and dropoff.",
+        pickup_address="11 Warehouse Way",
+        dropoff_address="22 Customer Crescent",
+    )
+
+    assert result["_internal"]["cash_before_round_cad"] == 105.0
+    assert result["total_cash_cad"] == 105.0
 
 
 def test_normal_single_routed_delivery_does_not_receive_multi_stop_protection() -> None:
@@ -2074,6 +2128,39 @@ def test_normal_single_routed_delivery_does_not_receive_multi_stop_protection() 
     assert result["total_cash_cad"] == 100.0
     assert result["_internal"]["multi_stop_complexity_adder_cad"] == 0.0
     assert result["_internal"]["operational_complexity_adder_cad"] == 0.0
+
+
+def test_out_of_town_three_bag_job_not_capped_by_small_job_ceiling() -> None:
+    result = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        travel_zone="out_of_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three garbage bags from the garage.",
+    )
+
+    assert result["_internal"]["cash_before_round_cad"] == 145.0
+    assert result["total_cash_cad"] == 145.0
+
+
+def test_above_minimum_billed_three_bag_job_not_capped_by_small_job_ceiling() -> None:
+    result = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three garbage bags from the garage.",
+    )
+
+    assert result["_internal"]["billable_hours"] == 2.0
+    assert result["_internal"]["cash_before_round_cad"] == 125.0
+    assert result["total_cash_cad"] == 125.0
 
 
 def test_routed_delivery_disassembly_note_does_not_trigger_multi_stop_protection() -> None:
