@@ -145,6 +145,11 @@ def _configured_admin_credentials() -> tuple[str, str] | None:
     return expected_user, expected_pass
 
 
+def _configured_gpt_internal_token() -> str | None:
+    token = os.getenv("GPT_INTERNAL_API_TOKEN", "").strip()
+    return token or None
+
+
 def _admin_operator_username(request: Request) -> str:
     header = request.headers.get("authorization") or ""
     credentials = _parse_basic_auth_credentials(header)
@@ -240,6 +245,7 @@ SIZE_LIMIT_RULES = [
         max_bytes=12 * 1024 * 1024,
     ),
     SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", exact_path="/api/gpt/quote", max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", exact_path="/admin/api/db/import", max_bytes=DB_IMPORT_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/quote/", max_bytes=JSON_SIZE_CAP_BYTES),
@@ -247,6 +253,7 @@ SIZE_LIMIT_RULES = [
 
 RATE_LIMIT_RULES = [
     RateLimitRule(rule_id="quote_calculate", method="POST", exact_path="/quote/calculate", limit=10),
+    RateLimitRule(rule_id="gpt_quote", method="POST", exact_path="/api/gpt/quote", limit=10),
     RateLimitRule(rule_id="quote_upload_photos", method="POST", exact_path="/quote/upload-photos", limit=6),
     RateLimitRule(
         rule_id="assistant_upload_photos",
@@ -401,6 +408,20 @@ def _require_admin(request: Request) -> None:
     # Success - reset attempts
     _reset_admin_attempts(client_ip)
     _enforce_admin_post_origin(request)
+
+
+def _require_gpt_internal_token(request: Request) -> None:
+    expected_token = _configured_gpt_internal_token()
+    if expected_token is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+
+    header = request.headers.get("authorization") or ""
+    if not header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Invalid internal API token.")
+
+    provided_token = header.split(" ", 1)[1].strip()
+    if not provided_token or not hmac.compare_digest(provided_token, expected_token):
+        raise HTTPException(status_code=401, detail="Invalid internal API token.")
 
 
 # =========================
@@ -768,10 +789,61 @@ class QuoteRequestPayload(BaseModel):
             return v.strip()
         return v
 
+
+class GptQuoteRequestPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service_type: str = Field(..., max_length=50)
+    description: str = Field(..., min_length=1, max_length=1000)
+    pickup_address: Optional[str] = Field(None, max_length=250)
+    dropoff_address: Optional[str] = Field(None, max_length=250)
+    estimated_hours: float = Field(0.0, ge=0)
+    crew_size: int = Field(1, ge=1)
+    garbage_bag_count: int = Field(0, ge=0)
+    bag_type: Optional[Literal["light", "heavy_mixed", "construction_debris"]] = Field(None)
+    trailer_fill_estimate: Optional[Literal["under_quarter", "quarter", "half", "three_quarter", "full"]] = Field(None)
+    trailer_class: Optional[Literal["single_axle_open_aluminum", "double_axle_open_aluminum", "older_enclosed", "newer_enclosed"]] = Field(None)
+    mattresses_count: int = Field(0, ge=0)
+    box_springs_count: int = Field(0, ge=0)
+    scrap_pickup_location: str = Field("curbside", max_length=50)
+    travel_zone: str = Field("in_town", max_length=50)
+    access_difficulty: str = Field("normal", max_length=50)
+    has_dense_materials: bool = Field(False)
+    load_mode: Optional[str] = Field("standard", max_length=20)
+
+    @field_validator(
+        "service_type",
+        "description",
+        "pickup_address",
+        "dropoff_address",
+        "bag_type",
+        "trailer_fill_estimate",
+        "trailer_class",
+        "scrap_pickup_location",
+        "travel_zone",
+        "access_difficulty",
+        "load_mode",
+        mode="before",
+    )
+    @classmethod
+    def strip(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
 @app.post("/quote/calculate")
 async def quote_calculate(payload: QuoteRequestPayload):
     request_payload = payload.model_dump()
     return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
+
+
+@app.post("/api/gpt/quote", include_in_schema=False)
+async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
+    _require_gpt_internal_token(request)
+    return quote_service.build_gpt_quote_response(payload.model_dump())
 
 
 class CustomerDecision(BaseModel):

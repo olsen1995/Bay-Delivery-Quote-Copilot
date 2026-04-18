@@ -30,6 +30,21 @@ BASE_PAYLOAD = {
     "travel_zone": "in_town",
 }
 
+GPT_BASE_PAYLOAD = {
+    "service_type": "haul_away",
+    "description": "gpt quote rate limit",
+    "pickup_address": "1 Pickup Rd",
+    "dropoff_address": "2 Dropoff Ave",
+    "estimated_hours": 1.0,
+    "crew_size": 1,
+    "garbage_bag_count": 0,
+    "trailer_fill_estimate": "under_quarter",
+    "mattresses_count": 0,
+    "box_springs_count": 0,
+    "scrap_pickup_location": "curbside",
+    "travel_zone": "in_town",
+}
+
 
 def _clear_rate_limit_buckets(test_client: TestClient) -> None:
     middleware = _get_rate_limit_middleware(test_client)
@@ -49,6 +64,7 @@ class TestRateLimits:
     def setup_method(self):
         # Enable X-Forwarded-For trust for rate limit tests that use it
         os.environ["BAYDELIVERY_TRUST_X_FORWARDED_FOR"] = "true"
+        os.environ["GPT_INTERNAL_API_TOKEN"] = "test-gpt-token"
         self.client = TestClient(app)
         self.client.__enter__()
         _clear_rate_limit_buckets(self.client)
@@ -57,6 +73,7 @@ class TestRateLimits:
         self.client.__exit__(None, None, None)
         # Clean up the environment variable
         os.environ.pop("BAYDELIVERY_TRUST_X_FORWARDED_FOR", None)
+        os.environ.pop("GPT_INTERNAL_API_TOKEN", None)
 
     def test_same_ip_exceeding_limit_returns_429(self):
         headers = {"x-forwarded-for": "203.0.113.10"}
@@ -99,6 +116,20 @@ class TestRateLimits:
         assert key in middleware._buckets
         assert middleware._buckets[key] is not stale_bucket
         assert list(middleware._buckets[key]) == [now]
+
+    def test_gpt_quote_same_ip_exceeding_limit_returns_429(self):
+        headers = {
+            "x-forwarded-for": "203.0.113.55",
+            "authorization": "Bearer test-gpt-token",
+        }
+
+        for _ in range(10):
+            response = self.client.post("/api/gpt/quote", headers=headers, json=GPT_BASE_PAYLOAD)
+            assert response.status_code == 200
+
+        blocked = self.client.post("/api/gpt/quote", headers=headers, json=GPT_BASE_PAYLOAD)
+        assert blocked.status_code == 429
+        assert blocked.json() == {"detail": "rate limit exceeded"}
 
 
 def test_admin_failed_attempt_bucket_removed_when_all_attempts_expire(monkeypatch):
@@ -202,3 +233,21 @@ def test_request_size_limit_restores_exact_body_when_malformed_content_length_un
 
     assert response.status_code == 200
     assert response.body == b'{"body":"abc123"}'
+
+
+def test_request_size_limit_blocks_gpt_quote_when_body_exceeds_cap():
+    middleware = RequestSizeLimitMiddleware(
+        app=lambda scope, receive, send: None,
+        rules=[SizeLimitRule(method="POST", exact_path="/api/gpt/quote", max_bytes=10)],
+    )
+    request = _build_request(
+        "/api/gpt/quote",
+        headers=[],
+        messages=[{"type": "http.request", "body": b"0123456789A", "more_body": False}],
+    )
+
+    response = middleware.dispatch(request, _echo_body_size)
+    response = __import__("asyncio").run(response)
+
+    assert response.status_code == 413
+    assert response.body == b'{"detail":"payload too large"}'

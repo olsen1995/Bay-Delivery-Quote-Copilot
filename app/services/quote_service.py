@@ -251,6 +251,46 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _gpt_request_to_quote_payload(request_payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "service_type": request_payload.get("service_type"),
+        "description": request_payload.get("description"),
+        "job_description_customer": request_payload.get("description"),
+        "pickup_address": request_payload.get("pickup_address"),
+        "dropoff_address": request_payload.get("dropoff_address"),
+        "estimated_hours": float(request_payload.get("estimated_hours", 0.0)),
+        "crew_size": int(request_payload.get("crew_size", 1)),
+        "garbage_bag_count": int(request_payload.get("garbage_bag_count", 0)),
+        "bag_type": request_payload.get("bag_type"),
+        "trailer_fill_estimate": request_payload.get("trailer_fill_estimate"),
+        "trailer_class": request_payload.get("trailer_class"),
+        "mattresses_count": int(request_payload.get("mattresses_count", 0)),
+        "box_springs_count": int(request_payload.get("box_springs_count", 0)),
+        "scrap_pickup_location": request_payload.get("scrap_pickup_location", "curbside"),
+        "travel_zone": request_payload.get("travel_zone", "in_town"),
+        "access_difficulty": request_payload.get("access_difficulty", "normal"),
+        "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
+        "load_mode": request_payload.get("load_mode", "standard"),
+    }
+
+
+def build_gpt_quote_response(request_payload: dict[str, Any]) -> dict[str, Any]:
+    quote_artifacts = build_quote_artifacts(_gpt_request_to_quote_payload(request_payload))
+    assessment = quote_artifacts.get("internal_risk_assessment") or {}
+    response = quote_artifacts["response"]
+    risk_flags_raw = assessment.get("risk_flags")
+    risk_flags = [str(flag) for flag in risk_flags_raw] if isinstance(risk_flags_raw, list) else []
+
+    return {
+        "cash_total_cad": float(response["cash_total_cad"]),
+        "emt_total_cad": float(response["emt_total_cad"]),
+        "disclaimer": str(response["disclaimer"]),
+        "normalized_service_type": str(quote_artifacts["normalized_request"]["service_type"]),
+        "confidence_level": str(assessment.get("confidence_level") or ""),
+        "risk_flags": risk_flags,
+    }
+
+
 def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[str, Any]:
     normalized_customer_phone = _normalize_customer_phone(request_payload.get("customer_phone"))
     if normalized_customer_phone is None:
