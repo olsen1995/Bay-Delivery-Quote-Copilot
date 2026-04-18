@@ -67,18 +67,40 @@ def _validate_enum_input(
     field_name: str,
     allowed_values: set[str],
     default_value: str,
-) -> None:
+) -> str:
     raw_value = request_payload.get(field_name, default_value)
     if raw_value is None and field_name not in request_payload:
         raw_value = default_value
     elif raw_value is None:
         raw_value = default_value
-    value = str(raw_value).strip()
+    value = str(raw_value).strip().lower()
     if value not in allowed_values:
         raise HTTPException(status_code=400, detail=f"Invalid {field_name}.")
+    request_payload[field_name] = value
+    return value
 
 
-def _validate_haul_away_structure(request_payload: dict[str, Any]) -> None:
+def _allowed_haul_away_trailer_fill_values(config: dict[str, Any]) -> set[str]:
+    service_conf = ((config.get("services") or {}).get("haul_away") or {})
+    allowed_values = {
+        str(key).strip().lower()
+        for key in ((service_conf.get("trailer_fill_floor_anchors_cad") or {}).keys())
+        if str(key).strip()
+    }
+    trailer_class_anchors = service_conf.get("trailer_class_fill_floor_anchors_cad") or {}
+    if isinstance(trailer_class_anchors, dict):
+        for fill_map in trailer_class_anchors.values():
+            if not isinstance(fill_map, dict):
+                continue
+            allowed_values.update(
+                str(key).strip().lower()
+                for key in fill_map.keys()
+                if str(key).strip()
+            )
+    return allowed_values
+
+
+def _validate_haul_away_structure(request_payload: dict[str, Any], *, config: dict[str, Any]) -> None:
     signal_text = " ".join(
         part.strip()
         for part in (
@@ -92,10 +114,12 @@ def _validate_haul_away_structure(request_payload: dict[str, Any]) -> None:
         int(request_payload.get("mattresses_count", 0)),
         int(request_payload.get("box_springs_count", 0)),
     )
+    trailer_fill_value = str(request_payload.get("trailer_fill_estimate", "") or "").strip().lower()
+    has_valid_trailer_fill_signal = trailer_fill_value in _allowed_haul_away_trailer_fill_values(config)
     has_load_detail = any(
         (
             int(request_payload.get("garbage_bag_count", 0)) > 0,
-            bool(str(request_payload.get("trailer_fill_estimate", "") or "").strip()),
+            has_valid_trailer_fill_signal,
             bool(request_payload.get("has_dense_materials", False)),
             has_bulky_signal,
         )
@@ -127,7 +151,7 @@ def _validate_quote_boundary(request_payload: dict[str, Any]) -> None:
         default_value="curbside",
     )
     if normalized_service_type == "haul_away":
-        _validate_haul_away_structure(request_payload)
+        _validate_haul_away_structure(request_payload, config=config)
 
 
 def _quote_engine_inputs(

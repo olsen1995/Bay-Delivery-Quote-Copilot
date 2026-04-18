@@ -110,13 +110,11 @@ def test_invalid_access_and_travel_inputs_do_not_count_as_scope_signals() -> Non
 
 
 def test_invalid_haul_away_scope_strings_do_not_count_as_structured_scope() -> None:
-    assessment = _assessment_for(
-        bag_type="foo",
-        trailer_fill_estimate="bar",
-    )
-
-    assert assessment["confidence_level"] == "low"
-    assert assessment["risk_flags"] == ["low_input_signal", "missing_structured_scope"]
+    with pytest.raises(HTTPException, match="Please add at least one load detail"):
+        _assessment_for(
+            bag_type="foo",
+            trailer_fill_estimate="bar",
+        )
 
 
 def test_valid_haul_away_scope_values_still_count_as_structured_scope() -> None:

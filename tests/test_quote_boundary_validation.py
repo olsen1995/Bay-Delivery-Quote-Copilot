@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.quote_service import build_quote_artifacts
 
 
 @pytest.fixture(scope="module")
@@ -68,6 +70,30 @@ def test_invalid_enum_inputs_return_400(client: TestClient, field_name: str, val
     assert response.json() == {"detail": f"Invalid {field_name}."}
 
 
+@pytest.mark.parametrize(
+    ("service_type", "field_name", "value", "expected"),
+    [
+        ("haul_away", "access_difficulty", "Normal", "normal"),
+        ("haul_away", "travel_zone", "IN_TOWN", "in_town"),
+        ("scrap_pickup", "scrap_pickup_location", "Inside", "inside"),
+    ],
+)
+def test_mixed_case_valid_enum_inputs_still_return_200(
+    client: TestClient,
+    service_type: str,
+    field_name: str,
+    value: str,
+    expected: str,
+) -> None:
+    payload = _base_payload(service_type=service_type)
+    payload[field_name] = value
+
+    response = _post_quote(client, payload)
+
+    assert response.status_code == 200
+    assert response.json()["request"][field_name] == expected
+
+
 def test_empty_haul_away_returns_400(client: TestClient) -> None:
     payload = _base_payload()
     payload["trailer_fill_estimate"] = None
@@ -83,10 +109,20 @@ def test_empty_haul_away_returns_400(client: TestClient) -> None:
     }
 
 
-def test_valid_haul_away_request_still_succeeds(client: TestClient) -> None:
+def test_valid_known_trailer_fill_estimate_satisfies_haul_away_load_detail(client: TestClient) -> None:
     response = _post_quote(client, _base_payload())
 
     assert response.status_code == 200
+
+
+def test_invalid_trailer_fill_text_does_not_satisfy_haul_away_load_detail_boundary() -> None:
+    payload = _base_payload()
+    payload["trailer_fill_estimate"] = "almost_full"
+
+    with pytest.raises(HTTPException, match="Please add at least one load detail") as exc_info:
+        build_quote_artifacts(payload)
+
+    assert exc_info.value.status_code == 400
 
 
 def test_valid_haul_away_bulky_signal_only_still_succeeds(client: TestClient) -> None:
