@@ -1,0 +1,115 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img "Bay Delivery" [ref=e5]
+      - generic [ref=e6]:
+        - strong [ref=e7]: Bay Delivery
+        - text: Professional Estimate Request
+    - link "Home" [ref=e9] [cursor=pointer]:
+      - /url: /
+  - region "Bay Delivery customer trust indicators" [ref=e10]:
+    - generic [ref=e11]: Local North Bay team
+    - generic [ref=e12]: Estimate first
+    - generic [ref=e13]: Clear pricing breakdown
+    - generic [ref=e14]: Final booking confirmed after review
+  - generic [ref=e15]:
+    - paragraph [ref=e16]: Bay Delivery
+    - heading "Get an Estimate" [level=1] [ref=e17]
+    - paragraph [ref=e18]: Start with a fast estimate and clear Cash (no HST) and EMT (+13% HST) totals. If the estimate works for you, continue to booking preferences and optional photos for admin review and final confirmation.
+    - generic [ref=e19]:
+      - generic [ref=e20]: Estimate first
+      - generic [ref=e21]: Continue only if it works
+  - generic [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - paragraph [ref=e25]: Quote Flow
+        - heading "What happens next" [level=2] [ref=e26]
+      - paragraph [ref=e27]: Start with the estimate. If it works for you, continue to booking preferences and optional photos for admin review. Your job is not booked until Bay Delivery confirms it.
+    - list "Quote progress" [ref=e28]:
+      - listitem [ref=e29]:
+        - generic [ref=e30]: "1"
+        - generic [ref=e31]: Job details
+      - listitem [ref=e32]:
+        - generic [ref=e33]: "2"
+        - generic [ref=e34]: Review estimate
+      - listitem [ref=e35]:
+        - generic [ref=e36]: "3"
+        - generic [ref=e37]: Continue or decline
+      - listitem [ref=e38]:
+        - generic [ref=e39]: "4"
+        - generic [ref=e40]: Booking request
+      - listitem [ref=e41]:
+        - generic [ref=e42]: "5"
+        - generic [ref=e43]: Optional photos
+  - generic [ref=e44]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - paragraph [ref=e47]: Customer Estimate
+        - heading "Tell us about the job" [level=2] [ref=e48]
+      - paragraph [ref=e49]: Share the job details used for your estimate. You see pricing first before any booking request details.
+    - generic [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e53]:
+          - heading "1) Contact & Job Location" [level=3] [ref=e54]
+          - paragraph [ref=e55]: Step 1 of 4 before your estimate. Start here so we can send your estimate first, then any booking-request follow-up only if you continue.
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - generic [ref=e58]: Customer name
+            - textbox "Customer name" [ref=e59]:
+              - /placeholder: Full name
+          - generic [ref=e60]:
+            - generic [ref=e61]: Customer phone
+            - textbox "Customer phone" [ref=e62]:
+              - /placeholder: 705-___-____
+        - generic [ref=e63]: Job address
+        - textbox "Job address" [ref=e64]:
+          - /placeholder: North Bay, ON
+      - generic [ref=e65]:
+        - generic [ref=e67]:
+          - heading "2) Service Details" [level=3] [ref=e68]
+          - paragraph [ref=e69]: Step 2 of 4 before your estimate. Choose the job type so we only show the details that matter.
+        - generic [ref=e71]:
+          - generic [ref=e72]: Service type
+          - combobox "Service type" [ref=e73]:
+            - option "Dump run / Junk removal" [selected]
+            - option "Scrap pickup"
+            - option "Small move"
+            - option "Item delivery"
+            - option "Demolition"
+          - generic [ref=e74]: Use rough counts, access details, and material notes. Simple estimates are fine as long as they are close.
+      - generic [ref=e75]:
+        - generic [ref=e77]:
+          - heading "3) Service-Specific Details" [level=3] [ref=e78]
+          - paragraph [ref=e79]: Step 3 of 4 before your estimate. Add the few service details that affect estimate accuracy.
+        - group [ref=e80]:
+          - generic "Load, access, and material details for your estimate" [ref=e81] [cursor=pointer]
+          - option "1 worker" [selected]
+          - option "2 workers"
+          - option "Easy access (main floor, close parking)" [selected]
+          - option "Difficult access (stairs, basement carry-out, long walk)"
+          - option "Extreme access (multiple flights, tight access, difficult parking)"
+          - option "Select bag type if known" [selected]
+          - option "Light household bags (clothes, packaging, light trash)"
+          - option "Heavy mixed junk bags (books, tools, mixed junk)"
+          - option "Construction / debris bags (drywall, tile, shingles, demo debris)"
+          - option "Select trailer space used if known" [selected]
+          - option "Under 1/4 trailer (few items or a small pile)"
+          - option "About 1/4 trailer (light partial load)"
+          - option "About 1/2 trailer (half load)"
+          - option "About 3/4 trailer (large load)"
+          - option "Full trailer (packed full)"
+      - generic [ref=e82]:
+        - generic [ref=e84]:
+          - heading "4) Job Description" [level=3] [ref=e85]
+          - paragraph [ref=e86]: Step 4 of 4 before your estimate. Add the details your driver or crew should know.
+        - generic [ref=e87]: Description
+        - textbox "Description" [ref=e88]:
+          - /placeholder: What needs to be hauled/moved/demo’d? Rough size/amount?
+        - paragraph [ref=e89]: "Helpful details: quantity, item type, access notes, stairs, parking, distance to truck, and anything unusual."
+      - generic [ref=e90]:
+        - button "Get Estimate Now" [ref=e91] [cursor=pointer]
+        - button "Clear" [ref=e92] [cursor=pointer]
+      - paragraph [ref=e93]: After you see your estimate, review what is included and compare Cash vs EMT totals. If you accept, you move to a booking request, not a confirmed booking. Optional photos come after that.
+  - generic [ref=e94]:
+    - generic [ref=e95]: Cash (no HST) • EMT (+13% HST)
+    - generic [ref=e96]: Bay Delivery — North Bay, Ontario
