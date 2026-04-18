@@ -2035,6 +2035,22 @@ def test_minimum_billed_zero_hour_three_bag_job_still_uses_small_job_ceiling() -
     assert result["total_cash_cad"] == 95.0
 
 
+def test_three_bag_two_worker_job_not_capped_by_small_job_ceiling() -> None:
+    result = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=2,
+        garbage_bag_count=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three garbage bags from the garage.",
+    )
+
+    assert result["_internal"]["cash_before_round_cad"] == 121.0
+    assert result["total_cash_cad"] == 120.0
+
+
 def test_small_load_mixed_bulky_wording_gets_protection() -> None:
     baseline = calculate_quote(
         "haul_away",
@@ -2077,6 +2093,67 @@ def test_heavy_small_load_not_capped_by_small_job_ceiling() -> None:
 
     assert result["_internal"]["cash_before_round_cad"] == 105.0
     assert result["total_cash_cad"] == 105.0
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_cash"),
+    [
+        (
+            {
+                "hours": 0.0,
+                "crew_size": 1,
+                "garbage_bag_count": 1,
+                "travel_zone": "in_town",
+                "access_difficulty": "normal",
+                "has_dense_materials": False,
+                "description": "Small load with couch, recliner, and dresser.",
+            },
+            160.0,
+        ),
+        (
+            {
+                "hours": 1.0,
+                "crew_size": 1,
+                "garbage_bag_count": 3,
+                "travel_zone": "in_town",
+                "access_difficulty": "normal",
+                "has_dense_materials": False,
+                "description": "Three garbage bags for pickup and dropoff.",
+                "pickup_address": "11 Warehouse Way",
+                "dropoff_address": "22 Customer Crescent",
+            },
+            105.0,
+        ),
+        (
+            {
+                "hours": 0.0,
+                "crew_size": 1,
+                "garbage_bag_count": 1,
+                "travel_zone": "in_town",
+                "access_difficulty": "normal",
+                "has_dense_materials": False,
+                "description": "Need to take apart a bed frame before removal.",
+            },
+            130.0,
+        ),
+        (
+            {
+                "hours": 0.0,
+                "crew_size": 1,
+                "garbage_bag_count": 1,
+                "travel_zone": "in_town",
+                "access_difficulty": "normal",
+                "has_dense_materials": True,
+                "description": "One bag of tile debris.",
+            },
+            140.0,
+        ),
+    ],
+)
+def test_small_job_ceiling_preserves_existing_exclusions(kwargs: dict, expected_cash: float) -> None:
+    result = calculate_quote("haul_away", **kwargs)
+
+    assert result["total_cash_cad"] == expected_cash
 
 
 def test_small_load_bulky_matching_uses_token_boundaries() -> None:

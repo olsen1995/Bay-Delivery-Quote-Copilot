@@ -419,6 +419,7 @@ def _is_small_light_haulaway(
     *,
     service_type: str,
     small_load_protected: bool,
+    crew_size: int,
     access_difficulty: str,
     fixed_bulky_floor: float,
     small_load_bulky_trap_adder: float,
@@ -432,6 +433,8 @@ def _is_small_light_haulaway(
     load_mode: str,
 ) -> bool:
     if service_type != "haul_away" or not small_load_protected:
+        return False
+    if int(crew_size) > 1:
         return False
     if access_difficulty != "normal" or route_complete or travel_zone != "in_town":
         return False
@@ -951,6 +954,7 @@ def calculate_quote(
     if _is_small_light_haulaway(
         service_type=normalized,
         small_load_protected=small_load_protected,
+        crew_size=crew_size,
         access_difficulty=_ad,
         fixed_bulky_floor=fixed_bulky_floor,
         small_load_bulky_trap_adder=small_load_bulky_trap_adder,
