@@ -1867,3 +1867,240 @@ def test_risk_margin_protection_keeps_rounding_tax_and_disclaimer_structure() ->
     assert buffered["total_cash_cad"] == 160.0
     assert buffered["total_emt_cad"] == 180.8
     assert buffered["disclaimer"] == baseline["disclaimer"]
+
+
+def test_easy_outside_mattress_uses_competitive_fixed_bulky_floor() -> None:
+    result = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="One mattress at curbside outside with one small bag.",
+    )
+
+    assert result["total_cash_cad"] == 90.0
+    assert result["_internal"]["fixed_bulky_floor_cad"] == 90.0
+    assert result["_internal"]["small_load_bulky_trap_adder_cad"] == 0.0
+
+
+def test_difficult_access_mattress_prices_above_easy_case() -> None:
+    easy = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="One mattress at curbside outside with one small bag.",
+    )
+    difficult = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+        description="One mattress up the stairs with one small bag.",
+    )
+
+    assert difficult["total_cash_cad"] == 115.0
+    assert difficult["_internal"]["fixed_bulky_floor_cad"] == 110.0
+    assert difficult["total_cash_cad"] > easy["total_cash_cad"]
+
+
+def test_single_recliner_no_longer_prices_like_tiny_job() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    protected = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Single recliner at curbside with one small bag.",
+    )
+
+    assert baseline["total_cash_cad"] == 80.0
+    assert protected["total_cash_cad"] == 90.0
+    assert protected["_internal"]["fixed_bulky_floor_cad"] == 90.0
+
+
+def test_multi_stop_blended_handling_job_gets_operational_protection() -> None:
+    result = calculate_quote(
+        "item_delivery",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Pickup sofa, dropoff to customer, then remove old couch.",
+        pickup_address="11 Warehouse Way",
+        dropoff_address="22 Customer Crescent",
+    )
+
+    assert result["total_cash_cad"] == 175.0
+    assert result["_internal"]["multi_stop_complexity_adder_cad"] == 75.0
+    assert result["_internal"]["operational_complexity_adder_cad"] == 75.0
+
+
+def test_disassembly_wording_triggers_operational_protection() -> None:
+    result = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Need to take apart a bed frame before removal.",
+    )
+
+    assert result["total_cash_cad"] == 130.0
+    assert result["_internal"]["disassembly_complexity_adder_cad"] == 50.0
+    assert result["_internal"]["operational_complexity_adder_cad"] == 50.0
+
+
+def test_normal_three_bag_job_does_not_receive_new_bulky_protection() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    described = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Three garbage bags from the garage.",
+    )
+
+    assert described["total_cash_cad"] == baseline["total_cash_cad"]
+    assert described["_internal"]["fixed_bulky_floor_cad"] == 0.0
+    assert described["_internal"]["small_load_bulky_trap_adder_cad"] == 0.0
+    assert described["_internal"]["operational_complexity_adder_cad"] == 0.0
+
+
+def test_small_load_mixed_bulky_wording_gets_protection() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Couch and dresser.",
+    )
+    protected = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Small load with couch, recliner, and dresser.",
+    )
+
+    assert baseline["total_cash_cad"] == 100.0
+    assert protected["total_cash_cad"] == 160.0
+    assert protected["_internal"]["small_load_bulky_trap_adder_cad"] == 60.0
+
+
+def test_normal_single_routed_delivery_does_not_receive_multi_stop_protection() -> None:
+    result = calculate_quote(
+        "item_delivery",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Single couch delivery from warehouse to customer.",
+        pickup_address="11 Warehouse Way",
+        dropoff_address="22 Customer Crescent",
+    )
+
+    assert result["total_cash_cad"] == 100.0
+    assert result["_internal"]["multi_stop_complexity_adder_cad"] == 0.0
+    assert result["_internal"]["operational_complexity_adder_cad"] == 0.0
+
+
+def test_overlapping_operational_signals_do_not_stack_into_unrealistic_jump() -> None:
+    result = calculate_quote(
+        "item_delivery",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Pickup bed, dropoff to customer, remove old frame, and take apart bed frame.",
+        pickup_address="11 Warehouse Way",
+        dropoff_address="22 Customer Crescent",
+    )
+
+    assert result["total_cash_cad"] == 175.0
+    assert result["_internal"]["multi_stop_complexity_adder_cad"] == 75.0
+    assert result["_internal"]["disassembly_complexity_adder_cad"] == 50.0
+    assert result["_internal"]["operational_complexity_adder_cad"] == 75.0
+
+
+def test_new_protections_only_raise_never_lower_existing_quote() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=16,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    protected = calculate_quote(
+        "haul_away",
+        2.0,
+        crew_size=2,
+        garbage_bag_count=16,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="One couch for removal.",
+    )
+
+    assert protected["total_cash_cad"] == baseline["total_cash_cad"]
+    assert protected["_internal"]["fixed_bulky_floor_cad"] == 100.0
+    assert protected["_internal"]["operational_complexity_adder_cad"] == 0.0
+    assert protected["_internal"]["small_load_bulky_trap_adder_cad"] == 0.0
+
+
+def test_new_pre_round_protections_preserve_rounding_and_emt_behavior() -> None:
+    result = calculate_quote(
+        "item_delivery",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Pickup sofa, dropoff to customer, then remove old couch.",
+        pickup_address="11 Warehouse Way",
+        dropoff_address="22 Customer Crescent",
+    )
+
+    assert result["_internal"]["cash_before_round_cad"] == 175.0
+    assert result["total_cash_cad"] == 175.0
+    assert result["total_emt_cad"] == 197.75

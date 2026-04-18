@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Dict
 
@@ -80,6 +81,112 @@ RISK_MARGIN_PROTECTION_STRONG_FLAGS = frozenset(
         "mixed_bulky_load_risk",
         "access_volume_risk",
     }
+)
+
+_TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
+_FIXED_BULKY_PHRASES = (
+    "mattress",
+    "mattresses",
+    "box spring",
+    "box springs",
+    "boxspring",
+    "boxsprings",
+    "couch",
+    "sofa",
+    "recliner",
+    "loveseat",
+)
+_EASY_FIXED_BULKY_ACCESS_PHRASES = (
+    "curbside",
+    "curb side",
+    "driveway",
+    "drive way",
+    "outside",
+    "outdoor",
+    "garage",
+)
+_DIFFICULT_FIXED_BULKY_ACCESS_PHRASES = (
+    "stairs",
+    "stair",
+    "basement",
+    "upstairs",
+    "downstairs",
+    "tight",
+    "narrow",
+    "maneuver",
+    "manoeuver",
+    "awkward",
+    "won t fit",
+    "wont fit",
+)
+_MULTI_STOP_COMPLEXITY_PHRASES = (
+    "remove old",
+    "take away old",
+    "haul away old",
+    "pickup dropoff removal",
+    "pick up drop off removal",
+    "pickup and dropoff and removal",
+    "pickup and drop off and removal",
+    "deliver and remove",
+    "delivery and removal",
+    "pickup dropoff and dump",
+    "pickup drop off and dump",
+    "multiple stops",
+    "two stops",
+    "three stops",
+    "second stop",
+    "stop at storage",
+    "stop at dump",
+    "stop at donation",
+    "donation drop off",
+    "drop off at donation",
+)
+_MULTI_STOP_REMOVAL_PHRASES = (
+    "remove",
+    "removal",
+    "haul away",
+    "take away",
+    "dispose",
+    "disposal",
+    "dump",
+    "old item",
+    "old couch",
+    "old mattress",
+)
+_DISASSEMBLY_PHRASES = (
+    "take apart",
+    "disassemble",
+    "disassembly",
+    "bed frame",
+    "sectional",
+    "remove legs",
+    "remove doors",
+    "frame",
+    "won t fit as is",
+    "wont fit as is",
+    "won t fit",
+    "wont fit",
+)
+_SMALL_LOAD_PHRASES = (
+    "small load",
+    "few things",
+    "few items",
+    "just a few",
+    "not much",
+    "small amount",
+)
+_AWKWARD_ITEM_PHRASES = (
+    "sectional",
+    "dresser",
+    "desk",
+    "table",
+    "chair",
+    "frame",
+)
+_SINGLE_ITEM_PHRASES = (
+    "one ",
+    "single ",
+    "just one ",
 )
 
 
@@ -423,6 +530,130 @@ def _risk_margin_protection(assessment: dict[str, Any] | None) -> tuple[float, l
     return 0.0, []
 
 
+def _normalized_signal_text(*parts: Any) -> str:
+    raw = " ".join(str(part or "") for part in parts if part is not None)
+    normalized = _TEXT_NORMALIZE_RE.sub(" ", raw.lower())
+    return " ".join(normalized.split())
+
+
+def _contains_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
+    if not text:
+        return False
+    return any(phrase in text for phrase in phrases)
+
+
+def _count_matched_phrases(text: str, phrases: tuple[str, ...]) -> int:
+    if not text:
+        return 0
+    return sum(1 for phrase in phrases if phrase in text)
+
+
+def _has_fixed_bulky_item_signal(text: str, mattresses_count: int, box_springs_count: int) -> bool:
+    if mattresses_count > 0 or box_springs_count > 0:
+        return True
+    return _contains_any_phrase(text, _FIXED_BULKY_PHRASES)
+
+
+def _is_single_bulky_item_job(
+    text: str,
+    mattresses_count: int,
+    box_springs_count: int,
+    garbage_bag_count: int,
+) -> bool:
+    structured_bulky_count = max(int(mattresses_count), 0) + max(int(box_springs_count), 0)
+    if structured_bulky_count == 1 and int(garbage_bag_count) <= SMALL_LOAD_MAX_BAGS:
+        return True
+    return (
+        int(garbage_bag_count) <= SMALL_LOAD_MAX_BAGS
+        and _contains_any_phrase(text, _FIXED_BULKY_PHRASES)
+        and _contains_any_phrase(text, _SINGLE_ITEM_PHRASES)
+    )
+
+
+def _haul_away_fixed_bulky_floor(
+    *,
+    access_difficulty: str,
+    text: str,
+    mattresses_count: int,
+    box_springs_count: int,
+    garbage_bag_count: int,
+) -> float:
+    if access_difficulty == "extreme":
+        return 0.0
+    if not (
+        _has_fixed_bulky_item_signal(text, mattresses_count, box_springs_count)
+        or _is_single_bulky_item_job(text, mattresses_count, box_springs_count, garbage_bag_count)
+    ):
+        return 0.0
+    if access_difficulty == "difficult" or _contains_any_phrase(text, _DIFFICULT_FIXED_BULKY_ACCESS_PHRASES):
+        return 110.0
+    if _contains_any_phrase(text, _EASY_FIXED_BULKY_ACCESS_PHRASES):
+        return 90.0
+    return 100.0
+
+
+def _multi_stop_complexity_adder(
+    *,
+    route_complete: bool,
+    service_type: str,
+    travel_zone: str,
+    access_difficulty: str,
+    text: str,
+) -> float:
+    if service_type not in {"small_move", "item_delivery"} or not route_complete:
+        return 0.0
+    has_complex_multi_stop_signal = _contains_any_phrase(text, _MULTI_STOP_COMPLEXITY_PHRASES)
+    has_routed_removal_blend = (
+        _contains_any_phrase(text, _MULTI_STOP_REMOVAL_PHRASES)
+        and ("pickup" in text or "pick up" in text or "dropoff" in text or "drop off" in text or "delivery" in text)
+    )
+    if not (has_complex_multi_stop_signal or has_routed_removal_blend):
+        return 0.0
+    if (
+        access_difficulty in {"difficult", "extreme"}
+        or travel_zone != "in_town"
+        or _contains_any_phrase(text, ("three stops", "multiple stops", "second stop", "stop at storage"))
+    ):
+        return 100.0
+    return 75.0
+
+
+def _disassembly_complexity_adder(
+    *,
+    access_difficulty: str,
+    text: str,
+) -> float:
+    if not _contains_any_phrase(text, _DISASSEMBLY_PHRASES):
+        return 0.0
+    if access_difficulty in {"difficult", "extreme"}:
+        return 75.0
+    return 50.0
+
+
+def _small_load_bulky_trap_adder(
+    *,
+    text: str,
+    garbage_bag_count: int,
+    mattresses_count: int,
+    box_springs_count: int,
+) -> float:
+    if int(garbage_bag_count) > SMALL_LOAD_MAX_BAGS:
+        return 0.0
+    if not _contains_any_phrase(text, _SMALL_LOAD_PHRASES):
+        return 0.0
+
+    fixed_bulky_matches = _count_matched_phrases(text, _FIXED_BULKY_PHRASES)
+    awkward_matches = _count_matched_phrases(text, _AWKWARD_ITEM_PHRASES)
+    structured_bulky_matches = min(max(int(mattresses_count), 0) + max(int(box_springs_count), 0), 2)
+    total_signal_count = fixed_bulky_matches + awkward_matches + structured_bulky_matches
+
+    if total_signal_count >= 3 or (fixed_bulky_matches + structured_bulky_matches >= 2 and awkward_matches >= 1):
+        return 60.0
+    if total_signal_count >= 2:
+        return 35.0
+    return 0.0
+
+
 def calculate_quote(
     service_type: str,
     hours: float,
@@ -440,6 +671,10 @@ def calculate_quote(
     has_dense_materials: bool = False,
     load_mode: str | None = "standard",
     internal_risk_assessment: dict[str, Any] | None = None,
+    description: str | None = None,
+    job_description_customer: str | None = None,
+    pickup_address: str | None = None,
+    dropoff_address: str | None = None,
 ) -> Dict[str, Any]:
     """
     Customer-safe output:
@@ -454,6 +689,8 @@ def calculate_quote(
 
     normalized = _normalize_service_type(config, service_type)
     normalized_load_mode = _normalize_load_mode(load_mode)
+    signal_text = _normalized_signal_text(job_description_customer, description)
+    route_complete = bool(str(pickup_address or "").strip() and str(dropoff_address or "").strip())
 
     # ------------------------------------------------------------
     # Scrap pickup uses location-specific base inputs, but the
@@ -621,6 +858,11 @@ def calculate_quote(
     bag_type_floor = 0.0
     trailer_fill_floor = 0.0
     awkward_small_load_floor = 0.0
+    fixed_bulky_floor = 0.0
+    multi_stop_complexity_adder = 0.0
+    disassembly_complexity_adder = 0.0
+    small_load_bulky_trap_adder = 0.0
+    operational_complexity_adder = 0.0
     if normalized == "haul_away":
         bag_type_floor = _haul_away_bag_type_floor(svc, bag_type, int(garbage_bag_count))
         trailer_fill_floor = _haul_away_trailer_class_fill_floor(svc, trailer_class, trailer_fill_estimate)
@@ -635,6 +877,35 @@ def calculate_quote(
                 discounted_cash = float(cash_before_round) * 0.8
                 space_fill_floor = _space_fill_floor_for_class(inferred_size_class)
                 cash_before_round = max(discounted_cash, space_fill_floor)
+
+        fixed_bulky_floor = _haul_away_fixed_bulky_floor(
+            access_difficulty=_ad,
+            text=signal_text,
+            mattresses_count=int(mattresses_count),
+            box_springs_count=int(box_springs_count),
+            garbage_bag_count=int(garbage_bag_count),
+        )
+        cash_before_round = max(cash_before_round, fixed_bulky_floor)
+        small_load_bulky_trap_adder = _small_load_bulky_trap_adder(
+            text=signal_text,
+            garbage_bag_count=int(garbage_bag_count),
+            mattresses_count=int(mattresses_count),
+            box_springs_count=int(box_springs_count),
+        )
+
+    multi_stop_complexity_adder = _multi_stop_complexity_adder(
+        route_complete=route_complete,
+        service_type=normalized,
+        travel_zone=tz,
+        access_difficulty=_ad,
+        text=signal_text,
+    )
+    disassembly_complexity_adder = _disassembly_complexity_adder(
+        access_difficulty=_ad,
+        text=signal_text,
+    )
+    operational_complexity_adder = max(multi_stop_complexity_adder, disassembly_complexity_adder)
+    cash_before_round += operational_complexity_adder + small_load_bulky_trap_adder
 
     risk_margin_protection_cad, risk_margin_protection_flags = _risk_margin_protection(internal_risk_assessment)
     cash_before_round += risk_margin_protection_cad
@@ -691,8 +962,13 @@ def calculate_quote(
             "trailer_class": trailer_class,
             "trailer_fill_floor_cad": round(float(trailer_fill_floor), 2),
             "awkward_small_load_floor_cad": round(float(awkward_small_load_floor), 2),
+            "fixed_bulky_floor_cad": round(float(fixed_bulky_floor), 2),
             "access_difficulty": _ad,
             "access_difficulty_adder_cad": round(float(access_adder), 2),
+            "multi_stop_complexity_adder_cad": round(float(multi_stop_complexity_adder), 2),
+            "disassembly_complexity_adder_cad": round(float(disassembly_complexity_adder), 2),
+            "operational_complexity_adder_cad": round(float(operational_complexity_adder), 2),
+            "small_load_bulky_trap_adder_cad": round(float(small_load_bulky_trap_adder), 2),
             "risk_margin_protection_cad": round(float(risk_margin_protection_cad), 2),
             "risk_margin_protection_flags": risk_margin_protection_flags,
         },

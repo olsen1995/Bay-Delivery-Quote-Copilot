@@ -62,6 +62,10 @@ def _quote_engine_inputs(
         "access_difficulty": str(request_payload.get("access_difficulty", "normal")),
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
         "load_mode": load_mode,
+        "description": request_payload.get("description"),
+        "job_description_customer": request_payload.get("job_description_customer"),
+        "pickup_address": request_payload.get("pickup_address"),
+        "dropoff_address": request_payload.get("dropoff_address"),
     }
 
 
