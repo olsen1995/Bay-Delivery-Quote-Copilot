@@ -19,6 +19,7 @@ except ImportError:
 
 from fastapi import (
     BackgroundTasks,
+    Depends,
     FastAPI,
     File,
     Form,
@@ -840,9 +841,8 @@ async def quote_calculate(payload: QuoteRequestPayload):
     return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
 
 
-@app.post("/api/gpt/quote", include_in_schema=False)
-async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
-    _require_gpt_internal_token(request)
+@app.post("/api/gpt/quote", include_in_schema=False, dependencies=[Depends(_require_gpt_internal_token)])
+async def gpt_quote(payload: GptQuoteRequestPayload):
     return quote_service.build_gpt_quote_response(payload.model_dump())
 
 

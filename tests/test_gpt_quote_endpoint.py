@@ -150,6 +150,26 @@ def test_gpt_quote_missing_token_returns_401(client: TestClient) -> None:
     assert response.json() == {"detail": "Invalid internal API token."}
 
 
+def test_gpt_quote_missing_token_on_malformed_body_returns_401_not_422(client: TestClient) -> None:
+    response = client.post("/api/gpt/quote", json={"unexpected": "field"})
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid internal API token."}
+
+
+def test_gpt_quote_invalid_token_on_malformed_body_returns_401_not_422(client: TestClient) -> None:
+    response = client.post("/api/gpt/quote", headers=_headers("wrong-token"), json={"unexpected": "field"})
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid internal API token."}
+
+
+def test_gpt_quote_valid_token_on_malformed_body_still_returns_422(client: TestClient) -> None:
+    response = client.post("/api/gpt/quote", headers=_headers(), json={"unexpected": "field"})
+
+    assert response.status_code == 422
+
+
 def test_gpt_quote_missing_env_token_fails_closed(monkeypatch) -> None:
     original_db_path = storage.DB_PATH
     original_cache = dict(storage._TABLE_COL_CACHE)
