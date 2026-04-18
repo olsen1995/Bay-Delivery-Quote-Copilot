@@ -39,6 +39,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "description": "Move stuff",
                 "service_type": "junk_removal",
                 "estimated_hours": 2.0,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         self.assertEqual(200, calculate_resp.status_code)
@@ -72,6 +73,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "description": "Move stuff",
                 "service_type": "junk_removal",
                 "estimated_hours": 1.0,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         self.assertEqual(200, calculate_resp.status_code)
@@ -103,6 +105,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "description": "Move stuff",
                 "service_type": "junk_removal",
                 "estimated_hours": 1.5,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         quote_data = calculate_resp.json()
@@ -144,6 +147,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "description": "Move stuff",
                 "service_type": "junk_removal",
                 "estimated_hours": 2.0,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         quote_data = calculate_resp.json()
@@ -199,6 +203,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "description": "Move stuff",
                 "service_type": "junk_removal",
                 "estimated_hours": 1.0,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         quote_data = calculate_resp.json()
@@ -230,6 +235,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "service_type": "haul_away",
                 "estimated_hours": 1.0,
                 "crew_size": 1,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         self.assertEqual(200, calculate_resp.status_code)
@@ -257,6 +263,7 @@ class AcceptTokenValidationTests(unittest.TestCase):
                 "service_type": "haul_away",
                 "estimated_hours": 1.0,
                 "crew_size": 1,
+                "trailer_fill_estimate": "under_quarter",
             },
         )
         self.assertEqual(200, calculate_resp.status_code)

@@ -23,6 +23,7 @@ BASE_PAYLOAD = {
     "estimated_hours": 1.0,
     "crew_size": 1,
     "garbage_bag_count": 0,
+    "trailer_fill_estimate": "under_quarter",
     "mattresses_count": 0,
     "box_springs_count": 0,
     "scrap_pickup_location": "curbside",

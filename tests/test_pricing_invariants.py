@@ -15,7 +15,7 @@ def client() -> TestClient:
 
 
 def _base_payload(service_type: str = "haul_away") -> dict:
-    return {
+    payload = {
         "customer_name": "Invariant Tester",
         "customer_phone": "705-555-0100",
         "job_address": "123 Main St",
@@ -33,6 +33,9 @@ def _base_payload(service_type: str = "haul_away") -> dict:
         "scrap_pickup_location": "curbside",
         "travel_zone": "in_town",
     }
+    if service_type == "haul_away":
+        payload["trailer_fill_estimate"] = "under_quarter"
+    return payload
 
 
 def _post_quote(client: TestClient, payload: dict):
@@ -607,14 +610,13 @@ def test_difficult_access_adder_applied(client: TestClient) -> None:
     )
 
 
-def test_unknown_access_difficulty_falls_back_to_normal(client: TestClient) -> None:
-    """An unrecognised access_difficulty value must not raise a 500; defaults to normal."""
+def test_unknown_access_difficulty_returns_400(client: TestClient) -> None:
+    """An unrecognised access_difficulty value must be rejected before pricing."""
     payload = _base_payload(service_type="haul_away")
     payload["access_difficulty"] = "a_random_nonsense_value"
     response = _post_quote(client, payload)
-    # The field is max_length=50 so this still passes Pydantic; engine should clamp it.
-    assert response.status_code == 200
-    _assert_success_schema_and_totals(response.json())
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid access_difficulty."}
 
 
 # =============================================================================

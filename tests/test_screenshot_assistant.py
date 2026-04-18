@@ -62,7 +62,12 @@ def configure_upload_mocks(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_screenshot_assistant_admin_only_access_control(client: TestClient) -> None:
     payload = {
         "message": "Customer sent screenshots of a dump run.",
-        "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.5, "crew_size": 2},
+        "candidate_inputs": {
+            "service_type": "haul_away",
+            "estimated_hours": 1.5,
+            "crew_size": 2,
+            "trailer_fill_estimate": "under_quarter",
+        },
         "operator_overrides": {},
         "screenshot_attachment_ids": [],
     }
@@ -105,7 +110,12 @@ def test_screenshot_assistant_persists_analysis_and_links_attachments(client: Te
         json={
             "message": "Estimate this screenshot thread for haul away.",
             "screenshot_attachment_ids": ["att-screenshot-1"],
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.25, "crew_size": 2},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.25,
+                "crew_size": 2,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {"job_address": "123 Example St"},
         },
     )
@@ -198,7 +208,12 @@ def test_screenshot_assistant_message_autofill_suggestions_are_persisted_separat
                 "Hi, my name is Taylor. You can reach me at 415-555-0199. "
                 "The address is 123 Example St. I need junk removed on 2026-04-12 in the morning."
             ),
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.5, "crew_size": 2},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.5,
+                "crew_size": 2,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -231,7 +246,12 @@ def test_screenshot_assistant_message_autofill_reports_missing_fields_and_warnin
         headers=admin_headers(),
         json={
             "message": "",
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -321,6 +341,7 @@ def test_screenshot_assistant_requested_date_and_window_round_trip_without_affec
                 "customer_phone": "(415) 555-0199",
                 "job_address": "123 Example St",
                 "description": "Reviewed draft description",
+                "trailer_fill_estimate": "under_quarter",
             },
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
@@ -363,7 +384,7 @@ def test_screenshot_assistant_upload_requires_admin_and_persists_analysis_link(
         headers=admin_headers(),
         json={
             "message": "Start a draft before uploading screenshots.",
-            "candidate_inputs": {"service_type": "haul_away"},
+            "candidate_inputs": {"service_type": "haul_away", "trailer_fill_estimate": "under_quarter"},
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -417,7 +438,7 @@ def test_screenshot_assistant_upload_stores_ocr_failure_without_blocking_upload(
         headers=admin_headers(),
         json={
             "message": "Start a draft before uploading screenshots.",
-            "candidate_inputs": {"service_type": "haul_away"},
+            "candidate_inputs": {"service_type": "haul_away", "trailer_fill_estimate": "under_quarter"},
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -447,7 +468,7 @@ def test_screenshot_assistant_upload_rejects_invalid_file_type(
         headers=admin_headers(),
         json={
             "message": "Draft for invalid upload validation.",
-            "candidate_inputs": {"service_type": "haul_away"},
+            "candidate_inputs": {"service_type": "haul_away", "trailer_fill_estimate": "under_quarter"},
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -482,7 +503,11 @@ def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClien
         headers=admin_headers(),
         json={
             "message": "Initial draft",
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -496,7 +521,11 @@ def test_screenshot_assistant_analysis_can_be_updated_in_place(client: TestClien
         json={
             "analysis_id": created["analysis_id"],
             "message": "Updated draft",
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 2.0},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 2.0,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {"job_address": "456 Updated St"},
             "screenshot_attachment_ids": [],
         },
@@ -517,7 +546,11 @@ def test_screenshot_assistant_low_information_analysis_keeps_minimum_safe_at_tar
         headers=admin_headers(),
         json={
             "message": "",
-            "candidate_inputs": {"estimated_hours": 1.0, "crew_size": 1},
+            "candidate_inputs": {
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {},
             "screenshot_attachment_ids": [],
         },
@@ -559,7 +592,12 @@ def test_screenshot_assistant_ocr_autofill_can_fill_v1a_fields_without_message(c
         headers=admin_headers(),
         json={
             "message": "",
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {},
             "screenshot_attachment_ids": ["att-ocr-1"],
         },
@@ -604,7 +642,12 @@ def test_screenshot_assistant_combines_message_and_ocr_sources_without_overwriti
         headers=admin_headers(),
         json={
             "message": "Hi, my name is Taylor. Please help with the address and phone from the screenshots.",
-            "candidate_inputs": {"service_type": "haul_away", "estimated_hours": 1.0, "crew_size": 1},
+            "candidate_inputs": {
+                "service_type": "haul_away",
+                "estimated_hours": 1.0,
+                "crew_size": 1,
+                "trailer_fill_estimate": "under_quarter",
+            },
             "operator_overrides": {},
             "screenshot_attachment_ids": ["att-ocr-2"],
         },
@@ -647,7 +690,6 @@ def test_screenshot_assistant_minimum_safe_respects_active_engine_floors(client:
     protected_floor = artifacts["engine_quote"]["_internal"]["item_delivery_protected_base_floor_cad"]
     assert protected_floor > 0
     assert guidance["range"]["minimum_safe_cash_cad"] >= protected_floor
-
 
 
 

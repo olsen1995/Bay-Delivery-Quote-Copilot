@@ -95,6 +95,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "service_type": "haul_away",
             "estimated_hours": 1.0,
             "crew_size": 1,
+            "trailer_fill_estimate": "under_quarter",
         })
         quote_id = resp.json()["quote_id"]
         accept_token = resp.json()["accept_token"]
@@ -114,6 +115,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "service_type": "haul_away",
             "estimated_hours": 1.0,
             "crew_size": 1,
+            "trailer_fill_estimate": "under_quarter",
         })
         quote_id = resp.json()["quote_id"]
         accept_token = resp.json()["accept_token"]
@@ -350,6 +352,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "service_type": "haul_away",
             "estimated_hours": 1.0,
             "crew_size": 1,
+            "trailer_fill_estimate": "under_quarter",
         })
         quote_id = resp.json()["quote_id"]
         accept_token = resp.json()["accept_token"]
@@ -386,6 +389,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "service_type": "haul_away",
             "estimated_hours": 1.0,
             "crew_size": 1,
+            "trailer_fill_estimate": "under_quarter",
         })
 
         self.assertEqual(resp.status_code, 200)
@@ -400,6 +404,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "service_type": "haul_away",
             "estimated_hours": 1.0,
             "crew_size": 1,
+            "trailer_fill_estimate": "under_quarter",
         })
 
         self.assertEqual(resp.status_code, 400)
@@ -417,6 +422,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
             "service_type": "haul_away",
             "estimated_hours": 1.0,
             "crew_size": 1,
+            "trailer_fill_estimate": "under_quarter",
         })
         quote_id = quote_resp.json()["quote_id"]
         accept_token = quote_resp.json()["accept_token"]

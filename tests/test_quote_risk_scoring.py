@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 from app import storage
 from app.quote_engine import calculate_quote
@@ -60,10 +61,8 @@ def temp_quote_db():
 
 
 def test_sparse_haul_away_inputs_score_low_confidence() -> None:
-    assessment = _assessment_for()
-
-    assert assessment["confidence_level"] == "low"
-    assert assessment["risk_flags"] == ["low_input_signal", "missing_structured_scope"]
+    with pytest.raises(HTTPException, match="Please add at least one load detail"):
+        _assessment_for()
 
 
 def test_dense_material_inputs_set_dense_material_risk() -> None:
@@ -102,14 +101,12 @@ def test_mixed_bulky_load_risk_uses_structured_load_signals() -> None:
 
 
 def test_invalid_access_and_travel_inputs_do_not_count_as_scope_signals() -> None:
-    assessment = _assessment_for(
-        service_type="demolition",
-        access_difficulty="stairs",
-        travel_zone="rural",
-    )
-
-    assert assessment["confidence_level"] == "medium"
-    assert assessment["risk_flags"] == ["low_input_signal"]
+    with pytest.raises(HTTPException, match="Invalid access_difficulty"):
+        _assessment_for(
+            service_type="demolition",
+            access_difficulty="stairs",
+            travel_zone="rural",
+        )
 
 
 def test_invalid_haul_away_scope_strings_do_not_count_as_structured_scope() -> None:
