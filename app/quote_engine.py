@@ -67,6 +67,8 @@ SMALL_LOAD_MAX_BAGS = 3
 SMALL_LOAD_DISPOSAL_PER_BAG = 15.0  # $15 per bag for 1–3 light bags
 SMALL_LOAD_DISPOSAL_SINGLE_BAG = 20.0
 SMALL_LOAD_DISPOSAL_TWO_BAGS = 35.0
+SMALL_LIGHT_HAULAWAY_CEILING_TARGET_CAD = 95.0
+SMALL_LIGHT_HAULAWAY_CEILING_ABSOLUTE_MAX_CAD = 100.0
 
 # Mid-band haul-away progression adder for 10-15 bag light jobs.
 # This avoids flat pricing in the 12-15 range while leaving heavy tiers unchanged.
@@ -411,6 +413,41 @@ def _haul_away_access_difficulty_small_load_floor(
     if anchor is None:
         return 0.0
     return float(anchor)
+
+
+def _is_small_light_haulaway(
+    *,
+    service_type: str,
+    small_load_protected: bool,
+    crew_size: int,
+    access_difficulty: str,
+    fixed_bulky_floor: float,
+    small_load_bulky_trap_adder: float,
+    operational_complexity_adder: float,
+    route_complete: bool,
+    travel_zone: str,
+    billable_hours: float,
+    service_conf: Dict[str, Any],
+    bag_type: str | None,
+    trailer_fill_floor: float,
+    load_mode: str,
+) -> bool:
+    if service_type != "haul_away" or not small_load_protected:
+        return False
+    if int(crew_size) > 1:
+        return False
+    if access_difficulty != "normal" or route_complete or travel_zone != "in_town":
+        return False
+    if fixed_bulky_floor > 0.0 or small_load_bulky_trap_adder > 0.0 or operational_complexity_adder > 0.0:
+        return False
+    if trailer_fill_floor > 0.0 or load_mode == "space_fill":
+        return False
+
+    bag_type_key = str(bag_type or "").strip().lower()
+    if bag_type_key not in {"", "light"}:
+        return False
+
+    return float(billable_hours) <= _get_min_hours(service_conf)
 
 
 def _haul_away_trailer_fill_floor(service_conf: Dict[str, Any], trailer_fill_estimate: str | None) -> float:
@@ -914,6 +951,27 @@ def calculate_quote(
         text=signal_text,
     )
     operational_complexity_adder = max(multi_stop_complexity_adder, disassembly_complexity_adder)
+    if _is_small_light_haulaway(
+        service_type=normalized,
+        small_load_protected=small_load_protected,
+        crew_size=crew_size,
+        access_difficulty=_ad,
+        fixed_bulky_floor=fixed_bulky_floor,
+        small_load_bulky_trap_adder=small_load_bulky_trap_adder,
+        operational_complexity_adder=operational_complexity_adder,
+        route_complete=route_complete,
+        travel_zone=tz,
+        billable_hours=billable_hours,
+        service_conf=svc,
+        bag_type=bag_type,
+        trailer_fill_floor=trailer_fill_floor,
+        load_mode=normalized_load_mode,
+    ):
+        ceiling_cap = min(
+            SMALL_LIGHT_HAULAWAY_CEILING_TARGET_CAD,
+            SMALL_LIGHT_HAULAWAY_CEILING_ABSOLUTE_MAX_CAD,
+        )
+        cash_before_round = min(cash_before_round, ceiling_cap)
     cash_before_round += operational_complexity_adder + small_load_bulky_trap_adder
 
     risk_margin_protection_cad, risk_margin_protection_flags = _risk_margin_protection(internal_risk_assessment)
