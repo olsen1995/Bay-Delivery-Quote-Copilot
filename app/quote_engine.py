@@ -141,17 +141,17 @@ _MULTI_STOP_COMPLEXITY_PHRASES = (
     "donation drop off",
     "drop off at donation",
 )
-_MULTI_STOP_REMOVAL_PHRASES = (
-    "remove",
-    "removal",
-    "haul away",
-    "take away",
-    "dispose",
-    "disposal",
-    "dump",
+_MULTI_STOP_EXCHANGE_PHRASES = (
+    "remove old",
+    "take away old",
+    "haul away old",
     "old item",
     "old couch",
     "old mattress",
+    "existing item",
+    "existing couch",
+    "existing mattress",
+    "swap out",
 )
 _DISASSEMBLY_PHRASES = (
     "take apart",
@@ -537,13 +537,24 @@ def _normalized_signal_text(*parts: Any) -> str:
 def _contains_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
     if not text:
         return False
-    return any(phrase in text for phrase in phrases)
+    padded_text = f" {text} "
+    for phrase in phrases:
+        normalized_phrase = _normalized_signal_text(phrase)
+        if normalized_phrase and f" {normalized_phrase} " in padded_text:
+            return True
+    return False
 
 
 def _count_matched_phrases(text: str, phrases: tuple[str, ...]) -> int:
     if not text:
         return 0
-    return sum(1 for phrase in phrases if phrase in text)
+    padded_text = f" {text} "
+    matched = 0
+    for phrase in phrases:
+        normalized_phrase = _normalized_signal_text(phrase)
+        if normalized_phrase and f" {normalized_phrase} " in padded_text:
+            matched += 1
+    return matched
 
 
 def _has_fixed_bulky_item_signal(text: str, mattresses_count: int, box_springs_count: int) -> bool:
@@ -602,7 +613,7 @@ def _multi_stop_complexity_adder(
         return 0.0
     has_complex_multi_stop_signal = _contains_any_phrase(text, _MULTI_STOP_COMPLEXITY_PHRASES)
     has_routed_removal_blend = (
-        _contains_any_phrase(text, _MULTI_STOP_REMOVAL_PHRASES)
+        _contains_any_phrase(text, _MULTI_STOP_EXCHANGE_PHRASES)
         and ("pickup" in text or "pick up" in text or "dropoff" in text or "drop off" in text or "delivery" in text)
     )
     if not (has_complex_multi_stop_signal or has_routed_removal_blend):

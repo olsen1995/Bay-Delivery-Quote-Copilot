@@ -224,3 +224,19 @@ def test_build_quote_artifacts_keeps_internal_assessment_out_of_public_quote(tem
     record = get_quote_record(saved["quote_id"])
     assert record is not None
     assert "internal_risk_assessment" not in record["response"]
+
+
+def test_build_quote_artifacts_preserves_description_for_second_engine_pass() -> None:
+    payload = _base_payload(service_type="item_delivery")
+    payload.update(
+        {
+            "job_description_customer": "Single delivery",
+            "description": "Pickup sofa, dropoff to customer, then remove old couch.",
+        }
+    )
+
+    artifacts = build_quote_artifacts(payload)
+
+    assert artifacts["normalized_request"]["description"] == payload["description"]
+    assert artifacts["engine_quote"]["_internal"]["multi_stop_complexity_adder_cad"] == 75.0
+    assert artifacts["response"]["cash_total_cad"] == 175.0

@@ -91,6 +91,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "customer_phone": request_payload.get("customer_phone"),
         "job_address": request_payload.get("job_address"),
         "job_description_customer": request_payload.get("job_description_customer") or request_payload.get("description"),
+        "description": request_payload.get("description") or request_payload.get("job_description_customer"),
         "service_type": baseline_engine_quote["service_type"],
         "payment_method": request_payload.get("payment_method"),
         "pickup_address": request_payload.get("pickup_address"),

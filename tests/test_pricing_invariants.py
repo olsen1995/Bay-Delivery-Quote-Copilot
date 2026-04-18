@@ -2043,6 +2043,22 @@ def test_small_load_mixed_bulky_wording_gets_protection() -> None:
     assert protected["_internal"]["small_load_bulky_trap_adder_cad"] == 60.0
 
 
+def test_small_load_bulky_matching_uses_token_boundaries() -> None:
+    result = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Small load with a comfortable sofa.",
+    )
+
+    assert result["_internal"]["fixed_bulky_floor_cad"] == 100.0
+    assert result["_internal"]["small_load_bulky_trap_adder_cad"] == 0.0
+
+
 def test_normal_single_routed_delivery_does_not_receive_multi_stop_protection() -> None:
     result = calculate_quote(
         "item_delivery",
@@ -2058,6 +2074,24 @@ def test_normal_single_routed_delivery_does_not_receive_multi_stop_protection() 
     assert result["total_cash_cad"] == 100.0
     assert result["_internal"]["multi_stop_complexity_adder_cad"] == 0.0
     assert result["_internal"]["operational_complexity_adder_cad"] == 0.0
+
+
+def test_routed_delivery_disassembly_note_does_not_trigger_multi_stop_protection() -> None:
+    result = calculate_quote(
+        "item_delivery",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Delivery, remove doors to fit the item.",
+        pickup_address="11 Warehouse Way",
+        dropoff_address="22 Customer Crescent",
+    )
+
+    assert result["total_cash_cad"] == 150.0
+    assert result["_internal"]["multi_stop_complexity_adder_cad"] == 0.0
+    assert result["_internal"]["disassembly_complexity_adder_cad"] == 50.0
+    assert result["_internal"]["operational_complexity_adder_cad"] == 50.0
 
 
 def test_overlapping_operational_signals_do_not_stack_into_unrealistic_jump() -> None:
