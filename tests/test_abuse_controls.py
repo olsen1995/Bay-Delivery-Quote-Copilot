@@ -49,6 +49,7 @@ GPT_BASE_PAYLOAD = {
 def _clear_rate_limit_buckets(test_client: TestClient) -> None:
     middleware = _get_rate_limit_middleware(test_client)
     middleware.clear_buckets()
+    main_module.clear_gpt_quote_rate_limit_state()
 
 
 def _get_rate_limit_middleware(test_client: TestClient) -> RateLimitMiddleware:
@@ -130,6 +131,25 @@ class TestRateLimits:
         blocked = self.client.post("/api/gpt/quote", headers=headers, json=GPT_BASE_PAYLOAD)
         assert blocked.status_code == 429
         assert blocked.json() == {"detail": "rate limit exceeded"}
+
+    def test_gpt_quote_missing_token_repeated_requests_stay_401(self):
+        headers = {"x-forwarded-for": "203.0.113.56"}
+
+        for _ in range(12):
+            response = self.client.post("/api/gpt/quote", headers=headers, json=GPT_BASE_PAYLOAD)
+            assert response.status_code == 401
+            assert response.json() == {"detail": "Invalid internal API token."}
+
+    def test_gpt_quote_invalid_token_repeated_requests_stay_401(self):
+        headers = {
+            "x-forwarded-for": "203.0.113.57",
+            "authorization": "Bearer wrong-token",
+        }
+
+        for _ in range(12):
+            response = self.client.post("/api/gpt/quote", headers=headers, json=GPT_BASE_PAYLOAD)
+            assert response.status_code == 401
+            assert response.json() == {"detail": "Invalid internal API token."}
 
 
 def test_admin_failed_attempt_bucket_removed_when_all_attempts_expire(monkeypatch):

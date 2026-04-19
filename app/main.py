@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import deque
 import base64
 import hmac
 import json
@@ -9,6 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Any, Literal, Optional
 from uuid import uuid4
 
@@ -82,6 +84,10 @@ _admin_failed_attempts: dict[str, list[float]] = {}
 _admin_lockout_threshold = 5
 _admin_lockout_window = 300  # seconds
 _admin_list_limit_cap = 500
+_gpt_quote_rate_limit = 10
+_gpt_quote_rate_limit_window = 60
+_gpt_quote_rate_limit_buckets: dict[str, deque[float]] = {}
+_gpt_quote_rate_limit_lock = Lock()
 _ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH = 240
 _ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
     ("POST", "/admin/api/db/import"): {
@@ -254,7 +260,6 @@ SIZE_LIMIT_RULES = [
 
 RATE_LIMIT_RULES = [
     RateLimitRule(rule_id="quote_calculate", method="POST", exact_path="/quote/calculate", limit=10),
-    RateLimitRule(rule_id="gpt_quote", method="POST", exact_path="/api/gpt/quote", limit=10),
     RateLimitRule(rule_id="quote_upload_photos", method="POST", exact_path="/quote/upload-photos", limit=6),
     RateLimitRule(
         rule_id="assistant_upload_photos",
@@ -423,6 +428,34 @@ def _require_gpt_internal_token(request: Request) -> None:
     provided_token = header.split(" ", 1)[1].strip()
     if not provided_token or not hmac.compare_digest(provided_token, expected_token):
         raise HTTPException(status_code=401, detail="Invalid internal API token.")
+
+    _enforce_gpt_quote_rate_limit(request)
+
+
+def _enforce_gpt_quote_rate_limit(request: Request) -> None:
+    ip = extract_client_ip(request)
+    now = time.time()
+    window_start = now - _gpt_quote_rate_limit_window
+
+    with _gpt_quote_rate_limit_lock:
+        bucket = _gpt_quote_rate_limit_buckets.setdefault(ip, deque())
+
+        while bucket and bucket[0] <= window_start:
+            bucket.popleft()
+
+        if not bucket:
+            _gpt_quote_rate_limit_buckets.pop(ip, None)
+            bucket = _gpt_quote_rate_limit_buckets.setdefault(ip, deque())
+
+        if len(bucket) >= _gpt_quote_rate_limit:
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+
+        bucket.append(now)
+
+
+def clear_gpt_quote_rate_limit_state() -> None:
+    with _gpt_quote_rate_limit_lock:
+        _gpt_quote_rate_limit_buckets.clear()
 
 
 # =========================
