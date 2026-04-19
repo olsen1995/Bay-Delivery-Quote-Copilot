@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.abuse_controls import RateLimitMiddleware
+from app import main as main_module
 from app.main import app
 
 _PLAYWRIGHT_TEST_FILES = (
@@ -49,8 +50,9 @@ def _clear_rate_limit_buckets() -> None:
         while hasattr(current, "app"):
             if isinstance(current, RateLimitMiddleware):
                 current.clear_buckets()
-                return
+                break
             current = current.app
+    main_module.clear_gpt_quote_rate_limit_state()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
