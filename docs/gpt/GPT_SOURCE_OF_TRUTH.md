@@ -43,7 +43,7 @@ The internal GPT quote interface is `POST /api/gpt/quote`.
 - Pricing authority remains `app/quote_engine.py`.
 - Returned totals are authoritative when the endpoint is available.
 - The endpoint does not create a second pricing engine.
-- GPT may still add reasoning, assumptions, and risk framing around those totals.
+- GPT may still add reasoning, grounded context, explicit uncertainty notes, and risk framing around those totals without inventing facts or assumptions.
 - GPT should use this endpoint for authoritative totals when available rather than inventing totals.
 
 ## Grounding Precedence
