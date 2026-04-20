@@ -21,6 +21,16 @@ No second pricing path is allowed.
 - GPT is internal-only for Austin + Dan.
 - GPT is not a customer-facing pricing system.
 - Customer-facing quote behavior remains the live Render quote flow.
+- `/api/gpt/quote` is not the public customer quote route.
+
+## Internal GPT Quote Endpoint Boundary
+
+- GPT may use `/api/gpt/quote` for authoritative totals.
+- The endpoint is a controlled interface into the existing pricing engine in `app/quote_engine.py`.
+- It does not persist quotes or bookings.
+- It does not create a second pricing engine.
+- GPT must not invent totals when endpoint results are available.
+- Customer-facing quote behavior remains the live Render flow.
 
 ## Screenshot Assistant Boundary
 

@@ -41,7 +41,13 @@ It is not a customer-facing product behavior change.
 
 The purpose is to improve consistency and reduce drift while preserving existing production flows.
 
-Pricing authority remains unchanged in `app/quote_engine.py`, and GPT remains recommendation-only.
+Pricing authority remains unchanged in `app/quote_engine.py`.
+
+An internal-only `POST /api/gpt/quote` endpoint now exists as a non-persistent interface into that pricing authority.
+
+When the endpoint is available, GPT should use its returned totals rather than inventing totals or generating independent pricing.
+
+This internal endpoint does not replace the customer quote flow, booking flow, or live Render customer path, and it is not a customer-facing quote route.
 
 ## Conservative Truth Rule
 

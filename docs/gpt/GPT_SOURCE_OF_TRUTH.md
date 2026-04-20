@@ -30,6 +30,22 @@ There is one pricing engine only: `app/quote_engine.py`.
 
 The GPT must not propose, imply, or create a second pricing logic path.
 
+## Internal GPT Quote Endpoint
+
+The internal GPT quote interface is `POST /api/gpt/quote`.
+
+- It is internal-only.
+- It is hidden from schema exposure.
+- It is bearer-token protected via `GPT_INTERNAL_API_TOKEN`.
+- If `GPT_INTERNAL_API_TOKEN` is unset, the endpoint fails closed and is unavailable.
+- It is non-persistent.
+- It derives quote output through `build_quote_artifacts()` in `app/services/quote_service.py`.
+- Pricing authority remains `app/quote_engine.py`.
+- Returned totals are authoritative when the endpoint is available.
+- The endpoint does not create a second pricing engine.
+- GPT may still add reasoning, grounded context, explicit uncertainty notes, and risk framing around those totals without inventing facts or assumptions.
+- GPT should use this endpoint for authoritative totals when available rather than inventing totals.
+
 ## Grounding Precedence
 
 1. `PROJECT_RULES.md`
