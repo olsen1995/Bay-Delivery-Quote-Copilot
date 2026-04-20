@@ -16,7 +16,7 @@
         <img src="/static/images/logo.jpg" alt="Bay Delivery" class="brandLogo" />
         <div class="brandTitle">
           <strong>Bay Delivery</strong><br />
-          <span class="muted">Professional Estimate Request</span>
+          <span class="muted">North Bay estimate request</span>
         </div>
       </div>
 
@@ -26,19 +26,20 @@
     </div>
 
     <section class="quoteTrustStrip" aria-label="Bay Delivery customer trust indicators">
-      <div class="quoteTrustBadge">Local North Bay team</div>
-      <div class="quoteTrustBadge">Estimate first</div>
-      <div class="quoteTrustBadge">Clear pricing breakdown</div>
-      <div class="quoteTrustBadge">Final booking confirmed after review</div>
+      <div class="quoteTrustBadge">Local North Bay service</div>
+      <div class="quoteTrustBadge">Estimate before booking</div>
+      <div class="quoteTrustBadge">Cash and EMT totals shown clearly</div>
+      <div class="quoteTrustBadge">No-pressure decision</div>
     </section>
 
     <div class="heroCard card quoteHeroShell">
       <p class="eyebrow">Bay Delivery</p>
       <h1>Get an Estimate</h1>
-      <p class="muted heroCopy">Start with a fast estimate and clear Cash (no HST) and EMT (+13% HST) totals. If the estimate works for you, continue to booking preferences and optional photos for admin review and final confirmation.</p>
+      <p class="muted heroCopy">Start with a fast estimate, review clear Cash (no HST) and EMT (+13% HST) totals, and continue only if it works for you. Booking requests and optional photos come after acceptance.</p>
       <div class="heroHighlights" aria-hidden="true">
+        <span class="heroHighlight">North Bay service</span>
         <span class="heroHighlight">Estimate first</span>
-        <span class="heroHighlight">Continue only if it works</span>
+        <span class="heroHighlight">Booking only after acceptance</span>
       </div>
     </div>
 
@@ -48,7 +49,7 @@
           <p class="sectionEyebrow">Quote Flow</p>
           <h2>What happens next</h2>
         </div>
-        <p class="muted sectionLead">Start with the estimate. If it works for you, continue to booking preferences and optional photos for admin review. Your job is not booked until Bay Delivery confirms it.</p>
+        <p class="muted sectionLead">Start with the estimate. If it works for you, continue to the booking request and optional photos. Your job is not booked until Bay Delivery reviews and confirms it.</p>
       </div>
       <ol class="flowProgress" id="flowProgress" aria-label="Quote progress">
         <li class="flowStep is-active" data-step="1"><span class="flowStepBadge">1</span><span class="flowStepLabel">Job details</span></li>
@@ -65,15 +66,15 @@
           <p class="sectionEyebrow">Customer Estimate</p>
           <h2>Tell us about the job</h2>
         </div>
-        <p class="muted sectionLead">Share the job details used for your estimate. You see pricing first before any booking request details.</p>
+        <p class="muted sectionLead">Share the job details used for your estimate. You see pricing before any booking request details.</p>
       </div>
 
       <form id="quoteForm" class="formWrap" novalidate>
         <div class="formSection firstStepSection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">1) Contact &amp; Job Location</h3>
-              <p class="firstStepHint">Step 1 of 4 before your estimate. Start here so we can send your estimate first, then any booking-request follow-up only if you continue.</p>
+              <h3 class="formSectionTitle">Contact and job location</h3>
+              <p class="firstStepHint">Start here so we can send your estimate first, then follow up only if you decide to continue.</p>
             </div>
           </div>
 
@@ -95,8 +96,8 @@
         <div class="formSection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">2) Service Details</h3>
-              <p class="startIntro">Step 2 of 4 before your estimate. Choose the job type so we only show the details that matter.</p>
+              <h3 class="formSectionTitle">Choose the service</h3>
+              <p class="startIntro">Pick the job type first so we only show the estimate details that matter.</p>
             </div>
           </div>
 
@@ -118,21 +119,21 @@
         <div class="formSection secondarySection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">3) Service-Specific Details</h3>
-              <p class="muted sectionLead">Step 3 of 4 before your estimate. Add the few service details that affect estimate accuracy.</p>
+              <h3 class="formSectionTitle">Estimate details</h3>
+              <p class="muted sectionLead">Add the service details that affect estimate accuracy and pricing.</p>
             </div>
           </div>
 
-          <details id="serviceDetailsPanel" class="detailPanel">
-            <summary id="serviceDetailsSummary">Service details that affect your estimate</summary>
-            <p class="panelLead" id="serviceDetailsLead">Open this section to fill in the service details that affect estimate accuracy for this job.</p>
-            <p class="helperText">Not sure? Give your best estimate — we’ll confirm details before finalizing the job.</p>
+          <details id="serviceDetailsPanel" class="detailPanel" open>
+            <summary id="serviceDetailsSummary">Details used for your estimate</summary>
+            <p class="panelLead" id="serviceDetailsLead">These details affect pricing. For moves and deliveries, route addresses are required.</p>
+            <p class="helperText">Not sure? Give your best estimate. Clear, close guesses are enough to start.</p>
 
             <div class="row">
               <div id="estimatedHoursGroup">
                 <label for="estimated_hours">Estimated hours</label>
                 <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
-                <div class="helperText">Use your best guess. If you are unsure, add more detail below so we can size the work more accurately.</div>
+                <div class="helperText">Use your best guess. If you are unsure, give the closest number and describe the work below.</div>
               </div>
             </div>
 
@@ -163,7 +164,7 @@
                   <option value="extreme">Extreme access (multiple flights, tight access, difficult parking)</option>
                 </select>
                 <div class="helperText">Choose the closest match. Think about stairs, carry distance, and parking.</div>
-                <div class="helperText">Easy = curbside / garage  Medium = short walk / a few stairs  Hard = basement / long carry / tight access</div>
+                <div class="helperText">Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access.</div>
               </div>
             </div>
 
@@ -234,7 +235,7 @@
               </div>
               <div>
                 <label class="muted">Photo tip</label>
-                <div class="hint">You can add photos after your estimate to help confirm accuracy.</div>
+                <div class="hint">Prefer to send photos after the estimate? You can add them later to help confirm accuracy.</div>
               </div>
             </div>
           </details>
@@ -243,16 +244,16 @@
         <div class="formSection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">4) Job Description</h3>
-              <p class="muted sectionLead">Step 4 of 4 before your estimate. Add the details your driver or crew should know.</p>
+              <h3 class="formSectionTitle">Anything else we should know?</h3>
+              <p class="muted sectionLead">Add any notes that help us price the work and understand access.</p>
             </div>
           </div>
 
-          <label for="description">Description</label>
+          <label for="description">Job description</label>
           <textarea id="description" name="description" rows="4"
             placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
             required></textarea>
-          <p class="helperText">Helpful details: quantity, item type, access notes, stairs, parking, distance to truck, and anything unusual.</p>
+          <p class="helperText">Helpful details: item type, rough amount, stairs, parking, carry distance, timing notes, and anything unusual.</p>
         </div>
 
         <div class="btnRow">
@@ -270,7 +271,7 @@
     <div class="card resultBox hidden" id="resultBox" aria-live="polite"></div>
     <div class="card hidden stageCard" id="quoteSummaryCard">
       <h2>Estimate Summary</h2>
-      <p class="muted sectionLead">Your estimate is based on the job details you provided and follows our current North Bay pricing structure. If you continue, Bay Delivery still reviews the booking request and confirms final scheduling details with you.</p>
+      <p class="muted sectionLead">Your estimate is based on the job details you provided and follows our current North Bay pricing structure. If you continue, Bay Delivery reviews the booking request and confirms final scheduling details with you.</p>
       <div class="quoteSummaryGrid">
         <div><strong>Service:</strong> <span id="summaryService"></span></div>
         <div><strong>Customer:</strong> <span id="summaryCustomer"></span></div>
@@ -289,7 +290,7 @@
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
         <textarea id="decisionNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
-        <p class="helperText">Accepting saves your decision and opens the next step so you can submit your preferred date, time window, and notes for admin review. The job is only confirmed after Bay Delivery follows up.</p>
+        <p class="helperText">Accepting saves your decision and opens the booking request step so you can share your preferred date, time window, and notes for admin review. The job is only confirmed after Bay Delivery follows up.</p>
 
         <div class="btnRow">
           <button class="btn" id="btnAccept" type="button">Accept Estimate &amp; Continue</button>
@@ -303,7 +304,7 @@
     <div class="card statusBox hidden stageCard" id="flowStatus"></div>
 
     <div class="card hidden stageCard" id="bookingCard">
-      <h2>Booking Details</h2>
+      <h2>Booking Request</h2>
       <p class="muted sectionLead">Share your preferred timing and any notes that will help with planning. This is a booking request, not a confirmed appointment, and Bay Delivery will follow up to confirm the final schedule.</p>
 
       <div class="formWrap">
@@ -344,7 +345,7 @@
 
     <div class="card hidden stageCard" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
-      <p class="muted sectionLead">Adding photos now helps lock in your price and avoid changes later.</p>
+      <p class="muted sectionLead">Prefer to send photos after the estimate? Add them here if they help confirm the scope or access.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>
