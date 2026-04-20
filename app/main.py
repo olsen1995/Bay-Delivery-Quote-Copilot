@@ -539,6 +539,7 @@ def _enforce_gpt_quote_rate_limit(request: Request) -> None:
     ip = extract_client_ip(request)
     now = time.time()
     window_start = now - _gpt_quote_rate_limit_window
+    is_rate_limited = False
 
     with _gpt_quote_rate_limit_lock:
         bucket = _gpt_quote_rate_limit_buckets.setdefault(ip, deque())
@@ -551,10 +552,13 @@ def _enforce_gpt_quote_rate_limit(request: Request) -> None:
             bucket = _gpt_quote_rate_limit_buckets.setdefault(ip, deque())
 
         if len(bucket) >= _gpt_quote_rate_limit:
-            _finalize_gpt_quote_observability(request, success=False, failure_reason="rate_limited")
-            raise HTTPException(status_code=429, detail="rate limit exceeded")
+            is_rate_limited = True
+        else:
+            bucket.append(now)
 
-        bucket.append(now)
+    if is_rate_limited:
+        _finalize_gpt_quote_observability(request, success=False, failure_reason="rate_limited")
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
 
 
 def clear_gpt_quote_rate_limit_state() -> None:
