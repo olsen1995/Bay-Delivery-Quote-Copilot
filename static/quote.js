@@ -382,7 +382,7 @@ function renderQuoteResult(data, quoteResponse) {
   title.textContent = "Your Estimate";
   const subtitle = document.createElement("p");
   subtitle.className = "muted";
-  subtitle.textContent = "Review your estimate first, see what is included, and compare Cash vs EMT totals before deciding whether to continue.";
+  subtitle.textContent = "Review the totals, see what is included, and confirm what happens next before deciding whether to continue.";
   titleWrap.append(title, subtitle);
 
   const meta = document.createElement("div");
@@ -407,14 +407,14 @@ function renderQuoteResult(data, quoteResponse) {
   );
   const amountHint = document.createElement("p");
   amountHint.className = "quoteAmountHint muted";
-  amountHint.textContent = "Cash is tax-free. EMT / e-transfer includes 13% HST. The estimate reflects the job details you entered here.";
+  amountHint.textContent = "Cash is tax-free. EMT / e-transfer includes 13% HST. These totals reflect the job details you entered.";
   breakdown.append(breakdownTitle, amountGrid, amountHint);
 
   const included = document.createElement("div");
   included.className = "quoteResultIncluded";
   included.append(
     createTextBlock("What this estimate includes", "Your estimate reflects the service details you provided, including local travel, labor, and any handling or disposal already captured by this form.", "quoteInfoCard"),
-    createTextBlock("What happens next", "If the estimate works for you, choose Accept Estimate & Continue to open the booking request step. You can share your preferred date, time window, and notes, and Bay Delivery will review and confirm the final booking before the job is scheduled.", "quoteInfoCard")
+    createTextBlock("What happens next", "If the estimate works for you, choose Accept Estimate & Continue to open the booking request step. Share your preferred date, time window, and notes, and Bay Delivery will review the request before confirming the job.", "quoteInfoCard")
   );
 
   const estimateDetails = document.createElement("div");
@@ -439,12 +439,12 @@ function renderQuoteResult(data, quoteResponse) {
   noteTitle.textContent = "Estimate Confidence";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = (quoteResponse.disclaimer || "") + " Adding photos now helps lock in your price and avoid changes later.";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after the estimate if they help confirm scope or access.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
   nextStep.className = "nextStepCallout";
-  nextStep.textContent = "Next step: review this estimate. If you want to continue, choose Accept Estimate & Continue to open the booking request form. Your job is not booked until Bay Delivery reviews and confirms it.";
+  nextStep.textContent = "Next step: decide whether this estimate works for you. Accept Estimate & Continue opens the booking request form. Your job is not booked until Bay Delivery reviews and confirms it.";
 
   wrapper.append(header, breakdown, included, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
@@ -453,7 +453,7 @@ function renderQuoteResult(data, quoteResponse) {
 function clearForm() {
   el("quoteForm").reset();
   const servicePanel = el("serviceDetailsPanel");
-  if (servicePanel) servicePanel.open = false;
+  if (servicePanel) servicePanel.open = true;
   syncRouteFields();
   syncServiceFields();
   hideBox("resultBox");
@@ -534,21 +534,21 @@ function syncServiceFields() {
   const detailsSummary = el("serviceDetailsSummary");
   const detailsLead = el("serviceDetailsLead");
   if (showScrap) {
-    help.textContent = "Scrap pickup keeps the estimate simple. Tell us whether the scrap is curbside or inside/on-property so the handling effort is clear.";
-    detailsSummary.textContent = "Scrap pickup details that affect your estimate";
+    help.textContent = "Scrap pickup is usually quick to estimate. Tell us whether the scrap is curbside or inside/on-property so the handling effort is clear.";
+    detailsSummary.textContent = "Details used for your scrap pickup estimate";
     detailsLead.textContent = "Scrap pickup usually needs only location and access details. Photos are optional later if they help confirm the pile.";
   } else if (showRoute) {
     help.textContent = "For moves and deliveries, we need both the pickup and dropoff addresses to estimate the route. You still review the estimate before any booking request.";
-    detailsSummary.textContent = "Required route details for moves and deliveries";
+    detailsSummary.textContent = "Required route details for your estimate";
     detailsLead.textContent = "Enter both the pickup address and dropoff address. These fields are required for " + serviceTypeLabel(serviceType).toLowerCase() + " estimates.";
   } else if (showLoadCounts) {
-    help.textContent = "Use rough counts, access details, and material notes. Simple estimates are fine as long as they are close.";
+    help.textContent = "Use rough counts, access details, and material notes. Clear, close estimates are fine.";
     detailsSummary.textContent = "Load, access, and material details for your estimate";
-    detailsLead.textContent = "Add the closest counts and access details. For loose junk, think in regular garbage bags; for trailer fill, choose the closest space used.";
+    detailsLead.textContent = "Add the closest counts and access details. For loose junk, think in regular garbage bags. For trailer fill, choose the closest space used.";
   } else {
-    help.textContent = "Select a service to show only the fields used for that type of estimate.";
-    detailsSummary.textContent = "Service details that affect your estimate";
-    detailsLead.textContent = "Open this section to fill in the service details that affect estimate accuracy for your service.";
+    help.textContent = "Choose the service first. We will show only the estimate fields used for that job.";
+    detailsSummary.textContent = "Details used for your estimate";
+    detailsLead.textContent = "Fill in the service details that affect estimate accuracy for your job.";
   }
 
   syncBagCountNudge();

@@ -70,21 +70,26 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Share the job details used for your estimate." in quote_html
     assert 'id="serviceDetailsSummary"' in quote_html
     assert 'id="serviceDetailsLead"' in quote_html
-    assert "Not sure? Give your best estimate" in quote_html
+    assert 'id="serviceDetailsPanel" class="detailPanel" open' in quote_html
+    assert "Not sure? Give your best estimate. Clear, close guesses are enough to start." in quote_html
     assert "Required for moves and deliveries so the estimate reflects the actual route." in quote_html
     assert "A full kitchen garbage bag = 1. If unsure, estimate slightly higher." in quote_html
     assert "Most jobs are 5–10 bags. Adjust if needed." in quote_html
     assert "Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more." in quote_html
-    assert "Easy = curbside / garage" in quote_html
-    assert "You can add photos after your estimate to help confirm accuracy." in quote_html
-    assert "Adding photos now helps lock in your price and avoid changes later." in quote_html
+    assert "Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access." in quote_html
+    assert "Prefer to send photos after the estimate? You can add them later to help confirm accuracy." in quote_html
+    assert "Prefer to send photos after the estimate? Add them here if they help confirm the scope or access." in quote_html
     assert "After you see your estimate, review what is included and compare Cash vs EMT totals." in quote_html
+    assert "Step 1 of 4" not in quote_html
+    assert "Step 2 of 4" not in quote_html
+    assert "Step 3 of 4" not in quote_html
+    assert "Step 4 of 4" not in quote_html
     assert "friendlyQuoteErrorMessage" in quote_js
     assert "syncBagCountNudge" in quote_js
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
     assert "Estimate Confidence" in quote_js
-    assert "Adding photos now helps lock in your price and avoid changes later." in quote_js
+    assert "Photos are optional after the estimate if they help confirm scope or access." in quote_js
     assert "Accept Estimate & Continue" in quote_js
     assert "Your job is not booked until Bay Delivery reviews and confirms it." in quote_js
     assert "quoteResultIncluded" in quote_css
