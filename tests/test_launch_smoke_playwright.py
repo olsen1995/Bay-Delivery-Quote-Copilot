@@ -151,7 +151,7 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#customer_phone").fill("705-555-0101")
     await page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
     await page.locator("#description").fill("Launch smoke validation for quote flow")
-    await page.locator("#serviceDetailsPanel summary").click()
+    await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
     await page.locator("#trailer_fill_estimate").select_option("under_quarter")
     await page.locator("#btnCalc").click()
 
@@ -206,18 +206,18 @@ async def test_launch_quote_route_missing_fields_are_named(page: Page, live_serv
 async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server: str) -> None:
     await page.goto(f"{live_server}/quote", wait_until="networkidle")
     await expect(page.locator("#quoteForm")).to_be_visible()
-    await expect(page.locator("#quoteForm")).to_contain_text("Not sure? Give your best estimate")
+    await expect(page.locator("#quoteForm")).to_contain_text("Not sure? Give your best estimate. Clear, close guesses are enough to start.")
     await expect(page.locator("#quoteForm")).to_contain_text("A full kitchen garbage bag = 1. If unsure, estimate slightly higher.")
     await expect(page.locator("#quoteForm")).to_contain_text("Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.")
-    await expect(page.locator("#quoteForm")).to_contain_text("Easy = curbside / garage")
-    await expect(page.locator("#quoteForm")).to_contain_text("You can add photos after your estimate to help confirm accuracy.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Prefer to send photos after the estimate? You can add them later to help confirm accuracy.")
 
     await page.locator("#customer_name").fill("Playwright Decline Smoke")
     await page.locator("#customer_phone").fill("705-555-0112")
     await page.locator("#job_address").fill("456 Coverage Ave, North Bay")
     await page.locator("#description").fill("Verify estimate transparency details and decline flow")
 
-    await page.locator("#serviceDetailsPanel summary").click()
+    await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
     assert await page.locator("#serviceDetailsPanel").evaluate("node => node.open") is True
 
     await page.locator("#access_difficulty").select_option("difficult")
@@ -237,11 +237,11 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("Adding photos now helps lock in your price and avoid changes later.")
-    await expect(page.locator("#resultBox")).to_contain_text("Next step: review this estimate. If you want to continue, choose Accept Estimate & Continue to open the booking request form.")
+    await expect(page.locator("#resultBox")).to_contain_text("Photos are optional after the estimate if they help confirm scope or access.")
+    await expect(page.locator("#resultBox")).to_contain_text("Next step: decide whether this estimate works for you. Accept Estimate & Continue opens the booking request form.")
     await expect(page.locator("#resultBox")).to_contain_text("Your job is not booked until Bay Delivery reviews and confirms it.")
     await expect(page.locator("#decisionCard")).to_be_visible()
-    await expect(page.locator("#uploadCard")).to_contain_text("Adding photos now helps lock in your price and avoid changes later.")
+    await expect(page.locator("#uploadCard")).to_contain_text("Prefer to send photos after the estimate? Add them here if they help confirm the scope or access.")
 
     await page.locator("#btnDecline").click()
 

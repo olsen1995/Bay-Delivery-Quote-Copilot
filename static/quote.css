@@ -232,7 +232,7 @@ body.quotePage {
 }
 
 .sectionLead {
-  max-width: 44ch;
+  max-width: 50ch;
   margin: 0;
 }
 
@@ -313,10 +313,13 @@ body.quotePage {
   font-size: 1.02rem;
 }
 
+.firstStepHint,
 .startIntro {
   margin: 6px 0 0;
   color: var(--ink-muted);
   font-size: 0.95em;
+  max-width: 60ch;
+  line-height: 1.5;
 }
 
 .startGrid {
@@ -330,15 +333,17 @@ body.quotePage {
 .detailPanel {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 14px;
-  padding: 14px;
+  padding: 16px;
   background: rgba(12, 18, 29, 0.78);
 }
 
 .detailPanel summary {
   cursor: pointer;
+  display: block;
   font-weight: 700;
   color: rgba(217, 224, 235, 0.9);
   margin-bottom: 6px;
+  min-height: 24px;
 }
 
 .detailPanel[open] summary {
@@ -357,6 +362,11 @@ body.quotePage {
   font-size: 0.84em;
   color: var(--quote-muted);
   line-height: 1.45;
+}
+
+#serviceHelp,
+.stepHelper {
+  max-width: 64ch;
 }
 
 .quotePage input,
@@ -458,7 +468,7 @@ body.quotePage {
   font-size: 0.88em;
   color: var(--brand-red);
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .loadingState {
@@ -480,9 +490,10 @@ body.quotePage {
 }
 
 .stepHelper {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: var(--quote-muted);
   font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 #btnAccept {
