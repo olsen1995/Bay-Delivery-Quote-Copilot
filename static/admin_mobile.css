@@ -215,8 +215,12 @@ textarea {
 .cardList,
 .appScreen,
 .mobileMain,
-#authenticatedShell,
 .collapsibleBody {
+  display: grid;
+  gap: 12px;
+}
+
+#authenticatedShell:not([hidden]) {
   display: grid;
   gap: 12px;
 }
