@@ -55,6 +55,7 @@ from app.services import (
 from app.storage import (
     export_db_to_json,
     get_job,
+    GptQuoteObservabilityRecord,
     get_quote_record,
     import_db_from_json,
     init_db,
@@ -66,6 +67,7 @@ from app.storage import (
     list_quote_requests,
     list_quotes,
     save_attachment,
+    save_gpt_quote_observability_event,
     update_job,
 )
 from app.update_fields import InvalidJobTransition, InvalidQuoteRequestTransition
@@ -89,6 +91,8 @@ _gpt_quote_rate_limit_window = 60
 _gpt_quote_rate_limit_buckets: dict[str, deque[float]] = {}
 _gpt_quote_rate_limit_lock = Lock()
 _ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH = 240
+_GPT_QUOTE_ROUTE_NAME = "/api/gpt/quote"
+_GPT_QUOTE_OBSERVABILITY_STATE_KEY = "gpt_quote_observability"
 _ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
     ("POST", "/admin/api/db/import"): {
         "action_type": "import_db",
@@ -101,6 +105,101 @@ _ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
         "record_id": "pending",
     },
 }
+
+
+def _init_gpt_quote_observability(request: Request) -> dict[str, Any]:
+    payload = getattr(request.state, _GPT_QUOTE_OBSERVABILITY_STATE_KEY, None)
+    if isinstance(payload, dict):
+        return payload
+
+    payload = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "route_name": _GPT_QUOTE_ROUTE_NAME,
+        "success": False,
+        "normalized_service_type": None,
+        "cash_total_cad": None,
+        "emt_total_cad": None,
+        "confidence_level": None,
+        "risk_flags": [],
+        "failure_reason": None,
+        "latency_ms": None,
+        "started_at": time.perf_counter(),
+        "logged": False,
+    }
+    setattr(request.state, _GPT_QUOTE_OBSERVABILITY_STATE_KEY, payload)
+    return payload
+
+
+def _finalize_gpt_quote_observability(
+    request: Request,
+    *,
+    success: bool,
+    normalized_service_type: str | None = None,
+    cash_total_cad: float | None = None,
+    emt_total_cad: float | None = None,
+    confidence_level: str | None = None,
+    risk_flags: list[str] | None = None,
+    failure_reason: str | None = None,
+) -> None:
+    payload = _init_gpt_quote_observability(request)
+    if payload.get("logged"):
+        return
+
+    started_at = payload.get("started_at")
+    latency_ms: int | None = None
+    if isinstance(started_at, (int, float)):
+        latency_ms = int((time.perf_counter() - started_at) * 1000)
+
+    payload.update(
+        {
+            "success": success,
+            "normalized_service_type": normalized_service_type,
+            "cash_total_cad": cash_total_cad,
+            "emt_total_cad": emt_total_cad,
+            "confidence_level": confidence_level,
+            "risk_flags": [str(flag) for flag in (risk_flags or [])],
+            "failure_reason": failure_reason,
+            "latency_ms": latency_ms,
+            "logged": True,
+        }
+    )
+
+    record: GptQuoteObservabilityRecord = {
+        "timestamp": str(payload["timestamp"]),
+        "route_name": str(payload["route_name"]),
+        "success": bool(payload["success"]),
+        "normalized_service_type": (
+            str(payload["normalized_service_type"])
+            if payload.get("normalized_service_type") is not None
+            else None
+        ),
+        "cash_total_cad": float(payload["cash_total_cad"]) if payload.get("cash_total_cad") is not None else None,
+        "emt_total_cad": float(payload["emt_total_cad"]) if payload.get("emt_total_cad") is not None else None,
+        "confidence_level": str(payload["confidence_level"]) if payload.get("confidence_level") is not None else None,
+        "risk_flags": [str(flag) for flag in payload.get("risk_flags") or []],
+        "failure_reason": str(payload["failure_reason"]) if payload.get("failure_reason") is not None else None,
+        "latency_ms": int(payload["latency_ms"]) if payload.get("latency_ms") is not None else None,
+    }
+    try:
+        save_gpt_quote_observability_event(record)
+    except Exception:
+        logger.exception(
+            "Best-effort GPT quote observability logging failed for route=%s failure_reason=%s",
+            record["route_name"],
+            record["failure_reason"],
+        )
+
+
+def _gpt_failure_reason_from_status_code(status_code: int) -> str:
+    if status_code == 400:
+        return "invalid_request"
+    if status_code == 401:
+        return "auth_failed"
+    if status_code == 404:
+        return "endpoint_disabled"
+    if status_code == 429:
+        return "rate_limited"
+    return "http_error"
 
 
 def _check_admin_lockout(client_ip: str) -> bool:
@@ -417,16 +516,20 @@ def _require_admin(request: Request) -> None:
 
 
 def _require_gpt_internal_token(request: Request) -> None:
+    _init_gpt_quote_observability(request)
     expected_token = _configured_gpt_internal_token()
     if expected_token is None:
+        _finalize_gpt_quote_observability(request, success=False, failure_reason="endpoint_disabled")
         raise HTTPException(status_code=404, detail="Not found.")
 
     header = request.headers.get("authorization") or ""
     if not header.lower().startswith("bearer "):
+        _finalize_gpt_quote_observability(request, success=False, failure_reason="auth_failed")
         raise HTTPException(status_code=401, detail="Invalid internal API token.")
 
     provided_token = header.split(" ", 1)[1].strip()
     if not provided_token or not hmac.compare_digest(provided_token, expected_token):
+        _finalize_gpt_quote_observability(request, success=False, failure_reason="auth_failed")
         raise HTTPException(status_code=401, detail="Invalid internal API token.")
 
     _enforce_gpt_quote_rate_limit(request)
@@ -448,6 +551,7 @@ def _enforce_gpt_quote_rate_limit(request: Request) -> None:
             bucket = _gpt_quote_rate_limit_buckets.setdefault(ip, deque())
 
         if len(bucket) >= _gpt_quote_rate_limit:
+            _finalize_gpt_quote_observability(request, success=False, failure_reason="rate_limited")
             raise HTTPException(status_code=429, detail="rate limit exceeded")
 
         bucket.append(now)
@@ -523,6 +627,8 @@ async def request_validation_audit_handler(request: Request, exc: RequestValidat
                 error_summary=_summarize_validation_error(exc),
                 **audit_metadata,
             )
+    if request.method.upper() == "POST" and request.url.path == _GPT_QUOTE_ROUTE_NAME:
+        _finalize_gpt_quote_observability(request, success=False, failure_reason="validation_error")
     return await request_validation_exception_handler(request, exc)
 
 
@@ -874,9 +980,33 @@ async def quote_calculate(payload: QuoteRequestPayload):
     return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
 
 
-@app.post("/api/gpt/quote", include_in_schema=False, dependencies=[Depends(_require_gpt_internal_token)])
-async def gpt_quote(payload: GptQuoteRequestPayload):
-    return quote_service.build_gpt_quote_response(payload.model_dump())
+@app.post(_GPT_QUOTE_ROUTE_NAME, include_in_schema=False, dependencies=[Depends(_require_gpt_internal_token)])
+async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
+    _init_gpt_quote_observability(request)
+    try:
+        response = quote_service.build_gpt_quote_response(payload.model_dump())
+    except HTTPException as exc:
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason=_gpt_failure_reason_from_status_code(exc.status_code),
+        )
+        raise
+    except Exception:
+        _finalize_gpt_quote_observability(request, success=False, failure_reason="internal_error")
+        raise
+
+    _finalize_gpt_quote_observability(
+        request,
+        success=True,
+        normalized_service_type=str(response.get("normalized_service_type") or ""),
+        cash_total_cad=float(response["cash_total_cad"]),
+        emt_total_cad=float(response["emt_total_cad"]),
+        confidence_level=str(response.get("confidence_level") or ""),
+        risk_flags=[str(flag) for flag in response.get("risk_flags") or []],
+        failure_reason=None,
+    )
+    return response
 
 
 class CustomerDecision(BaseModel):

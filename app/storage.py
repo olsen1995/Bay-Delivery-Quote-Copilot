@@ -163,6 +163,19 @@ class WebhookEventRecord(TypedDict):
     payload_json: Any
 
 
+class GptQuoteObservabilityRecord(TypedDict):
+    timestamp: str
+    route_name: str
+    success: bool
+    normalized_service_type: Optional[str]
+    cash_total_cad: Optional[float]
+    emt_total_cad: Optional[float]
+    confidence_level: Optional[str]
+    risk_flags: List[str]
+    failure_reason: Optional[str]
+    latency_ms: Optional[int]
+
+
 def _validate_deposit_status(value: Any) -> None:
     if value is None:
         return
@@ -236,6 +249,7 @@ KNOWN_TABLES = [
     "attachments",
     "screenshot_assistant_analyses",
     "admin_audit_log",
+    "gpt_quote_observability",
     "payment_attempts",
     "webhook_events",
 ]
@@ -505,6 +519,24 @@ def init_db() -> None:
                 processed_at TEXT,
                 payload_json TEXT NOT NULL,
                 UNIQUE(provider, provider_event_id)
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gpt_quote_observability (
+                event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                route_name TEXT NOT NULL,
+                success INTEGER NOT NULL,
+                normalized_service_type TEXT,
+                cash_total_cad REAL,
+                emt_total_cad REAL,
+                confidence_level TEXT,
+                risk_flags_json TEXT NOT NULL,
+                failure_reason TEXT,
+                latency_ms INTEGER
             )
             """
         )
@@ -1779,6 +1811,91 @@ def list_admin_audit_log(limit: int = 50) -> List[Dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+def save_gpt_quote_observability_event(record: GptQuoteObservabilityRecord) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO gpt_quote_observability (
+                timestamp,
+                route_name,
+                success,
+                normalized_service_type,
+                cash_total_cad,
+                emt_total_cad,
+                confidence_level,
+                risk_flags_json,
+                failure_reason,
+                latency_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["timestamp"],
+                record["route_name"],
+                int(record["success"]),
+                record.get("normalized_service_type"),
+                record.get("cash_total_cad"),
+                record.get("emt_total_cad"),
+                record.get("confidence_level"),
+                json.dumps(record.get("risk_flags") or [], ensure_ascii=False),
+                record.get("failure_reason"),
+                record.get("latency_ms"),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def list_gpt_quote_observability(limit: int = 50) -> List[GptQuoteObservabilityRecord]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                timestamp,
+                route_name,
+                success,
+                normalized_service_type,
+                cash_total_cad,
+                emt_total_cad,
+                confidence_level,
+                risk_flags_json,
+                failure_reason,
+                latency_ms
+            FROM gpt_quote_observability
+            ORDER BY timestamp DESC, event_id DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    items: List[GptQuoteObservabilityRecord] = []
+    for row in rows:
+        try:
+            risk_flags_raw = json.loads(row["risk_flags_json"]) if row["risk_flags_json"] else []
+        except (TypeError, ValueError):
+            risk_flags_raw = []
+        risk_flags = [str(flag) for flag in risk_flags_raw] if isinstance(risk_flags_raw, list) else []
+        items.append(
+            {
+                "timestamp": row["timestamp"],
+                "route_name": row["route_name"],
+                "success": bool(row["success"]),
+                "normalized_service_type": row["normalized_service_type"],
+                "cash_total_cad": row["cash_total_cad"],
+                "emt_total_cad": row["emt_total_cad"],
+                "confidence_level": row["confidence_level"],
+                "risk_flags": risk_flags,
+                "failure_reason": row["failure_reason"],
+                "latency_ms": row["latency_ms"],
+            }
+        )
+    return items
 
 
 # =========================
