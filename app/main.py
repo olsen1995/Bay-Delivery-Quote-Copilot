@@ -63,6 +63,7 @@ from app.storage import (
     Job,
     list_attachments,
     list_admin_audit_log,
+    list_gpt_quote_observability,
     list_jobs,
     list_quote_requests,
     list_quotes,
@@ -1938,3 +1939,13 @@ def admin_audit_log(request: Request):
     """
     _require_admin(request)
     return {"items": list_admin_audit_log(limit=50)}
+
+
+@app.get("/admin/api/gpt-quote-observability")
+def admin_gpt_quote_observability(request: Request):
+    """
+    Returns the latest 50 GPT quote observability entries as JSON.
+    Requires admin authentication.
+    """
+    _require_admin(request)
+    return {"items": list_gpt_quote_observability(limit=50)}
