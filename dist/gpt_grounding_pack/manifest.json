@@ -1,0 +1,44 @@
+{
+  "upload_set": [
+    {
+      "file": "docs/gpt/GPT_SOURCE_OF_TRUTH.md",
+      "output": "GPT_SOURCE_OF_TRUTH.md",
+      "sha256": "940d16fa8862aaae5b02313542e2227e4f68a4fd16a80fd7c184d97f61e1ffd6"
+    },
+    {
+      "file": "docs/gpt/GPT_BUSINESS_RULES.md",
+      "output": "GPT_BUSINESS_RULES.md",
+      "sha256": "7ba8e8955b5ce425810e593393233dddba0df2206d21099a3f1842b1a8201fe4"
+    },
+    {
+      "file": "docs/gpt/GPT_CURRENT_STATE.md",
+      "output": "GPT_CURRENT_STATE.md",
+      "sha256": "0431e64b869d01e1d15ba1ed7149eaf9bd5318b36352536d97978d3693efb0d3"
+    },
+    {
+      "file": "docs/gpt/GPT_SYSTEM_BOUNDARIES.md",
+      "output": "GPT_SYSTEM_BOUNDARIES.md",
+      "sha256": "64965fce106cbab812e50ea9897d5b3149dd8bd0c5136cba7324bba0f017ca65"
+    },
+    {
+      "file": "docs/gpt/GPT_WORKFLOW_RULES.md",
+      "output": "GPT_WORKFLOW_RULES.md",
+      "sha256": "2bab914e450d120d01cde07380353cc2433f5ab68bde8e8a588e6873d5476711"
+    },
+    {
+      "file": "docs/gpt/GPT_BUILDER_INSTRUCTIONS.md",
+      "output": "GPT_BUILDER_INSTRUCTIONS.md",
+      "sha256": "5b34d2f004b63412febc8b60d03946ee915091a4857fe4fbebfbcd792fc2e12b"
+    },
+    {
+      "file": "docs/gpt/GPT_ACCEPTANCE_TESTS.md",
+      "output": "GPT_ACCEPTANCE_TESTS.md",
+      "sha256": "26d5a7129d21cc23f613330b172a45b1f125c3e3a1890c6226443b93322d7e71"
+    },
+    {
+      "file": "PROJECT_RULES.md",
+      "output": "PROJECT_RULES.md",
+      "sha256": "35db2b079162381d5692563be2a48b7fce01116175a62288cfca4ddc64977fe0"
+    }
+  ]
+}
