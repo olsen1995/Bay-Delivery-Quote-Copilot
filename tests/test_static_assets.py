@@ -133,7 +133,7 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     admin_css = Path("static/admin.css").read_text(encoding="utf-8")
 
     assert 'id="adminProtectedDashboard"' in admin_html
-    assert 'hidden aria-hidden="true"' in admin_html
+    assert 'hidden aria-hidden="true" style="display:none"' in admin_html
     assert 'class="card adminHero adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true"' in admin_html
     assert 'class="dashboardGrid adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true"' in admin_html
     assert 'class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true"' in admin_html
@@ -146,7 +146,7 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     assert ".adminProtectedSection[hidden]" in admin_css
 
     protected_match = re.search(
-        r'(<div id="adminProtectedDashboard" class="protectedDashboard" hidden aria-hidden="true">.*?</div>\s*</div>\s*<script src="/static/admin.js" defer></script>)',
+        r'(<div id="adminProtectedDashboard" class="protectedDashboard" hidden aria-hidden="true" style="display:none">.*?</div>\s*</div>\s*<script src="/static/admin.js" defer></script>)',
         admin_html,
         re.DOTALL,
     )
@@ -159,9 +159,11 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
         assert f"<h3>{heading}</h3>" not in remainder
 
     assert 'id="adminProtectedDashboard"' in admin_html
-    assert 'hidden aria-hidden="true"' in admin_html
+    assert 'hidden aria-hidden="true" style="display:none"' in admin_html
     assert "setProtectedDashboardVisible(true);" in admin_js
     assert "setProtectedDashboardVisible(false);" in admin_js
+    assert 'adminProtectedDashboard.style.display = "";' in admin_js
+    assert 'adminProtectedDashboard.style.display = "none";' in admin_js
 
 
 def test_admin_page_includes_quote_detail_risk_panel() -> None:

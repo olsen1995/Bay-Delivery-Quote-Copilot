@@ -181,6 +181,12 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.goto(f"{live_server}/admin", wait_until="networkidle")
     await expect(page.locator("#adminUsername")).to_be_visible()
     await expect(page.locator("#adminPassword")).to_be_visible()
+    await expect(page.locator("#adminProtectedDashboard")).not_to_be_visible()
+    await expect(page.get_by_role("heading", name="Admin Dashboard")).not_to_be_visible()
+    await expect(page.get_by_role("heading", name="Recent Estimates")).not_to_be_visible()
+    await expect(page.get_by_role("heading", name="Booking Requests")).not_to_be_visible()
+    await expect(page.get_by_role("heading", name="Admin Audit Log")).not_to_be_visible()
+    await expect(page.get_by_role("heading", name="Jobs")).not_to_be_visible()
 
 
 @pytest.mark.asyncio
