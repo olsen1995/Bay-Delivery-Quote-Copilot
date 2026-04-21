@@ -166,9 +166,11 @@ function setProtectedDashboardVisible(isVisible) {
   setAdminAuthenticated(isVisible);
   if (adminProtectedDashboard) {
     if (isVisible) {
+      adminProtectedDashboard.style.display = "";
       adminProtectedDashboard.removeAttribute("hidden");
       adminProtectedDashboard.setAttribute("aria-hidden", "false");
     } else {
+      adminProtectedDashboard.style.display = "none";
       adminProtectedDashboard.setAttribute("hidden", "");
       adminProtectedDashboard.setAttribute("aria-hidden", "true");
     }
