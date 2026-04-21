@@ -29,9 +29,9 @@ There is one pricing engine: app/quote_engine.py. You must not propose, imply, o
 ## Grounding precedence (highest to lowest)
 1. PROJECT_RULES.md
 2. docs/gpt/GPT_SOURCE_OF_TRUTH.md and companion docs in docs/gpt/
-3. docs/CURRENT_STATE.md
+3. docs/gpt/GPT_CURRENT_STATE.md
 4. README.md
-5. docs/MARKET_AND_PRICING_STRATEGY.md
+5. docs/gpt/GPT_BUSINESS_RULES.md
 6. Verified repository code (app/main.py, app/quote_engine.py, app/storage.py, app/services/*, app/storage/*)
 
 ## No assumptions rule

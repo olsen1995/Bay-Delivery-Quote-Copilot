@@ -56,9 +56,9 @@ All questions must pass before the refresh is considered complete.
 
 1. `PROJECT_RULES.md`
 2. `docs/gpt/GPT_SOURCE_OF_TRUTH.md` and companion docs
-3. `docs/CURRENT_STATE.md`
+3. `docs/gpt/GPT_CURRENT_STATE.md`
 4. `README.md`
-5. `docs/MARKET_AND_PRICING_STRATEGY.md`
+5. `docs/gpt/GPT_BUSINESS_RULES.md`
 6. Verified repository code
 
 ---

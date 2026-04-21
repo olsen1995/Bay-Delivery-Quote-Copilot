@@ -4,7 +4,7 @@
 
 - Plan first, then implement.
 - Inspect repo truth before changing anything.
-- Verify against `PROJECT_RULES.md`, `docs/CURRENT_STATE.md`, `docs/gpt/`, `README.md`, verified repo code, and CI logs when docs are ambiguous.
+- Verify against `PROJECT_RULES.md`, `docs/gpt/GPT_CURRENT_STATE.md`, `docs/gpt/`, `README.md`, verified repo code, and CI logs when docs are ambiguous.
 - Do not guess or invent business rules, workflow rules, or undocumented behavior.
 
 ## Workflow

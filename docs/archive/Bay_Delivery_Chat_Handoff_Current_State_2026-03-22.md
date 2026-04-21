@@ -1,5 +1,5 @@
 > ⚠️ Archived — This document reflects a previous state of the project and may no longer be accurate.
-> Refer to `docs/CURRENT_STATE.md` for the latest source of truth.
+> Refer to `docs/gpt/GPT_CURRENT_STATE.md` for the latest source of truth.
 
 # Bay Delivery Quote Copilot — Chat Handoff / Current State / Next Steps
 

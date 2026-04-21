@@ -5,7 +5,7 @@ Local quote/estimate tool for Bay Delivery (North Bay, Ontario).
 Current stable milestone: `0.10.1`.
 
 ## Current Project State
-See `docs/CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
+See `docs/gpt/GPT_CURRENT_STATE.md` for the authoritative current system status, rules, and priorities.
 See `docs/gpt/GPT_SOURCE_OF_TRUTH.md` for GPT grounding precedence and boundary rules.
 
 ## GPT Grounding Workflow

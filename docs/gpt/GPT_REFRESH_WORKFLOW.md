@@ -14,7 +14,7 @@ Refresh GPT grounding on every release that changes any of the following:
 
 - `PROJECT_RULES.md`
 - Any file in `docs/gpt/`
-- `docs/CURRENT_STATE.md`
+- `docs/gpt/GPT_CURRENT_STATE.md`
 - Pricing rules in `app/quote_engine.py` or `config/business_profile.json`
 
 If none of the above files changed in a release, grounding refresh is optional.
