@@ -237,6 +237,10 @@ async def test_admin_mobile_prelogin_refresh_guard_blocks_protected_calls(page: 
     page.on("request", track_request)
 
     await page.goto(f"{live_server}/admin/mobile", wait_until="networkidle")
+    await expect(page.locator("#loginScreen")).to_be_visible()
+    await expect(page.locator("#authenticatedShell")).not_to_be_visible()
+    await expect(page.locator("nav.mobileNav")).not_to_be_visible()
+    await expect(page.locator("#homeScreen")).not_to_be_visible()
     await page.evaluate(
         """
         async () => {
