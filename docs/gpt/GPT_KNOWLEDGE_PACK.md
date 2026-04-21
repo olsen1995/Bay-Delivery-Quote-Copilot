@@ -22,7 +22,6 @@ The following files form the complete grounding pack for a GPT Builder refresh:
 | `docs/gpt/GPT_BUILDER_INSTRUCTIONS.md` | Builder-ready system instruction block                            |
 | `docs/gpt/GPT_ACCEPTANCE_TESTS.md`     | Fixed acceptance question set for verifying a fresh grounding     |
 | `PROJECT_RULES.md`                     | Core repo rules (structural changes, pricing, admin, booking)     |
-| `docs/CURRENT_STATE.md`                | Live authoritative system status                                  |
 
 > **Upload only** the exported `.md` files from `dist/gpt_grounding_pack/`. Do **not** upload `tools/export_gpt_grounding_pack.py` or `manifest.json` — those are local helpers only.
 
@@ -46,7 +45,7 @@ Refresh GPT grounding on every release that changes any of the following:
 
 - `PROJECT_RULES.md`
 - Any file in `docs/gpt/`
-- `docs/CURRENT_STATE.md`
+- `docs/gpt/GPT_CURRENT_STATE.md`
 - Pricing rules in `app/quote_engine.py` or `config/business_profile.json`
 
 See `docs/gpt/GPT_REFRESH_WORKFLOW.md` for the full refresh runbook.

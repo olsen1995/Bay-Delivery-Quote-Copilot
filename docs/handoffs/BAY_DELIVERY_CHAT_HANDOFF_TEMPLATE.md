@@ -1,5 +1,5 @@
 > ⚠️ This is a template, not the current project state.
-> Refer to `docs/CURRENT_STATE.md` for the latest source of truth.
+> Refer to `docs/gpt/GPT_CURRENT_STATE.md` for the latest source of truth.
 
 # Bay Delivery Quote Copilot — Chat Handoff Template
 

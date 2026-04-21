@@ -22,7 +22,7 @@ Customers continue to use the live Render customer quote flow (`/` and `/quote`)
 
 Undocumented assumptions are not allowed.
 
-If a behavior, rule, or boundary is not documented in this pack, `PROJECT_RULES.md`, `docs/CURRENT_STATE.md`, `README.md`, or validated code paths, treat it as unknown and do not invent it.
+If a behavior, rule, or boundary is not documented in this pack, `PROJECT_RULES.md`, `docs/gpt/GPT_CURRENT_STATE.md`, `README.md`, or validated code paths, treat it as unknown and do not invent it.
 
 ## Pricing Authority Rule
 
@@ -50,9 +50,9 @@ The internal GPT quote interface is `POST /api/gpt/quote`.
 
 1. `PROJECT_RULES.md`
 2. `docs/gpt/GPT_SOURCE_OF_TRUTH.md` and companion docs in `docs/gpt/`
-3. `docs/CURRENT_STATE.md`
+3. `docs/gpt/GPT_CURRENT_STATE.md`
 4. `README.md`
-5. `docs/MARKET_AND_PRICING_STRATEGY.md`
+5. `docs/gpt/GPT_BUSINESS_RULES.md`
 6. Verified repository code (`app/main.py`, `app/quote_engine.py`, `app/storage.py`, `app/services/*`, `app/storage/*`)
 
 ## Required GPT Behavior
@@ -75,4 +75,4 @@ The following documents operationalize the grounding refresh cycle:
 | `docs/gpt/GPT_ACCEPTANCE_TESTS.md` | Fixed acceptance question set for verifying a fresh grounding |
 | `tools/export_gpt_grounding_pack.py` | Export script — generates the local upload pack with manifest |
 
-Refresh grounding on every release that changes `PROJECT_RULES.md`, any file in `docs/gpt/`, `docs/CURRENT_STATE.md`, or pricing rules in `app/quote_engine.py` / `config/business_profile.json`.
+Refresh grounding on every release that changes `PROJECT_RULES.md`, any file in `docs/gpt/`, `docs/gpt/GPT_CURRENT_STATE.md`, or pricing rules in `app/quote_engine.py` / `config/business_profile.json`.
