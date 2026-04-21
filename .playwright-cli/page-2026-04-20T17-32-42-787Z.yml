@@ -1,0 +1,159 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img "Bay Delivery" [ref=e5]
+      - generic [ref=e6]:
+        - strong [ref=e7]: Bay Delivery
+        - text: North Bay estimate request
+    - link "Home" [ref=e9] [cursor=pointer]:
+      - /url: /
+  - region "Bay Delivery customer trust indicators" [ref=e10]:
+    - generic [ref=e11]: Local North Bay service
+    - generic [ref=e12]: Estimate before booking
+    - generic [ref=e13]: Cash and EMT totals shown clearly
+    - generic [ref=e14]: No-pressure decision
+  - generic [ref=e15]:
+    - paragraph [ref=e16]: Bay Delivery
+    - heading "Get an Estimate" [level=1] [ref=e17]
+    - paragraph [ref=e18]: Start with a fast estimate, review clear Cash (no HST) and EMT (+13% HST) totals, and continue only if it works for you. Booking requests and optional photos come after acceptance.
+    - generic [ref=e19]:
+      - generic [ref=e20]: North Bay service
+      - generic [ref=e21]: Estimate first
+      - generic [ref=e22]: Booking only after acceptance
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - paragraph [ref=e26]: Quote Flow
+        - heading "What happens next" [level=2] [ref=e27]
+      - paragraph [ref=e28]: Start with the estimate. If it works for you, continue to the booking request and optional photos. Your job is not booked until Bay Delivery reviews and confirms it.
+    - list "Quote progress" [ref=e29]:
+      - listitem [ref=e30]:
+        - generic [ref=e31]: "1"
+        - generic [ref=e32]: Job details
+      - listitem [ref=e33]:
+        - generic [ref=e34]: "2"
+        - generic [ref=e35]: Review estimate
+      - listitem [ref=e36]:
+        - generic [ref=e37]: "3"
+        - generic [ref=e38]: Continue or decline
+      - listitem [ref=e39]:
+        - generic [ref=e40]: "4"
+        - generic [ref=e41]: Booking request
+      - listitem [ref=e42]:
+        - generic [ref=e43]: "5"
+        - generic [ref=e44]: Optional photos
+  - generic [ref=e45]:
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - paragraph [ref=e48]: Customer Estimate
+        - heading "Tell us about the job" [level=2] [ref=e49]
+      - paragraph [ref=e50]: Share the job details used for your estimate. You see pricing before any booking request details.
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e54]:
+          - heading "Contact and job location" [level=3] [ref=e55]
+          - paragraph [ref=e56]: Start here so we can send your estimate first, then follow up only if you decide to continue.
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: Customer name
+            - textbox "Customer name" [ref=e60]:
+              - /placeholder: Full name
+          - generic [ref=e61]:
+            - generic [ref=e62]: Customer phone
+            - textbox "Customer phone" [ref=e63]:
+              - /placeholder: 705-___-____
+        - generic [ref=e64]: Job address
+        - textbox "Job address" [ref=e65]:
+          - /placeholder: North Bay, ON
+      - generic [ref=e66]:
+        - generic [ref=e68]:
+          - heading "Choose the service" [level=3] [ref=e69]
+          - paragraph [ref=e70]: Pick the job type first so we only show the estimate details that matter.
+        - generic [ref=e72]:
+          - generic [ref=e73]: Service type
+          - combobox "Service type" [ref=e74]:
+            - option "Dump run / Junk removal" [selected]
+            - option "Scrap pickup"
+            - option "Small move"
+            - option "Item delivery"
+            - option "Demolition"
+          - generic [ref=e75]: Use rough counts, access details, and material notes. Clear, close estimates are fine.
+      - generic [ref=e76]:
+        - generic [ref=e78]:
+          - heading "Estimate details" [level=3] [ref=e79]
+          - paragraph [ref=e80]: Add the service details that affect estimate accuracy and pricing.
+        - group [ref=e81]:
+          - generic "Load, access, and material details for your estimate" [ref=e82] [cursor=pointer]
+          - paragraph [ref=e83]: Add the closest counts and access details. For loose junk, think in regular garbage bags. For trailer fill, choose the closest space used.
+          - paragraph [ref=e84]: Not sure? Give your best estimate. Clear, close guesses are enough to start.
+          - generic [ref=e86]:
+            - generic [ref=e87]: Estimated hours
+            - spinbutton "Estimated hours" [ref=e88]: "1.0"
+            - generic [ref=e89]: Use your best guess. If you are unsure, give the closest number and describe the work below.
+          - generic [ref=e91]:
+            - generic [ref=e92]: Crew size
+            - combobox "Crew size" [ref=e93]:
+              - option "1 worker" [selected]
+              - option "2 workers"
+          - generic [ref=e95]:
+            - generic [ref=e96]: Access difficulty
+            - combobox "Access difficulty" [ref=e97]:
+              - option "Easy access (main floor, close parking)" [selected]
+              - option "Difficult access (stairs, basement carry-out, long walk)"
+              - option "Extreme access (multiple flights, tight access, difficult parking)"
+            - generic [ref=e98]: Choose the closest match. Think about stairs, carry distance, and parking.
+            - generic [ref=e99]: Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access.
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - checkbox "This job includes heavy or dense materials (for example drywall, concrete, tile, shingles, soil, wet debris, or similar)." [ref=e103]
+              - generic [ref=e104]: This job includes heavy or dense materials (for example drywall, concrete, tile, shingles, soil, wet debris, or similar).
+            - generic [ref=e105]: "Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more."
+          - generic [ref=e106]:
+            - generic [ref=e107]:
+              - generic [ref=e108]: Bag-equivalent count
+              - spinbutton "Bag-equivalent count" [ref=e109]: "0"
+              - generic [ref=e110]: A full kitchen garbage bag = 1. If unsure, estimate slightly higher.
+              - generic [ref=e111]: Most jobs are 5–10 bags. Adjust if needed.
+            - generic [ref=e112]:
+              - generic [ref=e113]: Mattresses
+              - spinbutton "Mattresses" [ref=e114]: "0"
+              - generic [ref=e115]: Count bulky items separately so the estimate reflects handling and disposal properly.
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - generic [ref=e118]: Bag type
+              - combobox "Bag type" [ref=e119]:
+                - option "Select bag type if known" [selected]
+                - option "Light household bags (clothes, packaging, light trash)"
+                - option "Heavy mixed junk bags (books, tools, mixed junk)"
+                - option "Construction / debris bags (drywall, tile, shingles, demo debris)"
+            - generic [ref=e120]:
+              - generic [ref=e121]: Trailer space used
+              - combobox "Trailer space used" [ref=e122]:
+                - option "Select trailer space used if known" [selected]
+                - option "Under 1/4 trailer (few items or a small pile)"
+                - option "About 1/4 trailer (light partial load)"
+                - option "About 1/2 trailer (half load)"
+                - option "About 3/4 trailer (large load)"
+                - option "Full trailer (packed full)"
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: Box springs
+              - spinbutton "Box springs" [ref=e126]: "0"
+            - generic [ref=e127]:
+              - generic [ref=e128]: Photo tip
+              - generic [ref=e129]: Prefer to send photos after the estimate? You can add them later to help confirm accuracy.
+      - generic [ref=e130]:
+        - generic [ref=e132]:
+          - heading "Anything else we should know?" [level=3] [ref=e133]
+          - paragraph [ref=e134]: Add any notes that help us price the work and understand access.
+        - generic [ref=e135]: Job description
+        - textbox "Job description" [ref=e136]:
+          - /placeholder: What needs to be hauled/moved/demo’d? Rough size/amount?
+        - paragraph [ref=e137]: "Helpful details: item type, rough amount, stairs, parking, carry distance, timing notes, and anything unusual."
+      - generic [ref=e138]:
+        - button "Get Estimate Now" [ref=e139] [cursor=pointer]
+        - button "Clear" [ref=e140] [cursor=pointer]
+      - paragraph [ref=e141]: After you see your estimate, review what is included and compare Cash vs EMT totals. If you accept, you move to a booking request, not a confirmed booking. Optional photos come after that.
+  - generic [ref=e142]:
+    - generic [ref=e143]: Cash (no HST) • EMT (+13% HST)
+    - generic [ref=e144]: Bay Delivery — North Bay, Ontario

@@ -1,0 +1,56 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - paragraph [ref=e5]: Internal Admin
+      - heading "Bay Delivery Mobile Ops" [level=1] [ref=e6]
+  - main [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e10]:
+        - heading "Mobile Login" [level=2] [ref=e11]
+        - paragraph [ref=e12]: Enter your admin credentials to access the operations dashboard.
+      - generic [ref=e13]:
+        - generic [ref=e14]: Username
+        - textbox "Username" [ref=e15]:
+          - /placeholder: Admin username
+        - generic [ref=e16]: Password
+        - textbox "Password" [ref=e17]:
+          - /placeholder: Admin password
+        - button "Log In" [ref=e18] [cursor=pointer]
+      - status [ref=e19]: Enter admin username/password, then log in.
+    - generic [ref=e20]:
+      - navigation "Mobile admin navigation" [ref=e21]:
+        - button "Home" [ref=e22] [cursor=pointer]
+        - button "Requests" [ref=e23] [cursor=pointer]
+        - button "Jobs" [ref=e24] [cursor=pointer]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - heading "Home / Queue" [level=2] [ref=e28]
+            - paragraph [ref=e29]: Operations summary for requests and jobs.
+          - button "Refresh" [ref=e30] [cursor=pointer]
+        - generic [ref=e31]:
+          - article [ref=e32]:
+            - text: Open Requests
+            - strong [ref=e33]: "0"
+          - article [ref=e34]:
+            - text: Upcoming Jobs
+            - strong [ref=e35]: "0"
+        - generic [ref=e36]:
+          - generic [ref=e38]:
+            - heading "Operations Focus" [level=3] [ref=e39]
+            - paragraph [ref=e40]: Review incoming requests and manage active jobs. No quote authoring on mobile admin.
+          - generic [ref=e43]: Log in to load mobile ops context.
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - heading "Requests" [level=2] [ref=e47]
+            - paragraph [ref=e48]: Incoming booking requests awaiting review.
+          - button "Refresh" [ref=e49] [cursor=pointer]
+        - generic [ref=e52]: Log in to load requests.
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - heading "Upcoming Jobs" [level=2] [ref=e56]
+            - paragraph [ref=e57]: Approved and in-progress jobs — view status and scheduling.
+          - button "Refresh" [ref=e58] [cursor=pointer]
+        - generic [ref=e61]: Log in to load upcoming jobs.

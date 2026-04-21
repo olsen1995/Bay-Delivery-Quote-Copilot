@@ -1,0 +1,112 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img "Bay Delivery" [ref=e5]
+      - generic [ref=e6]:
+        - strong [ref=e7]: Bay Delivery
+        - generic [ref=e8]: North Bay, Ontario • Hauling • Moving • Cleanouts
+    - navigation [ref=e9]:
+      - link "Get a Quote" [ref=e10] [cursor=pointer]:
+        - /url: /quote
+      - link "Facebook" [ref=e11] [cursor=pointer]:
+        - /url: https://www.facebook.com/p/Bay-Delivery-61556796055262/
+      - link "Google Profile" [ref=e12] [cursor=pointer]:
+        - /url: https://www.google.com/search?kgmid=/g/11y3rzh_gz&q=Bay+Delivery
+  - region "Why customers choose Bay Delivery" [ref=e13]:
+    - generic [ref=e14]: ✓ Local North Bay service
+    - generic [ref=e15]: ✓ Fast estimate turnaround
+    - generic [ref=e16]: ✓ Clear cash vs EMT totals
+    - generic [ref=e17]: ✓ No-pressure quote acceptance
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - heading "Get a fast estimate with no obligation to book." [level=1] [ref=e20]
+      - paragraph [ref=e21]: Share a few job details, see your estimate right away, then request a booking time window only if it works for you. We’ll confirm availability and lock it in.
+      - generic [ref=e22]:
+        - generic [ref=e23]: Junk Removal / Haul Away
+        - generic [ref=e24]: Scrap Pickup
+        - generic [ref=e25]: Small Moves
+        - generic [ref=e26]: Item Delivery
+        - generic [ref=e27]: Demolition
+      - generic [ref=e29]: Cash is tax-free. EMT/e-transfer adds 13% HST.
+      - link "Get My Fast Estimate" [ref=e30] [cursor=pointer]:
+        - /url: /quote
+      - paragraph [ref=e31]: Takes about 2–3 minutes. No booking is created unless you accept.
+    - generic [ref=e32]:
+      - heading "How it works" [level=2] [ref=e33]
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - strong [ref=e36]: 1) Fill the details
+          - text: Items + access (stairs, elevator, tight corners).
+        - generic [ref=e37]:
+          - strong [ref=e38]: 2) Get your estimate
+          - text: We show cash and EMT totals. Scrap follows our minimum service charge.
+        - generic [ref=e39]:
+          - strong [ref=e40]: 3) Request booking
+          - text: We approve/confirm the schedule from the admin dashboard.
+  - generic [ref=e41]:
+    - heading "Recent Work" [level=2] [ref=e42]
+    - paragraph [ref=e43]: From cleanup jobs to deck removals and shed demolitions, we handle it all.
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - img "Cleanup job completed by Bay Delivery" [ref=e46]
+        - paragraph [ref=e47]: Property cleanup completed with full haul-away and disposal.
+      - generic [ref=e48]:
+        - img "Deck removal by Bay Delivery" [ref=e49]
+        - paragraph [ref=e50]: Deck teardown and debris removal handled in one visit.
+      - generic [ref=e51]:
+        - img "Shed demolition by Bay Delivery" [ref=e52]
+        - paragraph [ref=e53]: Shed demolition with tidy site cleanup before handoff.
+  - generic [ref=e54]:
+    - heading "Services" [level=2] [ref=e55]
+    - generic [ref=e56]:
+      - generic [ref=e57]:
+        - generic [ref=e58]: 🚚
+        - strong [ref=e59]: Junk Removal / Haul Away
+        - generic [ref=e60]: We load, haul, and dispose — removal & disposal included (if required).
+      - generic [ref=e61]:
+        - generic [ref=e62]: ♻️
+        - strong [ref=e63]: Scrap Pickup
+        - generic [ref=e64]: Scrap pickup is included as part of the minimum service charge. Pricing reflects labor, travel, and handling.
+      - generic [ref=e65]:
+        - generic [ref=e66]: 📦
+        - strong [ref=e67]: Small Moving
+        - generic [ref=e68]: Pickup + drop-off required. Minimum 4 hours. Minimum crew 2.
+      - generic [ref=e69]:
+        - generic [ref=e70]: 🏠
+        - strong [ref=e71]: Item Delivery
+        - generic [ref=e72]: Marketplace deliveries, bulky item drops, and more.
+      - generic [ref=e73]:
+        - generic [ref=e74]: 🔨
+        - strong [ref=e75]: Demolition
+        - generic [ref=e76]: Interior rip-outs, debris handling, and cleanup. Final confirmed after review.
+  - generic [ref=e78]:
+    - heading "Ready to get started?" [level=2] [ref=e79]
+    - paragraph [ref=e80]: Get a fair quote online first. If you want to confirm access, timing, or job details, contact us directly below.
+    - generic [ref=e81]:
+      - generic [ref=e82]:
+        - strong [ref=e83]: Call us
+        - link "Call Bay Delivery at 705 303 4409" [ref=e84] [cursor=pointer]:
+          - /url: tel:+17053034409
+          - text: (705) 303-4409
+      - generic [ref=e85]:
+        - strong [ref=e86]: Email us
+        - link "Email Bay Delivery" [ref=e87] [cursor=pointer]:
+          - /url: mailto:BayDeliveryNB@gmail.com
+          - text: BayDeliveryNB@gmail.com
+    - paragraph [ref=e88]:
+      - text: Prefer to talk first?
+      - link "Call Bay Delivery at 705 303 4409" [ref=e89] [cursor=pointer]:
+        - /url: tel:+17053034409
+        - text: Call
+      - text: or
+      - link "Text Bay Delivery at 705 303 4409" [ref=e90] [cursor=pointer]:
+        - /url: sms:+17053034409
+        - text: Text
+      - text: .
+  - link "☎️ Call" [ref=e91] [cursor=pointer]:
+    - /url: tel:+17053034409
+    - generic [ref=e92]: ☎️
+    - generic [ref=e93]: Call
+  - contentinfo [ref=e94]:
+    - generic [ref=e95]: Bay Delivery • North Bay, Ontario
+    - generic [ref=e96]: This site generates estimates and booking requests. Final pricing may change if job details differ from what’s described.

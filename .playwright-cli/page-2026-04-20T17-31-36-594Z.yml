@@ -1,0 +1,44 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: BD
+      - generic [ref=e6]:
+        - strong [ref=e7]: Bay Delivery
+        - text: Admin — Uploads
+    - generic [ref=e8]:
+      - link "Dashboard" [ref=e9] [cursor=pointer]:
+        - /url: /admin
+      - link "Home" [ref=e10] [cursor=pointer]:
+        - /url: /
+  - generic [ref=e11]:
+    - heading "Customer Uploads" [level=1] [ref=e12]
+    - paragraph [ref=e13]: Search by Quote ID to see photos stored in Google Drive.
+    - generic [ref=e14]:
+      - generic [ref=e15]: Quote ID
+      - textbox "Quote ID" [ref=e16]:
+        - /placeholder: paste quote id here
+      - button "Search" [ref=e18] [cursor=pointer]
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - text: Admin access uses
+      - strong [ref=e21]: Basic Auth
+      - text: (
+      - code [ref=e22]: ADMIN_USERNAME
+      - text: +
+      - code [ref=e23]: ADMIN_PASSWORD
+      - text: ).
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: Admin Username
+        - textbox "Admin Username" [ref=e27]:
+          - /placeholder: ADMIN_USERNAME
+      - generic [ref=e28]:
+        - generic [ref=e29]: Admin Password
+        - textbox "Admin Password" [ref=e30]:
+          - /placeholder: ADMIN_PASSWORD
+    - generic [ref=e31]:
+      - text: "Note: token-based auth ("
+      - code [ref=e32]: "?token="
+      - text: /
+      - code [ref=e33]: X-Admin-Token
+      - text: ) is not used by the backend.
