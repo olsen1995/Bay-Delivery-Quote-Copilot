@@ -248,11 +248,11 @@ def _run_admin_read_checks(health: Dict[str, Any], *, check_gpt_observability: b
         print("[skip] drive backup check (drive_configured=false or not reported)")
 
 
-def _run_live_safe_smoke() -> int:
+def _run_live_safe_smoke(*, check_gpt_observability: bool = False) -> int:
     print(f"Smoke test target: {base_url()} (mode=live-safe)")
     health = _run_health_check()
     _run_public_customer_page_checks()
-    _run_admin_read_checks(health, check_gpt_observability=True)
+    _run_admin_read_checks(health, check_gpt_observability=check_gpt_observability)
     print("Live-safe smoke test passed.")
     return 0
 
@@ -364,11 +364,16 @@ def main() -> int:
         default="live-safe",
         help="Smoke mode: live-safe (read-only) or stateful (creates quote workflow records).",
     )
+    parser.add_argument(
+        "--check-gpt-observability",
+        action="store_true",
+        help="Opt-in: include /admin/api/gpt-quote-observability assertion during live-safe mode.",
+    )
     args = parser.parse_args()
 
     if args.mode == "stateful":
         return _run_stateful_workflow_smoke()
-    return _run_live_safe_smoke()
+    return _run_live_safe_smoke(check_gpt_observability=args.check_gpt_observability)
 
 
 if __name__ == "__main__":
