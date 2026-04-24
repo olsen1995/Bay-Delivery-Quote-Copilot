@@ -126,6 +126,8 @@ def test_gpt_quote_returns_engine_backed_totals_without_persistence(client: Test
     assert event["failure_reason"] is None
     assert isinstance(event["latency_ms"], int)
     assert event["latency_ms"] >= 0
+    assert event["server_grounding_revision"] is None
+    assert event["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_invalid_enum_returns_400(client: TestClient) -> None:
@@ -154,6 +156,8 @@ def test_gpt_quote_invalid_service_type_returns_400(client: TestClient) -> None:
     assert event["cash_total_cad"] is None
     assert event["emt_total_cad"] is None
     assert event["risk_flags"] == []
+    assert event["server_grounding_revision"] is None
+    assert event["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_empty_haul_away_returns_400(client: TestClient) -> None:
@@ -179,6 +183,8 @@ def test_gpt_quote_missing_token_returns_401(client: TestClient) -> None:
     events = storage.list_gpt_quote_observability(limit=10)
     assert len(events) == 1
     assert _latest_event()["failure_reason"] == "auth_failed"
+    assert _latest_event()["server_grounding_revision"] is None
+    assert _latest_event()["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_missing_token_on_malformed_body_returns_401_not_422(client: TestClient) -> None:
@@ -189,6 +195,8 @@ def test_gpt_quote_missing_token_on_malformed_body_returns_401_not_422(client: T
     events = storage.list_gpt_quote_observability(limit=10)
     assert len(events) == 1
     assert _latest_event()["failure_reason"] == "auth_failed"
+    assert _latest_event()["server_grounding_revision"] is None
+    assert _latest_event()["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_invalid_token_on_malformed_body_returns_401_not_422(client: TestClient) -> None:
@@ -199,6 +207,8 @@ def test_gpt_quote_invalid_token_on_malformed_body_returns_401_not_422(client: T
     events = storage.list_gpt_quote_observability(limit=10)
     assert len(events) == 1
     assert _latest_event()["failure_reason"] == "auth_failed"
+    assert _latest_event()["server_grounding_revision"] is None
+    assert _latest_event()["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_valid_token_on_malformed_body_still_returns_422(client: TestClient) -> None:
@@ -210,6 +220,8 @@ def test_gpt_quote_valid_token_on_malformed_body_still_returns_422(client: TestC
     event = events[0]
     assert event["success"] is False
     assert event["failure_reason"] == "validation_error"
+    assert event["server_grounding_revision"] is None
+    assert event["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_missing_env_token_fails_closed(monkeypatch) -> None:
@@ -235,6 +247,8 @@ def test_gpt_quote_missing_env_token_fails_closed(monkeypatch) -> None:
     assert len(events) == 1
     assert events[0]["success"] is False
     assert events[0]["failure_reason"] == "endpoint_disabled"
+    assert events[0]["server_grounding_revision"] is None
+    assert events[0]["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_unknown_field_returns_422(client: TestClient) -> None:
@@ -247,6 +261,8 @@ def test_gpt_quote_unknown_field_returns_422(client: TestClient) -> None:
     events = storage.list_gpt_quote_observability(limit=10)
     assert len(events) == 1
     assert events[0]["failure_reason"] == "validation_error"
+    assert events[0]["server_grounding_revision"] is None
+    assert events[0]["caller_grounding_revision"] is None
 
 
 def test_gpt_quote_rate_limit_logs_once(client: TestClient) -> None:
@@ -261,3 +277,20 @@ def test_gpt_quote_rate_limit_logs_once(client: TestClient) -> None:
     assert len(events) == 11
     assert events[0]["success"] is False
     assert events[0]["failure_reason"] == "rate_limited"
+    assert events[0]["server_grounding_revision"] is None
+    assert events[0]["caller_grounding_revision"] is None
+
+
+def test_gpt_quote_logs_server_authoritative_and_caller_declared_revisions(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    monkeypatch.setenv("GPT_GROUNDING_REVISION", "v0.10.1+manifest-abc123")
+    headers = dict(_headers())
+    headers["X-GPT-Grounding-Revision"] = "caller-2026-04-24"
+
+    response = client.post("/api/gpt/quote", headers=headers, json=_base_payload())
+
+    assert response.status_code == 200
+    event = _latest_event()
+    assert event["server_grounding_revision"] == "v0.10.1+manifest-abc123"
+    assert event["caller_grounding_revision"] == "caller-2026-04-24"

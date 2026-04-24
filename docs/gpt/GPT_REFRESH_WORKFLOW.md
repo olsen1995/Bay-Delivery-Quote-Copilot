@@ -77,6 +77,10 @@ Note the refresh in the release notes or internal ops log:
 GPT grounding refreshed for vX.Y.Z – files: [list], manifest hash: [hash from manifest.json]
 ```
 
+Set/update the Render environment variable `GPT_GROUNDING_REVISION` using the same refresh record convention
+(for example: `vX.Y.Z+<manifest-hash-prefix>`), so server-side GPT observability records the authoritative
+grounding revision used during quote requests.
+
 Also record completion in the canonical release checklist log: `docs/RELEASE_VERIFICATION_CHECKLIST.md`.
 
 ---

@@ -50,6 +50,8 @@ Before concluding verification, confirm expected Render env assumptions are stil
 - `LOCAL_TIMEZONE` is set (expected documented value: `America/Toronto`).
 - `BAYDELIVERY_CORS_ORIGINS` is set to exact production origin(s), no wildcard, no trailing slash.
 - DB path expectation is consistent with documented Render disk usage (`BAYDELIVERY_DB_PATH=/var/data/bay_delivery.sqlite3`).
+- If GPT grounding refresh was required/performed, `GPT_GROUNDING_REVISION` is set to the current refresh record value
+  (for example `vX.Y.Z+<manifest-hash-prefix>` from `docs/gpt/GPT_REFRESH_WORKFLOW.md` step 8).
 
 If behavior looks wrong, check env/config first before proposing code changes.
 

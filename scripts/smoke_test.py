@@ -204,6 +204,14 @@ def _run_admin_read_checks(health: Dict[str, Any], *, check_gpt_observability: b
                 isinstance(gpt_observability, dict) and isinstance(gpt_observability.get("items"), list),
                 "gpt quote observability expected top-level items list",
             )
+            items = gpt_observability.get("items") or []
+            if items:
+                first = items[0]
+                require(isinstance(first, dict), "gpt quote observability items must be objects")
+                require(
+                    "server_grounding_revision" in first and "caller_grounding_revision" in first,
+                    "gpt quote observability item missing grounding revision fields",
+                )
             print("[ok] /admin/api/gpt-quote-observability authed read-only fetch")
     else:
         print("[skip] admin auth pass/fail checks (ADMIN_USERNAME/ADMIN_PASSWORD not configured)")
