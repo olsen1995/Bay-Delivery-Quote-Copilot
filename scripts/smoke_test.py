@@ -151,7 +151,7 @@ def _run_public_customer_page_checks() -> None:
     print("[ok] /quote page marker checks")
 
 
-def _run_admin_read_checks(health: Dict[str, Any]) -> None:
+def _run_admin_read_checks(health: Dict[str, Any], *, check_gpt_observability: bool = False) -> None:
     # --- Admin page and auth behavior ---
     creds_configured = _admin_creds_configured()
     headers = admin_headers()
@@ -193,6 +193,18 @@ def _run_admin_read_checks(health: Dict[str, Any]) -> None:
         require(status == 200, f"GET /admin/api/quotes?limit=1 with auth expected 200, got {status} ({authed_quotes})")
         require(isinstance(authed_quotes, dict) and isinstance(authed_quotes.get("items"), list), "admin quotes expected items list")
         print("[ok] /admin/api/quotes authed read-only fetch")
+
+        if check_gpt_observability:
+            status, gpt_observability = api("GET", "/admin/api/gpt-quote-observability", headers=headers)
+            require(
+                status == 200,
+                f"GET /admin/api/gpt-quote-observability with auth expected 200, got {status} ({gpt_observability})",
+            )
+            require(
+                isinstance(gpt_observability, dict) and isinstance(gpt_observability.get("items"), list),
+                "gpt quote observability expected top-level items list",
+            )
+            print("[ok] /admin/api/gpt-quote-observability authed read-only fetch")
     else:
         print("[skip] admin auth pass/fail checks (ADMIN_USERNAME/ADMIN_PASSWORD not configured)")
 
@@ -240,7 +252,7 @@ def _run_live_safe_smoke() -> int:
     print(f"Smoke test target: {base_url()} (mode=live-safe)")
     health = _run_health_check()
     _run_public_customer_page_checks()
-    _run_admin_read_checks(health)
+    _run_admin_read_checks(health, check_gpt_observability=True)
     print("Live-safe smoke test passed.")
     return 0
 
