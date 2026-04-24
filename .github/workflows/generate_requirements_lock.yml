@@ -42,7 +42,7 @@ jobs:
 
       - name: Commit and push lock file
         run: |
-          if git diff --quiet -- requirements.lock.txt; then
+          if [ -z "$(git status --porcelain -- requirements.lock.txt)" ]; then
             echo "No changes to requirements.lock.txt to commit."
             exit 0
           fi
