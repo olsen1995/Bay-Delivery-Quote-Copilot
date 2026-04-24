@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This file translates the business strategy in `docs/MARKET_AND_PRICING_STRATEGY.md`
+This file translates the business strategy in `docs/gpt/GPT_BUSINESS_RULES.md`
 into practical, enforceable calibration rules for future pricing PRs.
 
 Anyone proposing a pricing change should read both files before opening a PR.
