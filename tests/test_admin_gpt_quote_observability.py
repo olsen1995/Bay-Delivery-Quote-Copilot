@@ -46,6 +46,8 @@ def setup_observability_log(isolated_db: None) -> None:
             "risk_flags": ["stairs"],
             "failure_reason": None,
             "latency_ms": 145,
+            "server_grounding_revision": "v0.12.3+abc123",
+            "caller_grounding_revision": "caller-rev-01",
         }
     )
     storage.save_gpt_quote_observability_event(
@@ -60,6 +62,8 @@ def setup_observability_log(isolated_db: None) -> None:
             "risk_flags": [],
             "failure_reason": "validation_error",
             "latency_ms": 32,
+            "server_grounding_revision": "v0.12.3+abc123",
+            "caller_grounding_revision": None,
         }
     )
     storage.save_gpt_quote_observability_event(
@@ -74,6 +78,8 @@ def setup_observability_log(isolated_db: None) -> None:
             "risk_flags": ["long_carry", "heavy_item"],
             "failure_reason": None,
             "latency_ms": 88,
+            "server_grounding_revision": "v0.12.3+abc123",
+            "caller_grounding_revision": "caller-rev-02",
         }
     )
 
@@ -121,6 +127,8 @@ def test_response_shape_and_descending_order(client: TestClient, admin_creds: tu
         "risk_flags",
         "failure_reason",
         "latency_ms",
+        "server_grounding_revision",
+        "caller_grounding_revision",
     }
     assert isinstance(entry["timestamp"], str)
     assert isinstance(entry["route_name"], str)
@@ -132,3 +140,5 @@ def test_response_shape_and_descending_order(client: TestClient, admin_creds: tu
     assert isinstance(entry["risk_flags"], list)
     assert entry["failure_reason"] is None or isinstance(entry["failure_reason"], str)
     assert entry["latency_ms"] is None or isinstance(entry["latency_ms"], int)
+    assert entry["server_grounding_revision"] is None or isinstance(entry["server_grounding_revision"], str)
+    assert entry["caller_grounding_revision"] is None or isinstance(entry["caller_grounding_revision"], str)

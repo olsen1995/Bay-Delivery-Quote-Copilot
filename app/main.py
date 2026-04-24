@@ -94,6 +94,8 @@ _gpt_quote_rate_limit_lock = Lock()
 _ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH = 240
 _GPT_QUOTE_ROUTE_NAME = "/api/gpt/quote"
 _GPT_QUOTE_OBSERVABILITY_STATE_KEY = "gpt_quote_observability"
+_GPT_GROUNDING_REVISION_HEADER = "x-gpt-grounding-revision"
+_MAX_GROUNDING_REVISION_LENGTH = 120
 _ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
     ("POST", "/admin/api/db/import"): {
         "action_type": "import_db",
@@ -124,6 +126,8 @@ def _init_gpt_quote_observability(request: Request) -> dict[str, Any]:
         "risk_flags": [],
         "failure_reason": None,
         "latency_ms": None,
+        "server_grounding_revision": None,
+        "caller_grounding_revision": None,
         "started_at": time.perf_counter(),
         "logged": False,
     }
@@ -141,6 +145,8 @@ def _finalize_gpt_quote_observability(
     confidence_level: str | None = None,
     risk_flags: list[str] | None = None,
     failure_reason: str | None = None,
+    server_grounding_revision: str | None = None,
+    caller_grounding_revision: str | None = None,
 ) -> None:
     payload = _init_gpt_quote_observability(request)
     if payload.get("logged"):
@@ -161,6 +167,8 @@ def _finalize_gpt_quote_observability(
             "risk_flags": [str(flag) for flag in (risk_flags or [])],
             "failure_reason": failure_reason,
             "latency_ms": latency_ms,
+            "server_grounding_revision": server_grounding_revision,
+            "caller_grounding_revision": caller_grounding_revision,
             "logged": True,
         }
     )
@@ -180,6 +188,16 @@ def _finalize_gpt_quote_observability(
         "risk_flags": [str(flag) for flag in payload.get("risk_flags") or []],
         "failure_reason": str(payload["failure_reason"]) if payload.get("failure_reason") is not None else None,
         "latency_ms": int(payload["latency_ms"]) if payload.get("latency_ms") is not None else None,
+        "server_grounding_revision": (
+            str(payload["server_grounding_revision"])
+            if payload.get("server_grounding_revision") is not None
+            else None
+        ),
+        "caller_grounding_revision": (
+            str(payload["caller_grounding_revision"])
+            if payload.get("caller_grounding_revision") is not None
+            else None
+        ),
     }
     try:
         save_gpt_quote_observability_event(record)
@@ -255,6 +273,20 @@ def _configured_admin_credentials() -> tuple[str, str] | None:
 def _configured_gpt_internal_token() -> str | None:
     token = os.getenv("GPT_INTERNAL_API_TOKEN", "").strip()
     return token or None
+
+
+def _configured_gpt_grounding_revision() -> str | None:
+    revision = os.getenv("GPT_GROUNDING_REVISION", "").strip()
+    if not revision:
+        return None
+    return revision[:_MAX_GROUNDING_REVISION_LENGTH]
+
+
+def _caller_declared_gpt_grounding_revision(request: Request) -> str | None:
+    revision = (request.headers.get(_GPT_GROUNDING_REVISION_HEADER) or "").strip()
+    if not revision:
+        return None
+    return revision[:_MAX_GROUNDING_REVISION_LENGTH]
 
 
 def _admin_operator_username(request: Request) -> str:
@@ -518,19 +550,39 @@ def _require_admin(request: Request) -> None:
 
 def _require_gpt_internal_token(request: Request) -> None:
     _init_gpt_quote_observability(request)
+    server_grounding_revision = _configured_gpt_grounding_revision()
+    caller_grounding_revision = _caller_declared_gpt_grounding_revision(request)
     expected_token = _configured_gpt_internal_token()
     if expected_token is None:
-        _finalize_gpt_quote_observability(request, success=False, failure_reason="endpoint_disabled")
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason="endpoint_disabled",
+            server_grounding_revision=server_grounding_revision,
+            caller_grounding_revision=caller_grounding_revision,
+        )
         raise HTTPException(status_code=404, detail="Not found.")
 
     header = request.headers.get("authorization") or ""
     if not header.lower().startswith("bearer "):
-        _finalize_gpt_quote_observability(request, success=False, failure_reason="auth_failed")
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason="auth_failed",
+            server_grounding_revision=server_grounding_revision,
+            caller_grounding_revision=caller_grounding_revision,
+        )
         raise HTTPException(status_code=401, detail="Invalid internal API token.")
 
     provided_token = header.split(" ", 1)[1].strip()
     if not provided_token or not hmac.compare_digest(provided_token, expected_token):
-        _finalize_gpt_quote_observability(request, success=False, failure_reason="auth_failed")
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason="auth_failed",
+            server_grounding_revision=server_grounding_revision,
+            caller_grounding_revision=caller_grounding_revision,
+        )
         raise HTTPException(status_code=401, detail="Invalid internal API token.")
 
     _enforce_gpt_quote_rate_limit(request)
@@ -558,7 +610,13 @@ def _enforce_gpt_quote_rate_limit(request: Request) -> None:
             bucket.append(now)
 
     if is_rate_limited:
-        _finalize_gpt_quote_observability(request, success=False, failure_reason="rate_limited")
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason="rate_limited",
+            server_grounding_revision=_configured_gpt_grounding_revision(),
+            caller_grounding_revision=_caller_declared_gpt_grounding_revision(request),
+        )
         raise HTTPException(status_code=429, detail="rate limit exceeded")
 
 
@@ -633,7 +691,13 @@ async def request_validation_audit_handler(request: Request, exc: RequestValidat
                 **audit_metadata,
             )
     if request.method.upper() == "POST" and request.url.path == _GPT_QUOTE_ROUTE_NAME:
-        _finalize_gpt_quote_observability(request, success=False, failure_reason="validation_error")
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason="validation_error",
+            server_grounding_revision=_configured_gpt_grounding_revision(),
+            caller_grounding_revision=_caller_declared_gpt_grounding_revision(request),
+        )
     return await request_validation_exception_handler(request, exc)
 
 
@@ -988,6 +1052,8 @@ async def quote_calculate(payload: QuoteRequestPayload):
 @app.post(_GPT_QUOTE_ROUTE_NAME, include_in_schema=False, dependencies=[Depends(_require_gpt_internal_token)])
 async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
     _init_gpt_quote_observability(request)
+    server_grounding_revision = _configured_gpt_grounding_revision()
+    caller_grounding_revision = _caller_declared_gpt_grounding_revision(request)
     try:
         response = quote_service.build_gpt_quote_response(payload.model_dump())
     except HTTPException as exc:
@@ -995,10 +1061,18 @@ async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
             request,
             success=False,
             failure_reason=_gpt_failure_reason_from_status_code(exc.status_code),
+            server_grounding_revision=server_grounding_revision,
+            caller_grounding_revision=caller_grounding_revision,
         )
         raise
     except Exception:
-        _finalize_gpt_quote_observability(request, success=False, failure_reason="internal_error")
+        _finalize_gpt_quote_observability(
+            request,
+            success=False,
+            failure_reason="internal_error",
+            server_grounding_revision=server_grounding_revision,
+            caller_grounding_revision=caller_grounding_revision,
+        )
         raise
 
     _finalize_gpt_quote_observability(
@@ -1010,6 +1084,8 @@ async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
         confidence_level=str(response.get("confidence_level") or ""),
         risk_flags=[str(flag) for flag in response.get("risk_flags") or []],
         failure_reason=None,
+        server_grounding_revision=server_grounding_revision,
+        caller_grounding_revision=caller_grounding_revision,
     )
     return response
 

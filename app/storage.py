@@ -174,6 +174,8 @@ class GptQuoteObservabilityRecord(TypedDict):
     risk_flags: List[str]
     failure_reason: Optional[str]
     latency_ms: Optional[int]
+    server_grounding_revision: Optional[str]
+    caller_grounding_revision: Optional[str]
 
 
 def _validate_deposit_status(value: Any) -> None:
@@ -536,7 +538,9 @@ def init_db() -> None:
                 confidence_level TEXT,
                 risk_flags_json TEXT NOT NULL,
                 failure_reason TEXT,
-                latency_ms INTEGER
+                latency_ms INTEGER,
+                server_grounding_revision TEXT,
+                caller_grounding_revision TEXT
             )
             """
         )
@@ -557,6 +561,8 @@ def init_db() -> None:
         _try_add_column(conn, "quote_requests", "deposit_refund_status TEXT")
         _try_add_column(conn, "quote_requests", "deposit_refunded_at TEXT")
         _try_add_column(conn, "quote_requests", "deposit_last_error TEXT")
+        _try_add_column(conn, "gpt_quote_observability", "server_grounding_revision TEXT")
+        _try_add_column(conn, "gpt_quote_observability", "caller_grounding_revision TEXT")
 
         # Add scheduling columns to jobs table
         _try_add_column(conn, "jobs", "scheduled_start TEXT")
@@ -1828,8 +1834,10 @@ def save_gpt_quote_observability_event(record: GptQuoteObservabilityRecord) -> N
                 confidence_level,
                 risk_flags_json,
                 failure_reason,
-                latency_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                latency_ms,
+                server_grounding_revision,
+                caller_grounding_revision
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["timestamp"],
@@ -1842,6 +1850,8 @@ def save_gpt_quote_observability_event(record: GptQuoteObservabilityRecord) -> N
                 json.dumps(record.get("risk_flags") or [], ensure_ascii=False),
                 record.get("failure_reason"),
                 record.get("latency_ms"),
+                record.get("server_grounding_revision"),
+                record.get("caller_grounding_revision"),
             ),
         )
         conn.commit()
@@ -1864,7 +1874,9 @@ def list_gpt_quote_observability(limit: int = 50) -> List[GptQuoteObservabilityR
                 confidence_level,
                 risk_flags_json,
                 failure_reason,
-                latency_ms
+                latency_ms,
+                server_grounding_revision,
+                caller_grounding_revision
             FROM gpt_quote_observability
             ORDER BY timestamp DESC, event_id DESC
             LIMIT ?
@@ -1893,6 +1905,8 @@ def list_gpt_quote_observability(limit: int = 50) -> List[GptQuoteObservabilityR
                 "risk_flags": risk_flags,
                 "failure_reason": row["failure_reason"],
                 "latency_ms": row["latency_ms"],
+                "server_grounding_revision": row["server_grounding_revision"],
+                "caller_grounding_revision": row["caller_grounding_revision"],
             }
         )
     return items
