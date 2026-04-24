@@ -2,6 +2,8 @@
 
 This file documents production deployment expectations that are operationally important but should not be rediscovered during incidents.
 
+For unified post-release verification steps, use `docs/RELEASE_VERIFICATION_CHECKLIST.md`.
+
 ---
 
 ## Production Hosting

@@ -77,6 +77,8 @@ Note the refresh in the release notes or internal ops log:
 GPT grounding refreshed for vX.Y.Z – files: [list], manifest hash: [hash from manifest.json]
 ```
 
+Also record completion in the canonical release checklist log: `docs/RELEASE_VERIFICATION_CHECKLIST.md`.
+
 ---
 
 ## Rollback
