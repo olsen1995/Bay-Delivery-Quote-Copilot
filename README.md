@@ -20,6 +20,12 @@ The internal advisor GPT grounding workflow is documented in `docs/gpt/`:
 
 Export script: `tools/export_gpt_grounding_pack.py`
 
+## Release Verification Workflow
+
+Use the canonical post-release checklist at:
+
+- [`docs/RELEASE_VERIFICATION_CHECKLIST.md`](docs/RELEASE_VERIFICATION_CHECKLIST.md)
+
 ## Render Parity and Release Signals (2026-03-14)
 
 - Live Render behavior was audited against current `main` before further pricing work.
