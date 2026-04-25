@@ -189,7 +189,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ### Refreshing the dependency lockfile
 
 CI and production live-safe smoke install app dependencies from `requirements.lock.txt`.
-Refresh it by running the manual GitHub Actions workflow `.github/workflows/generate_requirements_lock.yml` on the target branch; the workflow uses `pip-compile` from `requirements.txt` and commits only `requirements.lock.txt` when the lockfile changes.
+CI checks that `requirements.lock.txt` is current before installing locked dependencies.
+Refresh it whenever `requirements.txt` changes by running the manual GitHub Actions workflow `.github/workflows/generate_requirements_lock.yml` on the target branch; the workflow uses `pip-compile` from `requirements.txt` and commits only `requirements.lock.txt` when the lockfile changes.
 
 ---
 
