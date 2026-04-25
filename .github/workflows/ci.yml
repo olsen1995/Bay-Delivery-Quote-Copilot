@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock.txt
           pip install pytest
 
 
@@ -37,7 +37,7 @@ jobs:
 
       - name: Run security audit (project dependencies only)
         run: |
-          pip-audit -r requirements.txt
+          pip-audit -r requirements.lock.txt
 
   playwright-smoke:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
 
       - name: Install dependencies and Playwright
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock.txt
           pip install pytest pytest-asyncio playwright
 
       - name: Install Chromium browser for Playwright

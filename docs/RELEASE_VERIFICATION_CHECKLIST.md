@@ -1,6 +1,6 @@
 # Release Verification Checklist (Canonical)
 
-Use this checklist after an important production release or GPT grounding-related change.  
+Use this checklist after an important production release or GPT grounding-related change.
 Audience: Austin + Dan (internal operators).
 
 This checklist consolidates existing repo runbooks into one operator sequence. It does **not** replace detailed source docs; it links back to them.
