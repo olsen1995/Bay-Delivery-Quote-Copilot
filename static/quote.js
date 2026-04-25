@@ -3,6 +3,7 @@ let lastQuoteId = null;
 let lastAcceptToken = null;
 let lastBookingToken = null;
 let persistedReviewMode = false;
+let quoteCalculationInFlight = false;
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const persistedReviewHelperText = "You are reviewing a saved estimate prepared for you. Review the pricing and request details here, and contact Bay Delivery if anything needs to be updated.";
 
@@ -272,13 +273,17 @@ function persistedReviewFields() {
 
 function setPersistedReviewMode(isActive) {
   persistedReviewMode = Boolean(isActive);
-  const calcBtn = el("btnCalc");
   const clearBtn = el("btnClear");
-  if (calcBtn) calcBtn.disabled = persistedReviewMode;
+  syncQuoteCalculateActionState();
   if (clearBtn) clearBtn.disabled = persistedReviewMode;
   persistedReviewFields().forEach((field) => {
     field.disabled = persistedReviewMode;
   });
+}
+
+function syncQuoteCalculateActionState() {
+  const calcBtn = el("btnCalc");
+  if (calcBtn) calcBtn.disabled = persistedReviewMode || quoteCalculationInFlight;
 }
 
 function getLoadSizeLabel(bagCount) {
@@ -800,6 +805,11 @@ el("btnCalc").addEventListener("click", async () => {
     showBox("flowStatus", persistedReviewHelperText, "info");
     return;
   }
+  if (quoteCalculationInFlight) return;
+
+  quoteCalculationInFlight = true;
+  syncQuoteCalculateActionState();
+
   hideBox("resultBox");
   hideBox("uploadStatus");
   hideBox("decisionStatus");
@@ -929,6 +939,8 @@ el("btnCalc").addEventListener("click", async () => {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
+    quoteCalculationInFlight = false;
+    syncQuoteCalculateActionState();
     el("loadingState").classList.add("hidden");
   }
 });

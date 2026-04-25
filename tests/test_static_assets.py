@@ -45,7 +45,8 @@ def test_quote_page_supports_persisted_review_mode() -> None:
     assert "let persistedReviewMode = false;" in quote_js
     assert "persistedReviewHelperText" in quote_js
     assert "setPersistedReviewMode(true);" in quote_js
-    assert 'if (calcBtn) calcBtn.disabled = persistedReviewMode;' in quote_js
+    assert "function syncQuoteCalculateActionState()" in quote_js
+    assert "calcBtn.disabled = persistedReviewMode || quoteCalculationInFlight;" in quote_js
     assert 'if (clearBtn) clearBtn.disabled = persistedReviewMode;' in quote_js
     assert 'if (persistedReviewMode) {' in quote_js
     assert 'showBox("flowStatus", persistedReviewHelperText, "info");' in quote_js
@@ -59,6 +60,28 @@ def test_quote_page_supports_persisted_review_mode() -> None:
     assert 'showPersistedQuoteReview' in quote_js
     assert "You are reviewing a saved estimate prepared for you. Review the pricing and request details here, and contact Bay Delivery if anything needs to be updated." in quote_js
     assert 'const res = await fetch("/quote/calculate"' in quote_js
+
+
+def test_quote_page_guards_duplicate_calculation_submits() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    guard_check = "if (quoteCalculationInFlight) return;"
+    guard_set = "quoteCalculationInFlight = true;"
+    fetch_call = 'const res = await fetch("/quote/calculate"'
+    cleanup_reset = "quoteCalculationInFlight = false;"
+    calc_handler = 'el("btnCalc").addEventListener("click", async () => {'
+    calc_handler_start = quote_js.index(calc_handler)
+    finally_start = quote_js.index("} finally {", calc_handler_start)
+
+    assert "let quoteCalculationInFlight = false;" in quote_js
+    assert "function syncQuoteCalculateActionState()" in quote_js
+    assert "calcBtn.disabled = persistedReviewMode || quoteCalculationInFlight;" in quote_js
+    assert guard_check in quote_js
+    assert guard_set in quote_js
+    assert cleanup_reset in quote_js
+    assert quote_js.index(guard_check, calc_handler_start) < quote_js.index('hideBox("resultBox");', calc_handler_start)
+    assert quote_js.index(guard_set) < quote_js.index(fetch_call)
+    assert quote_js.index(cleanup_reset, finally_start) > finally_start
 
 
 def test_quote_page_phase_a_guidance_copy_is_present() -> None:
