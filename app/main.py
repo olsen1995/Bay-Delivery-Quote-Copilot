@@ -70,6 +70,7 @@ from app.storage import (
     save_attachment,
     save_gpt_quote_observability_event,
     update_job,
+    update_job_costing,
 )
 from app.update_fields import InvalidJobTransition, InvalidQuoteRequestTransition
 from app.audit_log import init_audit_table, log_admin_audit
@@ -1297,6 +1298,34 @@ class JobCloseoutPayload(BaseModel):
         return v
 
 
+class JobCostingPayload(BaseModel):
+    actual_hours: Optional[float] = Field(None, ge=0)
+    actual_crew_size: Optional[int] = Field(None, ge=1)
+    actual_disposal_cost_cad: Optional[float] = Field(None, ge=0)
+    actual_fuel_cost_cad: Optional[float] = Field(None, ge=0)
+    final_amount_collected_cad: Optional[float] = Field(None, ge=0)
+    payment_method: Optional[Literal["cash", "emt", "other", "not_paid_yet", "partial_payment"]] = None
+    job_profit_status: Optional[Literal["underquoted", "fair", "profitable", "painful"]] = None
+    quote_accuracy_note: Optional[str] = Field(None, max_length=500)
+    disposal_receipt_note: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("payment_method", "job_profit_status", mode="before")
+    @classmethod
+    def normalize_vocab(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip().lower()
+            return stripped or None
+        return v
+
+    @field_validator("quote_accuracy_note", "disposal_receipt_note", mode="before")
+    @classmethod
+    def strip_optional_text(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped or None
+        return v
+
+
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
     provided_fields = getattr(body, "model_fields_set", None)
@@ -1747,6 +1776,61 @@ def admin_complete_job(request: Request, job_id: str, body: Optional[JobCloseout
         if "not found" in error_msg.lower():
             raise HTTPException(status_code=404, detail=error_msg)
         raise HTTPException(status_code=400, detail=error_msg)
+
+
+@app.post("/admin/api/jobs/{job_id}/costing")
+def admin_update_job_costing(request: Request, job_id: str, body: JobCostingPayload):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    existing = get_job(job_id)
+    if not existing:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_job_costing",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary="Job not found",
+        )
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if existing.get("status") != "completed":
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_job_costing",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary="Job costing is only editable for completed jobs",
+        )
+        raise HTTPException(status_code=409, detail="Job costing is only editable for completed jobs.")
+
+    fields = body.model_dump(exclude_unset=True)
+    try:
+        job = update_job_costing(job_id, **fields)
+    except ValueError as exc:
+        log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_job_costing",
+            entity_type="job",
+            record_id=job_id,
+            success=False,
+            error_summary=str(exc),
+        )
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    log_admin_audit(
+        operator_username=operator_username,
+        action_type="update_job_costing",
+        entity_type="job",
+        record_id=job_id,
+        success=True,
+    )
+    return {"ok": True, "job": job}
 
 
 @app.post("/admin/api/jobs/{job_id}/cancel")

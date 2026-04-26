@@ -276,6 +276,34 @@ function money(n) {
 const formatMoneyOrDash = (value) =>
   value == null || value === "" ? "-" : money(value);
 
+function nullableNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatInputNumber(value) {
+  return value === null || value === undefined || value === "" ? "" : String(value);
+}
+
+function selectedValue(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function costingKnownCosts(job) {
+  const disposal = nullableNumber(job.actual_disposal_cost_cad);
+  const fuel = nullableNumber(job.actual_fuel_cost_cad);
+  if (disposal === null && fuel === null) return null;
+  return (disposal || 0) + (fuel || 0);
+}
+
+function advisoryKnownCostProfit(job) {
+  const collected = nullableNumber(job.final_amount_collected_cad);
+  const costs = costingKnownCosts(job);
+  if (collected === null || costs === null) return null;
+  return collected - costs;
+}
+
 function normalizeStatusKey(status) {
   const key = (status || "").toLowerCase();
   if (key === "customer_pending") return "pending";
@@ -656,6 +684,124 @@ function renderRequests(items) {
   box.appendChild(table);
 }
 
+function createCostingField(label, field, type, value, options) {
+  const wrap = document.createElement("label");
+  wrap.className = "jobCostingField";
+  const labelText = document.createElement("span");
+  labelText.textContent = label;
+  wrap.appendChild(labelText);
+
+  if (options && options.length) {
+    const select = document.createElement("select");
+    select.name = field;
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "Not recorded";
+    select.appendChild(blank);
+    options.forEach(([optionValue, optionLabel]) => {
+      const option = document.createElement("option");
+      option.value = optionValue;
+      option.textContent = optionLabel;
+      select.appendChild(option);
+    });
+    select.value = selectedValue(value);
+    wrap.appendChild(select);
+    return wrap;
+  }
+
+  const input = document.createElement("input");
+  input.name = field;
+  input.type = type || "text";
+  input.value = formatInputNumber(value);
+  if (type === "number") {
+    input.min = "0";
+    input.step = field === "actual_crew_size" ? "1" : "0.01";
+  }
+  wrap.appendChild(input);
+  return wrap;
+}
+
+function createJobCostingPanel(job) {
+  const panel = document.createElement("div");
+  panel.className = "jobCostingPanel";
+
+  const title = document.createElement("div");
+  title.className = "quoteDetailTitle";
+  title.textContent = "Completed Job Costing";
+  panel.appendChild(title);
+
+  const collected = nullableNumber(job.final_amount_collected_cad);
+  const knownCosts = costingKnownCosts(job);
+  const profit = advisoryKnownCostProfit(job);
+  const margin = collected && profit !== null ? `${((profit / collected) * 100).toFixed(1)}%` : "-";
+
+  const summary = document.createElement("div");
+  summary.className = "jobCostingSummary";
+  [
+    ["Quoted cash", formatMoneyOrDash(job.cash_total_cad)],
+    ["Quoted EMT", formatMoneyOrDash(job.emt_total_cad)],
+    ["Final collected", formatMoneyOrDash(job.final_amount_collected_cad)],
+    ["Actual costs recorded", knownCosts === null ? "-" : formatMoney(knownCosts)],
+    ["Advisory known-cost profit", profit === null ? "-" : formatMoney(profit)],
+    ["Advisory known-cost margin", margin],
+  ].forEach(([label, value]) => {
+    const item = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = label;
+    const text = document.createElement("span");
+    text.textContent = value;
+    item.append(strong, text);
+    summary.appendChild(item);
+  });
+  panel.appendChild(summary);
+
+  const note = document.createElement("div");
+  note.className = "small muted";
+  note.textContent = "Admin-only advisory feedback. Known-cost margin uses saved final collected, disposal, and fuel costs only; quote calculation is unchanged.";
+  panel.appendChild(note);
+
+  const form = document.createElement("form");
+  form.className = "jobCostingForm";
+  form.append(
+    createCostingField("Actual hours", "actual_hours", "number", job.actual_hours),
+    createCostingField("Actual crew size", "actual_crew_size", "number", job.actual_crew_size),
+    createCostingField("Actual disposal cost CAD", "actual_disposal_cost_cad", "number", job.actual_disposal_cost_cad),
+    createCostingField("Actual fuel cost CAD", "actual_fuel_cost_cad", "number", job.actual_fuel_cost_cad),
+    createCostingField("Final amount collected CAD", "final_amount_collected_cad", "number", job.final_amount_collected_cad),
+    createCostingField("Payment method", "payment_method", "text", job.payment_method, [
+      ["cash", "Cash"],
+      ["emt", "EMT / e-transfer"],
+      ["other", "Other"],
+      ["not_paid_yet", "Not paid yet"],
+      ["partial_payment", "Partial payment"],
+    ]),
+    createCostingField("Profit status", "job_profit_status", "text", job.job_profit_status, [
+      ["underquoted", "Underquoted"],
+      ["fair", "Fair"],
+      ["profitable", "Profitable"],
+      ["painful", "Painful"],
+    ]),
+    createCostingField("Quote accuracy note", "quote_accuracy_note", "text", job.quote_accuracy_note),
+    createCostingField("Disposal receipt note", "disposal_receipt_note", "text", job.disposal_receipt_note)
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "jobCostingActions";
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.className = "actionBtn";
+  saveBtn.textContent = "Save Costing";
+  actions.appendChild(saveBtn);
+  form.appendChild(actions);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveJobCosting(job.job_id, form);
+  });
+
+  panel.appendChild(form);
+  return panel;
+}
+
 function renderJobs(items) {
   const box = document.getElementById("jobsBox");
   if (!items || items.length === 0) return addEmptyState(box, "No jobs yet.");
@@ -791,6 +937,15 @@ function renderJobs(items) {
 
     tr.append(tdJob, tdQuote, tdStatus, tdCustomer, tdAddress, tdTotal, tdScheduled, tdSync, tdActions);
     tbody.appendChild(tr);
+    if (j.status === "completed") {
+      const costingRow = document.createElement("tr");
+      costingRow.className = "jobCostingRow";
+      const costingCell = document.createElement("td");
+      costingCell.colSpan = 9;
+      costingCell.appendChild(createJobCostingPanel(j));
+      costingRow.appendChild(costingCell);
+      tbody.appendChild(costingRow);
+    }
   });
 
   box.appendChild(table);
@@ -959,6 +1114,48 @@ async function completeJob(jobId) {
     } else {
       alert("Error completing job: " + await resp.text());
     }
+  } catch (err) {
+    alert("Error: " + err);
+  }
+}
+
+function costingPayloadFromForm(form) {
+  const data = new FormData(form);
+  const numberField = (field) => {
+    const value = String(data.get(field) || "").trim();
+    return value ? Number(value) : null;
+  };
+  const textField = (field) => {
+    const value = String(data.get(field) || "").trim();
+    return value || null;
+  };
+  return {
+    actual_hours: numberField("actual_hours"),
+    actual_crew_size: numberField("actual_crew_size"),
+    actual_disposal_cost_cad: numberField("actual_disposal_cost_cad"),
+    actual_fuel_cost_cad: numberField("actual_fuel_cost_cad"),
+    final_amount_collected_cad: numberField("final_amount_collected_cad"),
+    payment_method: textField("payment_method"),
+    job_profit_status: textField("job_profit_status"),
+    quote_accuracy_note: textField("quote_accuracy_note"),
+    disposal_receipt_note: textField("disposal_receipt_note")
+  };
+}
+
+async function saveJobCosting(jobId, form) {
+  try {
+    const resp = await fetch(`/admin/api/jobs/${jobId}/costing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(costingPayloadFromForm(form))
+    });
+    const text = await resp.text();
+    if (resp.ok) {
+      setLine(statusLine, "ok", "Saved job costing.");
+      refreshAll();
+      return;
+    }
+    alert("Error saving job costing: " + text);
   } catch (err) {
     alert("Error: " + err);
   }

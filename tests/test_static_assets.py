@@ -377,6 +377,38 @@ def test_admin_page_includes_job_lifecycle_controls() -> None:
     assert "/admin/api/jobs/${jobId}/complete" in admin_js
 
 
+def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    assert "record completed-job costing feedback" in admin_html
+    assert "Completed Job Costing" in admin_js
+    assert "Quoted cash" in admin_js
+    assert "Quoted EMT" in admin_js
+    assert "Final collected" in admin_js
+    assert "Actual costs recorded" in admin_js
+    assert "Advisory known-cost profit" in admin_js
+    assert "Admin-only advisory feedback." in admin_js
+    assert "/admin/api/jobs/${jobId}/costing" in admin_js
+    assert 'if (j.status === "completed")' in admin_js
+    assert "payment_method" in admin_js
+    for option in [
+        '["cash", "Cash"]',
+        '["emt", "EMT / e-transfer"]',
+        '["other", "Other"]',
+        '["not_paid_yet", "Not paid yet"]',
+        '["partial_payment", "Partial payment"]',
+    ]:
+        assert option in admin_js
+    assert "job_profit_status" in admin_js
+    assert ".jobCostingPanel" in admin_css
+    assert "/costing" not in mobile_html
+    assert "/costing" not in mobile_js
+
+
 def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
     mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
