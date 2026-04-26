@@ -15,6 +15,25 @@ def test_homepage_images_exist():
         assert img_path.exists(), f"Referenced image {img} does not exist"
 
 
+def test_static_pages_reference_shared_favicon() -> None:
+    """Ensure routed HTML pages avoid browser fallback requests for /favicon.ico."""
+    favicon_path = Path("static/favicon.svg")
+    assert favicon_path.exists()
+    assert favicon_path.stat().st_size < 2048
+
+    favicon_link = '<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />'
+    for html_path in [
+        Path("static/index.html"),
+        Path("static/quote.html"),
+        Path("static/admin.html"),
+        Path("static/admin_mobile.html"),
+        Path("static/admin_uploads.html"),
+    ]:
+        content = html_path.read_text(encoding="utf-8")
+        assert favicon_link in content, f"{html_path} is missing the shared favicon link"
+        assert "/favicon.ico" not in content
+
+
 def test_quote_page_uses_external_script_for_csp():
     """Ensure quote page JS executes under CSP by avoiding inline script blocks."""
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
