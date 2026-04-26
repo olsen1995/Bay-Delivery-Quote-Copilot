@@ -40,6 +40,15 @@ DEPOSIT_STATUS_CHECK_SQL = (
 PAYMENT_ATTEMPT_STATUS_CHECK_SQL = (
     "status IN ('created', 'pending', 'succeeded', 'failed', 'expired')"
 )
+ALLOWED_JOB_COSTING_PAYMENT_METHODS = ("cash", "emt", "other")
+ALLOWED_JOB_PROFIT_STATUSES = ("underquoted", "fair", "profitable", "painful")
+JOB_COSTING_PAYMENT_METHOD_CHECK_SQL = (
+    "payment_method IS NULL OR payment_method IN ('cash', 'emt', 'other')"
+)
+JOB_PROFIT_STATUS_CHECK_SQL = (
+    "job_profit_status IS NULL OR job_profit_status IN "
+    "('underquoted', 'fair', 'profitable', 'painful')"
+)
 
 
 class Job(TypedDict):
@@ -67,6 +76,15 @@ class Job(TypedDict):
     completed_at: Optional[str]
     cancelled_at: Optional[str]
     closeout_notes: Optional[str]
+    actual_hours: Optional[float]
+    actual_crew_size: Optional[int]
+    actual_disposal_cost_cad: Optional[float]
+    actual_fuel_cost_cad: Optional[float]
+    final_amount_collected_cad: Optional[float]
+    payment_method: Optional[str]
+    job_profit_status: Optional[str]
+    quote_accuracy_note: Optional[str]
+    disposal_receipt_note: Optional[str]
     scheduling_context: NotRequired[Dict[str, Any]]
 
 
@@ -437,7 +455,7 @@ def init_db() -> None:
         )
 
         conn.execute(
-            """
+            f"""
             CREATE TABLE IF NOT EXISTS jobs (
                 job_id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
@@ -453,7 +471,16 @@ def init_db() -> None:
                 cash_total_cad REAL NOT NULL,
                 emt_total_cad REAL NOT NULL,
                 request_json TEXT NOT NULL,
-                notes TEXT
+                notes TEXT,
+                actual_hours REAL,
+                actual_crew_size INTEGER,
+                actual_disposal_cost_cad REAL,
+                actual_fuel_cost_cad REAL,
+                final_amount_collected_cad REAL,
+                payment_method TEXT CHECK ({JOB_COSTING_PAYMENT_METHOD_CHECK_SQL}),
+                job_profit_status TEXT CHECK ({JOB_PROFIT_STATUS_CHECK_SQL}),
+                quote_accuracy_note TEXT,
+                disposal_receipt_note TEXT
             )
             """
         )
@@ -574,6 +601,15 @@ def init_db() -> None:
         _try_add_column(conn, "jobs", "completed_at TEXT")
         _try_add_column(conn, "jobs", "cancelled_at TEXT")
         _try_add_column(conn, "jobs", "closeout_notes TEXT")
+        _try_add_column(conn, "jobs", "actual_hours REAL")
+        _try_add_column(conn, "jobs", "actual_crew_size INTEGER")
+        _try_add_column(conn, "jobs", "actual_disposal_cost_cad REAL")
+        _try_add_column(conn, "jobs", "actual_fuel_cost_cad REAL")
+        _try_add_column(conn, "jobs", "final_amount_collected_cad REAL")
+        _try_add_column(conn, "jobs", f"payment_method TEXT CHECK ({JOB_COSTING_PAYMENT_METHOD_CHECK_SQL})")
+        _try_add_column(conn, "jobs", f"job_profit_status TEXT CHECK ({JOB_PROFIT_STATUS_CHECK_SQL})")
+        _try_add_column(conn, "jobs", "quote_accuracy_note TEXT")
+        _try_add_column(conn, "jobs", "disposal_receipt_note TEXT")
 
         # Add assistant-compatible linkage to attachments without breaking existing uploads
         _try_add_column(conn, "attachments", "analysis_id TEXT")
@@ -1312,8 +1348,11 @@ def save_job(job: Dict[str, Any]) -> None:
              service_type, cash_total_cad, emt_total_cad, request_json, notes,
              scheduled_start, scheduled_end, google_calendar_event_id,
              calendar_sync_status, calendar_last_error, started_at,
-             completed_at, cancelled_at, closeout_notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             completed_at, cancelled_at, closeout_notes,
+             actual_hours, actual_crew_size, actual_disposal_cost_cad,
+             actual_fuel_cost_cad, final_amount_collected_cad, payment_method,
+             job_profit_status, quote_accuracy_note, disposal_receipt_note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job["job_id"],
@@ -1340,6 +1379,15 @@ def save_job(job: Dict[str, Any]) -> None:
                 job.get("completed_at"),
                 job.get("cancelled_at"),
                 job.get("closeout_notes"),
+                job.get("actual_hours"),
+                job.get("actual_crew_size"),
+                job.get("actual_disposal_cost_cad"),
+                job.get("actual_fuel_cost_cad"),
+                job.get("final_amount_collected_cad"),
+                job.get("payment_method"),
+                job.get("job_profit_status"),
+                job.get("quote_accuracy_note"),
+                job.get("disposal_receipt_note"),
             ),
         )
         conn.commit()
@@ -1389,6 +1437,15 @@ def get_job(job_id: str) -> Optional[Job]:
         "completed_at": row_dict["completed_at"] if "completed_at" in row_dict else None,
         "cancelled_at": row_dict["cancelled_at"] if "cancelled_at" in row_dict else None,
         "closeout_notes": row_dict["closeout_notes"] if "closeout_notes" in row_dict else None,
+        "actual_hours": row_dict["actual_hours"] if "actual_hours" in row_dict else None,
+        "actual_crew_size": row_dict["actual_crew_size"] if "actual_crew_size" in row_dict else None,
+        "actual_disposal_cost_cad": row_dict["actual_disposal_cost_cad"] if "actual_disposal_cost_cad" in row_dict else None,
+        "actual_fuel_cost_cad": row_dict["actual_fuel_cost_cad"] if "actual_fuel_cost_cad" in row_dict else None,
+        "final_amount_collected_cad": row_dict["final_amount_collected_cad"] if "final_amount_collected_cad" in row_dict else None,
+        "payment_method": row_dict["payment_method"] if "payment_method" in row_dict else None,
+        "job_profit_status": row_dict["job_profit_status"] if "job_profit_status" in row_dict else None,
+        "quote_accuracy_note": row_dict["quote_accuracy_note"] if "quote_accuracy_note" in row_dict else None,
+        "disposal_receipt_note": row_dict["disposal_receipt_note"] if "disposal_receipt_note" in row_dict else None,
         "scheduling_context": _build_job_scheduling_context(
             row_dict["request_id"],
             fallback_notes=row_dict["notes"],
@@ -1558,6 +1615,104 @@ def update_job(
         conn.close()
 
     # Return updated job
+    return cast(Optional[Job], get_job(job_id))
+
+
+_JOB_COSTING_FIELDS = {
+    "actual_hours",
+    "actual_crew_size",
+    "actual_disposal_cost_cad",
+    "actual_fuel_cost_cad",
+    "final_amount_collected_cad",
+    "payment_method",
+    "job_profit_status",
+    "quote_accuracy_note",
+    "disposal_receipt_note",
+}
+
+
+def _nullable_nonnegative_float(value: Any, field_name: str) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    parsed = float(value)
+    if parsed < 0:
+        raise ValueError(f"{field_name} must be non-negative")
+    return parsed
+
+
+def _nullable_positive_int(value: Any, field_name: str) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    parsed_float = float(value)
+    if not parsed_float.is_integer():
+        raise ValueError(f"{field_name} must be a whole number")
+    parsed = int(parsed_float)
+    if parsed < 1:
+        raise ValueError(f"{field_name} must be at least 1")
+    return parsed
+
+
+def _nullable_limited_text(value: Any, max_length: int = 500) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text[:max_length]
+
+
+def update_job_costing(job_id: str, **fields: Any) -> Optional[Job]:
+    existing = get_job(job_id)
+    if not existing:
+        return None
+
+    unknown_fields = set(fields) - _JOB_COSTING_FIELDS
+    if unknown_fields:
+        raise ValueError(f"Unsupported job costing fields: {', '.join(sorted(unknown_fields))}")
+
+    normalized: Dict[str, Any] = {}
+    for field_name, raw_value in fields.items():
+        if field_name in {
+            "actual_hours",
+            "actual_disposal_cost_cad",
+            "actual_fuel_cost_cad",
+            "final_amount_collected_cad",
+        }:
+            normalized[field_name] = _nullable_nonnegative_float(raw_value, field_name)
+            continue
+        if field_name == "actual_crew_size":
+            normalized[field_name] = _nullable_positive_int(raw_value, field_name)
+            continue
+        if field_name == "payment_method":
+            value = _nullable_limited_text(raw_value, max_length=20)
+            value = value.lower() if value is not None else None
+            if value is not None and value not in ALLOWED_JOB_COSTING_PAYMENT_METHODS:
+                raise ValueError("payment_method must be one of: cash, emt, other")
+            normalized[field_name] = value
+            continue
+        if field_name == "job_profit_status":
+            value = _nullable_limited_text(raw_value, max_length=30)
+            value = value.lower() if value is not None else None
+            if value is not None and value not in ALLOWED_JOB_PROFIT_STATUSES:
+                raise ValueError("job_profit_status must be one of: underquoted, fair, profitable, painful")
+            normalized[field_name] = value
+            continue
+        normalized[field_name] = _nullable_limited_text(raw_value, max_length=500)
+
+    if not normalized:
+        return existing
+
+    updates = [f"{field_name} = ?" for field_name in normalized]
+    params = list(normalized.values())
+    params.append(job_id)
+
+    conn = _connect()
+    try:
+        conn.execute(f"UPDATE jobs SET {', '.join(updates)} WHERE job_id = ?", params)
+        conn.commit()
+    finally:
+        conn.close()
+
     return cast(Optional[Job], get_job(job_id))
 
 

@@ -211,6 +211,62 @@ label {
 	background: rgba(18, 32, 51, 0.04);
 }
 
+.jobCostingRow td {
+	background: rgba(246, 248, 251, 0.72);
+}
+
+.jobCostingPanel {
+	display: grid;
+	gap: 12px;
+	padding: 14px;
+	border: 1px solid rgba(217, 225, 234, 0.9);
+	border-radius: 14px;
+	background: #fff;
+}
+
+.jobCostingSummary {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.jobCostingSummary > div {
+	display: grid;
+	gap: 3px;
+	padding: 10px;
+	border: 1px solid rgba(217, 225, 234, 0.75);
+	border-radius: 12px;
+	background: rgba(18, 32, 51, 0.03);
+}
+
+.jobCostingSummary strong {
+	font-size: 0.78rem;
+	text-transform: uppercase;
+	color: var(--ink-muted);
+}
+
+.jobCostingForm {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.jobCostingField {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+}
+
+.jobCostingField span {
+	font-size: 0.84rem;
+}
+
+.jobCostingActions {
+	display: flex;
+	align-items: end;
+	justify-content: flex-end;
+}
+
 .dashboardGrid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -607,6 +663,11 @@ textarea:focus {
 }
 
 @media (max-width: 980px) {
+	.jobCostingSummary,
+	.jobCostingForm {
+		grid-template-columns: 1fr;
+	}
+
 	.assistantKeyGrid {
 		grid-template-columns: 1fr;
 	}
