@@ -40,10 +40,11 @@ DEPOSIT_STATUS_CHECK_SQL = (
 PAYMENT_ATTEMPT_STATUS_CHECK_SQL = (
     "status IN ('created', 'pending', 'succeeded', 'failed', 'expired')"
 )
-ALLOWED_JOB_COSTING_PAYMENT_METHODS = ("cash", "emt", "other")
+ALLOWED_JOB_COSTING_PAYMENT_METHODS = ("cash", "emt", "other", "not_paid_yet", "partial_payment")
 ALLOWED_JOB_PROFIT_STATUSES = ("underquoted", "fair", "profitable", "painful")
 JOB_COSTING_PAYMENT_METHOD_CHECK_SQL = (
-    "payment_method IS NULL OR payment_method IN ('cash', 'emt', 'other')"
+    "payment_method IS NULL OR payment_method IN "
+    "('cash', 'emt', 'other', 'not_paid_yet', 'partial_payment')"
 )
 JOB_PROFIT_STATUS_CHECK_SQL = (
     "job_profit_status IS NULL OR job_profit_status IN "
@@ -1687,7 +1688,9 @@ def update_job_costing(job_id: str, **fields: Any) -> Optional[Job]:
             value = _nullable_limited_text(raw_value, max_length=20)
             value = value.lower() if value is not None else None
             if value is not None and value not in ALLOWED_JOB_COSTING_PAYMENT_METHODS:
-                raise ValueError("payment_method must be one of: cash, emt, other")
+                raise ValueError(
+                    "payment_method must be one of: cash, emt, other, not_paid_yet, partial_payment"
+                )
             normalized[field_name] = value
             continue
         if field_name == "job_profit_status":

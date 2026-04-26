@@ -772,6 +772,8 @@ function createJobCostingPanel(job) {
       ["cash", "Cash"],
       ["emt", "EMT / e-transfer"],
       ["other", "Other"],
+      ["not_paid_yet", "Not paid yet"],
+      ["partial_payment", "Partial payment"],
     ]),
     createCostingField("Profit status", "job_profit_status", "text", job.job_profit_status, [
       ["underquoted", "Underquoted"],

@@ -395,6 +395,14 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "/admin/api/jobs/${jobId}/costing" in admin_js
     assert 'if (j.status === "completed")' in admin_js
     assert "payment_method" in admin_js
+    for option in [
+        '["cash", "Cash"]',
+        '["emt", "EMT / e-transfer"]',
+        '["other", "Other"]',
+        '["not_paid_yet", "Not paid yet"]',
+        '["partial_payment", "Partial payment"]',
+    ]:
+        assert option in admin_js
     assert "job_profit_status" in admin_js
     assert ".jobCostingPanel" in admin_css
     assert "/costing" not in mobile_html

@@ -13,6 +13,11 @@ from app.main import app
 @pytest.fixture
 def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     db_path = tmp_path / "job-costing.sqlite3"
+    for suffix in ("", "-wal", "-shm"):
+        path = Path(f"{db_path}{suffix}")
+        if path.exists():
+            path.unlink()
+    monkeypatch.setattr(storage, "DB_PATH", storage.DEFAULT_DB_PATH)
     monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
     storage._TABLE_COL_CACHE.clear()
     storage.init_db()
@@ -172,6 +177,25 @@ def test_admin_job_costing_validates_numeric_and_vocab_fields(
     assert bad_numeric.status_code == 422
     assert bad_payment.status_code == 422
     assert bad_profit.status_code == 422
+
+
+@pytest.mark.parametrize("payment_method", ["cash", "emt", "other", "not_paid_yet", "partial_payment"])
+def test_admin_job_costing_accepts_payment_method_values(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    payment_method: str,
+) -> None:
+    _seed_job(job_id=f"job-{payment_method}")
+
+    resp = client.post(
+        f"/admin/api/jobs/job-{payment_method}/costing",
+        headers=admin_headers,
+        json={"payment_method": payment_method},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["job"]["payment_method"] == payment_method
 
 
 def test_admin_job_costing_is_completed_job_only(
