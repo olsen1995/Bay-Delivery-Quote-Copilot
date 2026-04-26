@@ -275,11 +275,49 @@ a:hover { opacity: 0.9; }
   padding: 24px;
   box-shadow: var(--shadow);
 }
+.trustFaqSection{
+  margin-top: 24px;
+  margin-bottom: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.sectionIntro{
+  margin-bottom: 14px;
+}
 .sectionDesc{
   margin: 0 0 16px 0;
   color: var(--muted);
   font-size: 15px;
   line-height: 1.5;
+}
+.trustFaqGrid{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 760px){
+  .trustFaqGrid{ grid-template-columns: 1fr; }
+}
+.trustFaqItem{
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+}
+.trustFaqItem strong{
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 14px;
+}
+.trustFaqItem p{
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 .workGallery{
   display: grid;
@@ -457,7 +495,6 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
   color: white;
   font-weight: 700;
   z-index: 999;
-  display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;

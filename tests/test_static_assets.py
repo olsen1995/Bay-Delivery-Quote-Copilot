@@ -103,6 +103,49 @@ def test_quote_page_guards_duplicate_calculation_submits() -> None:
     assert quote_js.index(cleanup_reset, finally_start) > finally_start
 
 
+def test_quote_failure_copy_includes_manual_contact_fallback() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    assert "function manualQuoteFallbackMessage(reason)" in quote_js
+    assert "call or text Dan at (705) 303-4409" in quote_js
+    assert "BayDeliveryNB@gmail.com" in quote_js
+    assert "Bay Delivery can review the job manually." in quote_js
+    assert 'manualQuoteFallbackMessage("Request timed out. Please try again in a moment.")' in quote_js
+    assert 'manualQuoteFallbackMessage("Failed to contact server.")' in quote_js
+
+
+def test_homepage_includes_service_area_trust_faq_copy() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+
+    assert 'class="trustFaqSection"' in index_html
+    assert "Service Area &amp; Estimate Notes" in index_html
+    assert "Bay Delivery serves North Bay and surrounding areas." in index_html
+    assert "Out-of-town jobs may include additional travel cost." in index_html
+    assert "Photos are optional but helpful." in index_html
+    assert "Pricing may be confirmed or adjusted if job details differ" in index_html
+    assert "Cash has no HST." in index_html
+    assert "EMT/e-transfer includes 13% HST" in index_html
+    assert "Submitting a booking request does not confirm the job." in index_html
+    assert "Bay Delivery follows up before the booking is locked in." in index_html
+    assert ".trustFaqSection" in site_css
+    assert ".trustFaqGrid" in site_css
+
+
+def test_sticky_mobile_call_is_hidden_by_default_and_mobile_only() -> None:
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+
+    base_match = re.search(r"\.stickyMobileCall\{(?P<body>.*?)\n\}", site_css, re.DOTALL)
+    assert base_match is not None
+    base_body = base_match.group("body")
+    assert "display: none;" in base_body
+    assert "display: flex;" not in base_body
+    assert re.search(
+        r"@media \(max-width: 720px\)\{\s*\.stickyMobileCall\{ display: flex; \}\s*\}",
+        site_css,
+    )
+
+
 def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
     quote_js = Path("static/quote.js").read_text(encoding="utf-8")
