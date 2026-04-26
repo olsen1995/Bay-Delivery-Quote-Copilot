@@ -120,7 +120,9 @@ def test_homepage_includes_service_area_trust_faq_copy() -> None:
 
     assert 'class="trustFaqSection"' in index_html
     assert "Service Area &amp; Estimate Notes" in index_html
-    assert "Bay Delivery serves North Bay and surrounding areas." in index_html
+    assert "Bay Delivery serves North Bay and surrounding areas" in index_html
+    for area_name in ["Callander", "Powassan", "Bonfield", "Astorville", "Corbeil", "Sturgeon Falls"]:
+        assert area_name in index_html
     assert "Out-of-town jobs may include additional travel cost." in index_html
     assert "Photos are optional but helpful." in index_html
     assert "Pricing may be confirmed or adjusted if job details differ" in index_html
