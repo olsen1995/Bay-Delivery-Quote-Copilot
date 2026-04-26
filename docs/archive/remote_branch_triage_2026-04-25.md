@@ -2,8 +2,8 @@
 
 Context: after PR #222 merged and stale merged branches were cleaned up, the remaining old remote branches were triaged before deletion.
 
-Future tasks to preserve:
-- Quote duplicate-submit guard: `feature/prevent-duplicate-quote-submissions` shows a still-useful idea. Implement from current `main`, not by reviving the branch. Keep scope frontend-only: prevent duplicate `/quote/calculate` submits while a quote calculation is in flight, with focused static/browser coverage.
+Archive notes to preserve:
+- Quote duplicate-submit guard: completed by PR #224 from current `main`. The old `feature/prevent-duplicate-quote-submissions` branch was not revived. PR #224 added a frontend-only in-flight guard around `/quote/calculate` and focused static coverage.
 - Optional admin mobile smoke resilience: `chore/post-157-audit-hardening` suggests making mobile admin smoke assertions less brittle. Only revisit if copy churn causes false failures, and preserve the current ops-only/no quote-authoring boundary.
 
 Covered or stale branches safe to delete:
