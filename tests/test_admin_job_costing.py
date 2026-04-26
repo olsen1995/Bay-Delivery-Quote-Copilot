@@ -62,6 +62,7 @@ def _seed_job(job_id: str = "job-costing", status: str = "completed") -> dict[st
 
 def test_job_costing_schema_backfills_nullable_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     db_path = tmp_path / "legacy-job-costing.sqlite3"
+    monkeypatch.setattr(storage, "DB_PATH", storage.DEFAULT_DB_PATH)
     monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
     storage._TABLE_COL_CACHE.clear()
 
@@ -107,6 +108,7 @@ def test_job_costing_schema_backfills_nullable_fields(monkeypatch: pytest.Monkey
         "actual_fuel_cost_cad",
         "final_amount_collected_cad",
         "payment_method",
+        "payment_status",
         "job_profit_status",
         "quote_accuracy_note",
         "disposal_receipt_note",
@@ -126,6 +128,7 @@ def test_save_and_read_job_costing_data(isolated_db: Path) -> None:
         actual_fuel_cost_cad=18.75,
         final_amount_collected_cad=260.0,
         payment_method="emt",
+        payment_status="paid_in_full",
         job_profit_status="profitable",
         quote_accuracy_note="Quoted baseline was close.",
         disposal_receipt_note="Receipt in Drive.",
@@ -138,6 +141,7 @@ def test_save_and_read_job_costing_data(isolated_db: Path) -> None:
     assert updated["actual_fuel_cost_cad"] == 18.75
     assert updated["final_amount_collected_cad"] == 260.0
     assert updated["payment_method"] == "emt"
+    assert updated["payment_status"] == "paid_in_full"
     assert updated["job_profit_status"] == "profitable"
     assert updated["quote_accuracy_note"] == "Quoted baseline was close."
     assert updated["disposal_receipt_note"] == "Receipt in Drive."
@@ -168,6 +172,11 @@ def test_admin_job_costing_validates_numeric_and_vocab_fields(
         headers=admin_headers,
         json={"payment_method": "cheque"},
     )
+    bad_payment_status = client.post(
+        "/admin/api/jobs/job-costing/costing",
+        headers=admin_headers,
+        json={"payment_status": "overdue"},
+    )
     bad_profit = client.post(
         "/admin/api/jobs/job-costing/costing",
         headers=admin_headers,
@@ -176,10 +185,11 @@ def test_admin_job_costing_validates_numeric_and_vocab_fields(
 
     assert bad_numeric.status_code == 422
     assert bad_payment.status_code == 422
+    assert bad_payment_status.status_code == 422
     assert bad_profit.status_code == 422
 
 
-@pytest.mark.parametrize("payment_method", ["cash", "emt", "other", "not_paid_yet", "partial_payment"])
+@pytest.mark.parametrize("payment_method", ["cash", "emt", "other"])
 def test_admin_job_costing_accepts_payment_method_values(
     client: TestClient,
     admin_headers: dict[str, str],
@@ -196,6 +206,54 @@ def test_admin_job_costing_accepts_payment_method_values(
 
     assert resp.status_code == 200
     assert resp.json()["job"]["payment_method"] == payment_method
+
+
+@pytest.mark.parametrize("payment_method", ["not_paid_yet", "partial_payment"])
+def test_admin_job_costing_rejects_payment_status_values_as_payment_methods(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    payment_method: str,
+) -> None:
+    _seed_job(job_id=f"job-{payment_method}")
+
+    resp = client.post(
+        f"/admin/api/jobs/job-{payment_method}/costing",
+        headers=admin_headers,
+        json={"payment_method": payment_method},
+    )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.parametrize("payment_status", ["not_paid_yet", "partial_payment", "paid_in_full"])
+def test_admin_job_costing_accepts_payment_status_values(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    payment_status: str,
+) -> None:
+    _seed_job(job_id=f"job-{payment_status}")
+
+    resp = client.post(
+        f"/admin/api/jobs/job-{payment_status}/costing",
+        headers=admin_headers,
+        json={"payment_status": payment_status},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["job"]["payment_status"] == payment_status
+    assert resp.json()["job"]["payment_method"] is None
+
+
+def test_storage_job_costing_rejects_invalid_payment_method_and_status(isolated_db: Path) -> None:
+    _seed_job()
+
+    with pytest.raises(ValueError, match="payment_method must be one of: cash, emt, other"):
+        storage.update_job_costing("job-costing", payment_method="not_paid_yet")
+
+    with pytest.raises(ValueError, match="payment_status must be one of: not_paid_yet, partial_payment, paid_in_full"):
+        storage.update_job_costing("job-costing", payment_status="cash")
 
 
 def test_admin_job_costing_is_completed_job_only(
@@ -229,6 +287,7 @@ def test_admin_job_costing_preserves_quoted_totals(
             "final_amount_collected_cad": 275.0,
             "actual_disposal_cost_cad": 60.0,
             "payment_method": "cash",
+            "payment_status": "partial_payment",
             "job_profit_status": "fair",
         },
     )
@@ -242,6 +301,7 @@ def test_admin_job_costing_preserves_quoted_totals(
     assert stored["cash_total_cad"] == 240.0
     assert stored["emt_total_cad"] == 271.2
     assert stored["final_amount_collected_cad"] == 275.0
+    assert stored["payment_status"] == "partial_payment"
 
 
 def test_job_costing_backup_export_import_round_trip(
@@ -258,6 +318,7 @@ def test_job_costing_backup_export_import_round_trip(
         actual_fuel_cost_cad=20,
         final_amount_collected_cad=300,
         payment_method="other",
+        payment_status="not_paid_yet",
         job_profit_status="underquoted",
         quote_accuracy_note="More stairs than expected.",
         disposal_receipt_note="Scale ticket saved.",
@@ -267,6 +328,7 @@ def test_job_costing_backup_export_import_round_trip(
     job_rows = payload["tables"]["jobs"]
     exported = next(row for row in job_rows if row["job_id"] == "job-costing")
     assert exported["actual_hours"] == 4.0
+    assert exported["payment_status"] == "not_paid_yet"
     assert exported["job_profit_status"] == "underquoted"
 
     restored_path = tmp_path / "restored-job-costing.sqlite3"
@@ -284,6 +346,114 @@ def test_job_costing_backup_export_import_round_trip(
     assert restored["actual_fuel_cost_cad"] == 20.0
     assert restored["final_amount_collected_cad"] == 300.0
     assert restored["payment_method"] == "other"
+    assert restored["payment_status"] == "not_paid_yet"
     assert restored["job_profit_status"] == "underquoted"
     assert restored["quote_accuracy_note"] == "More stairs than expected."
     assert restored["disposal_receipt_note"] == "Scale ticket saved."
+
+
+def test_legacy_payment_method_status_values_migrate_to_payment_status(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-payment-status.sqlite3"
+    monkeypatch.setattr(storage, "DB_PATH", storage.DEFAULT_DB_PATH)
+    monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
+    storage._TABLE_COL_CACHE.clear()
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE jobs (
+                job_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                quote_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                customer_name TEXT,
+                customer_phone TEXT,
+                job_address TEXT,
+                job_description_customer TEXT,
+                job_description_internal TEXT,
+                service_type TEXT NOT NULL,
+                cash_total_cad REAL NOT NULL,
+                emt_total_cad REAL NOT NULL,
+                request_json TEXT NOT NULL,
+                notes TEXT,
+                payment_method TEXT CHECK (
+                    payment_method IS NULL OR payment_method IN
+                    ('cash', 'emt', 'other', 'not_paid_yet', 'partial_payment')
+                )
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO jobs (
+                job_id, created_at, status, quote_id, request_id,
+                service_type, cash_total_cad, emt_total_cad, request_json, notes, payment_method
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy-partial",
+                "2026-04-26T10:00:00",
+                "completed",
+                "quote-legacy",
+                "request-legacy",
+                "dump_run",
+                240.0,
+                271.2,
+                "{}",
+                None,
+                "partial_payment",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    storage.init_db()
+
+    migrated = storage.require_job("legacy-partial")
+    assert migrated["payment_method"] is None
+    assert migrated["payment_status"] == "partial_payment"
+
+
+def test_legacy_backup_payment_method_status_values_import_as_payment_status(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-backup-payment-status.sqlite3"
+    monkeypatch.setattr(storage, "DB_PATH", storage.DEFAULT_DB_PATH)
+    monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
+    storage._TABLE_COL_CACHE.clear()
+    storage.init_db()
+
+    payload = {
+        "meta": {"format": "bay-delivery-sqlite-backup", "version": 1},
+        "tables": {
+            "jobs": [
+                {
+                    "job_id": "legacy-backup-partial",
+                    "created_at": "2026-04-26T10:00:00",
+                    "status": "completed",
+                    "quote_id": "quote-backup-legacy",
+                    "request_id": "request-backup-legacy",
+                    "service_type": "dump_run",
+                    "cash_total_cad": 240.0,
+                    "emt_total_cad": 271.2,
+                    "request_json": {"service_type": "dump_run"},
+                    "payment_method": "partial_payment",
+                }
+            ]
+        },
+    }
+
+    result = storage.import_db_from_json(payload)
+
+    assert result["ok"] is True
+    restored = storage.require_job("legacy-backup-partial")
+    assert restored["payment_method"] is None
+    assert restored["payment_status"] == "partial_payment"

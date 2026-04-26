@@ -1304,12 +1304,13 @@ class JobCostingPayload(BaseModel):
     actual_disposal_cost_cad: Optional[float] = Field(None, ge=0)
     actual_fuel_cost_cad: Optional[float] = Field(None, ge=0)
     final_amount_collected_cad: Optional[float] = Field(None, ge=0)
-    payment_method: Optional[Literal["cash", "emt", "other", "not_paid_yet", "partial_payment"]] = None
+    payment_method: Optional[Literal["cash", "emt", "other"]] = None
+    payment_status: Optional[Literal["not_paid_yet", "partial_payment", "paid_in_full"]] = None
     job_profit_status: Optional[Literal["underquoted", "fair", "profitable", "painful"]] = None
     quote_accuracy_note: Optional[str] = Field(None, max_length=500)
     disposal_receipt_note: Optional[str] = Field(None, max_length=500)
 
-    @field_validator("payment_method", "job_profit_status", mode="before")
+    @field_validator("payment_method", "payment_status", "job_profit_status", mode="before")
     @classmethod
     def normalize_vocab(cls, v):
         if isinstance(v, str):

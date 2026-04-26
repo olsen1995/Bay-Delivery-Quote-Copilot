@@ -394,15 +394,22 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "Admin-only advisory feedback." in admin_js
     assert "/admin/api/jobs/${jobId}/costing" in admin_js
     assert 'if (j.status === "completed")' in admin_js
+    assert "Payment method" in admin_js
     assert "payment_method" in admin_js
-    for option in [
+    for method_option in [
         '["cash", "Cash"]',
         '["emt", "EMT / e-transfer"]',
         '["other", "Other"]',
+    ]:
+        assert method_option in admin_js
+    assert "Payment status" in admin_js
+    assert "payment_status" in admin_js
+    for status_option in [
         '["not_paid_yet", "Not paid yet"]',
         '["partial_payment", "Partial payment"]',
+        '["paid_in_full", "Paid in full"]',
     ]:
-        assert option in admin_js
+        assert status_option in admin_js
     assert "job_profit_status" in admin_js
     assert ".jobCostingPanel" in admin_css
     assert "/costing" not in mobile_html
