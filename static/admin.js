@@ -772,8 +772,11 @@ function createJobCostingPanel(job) {
       ["cash", "Cash"],
       ["emt", "EMT / e-transfer"],
       ["other", "Other"],
+    ]),
+    createCostingField("Payment status", "payment_status", "text", job.payment_status, [
       ["not_paid_yet", "Not paid yet"],
       ["partial_payment", "Partial payment"],
+      ["paid_in_full", "Paid in full"],
     ]),
     createCostingField("Profit status", "job_profit_status", "text", job.job_profit_status, [
       ["underquoted", "Underquoted"],
@@ -1136,6 +1139,7 @@ function costingPayloadFromForm(form) {
     actual_fuel_cost_cad: numberField("actual_fuel_cost_cad"),
     final_amount_collected_cad: numberField("final_amount_collected_cad"),
     payment_method: textField("payment_method"),
+    payment_status: textField("payment_status"),
     job_profit_status: textField("job_profit_status"),
     quote_accuracy_note: textField("quote_accuracy_note"),
     disposal_receipt_note: textField("disposal_receipt_note")
