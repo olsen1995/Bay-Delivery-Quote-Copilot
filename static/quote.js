@@ -135,6 +135,10 @@ function friendlyQuoteErrorMessage(detail) {
   return detail;
 }
 
+function manualQuoteFallbackMessage(reason) {
+  return reason + "\n\nIf the online quote does not come through, call or text Dan at (705) 303-4409, or email BayDeliveryNB@gmail.com with your job details. Bay Delivery can review the job manually.";
+}
+
 function focusFirstInvalidField(missing) {
   if (!missing || missing.length === 0) return;
   const first = el(missing[0].id);
@@ -931,9 +935,9 @@ el("btnCalc").addEventListener("click", async () => {
     scrollToElement("resultBox");
   } catch (err) {
     if (err.name === "AbortError") {
-      showBox("resultBox", "Error:\nRequest timed out. Please try again in a moment.");
+      showBox("resultBox", "Error:\n" + manualQuoteFallbackMessage("Request timed out. Please try again in a moment."));
     } else {
-      showBox("resultBox", "Error:\nFailed to contact server.");
+      showBox("resultBox", "Error:\n" + manualQuoteFallbackMessage("Failed to contact server."));
     }
   } finally {
     if (timeoutId) {
