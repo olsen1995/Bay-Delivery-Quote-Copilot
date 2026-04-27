@@ -230,8 +230,9 @@ function addEmptyState(container, text) {
   container.appendChild(div);
 }
 
-async function fetchJSON(path) {
-  const res = await fetch(path, { headers: authHeaders() });
+async function fetchJSON(path, options = {}) {
+  const headers = Object.assign({}, authHeaders(), options.headers || {});
+  const res = await fetch(path, Object.assign({}, options, { headers }));
 
   // Some auth failures come back non-JSON; handle safely.
   const text = await res.text();
@@ -510,8 +511,7 @@ async function expireQuote(quoteId) {
 
   try {
     await fetchJSON(`/admin/api/quotes/${encodeURIComponent(quoteId)}/expire`, {
-      method: "POST",
-      headers: authHeaders()
+      method: "POST"
     });
     setLine(statusLine, "ok", "Marked expired:", quoteId);
     await refreshAll();

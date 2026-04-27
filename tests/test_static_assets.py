@@ -423,7 +423,14 @@ def test_desktop_admin_includes_pending_estimate_cleanup_controls_only() -> None
 
     assert "Mark expired" in admin_js
     assert "This keeps the record but removes it from active review." in admin_js
+    assert "async function fetchJSON(path, options = {})" in admin_js
+    assert "Object.assign({}, options, { headers })" in admin_js
     assert "/admin/api/quotes/${encodeURIComponent(quoteId)}/expire" in admin_js
+    expire_function = re.search(r"async function expireQuote\(quoteId\) \{(?P<body>.*?)\n\}\n\nfunction renderQuotes", admin_js, re.S)
+    assert expire_function is not None
+    expire_body = expire_function.group("body")
+    assert "/admin/api/quotes/${encodeURIComponent(quoteId)}/expire" in expire_body
+    assert 'method: "POST"' in expire_body
     assert 'expired: "Expired"' in admin_js
     assert "Mark expired" not in mobile_html
     assert "Mark expired" not in mobile_js
