@@ -34,8 +34,13 @@ class SizeLimitRule:
 
 
 def extract_client_ip(request: Request) -> str:
-    # If X-Forwarded-For is explicitly trusted (proxy scenario), use it preferentially
-    if os.getenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "").lower() == "true":
+    client_host = _direct_client_host(request)
+
+    # Only trust X-Forwarded-For when both header trust and direct proxy trust are configured.
+    if (
+        os.getenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "").strip().lower() == "true"
+        and _direct_peer_is_trusted_proxy(client_host)
+    ):
         x_forwarded_for = (request.headers.get("x-forwarded-for") or "").strip()
         if x_forwarded_for:
             first_ip = x_forwarded_for.split(",", 1)[0].strip()
@@ -48,11 +53,43 @@ def extract_client_ip(request: Request) -> str:
                 pass
 
     # Prefer request.client.host by default (secure, from direct connection)
+    if client_host:
+        return client_host
+
+    return "unknown"
+
+
+def _direct_client_host(request: Request) -> str | None:
     client = request.client
     if client and client.host:
         return client.host
+    return None
 
-    return "unknown"
+
+def _direct_peer_is_trusted_proxy(client_host: str | None) -> bool:
+    trusted_proxy_cidrs = (os.getenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS") or "").strip()
+    if not client_host or not trusted_proxy_cidrs:
+        return False
+
+    try:
+        client_ip = ipaddress.ip_address(client_host)
+    except ValueError:
+        return False
+
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for raw_network in trusted_proxy_cidrs.split(","):
+        network = raw_network.strip()
+        if not network:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(network, strict=False))
+        except ValueError:
+            return False
+
+    if not networks:
+        return False
+
+    return any(client_ip in network for network in networks)
 
 
 def _match_rule(method: str, path: str, rule) -> bool:

@@ -5,7 +5,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-from app.abuse_controls import RateLimitMiddleware, RequestSizeLimitMiddleware, SizeLimitRule
+from app.abuse_controls import RateLimitMiddleware, RequestSizeLimitMiddleware, SizeLimitRule, extract_client_ip
 from app import main as main_module
 from app.main import app
 
@@ -65,8 +65,9 @@ class TestRateLimits:
     def setup_method(self):
         # Enable X-Forwarded-For trust for rate limit tests that use it
         os.environ["BAYDELIVERY_TRUST_X_FORWARDED_FOR"] = "true"
+        os.environ["BAYDELIVERY_TRUSTED_PROXY_CIDRS"] = "127.0.0.1/32"
         os.environ["GPT_INTERNAL_API_TOKEN"] = "test-gpt-token"
-        self.client = TestClient(app)
+        self.client = TestClient(app, client=("127.0.0.1", 50000))
         self.client.__enter__()
         _clear_rate_limit_buckets(self.client)
 
@@ -74,6 +75,7 @@ class TestRateLimits:
         self.client.__exit__(None, None, None)
         # Clean up the environment variable
         os.environ.pop("BAYDELIVERY_TRUST_X_FORWARDED_FOR", None)
+        os.environ.pop("BAYDELIVERY_TRUSTED_PROXY_CIDRS", None)
         os.environ.pop("GPT_INTERNAL_API_TOKEN", None)
 
     def test_same_ip_exceeding_limit_returns_429(self):
@@ -165,7 +167,12 @@ def test_admin_failed_attempt_bucket_removed_when_all_attempts_expire(monkeypatc
     assert client_ip not in main_module._admin_failed_attempts
 
 
-def _build_request(path: str, headers: list[tuple[bytes, bytes]], messages: list[dict[str, object]]) -> Request:
+def _build_request(
+    path: str,
+    headers: list[tuple[bytes, bytes]],
+    messages: list[dict[str, object]],
+    client: tuple[str, int] = ("127.0.0.1", 12345),
+) -> Request:
     queue = deque(messages)
 
     async def receive() -> dict[str, object]:
@@ -181,11 +188,76 @@ def _build_request(path: str, headers: list[tuple[bytes, bytes]], messages: list
         "raw_path": path.encode("utf-8"),
         "query_string": b"",
         "headers": headers,
-        "client": ("127.0.0.1", 12345),
+        "client": client,
         "server": ("testserver", 80),
         "scheme": "http",
     }
     return Request(scope, receive)
+
+
+def test_extract_client_ip_ignores_forwarded_for_when_trusted_proxy_allowlist_missing(monkeypatch):
+    monkeypatch.setenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "true")
+    monkeypatch.delenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", raising=False)
+    request = _build_request(
+        "/quote/calculate",
+        headers=[(b"x-forwarded-for", b"203.0.113.10")],
+        messages=[],
+        client=("198.51.100.10", 12345),
+    )
+
+    assert extract_client_ip(request) == "198.51.100.10"
+
+
+def test_extract_client_ip_uses_forwarded_for_when_direct_peer_is_trusted_proxy(monkeypatch):
+    monkeypatch.setenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "true")
+    monkeypatch.setenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", "127.0.0.1/32")
+    request = _build_request(
+        "/quote/calculate",
+        headers=[(b"x-forwarded-for", b"203.0.113.10")],
+        messages=[],
+        client=("127.0.0.1", 12345),
+    )
+
+    assert extract_client_ip(request) == "203.0.113.10"
+
+
+def test_extract_client_ip_preserves_leftmost_forwarded_for_when_trust_granted(monkeypatch):
+    monkeypatch.setenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "true")
+    monkeypatch.setenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", "127.0.0.1/32")
+    request = _build_request(
+        "/quote/calculate",
+        headers=[(b"x-forwarded-for", b"203.0.113.10, 198.51.100.22, 192.0.2.33")],
+        messages=[],
+        client=("127.0.0.1", 12345),
+    )
+
+    assert extract_client_ip(request) == "203.0.113.10"
+
+
+def test_extract_client_ip_ignores_forwarded_for_when_direct_peer_is_not_trusted_proxy(monkeypatch):
+    monkeypatch.setenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "true")
+    monkeypatch.setenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", "127.0.0.1/32")
+    request = _build_request(
+        "/quote/calculate",
+        headers=[(b"x-forwarded-for", b"203.0.113.10")],
+        messages=[],
+        client=("198.51.100.10", 12345),
+    )
+
+    assert extract_client_ip(request) == "198.51.100.10"
+
+
+def test_extract_client_ip_ignores_forwarded_for_when_trusted_proxy_allowlist_is_malformed(monkeypatch):
+    monkeypatch.setenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "true")
+    monkeypatch.setenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", "127.0.0.1/32,not-a-network")
+    request = _build_request(
+        "/quote/calculate",
+        headers=[(b"x-forwarded-for", b"203.0.113.10")],
+        messages=[],
+        client=("127.0.0.1", 12345),
+    )
+
+    assert extract_client_ip(request) == "127.0.0.1"
 
 
 async def _echo_body_size(request: Request) -> JSONResponse:
