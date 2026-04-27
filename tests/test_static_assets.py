@@ -253,6 +253,22 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
     assert 'adminProtectedDashboard.style.display = "none";' in admin_js
 
 
+def test_desktop_admin_uses_branded_dark_theme_tokens() -> None:
+    """Ensure desktop admin visual polish stays aligned with the public Bay Delivery theme."""
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+
+    for expected in [
+        "--admin-bg: #0b0b10;",
+        "--brand-red-deep: #7a1020;",
+        "radial-gradient(1200px 680px at 18% -10%, rgba(122, 16, 32, 0.34), transparent 62%)",
+        "linear-gradient(155deg, rgba(18, 22, 31, 0.96), rgba(122, 16, 32, 0.9))",
+        "linear-gradient(135deg, var(--brand-red-deep), var(--brand-red))",
+        ".status-expired",
+        "::placeholder",
+    ]:
+        assert expected in admin_css
+
+
 def test_admin_page_includes_quote_detail_risk_panel() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
