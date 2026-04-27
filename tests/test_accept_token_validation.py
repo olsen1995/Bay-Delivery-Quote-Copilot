@@ -340,6 +340,131 @@ class AcceptTokenValidationTests(unittest.TestCase):
         self.assertEqual(401, decision_resp.status_code)
         self.assertEqual(decision_resp.json(), {"detail": "Invalid or expired accept token."})
 
+    def test_backup_export_redacts_and_restore_rotates_workflow_tokens(self) -> None:
+        quote_id = "backup-token-quote"
+        request_id = "backup-token-request"
+        created_at = datetime.now(timezone.utc).isoformat()
+        old_accept_token = "exported-accept-token"
+        old_booking_token = "exported-booking-token"
+
+        request_payload = {
+            "customer_name": "Backup Token",
+            "customer_phone": "705-555-9900",
+            "job_address": "10 Backup St",
+            "service_type": "haul_away",
+        }
+        response_payload = {
+            "cash_total_cad": 125.0,
+            "emt_total_cad": 141.25,
+            "job_description_internal": "Backup token restore test",
+            "disclaimer": "test",
+        }
+
+        storage.save_quote(
+            {
+                "quote_id": quote_id,
+                "created_at": created_at,
+                "request": request_payload,
+                "response": response_payload,
+                "accept_token": old_accept_token,
+            }
+        )
+        storage.save_quote_request(
+            {
+                "request_id": request_id,
+                "created_at": created_at,
+                "status": "customer_accepted",
+                "quote_id": quote_id,
+                "customer_name": "Backup Token",
+                "customer_phone": "705-555-9900",
+                "job_address": "10 Backup St",
+                "job_description_customer": "Restore token handling",
+                "job_description_internal": "Backup token restore test",
+                "service_type": "haul_away",
+                "cash_total_cad": 125.0,
+                "emt_total_cad": 141.25,
+                "request_json": request_payload,
+                "notes": "Keep the record intact",
+                "requested_job_date": None,
+                "requested_time_window": None,
+                "customer_accepted_at": created_at,
+                "admin_approved_at": None,
+                "accept_token": old_accept_token,
+                "booking_token": old_booking_token,
+                "booking_token_created_at": created_at,
+            }
+        )
+
+        payload = storage.export_db_to_json()
+        exported_quote = next(row for row in payload["tables"]["quotes"] if row["quote_id"] == quote_id)
+        exported_request = next(row for row in payload["tables"]["quote_requests"] if row["request_id"] == request_id)
+
+        self.assertEqual(storage.BACKUP_TOKEN_ROTATION_PLACEHOLDER, exported_quote["accept_token"])
+        self.assertEqual(storage.BACKUP_TOKEN_ROTATION_PLACEHOLDER, exported_request["accept_token"])
+        self.assertEqual(storage.BACKUP_TOKEN_ROTATION_PLACEHOLDER, exported_request["booking_token"])
+
+        restore_payload = json.loads(json.dumps(payload))
+        restore_quote = next(row for row in restore_payload["tables"]["quotes"] if row["quote_id"] == quote_id)
+        restore_request = next(row for row in restore_payload["tables"]["quote_requests"] if row["request_id"] == request_id)
+        restore_quote["accept_token"] = old_accept_token
+        restore_request["accept_token"] = old_accept_token
+        restore_request["booking_token"] = old_booking_token
+
+        storage.DB_PATH = Path(self._tmp.name) / "restored-token-test.sqlite3"
+        storage.init_db()
+        result = storage.import_db_from_json(restore_payload)
+
+        restored_quote = storage.get_quote_record(quote_id)
+        restored_request = storage.get_quote_request_record(request_id)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(1, result["restored"]["quotes"])
+        self.assertEqual(1, result["restored"]["quote_requests"])
+        self.assertIsNotNone(restored_quote)
+        self.assertIsNotNone(restored_request)
+        assert restored_quote is not None
+        assert restored_request is not None
+        self.assertEqual("Backup Token", restored_request["customer_name"])
+        self.assertEqual("customer_accepted", restored_request["status"])
+        self.assertNotEqual(old_accept_token, restored_quote["accept_token"])
+        self.assertNotEqual(old_booking_token, restored_request["booking_token"])
+        self.assertEqual(restored_quote["accept_token"], restored_request["accept_token"])
+        self.assertNotEqual(created_at, restored_request["booking_token_created_at"])
+
+        stale_view_resp = self.client.get(
+            f"/quote/{quote_id}/view",
+            headers={"Authorization": f"Bearer {old_accept_token}"},
+        )
+        self.assertEqual(401, stale_view_resp.status_code)
+
+        valid_view_resp = self.client.get(
+            f"/quote/{quote_id}/view",
+            headers={"Authorization": f"Bearer {restored_quote['accept_token']}"},
+        )
+        self.assertEqual(200, valid_view_resp.status_code)
+
+        stale_booking_resp = self.client.post(
+            f"/quote/{quote_id}/booking",
+            json={
+                "booking_token": old_booking_token,
+                "requested_job_date": "2099-01-01",
+                "requested_time_window": "morning",
+                "notes": None,
+            },
+        )
+        self.assertEqual(401, stale_booking_resp.status_code)
+
+        valid_booking_resp = self.client.post(
+            f"/quote/{quote_id}/booking",
+            json={
+                "booking_token": restored_request["booking_token"],
+                "requested_job_date": "2099-01-01",
+                "requested_time_window": "morning",
+                "notes": None,
+            },
+        )
+        self.assertEqual(200, valid_booking_resp.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

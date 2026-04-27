@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, NotRequired, Optional, Tuple, TypedDict, cast
+from uuid import uuid4
 
 from app.update_fields import validate_quote_request_transition
 
@@ -18,6 +19,7 @@ UNSET = object()
 
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
+BACKUP_TOKEN_ROTATION_PLACEHOLDER = "__bay_delivery_token_rotated_on_import__"
 
 ALLOWED_DEPOSIT_STATUSES = (
     "not_required",
@@ -2238,6 +2240,7 @@ def export_db_to_json() -> Dict[str, Any]:
             out_rows: List[Dict[str, Any]] = []
             for r in rows:
                 row_dict: Dict[str, Any] = dict(r)
+                row_dict = _sanitize_backup_tokens(table, row_dict)
                 for k in list(row_dict.keys()):
                     if k.endswith("_json") or k in {"request_json", "response_json"}:
                         v = row_dict.get(k)
@@ -2257,6 +2260,64 @@ def export_db_to_json() -> Dict[str, Any]:
     return payload
 
 
+def _sanitize_backup_tokens(table: str, row: Dict[str, Any]) -> Dict[str, Any]:
+    if table == "quotes" and row.get("accept_token"):
+        row["accept_token"] = BACKUP_TOKEN_ROTATION_PLACEHOLDER
+    elif table == "quote_requests":
+        for token_field in ("accept_token", "booking_token"):
+            if row.get(token_field):
+                row[token_field] = BACKUP_TOKEN_ROTATION_PLACEHOLDER
+    return row
+
+
+def _fresh_workflow_token() -> str:
+    return str(uuid4())
+
+
+def _restore_token_created_at() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _has_exported_token(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _rotate_restored_quote_tokens(
+    row: Dict[str, Any],
+    quote_accept_tokens_by_id: Dict[str, str],
+) -> Dict[str, Any]:
+    rotated = dict(row)
+    token = _fresh_workflow_token()
+    rotated["accept_token"] = token
+
+    quote_id = rotated.get("quote_id")
+    if quote_id is not None:
+        quote_accept_tokens_by_id[str(quote_id)] = token
+
+    return rotated
+
+
+def _rotate_restored_quote_request_tokens(
+    row: Dict[str, Any],
+    quote_accept_tokens_by_id: Dict[str, str],
+    restored_at: str,
+) -> Dict[str, Any]:
+    rotated = dict(row)
+
+    quote_id = rotated.get("quote_id")
+    quote_accept_token = quote_accept_tokens_by_id.get(str(quote_id)) if quote_id is not None else None
+    if quote_accept_token is not None:
+        rotated["accept_token"] = quote_accept_token
+    elif _has_exported_token(rotated.get("accept_token")):
+        rotated["accept_token"] = _fresh_workflow_token()
+
+    if _has_exported_token(rotated.get("booking_token")):
+        rotated["booking_token"] = _fresh_workflow_token()
+        rotated["booking_token_created_at"] = restored_at
+
+    return rotated
+
+
 def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Backup payload must be a JSON object")
@@ -2267,6 +2328,8 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     init_db()
     restored_counts: Dict[str, int] = {}
+    quote_accept_tokens_by_id: Dict[str, str] = {}
+    restored_at = _restore_token_created_at()
 
     conn = _connect()
     try:
@@ -2313,6 +2376,9 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                     raw = _normalize_job_payment_fields(raw)
                 if safe_table == "quotes":
                     raw = _normalize_quote_admin_fields(raw)
+                    raw = _rotate_restored_quote_tokens(raw, quote_accept_tokens_by_id)
+                if safe_table == "quote_requests":
+                    raw = _rotate_restored_quote_request_tokens(raw, quote_accept_tokens_by_id, restored_at)
 
                 row_vals: List[Any] = []
                 for col in cols:

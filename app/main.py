@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any, Literal, Optional
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 try:
@@ -476,11 +477,32 @@ def _enforce_admin_post_origin(request: Request) -> None:
         return
 
     origin = (request.headers.get("origin") or "").strip()
-    if not origin:
+    referer = (request.headers.get("referer") or "").strip()
+    sec_fetch_site = (request.headers.get("sec-fetch-site") or "").strip().lower()
+
+    if origin:
+        if origin not in allow_list:
+            raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
         return
 
-    if origin not in allow_list:
+    if sec_fetch_site and sec_fetch_site != "same-origin":
         raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
+
+    if referer:
+        referer_origin = _origin_from_referer(referer)
+        if referer_origin not in allow_list:
+            raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
+        return
+
+
+def _origin_from_referer(referer: str) -> str | None:
+    try:
+        parsed = urlsplit(referer)
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def _resolve_authenticated_admin_username(request: Request) -> str | None:
@@ -862,7 +884,7 @@ def _drive_snapshot_db() -> dict:
 
     payload = export_db_to_json()
     payload["meta"]["exported_at"] = _now_local_iso()
-    payload["meta"]["db_path"] = str(storage._resolve_db_path())
+    payload["meta"].pop("db_path", None)
 
     filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -2010,7 +2032,7 @@ def admin_db_export(request: Request):
     try:
         payload = export_db_to_json()
         payload["meta"]["exported_at"] = _now_local_iso()
-        payload["meta"]["db_path"] = str(storage._resolve_db_path())
+        payload["meta"].pop("db_path", None)
 
         filename = f"bay_delivery_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")

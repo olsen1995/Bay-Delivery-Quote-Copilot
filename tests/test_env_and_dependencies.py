@@ -160,6 +160,76 @@ def test_admin_post_allows_missing_origin_for_compatibility(monkeypatch):
     assert "Google Drive not configured." in resp.json()["detail"]
 
 
+def test_admin_post_allows_missing_origin_with_same_origin_browser_context(monkeypatch):
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD": "secret",
+        }
+    )
+    monkeypatch.setattr(main, "_drive_enabled", lambda: False)
+
+    with TestClient(main.app) as client:
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers={
+                "Authorization": _admin_basic_header(),
+                "Sec-Fetch-Site": "same-origin",
+            },
+            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+        )
+
+    assert resp.status_code == 501
+    assert "Google Drive not configured." in resp.json()["detail"]
+
+
+def test_admin_post_rejects_missing_origin_with_cross_site_browser_context(monkeypatch):
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD": "secret",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers={
+                "Authorization": _admin_basic_header(),
+                "Sec-Fetch-Site": "cross-site",
+            },
+            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+        )
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Origin not allowed for admin POST request."
+
+
+def test_admin_post_rejects_missing_origin_with_hostile_referer(monkeypatch):
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD": "secret",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers={
+                "Authorization": _admin_basic_header(),
+                "Referer": "https://evil.example.com/admin",
+            },
+            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+        )
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Origin not allowed for admin POST request."
+
+
 def test_google_drive_libs_optional(monkeypatch):
     """Ensure gdrive module can be imported and functions gracefully when google-auth missing."""
     # force any google import to fail
