@@ -84,6 +84,13 @@ const assistantAutofillFieldConfig = {
   requested_job_date: { label: "Requested Job Date" },
   requested_time_window: { label: "Requested Time Window" }
 };
+const quoteRequestFollowupOptions = [
+  ["needs_followup", "Needs follow-up"],
+  ["contacted", "Contacted"],
+  ["waiting_on_customer", "Waiting on customer"],
+  ["not_ready", "Not ready"],
+  ["closed_no_followup", "Closed - no follow-up"]
+];
 
 function setAssistantDraftLocked(isLocked) {
   // Desktop assistant is read-only; no draft controls to lock/unlock.
@@ -268,6 +275,11 @@ function statusLabel(status) {
     expired: "Expired"
   };
   return map[(status || "").toLowerCase()] || (status || "unknown");
+}
+
+function followupStatusLabel(status) {
+  const map = Object.fromEntries(quoteRequestFollowupOptions);
+  return map[(status || "").toLowerCase()] || "Unmarked";
 }
 
 function money(n) {
@@ -620,6 +632,60 @@ async function decide(requestId, action) {
   await refreshAll();
 }
 
+async function updateQuoteRequestFollowupStatus(requestId, followupStatus) {
+  if (!requestId) return;
+  statusLine.textContent = "Updating follow-up marker...";
+
+  try {
+    await fetchJSON(`/admin/api/quote-requests/${encodeURIComponent(requestId)}/followup-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ followup_status: followupStatus || null })
+    });
+    setLine(statusLine, "ok", "Follow-up marker saved:", followupStatusLabel(followupStatus));
+    await refreshAll();
+  } catch (err) {
+    const parsed = parseApiError(err);
+    setLine(statusLine, "bad", "Could not update follow-up marker:");
+    statusLine.appendChild(document.createTextNode(" " + (safeGet(parsed, "data.detail", parsed.raw || JSON.stringify(parsed.data || {})))));
+    await refreshAll();
+  }
+}
+
+function createFollowupStatusControl(item) {
+  const wrap = document.createElement("label");
+  wrap.className = "followupStatusControl";
+
+  const label = document.createElement("span");
+  label.className = "small muted";
+  label.textContent = "Admin follow-up";
+
+  const select = document.createElement("select");
+  select.name = "followup_status";
+  select.dataset.requestId = item.request_id || "";
+  select.className = "followupStatusSelect";
+
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "Unmarked";
+  select.appendChild(blank);
+
+  quoteRequestFollowupOptions.forEach(([value, text]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  });
+
+  select.value = selectedValue(item.followup_status);
+  select.addEventListener("change", () => {
+    updateQuoteRequestFollowupStatus(item.request_id || "", select.value);
+  });
+
+  wrap.append(label, select);
+  return wrap;
+}
+
 function actionCell(item) {
   const td = document.createElement("td");
   const st = (item.status || "").toLowerCase();
@@ -655,7 +721,7 @@ function renderRequests(items) {
   if (!items || items.length === 0) return addEmptyState(box, "No booking requests yet.");
   clearNode(box);
 
-  const { table, tbody } = createTable(["Request", "Customer", "Job", "Requested", "Totals", "Actions"]);
+  const { table, tbody } = createTable(["Request", "Customer", "Job", "Requested", "Follow-up", "Totals", "Actions"]);
 
   items.forEach((r) => {
     const tr = document.createElement("tr");
@@ -692,6 +758,9 @@ function renderRequests(items) {
     windowEl.textContent = "Window: " + (r.requested_time_window || "-");
     tdRequested.append(date, windowEl);
 
+    const tdFollowup = document.createElement("td");
+    tdFollowup.appendChild(createFollowupStatusControl(r));
+
     const tdTotals = document.createElement("td");
     const stWrap = document.createElement("div");
     stWrap.className = "small";
@@ -709,7 +778,7 @@ function renderRequests(items) {
 
     tdTotals.append(stWrap, cash, emt);
 
-    tr.append(tdReq, tdCustomer, tdJob, tdRequested, tdTotals, actionCell(r));
+    tr.append(tdReq, tdCustomer, tdJob, tdRequested, tdFollowup, tdTotals, actionCell(r));
     tbody.appendChild(tr);
   });
 
