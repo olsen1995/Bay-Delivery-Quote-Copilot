@@ -29,6 +29,7 @@ def clear_admin_attempts(monkeypatch: pytest.MonkeyPatch):
     yield
     main_module._admin_failed_attempts.clear()
     monkeypatch.delenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", raising=False)
+    monkeypatch.delenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", raising=False)
 
 
 def test_admin_quotes_limit_is_capped(monkeypatch: pytest.MonkeyPatch, admin_env: None) -> None:
@@ -70,8 +71,9 @@ def test_admin_lockout_uses_trusted_forwarded_ip_when_enabled(
     admin_env: None,
 ) -> None:
     monkeypatch.setenv("BAYDELIVERY_TRUST_X_FORWARDED_FOR", "true")
+    monkeypatch.setenv("BAYDELIVERY_TRUSTED_PROXY_CIDRS", "127.0.0.1/32")
 
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         for _ in range(main_module._admin_lockout_threshold):
             resp = client.get(
                 "/admin/api/quotes",

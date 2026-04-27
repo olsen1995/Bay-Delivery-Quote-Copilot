@@ -58,6 +58,26 @@ Prefer env-only fixes when the application code already supports the intended be
 
 ---
 
+## Trusted Proxy and Forwarded IP Handling
+
+The application ignores `X-Forwarded-For` unless forwarded IP trust is explicitly enabled.
+
+Use these environment variables together only after verifying the production direct proxy IP or CIDR range:
+
+- `BAYDELIVERY_TRUST_X_FORWARDED_FOR=true`
+- `BAYDELIVERY_TRUSTED_PROXY_CIDRS=<verified proxy IP or CIDR list>`
+
+Rules:
+
+- leave `BAYDELIVERY_TRUST_X_FORWARDED_FOR` unset or false unless production is behind a known trusted proxy
+- do not enable forwarded IP trust without `BAYDELIVERY_TRUSTED_PROXY_CIDRS`
+- use comma-separated exact proxy IPs or CIDRs only
+- do not guess Render proxy ranges
+
+If the trusted proxy allowlist is unset, malformed, or does not match the direct peer, the app falls back to the direct connection IP and ignores `X-Forwarded-For`.
+
+---
+
 ## Live Verification for CORS
 
 After a production CORS change, verify both a denied and allowed preflight.
