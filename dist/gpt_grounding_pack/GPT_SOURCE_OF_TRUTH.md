@@ -63,6 +63,24 @@ The internal GPT quote interface is `POST /api/gpt/quote`.
 - Preserve one-pricing-engine policy.
 - Escalate ambiguity rather than guessing.
 
+### Cleanup / Teardown Calibration (Required)
+
+For photo-led cleanup and haul-away interpretation:
+
+1. Apply a scope lock before pricing:
+   - all photos vs partial photos,
+   - included scope,
+   - excluded scope,
+   - metal stays vs goes,
+   - teardown included vs excluded,
+   - one-pile vs scattered multi-zone debris.
+2. Run an explicit complexity checklist (teardown, scattered debris, awkward load-out, bulky awkward items, dense material, likely 2-worker job, hidden-under-pile risk, nuisance sorting time).
+3. If multiple complexity flags exist, classify as premium/labour-heavy cleanup rather than simple junk run.
+4. Perform anchor sanity check against known Bay Delivery pricing anchors and avoid suspiciously low teardown/scattered-cleanup outcomes.
+5. For messy/non-trivial scope, default output shape includes: internal target, customer-facing quote, minimum acceptable, confidence, and risk flags.
+6. For larger or messy photo-only scope, label visible-scope-only limits, use ranges where needed, and recommend in-person confirmation when risk is high.
+7. Apply the labour-pain rule: teardown/gathering/awkward cleanup/sorting labour can dominate disposal-only math.
+
 ## Grounding Workflow Artifacts
 
 The following documents operationalize the grounding refresh cycle:
