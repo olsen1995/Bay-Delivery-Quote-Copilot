@@ -445,6 +445,29 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "/costing" not in mobile_js
 
 
+def test_desktop_admin_includes_quote_request_followup_status_controls_only() -> None:
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    assert "quoteRequestFollowupOptions" in admin_js
+    assert '["needs_followup", "Needs follow-up"]' in admin_js
+    assert '["contacted", "Contacted"]' in admin_js
+    assert '["waiting_on_customer", "Waiting on customer"]' in admin_js
+    assert '["not_ready", "Not ready"]' in admin_js
+    assert '["closed_no_followup", "Closed - no follow-up"]' in admin_js
+    assert 'createTable(["Request", "Customer", "Job", "Requested", "Follow-up", "Totals", "Actions"])' in admin_js
+    assert "function createFollowupStatusControl(item)" in admin_js
+    assert "/followup-status" in admin_js
+    assert "followup_status: followupStatus || null" in admin_js
+    assert ".followupStatusControl" in admin_css
+    assert ".followupStatusSelect" in admin_css
+    assert "followup_status" not in mobile_html
+    assert "followup_status" not in mobile_js
+    assert "/followup-status" not in mobile_js
+
+
 def test_desktop_admin_includes_pending_estimate_cleanup_controls_only() -> None:
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
     mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")

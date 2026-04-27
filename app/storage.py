@@ -34,6 +34,13 @@ ALLOWED_PAYMENT_ATTEMPT_STATUSES = (
     "expired",
 )
 ALLOWED_QUOTE_ADMIN_STATUSES = ("pending", "expired")
+ALLOWED_QUOTE_REQUEST_FOLLOWUP_STATUSES = (
+    "needs_followup",
+    "contacted",
+    "waiting_on_customer",
+    "not_ready",
+    "closed_no_followup",
+)
 DEPOSIT_STATUS_CHECK_SQL = (
     "deposit_status IS NULL OR deposit_status IN "
     "('not_required', 'required', 'pending', 'paid', 'failed')"
@@ -42,6 +49,10 @@ PAYMENT_ATTEMPT_STATUS_CHECK_SQL = (
     "status IN ('created', 'pending', 'succeeded', 'failed', 'expired')"
 )
 QUOTE_ADMIN_STATUS_CHECK_SQL = "admin_status IN ('pending', 'expired')"
+QUOTE_REQUEST_FOLLOWUP_STATUS_CHECK_SQL = (
+    "followup_status IS NULL OR followup_status IN "
+    "('needs_followup', 'contacted', 'waiting_on_customer', 'not_ready', 'closed_no_followup')"
+)
 ALLOWED_JOB_COSTING_PAYMENT_METHODS = ("cash", "emt", "other")
 ALLOWED_JOB_PAYMENT_STATUSES = ("not_paid_yet", "partial_payment", "paid_in_full")
 ALLOWED_JOB_PROFIT_STATUSES = ("underquoted", "fair", "profitable", "painful")
@@ -132,6 +143,7 @@ class QuoteRequest(TypedDict):
 
 
 class QuoteRequestRecord(QuoteRequest, total=False):
+    followup_status: Optional[str]
     deposit_required_cad: Optional[float]
     deposit_status: Optional[str]
     deposit_paid_at: Optional[str]
@@ -225,6 +237,21 @@ def _validate_quote_admin_status(value: Any) -> str:
         allowed = ", ".join(repr(item) for item in ALLOWED_QUOTE_ADMIN_STATUSES)
         raise ValueError(f"quote.admin_status must be one of: {allowed}")
     return value
+
+
+def _validate_quote_request_followup_status(value: Any) -> Optional[str]:
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        allowed = ", ".join(repr(item) for item in ALLOWED_QUOTE_REQUEST_FOLLOWUP_STATUSES)
+        raise ValueError(f"quote_request.followup_status must be None or one of: {allowed}")
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+    if normalized not in ALLOWED_QUOTE_REQUEST_FOLLOWUP_STATUSES:
+        allowed = ", ".join(repr(item) for item in ALLOWED_QUOTE_REQUEST_FOLLOWUP_STATUSES)
+        raise ValueError(f"quote_request.followup_status must be None or one of: {allowed}")
+    return normalized
 
 
 def _clean_missing_field(value: Any) -> bool:
@@ -496,6 +523,7 @@ def init_db() -> None:
                 accept_token TEXT,
                 booking_token TEXT,
                 booking_token_created_at TEXT,
+                followup_status TEXT CHECK (followup_status IS NULL OR followup_status IN ('needs_followup', 'contacted', 'waiting_on_customer', 'not_ready', 'closed_no_followup')),
                 deposit_required_cad REAL,
                 deposit_status TEXT CHECK (deposit_status IS NULL OR deposit_status IN ('not_required', 'required', 'pending', 'paid', 'failed')),
                 deposit_paid_at TEXT,
@@ -636,6 +664,7 @@ def init_db() -> None:
         _try_add_column(conn, "quote_requests", "accept_token TEXT")
         _try_add_column(conn, "quote_requests", "booking_token TEXT")
         _try_add_column(conn, "quote_requests", "booking_token_created_at TEXT")
+        _try_add_column(conn, "quote_requests", f"followup_status TEXT CHECK ({QUOTE_REQUEST_FOLLOWUP_STATUS_CHECK_SQL})")
         _try_add_column(conn, "quote_requests", "deposit_required_cad REAL")
         _try_add_column(conn, "quote_requests", f"deposit_status TEXT CHECK ({DEPOSIT_STATUS_CHECK_SQL})")
         _try_add_column(conn, "quote_requests", "deposit_paid_at TEXT")
@@ -955,6 +984,7 @@ def _quote_request_from_row(
     row: sqlite3.Row,
     *,
     include_payment_fields: bool = False,
+    include_followup_status: bool = False,
 ) -> QuoteRequest | QuoteRequestRecord:
     row_dict = dict(row)
 
@@ -987,6 +1017,9 @@ def _quote_request_from_row(
         "booking_token_created_at": row_dict["booking_token_created_at"],
     }
 
+    if include_followup_status:
+        out["followup_status"] = row_dict.get("followup_status")
+
     if include_payment_fields:
         out.update(
             {
@@ -1005,6 +1038,7 @@ def _quote_request_from_row(
 
 def save_quote_request(record: Dict[str, Any]) -> None:
     _validate_deposit_status(record.get("deposit_status"))
+    followup_status = _validate_quote_request_followup_status(record.get("followup_status"))
 
     conn = _connect()
     try:
@@ -1017,9 +1051,9 @@ def save_quote_request(record: Dict[str, Any]) -> None:
              service_type, cash_total_cad, emt_total_cad,
              request_json, notes, requested_job_date, requested_time_window,
              customer_accepted_at, admin_approved_at, accept_token, booking_token, booking_token_created_at,
-             deposit_required_cad, deposit_status, deposit_paid_at, deposit_refund_status,
+             followup_status, deposit_required_cad, deposit_status, deposit_paid_at, deposit_refund_status,
              deposit_refunded_at, deposit_last_error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["request_id"],
@@ -1043,6 +1077,7 @@ def save_quote_request(record: Dict[str, Any]) -> None:
                 record.get("accept_token"),
                 record.get("booking_token"),
                 record.get("booking_token_created_at"),
+                followup_status,
                 record.get("deposit_required_cad"),
                 record.get("deposit_status"),
                 record.get("deposit_paid_at"),
@@ -1079,7 +1114,7 @@ def get_quote_request_record(request_id: str) -> Optional[QuoteRequestRecord]:
     if not row:
         return None
 
-    return cast(QuoteRequestRecord, _quote_request_from_row(row, include_payment_fields=True))
+    return cast(QuoteRequestRecord, _quote_request_from_row(row, include_payment_fields=True, include_followup_status=True))
 
 
 def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
@@ -1094,7 +1129,7 @@ def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
     return get_quote_request(row["request_id"])
 
 
-def list_quote_requests(limit: int = 50) -> List[QuoteRequest]:
+def list_quote_requests(limit: int = 50, *, include_followup_status: bool = False) -> List[QuoteRequest]:
     conn = _connect()
     try:
         rows = conn.execute(
@@ -1111,9 +1146,12 @@ def list_quote_requests(limit: int = 50) -> List[QuoteRequest]:
 
     out: List[QuoteRequest] = []
     for r in rows:
-        item = get_quote_request(r["request_id"])
+        if include_followup_status:
+            item = get_quote_request_record(r["request_id"])
+        else:
+            item = get_quote_request(r["request_id"])
         if item is not None:
-            out.append(item)
+            out.append(cast(QuoteRequest, item))
     return out
 
 
@@ -1128,6 +1166,7 @@ def update_quote_request(
     admin_approved_at: Any = UNSET,
     booking_token: Any = UNSET,
     booking_token_created_at: Any = UNSET,
+    followup_status: Any = UNSET,
     deposit_required_cad: Any = UNSET,
     deposit_status: Any = UNSET,
     deposit_paid_at: Any = UNSET,
@@ -1161,6 +1200,8 @@ def update_quote_request(
         updated["booking_token"] = booking_token
     if booking_token_created_at is not UNSET:
         updated["booking_token_created_at"] = booking_token_created_at
+    if followup_status is not UNSET:
+        updated["followup_status"] = _validate_quote_request_followup_status(followup_status)
     if deposit_required_cad is not UNSET:
         updated["deposit_required_cad"] = deposit_required_cad
     if deposit_status is not UNSET:
@@ -1198,6 +1239,7 @@ def update_quote_request(
             "accept_token": updated.get("accept_token"),
             "booking_token": updated.get("booking_token"),
             "booking_token_created_at": updated.get("booking_token_created_at"),
+            "followup_status": updated.get("followup_status"),
             "deposit_required_cad": updated.get("deposit_required_cad"),
             "deposit_status": updated.get("deposit_status"),
             "deposit_paid_at": updated.get("deposit_paid_at"),
@@ -1207,6 +1249,13 @@ def update_quote_request(
         }
     )
     return get_quote_request(request_id)
+
+
+def update_quote_request_followup_status(request_id: str, followup_status: Any) -> Optional[QuoteRequestRecord]:
+    updated = update_quote_request(request_id, followup_status=followup_status)
+    if updated is None:
+        return None
+    return get_quote_request_record(request_id)
 
 
 # =========================

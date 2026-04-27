@@ -72,6 +72,7 @@ from app.storage import (
     update_job,
     update_job_costing,
     update_quote_admin_status,
+    update_quote_request_followup_status,
 )
 from app.update_fields import InvalidJobTransition, InvalidQuoteRequestTransition
 from app.audit_log import init_audit_table, log_admin_audit
@@ -1121,6 +1122,22 @@ class AdminDecision(BaseModel):
         return v
 
 
+class AdminFollowupStatusPayload(BaseModel):
+    followup_status: Optional[
+        Literal["needs_followup", "contacted", "waiting_on_customer", "not_ready", "closed_no_followup"]
+    ] = None
+
+    @field_validator("followup_status", mode="before")
+    @classmethod
+    def normalize_followup_status(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            normalized = v.strip().lower()
+            return normalized or None
+        return v
+
+
 class BookingDetails(BaseModel):
     booking_token: str = Field(..., description="Token from accept decision response")
     requested_job_date: str = Field(..., max_length=10, description="YYYY-MM-DD format")
@@ -1501,7 +1518,52 @@ def admin_expire_quote(request: Request, quote_id: str, background_tasks: Backgr
 @app.get("/admin/api/quote-requests")
 def admin_list_quote_requests(request: Request, limit: int = 50):
     _require_admin(request)
-    return {"items": list_quote_requests(limit=_cap_admin_list_limit(limit))}
+    return {"items": list_quote_requests(limit=_cap_admin_list_limit(limit), include_followup_status=True)}
+
+
+@app.post("/admin/api/quote-requests/{request_id}/followup-status")
+def admin_update_quote_request_followup_status(
+    request: Request,
+    request_id: str,
+    body: AdminFollowupStatusPayload,
+    background_tasks: BackgroundTasks,
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    try:
+        updated = update_quote_request_followup_status(request_id, body.followup_status)
+    except ValueError as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_followup_status",
+            entity_type="quote_request",
+            record_id=request_id,
+            success=False,
+            error_summary=str(exc),
+        )
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if not updated:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_followup_status",
+            entity_type="quote_request",
+            record_id=request_id,
+            success=False,
+            error_summary="Request not found",
+        )
+        raise HTTPException(status_code=404, detail="Request not found.")
+
+    _try_log_admin_audit(
+        operator_username=operator_username,
+        action_type="update_followup_status",
+        entity_type="quote_request",
+        record_id=request_id,
+        success=True,
+    )
+    _maybe_auto_snapshot(background_tasks)
+    return {"ok": True, "request": updated}
 
 
 @app.get("/admin/api/jobs")

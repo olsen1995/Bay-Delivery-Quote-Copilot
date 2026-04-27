@@ -292,6 +292,16 @@ label {
 	justify-content: flex-end;
 }
 
+.followupStatusControl {
+	display: grid;
+	gap: 6px;
+	min-width: 180px;
+}
+
+.followupStatusSelect {
+	min-width: 180px;
+}
+
 .dashboardGrid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
