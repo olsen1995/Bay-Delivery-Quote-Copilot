@@ -280,6 +280,12 @@ label {
 	font-size: 0.84rem;
 }
 
+.jobCostingHelp {
+	color: var(--ink-muted);
+	font-size: 0.78rem;
+	line-height: 1.35;
+}
+
 .jobCostingActions {
 	display: flex;
 	align-items: end;

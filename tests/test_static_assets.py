@@ -404,14 +404,17 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "Completed Job Costing" in admin_js
     assert "Quoted cash" in admin_js
     assert "Quoted EMT" in admin_js
-    assert "Final collected" in admin_js
+    assert "Final collected CAD" in admin_js
     assert "Actual costs recorded" in admin_js
     assert "Advisory known-cost profit" in admin_js
-    assert "Admin-only advisory feedback." in admin_js
+    assert "Admin-only advisory feedback for completed jobs." in admin_js
+    assert "Payment method is how the customer paid; payment status is whether the money is fully collected." in admin_js
+    assert "input.inputMode = field === \"actual_crew_size\" ? \"numeric\" : \"decimal\";" in admin_js
     assert "/admin/api/jobs/${jobId}/costing" in admin_js
     assert 'if (j.status === "completed")' in admin_js
     assert "Payment method" in admin_js
     assert "payment_method" in admin_js
+    assert "How they paid. This is separate from whether it is paid in full." in admin_js
     for method_option in [
         '["cash", "Cash"]',
         '["emt", "EMT / e-transfer"]',
@@ -420,6 +423,7 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
         assert method_option in admin_js
     assert "Payment status" in admin_js
     assert "payment_status" in admin_js
+    assert "Collection state. Use this even when the method is known." in admin_js
     for status_option in [
         '["not_paid_yet", "Not paid yet"]',
         '["partial_payment", "Partial payment"]',
@@ -427,7 +431,16 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     ]:
         assert status_option in admin_js
     assert "job_profit_status" in admin_js
+    for profit_label in [
+        '["underquoted", "Underquoted - should have charged more"]',
+        '["fair", "Fair - about right"]',
+        '["profitable", "Profitable - strong margin"]',
+        '["painful", "Painful - lost time or money"]',
+    ]:
+        assert profit_label in admin_js
+    assert "Operator gut check only. This does not change pricing." in admin_js
     assert ".jobCostingPanel" in admin_css
+    assert ".jobCostingHelp" in admin_css
     assert "/costing" not in mobile_html
     assert "/costing" not in mobile_js
 

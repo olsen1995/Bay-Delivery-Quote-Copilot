@@ -716,7 +716,7 @@ function renderRequests(items) {
   box.appendChild(table);
 }
 
-function createCostingField(label, field, type, value, options) {
+function createCostingField(label, field, type, value, options, config = {}) {
   const wrap = document.createElement("label");
   wrap.className = "jobCostingField";
   const labelText = document.createElement("span");
@@ -738,6 +738,12 @@ function createCostingField(label, field, type, value, options) {
     });
     select.value = selectedValue(value);
     wrap.appendChild(select);
+    if (config.helper) {
+      const helper = document.createElement("small");
+      helper.className = "jobCostingHelp";
+      helper.textContent = config.helper;
+      wrap.appendChild(helper);
+    }
     return wrap;
   }
 
@@ -745,11 +751,19 @@ function createCostingField(label, field, type, value, options) {
   input.name = field;
   input.type = type || "text";
   input.value = formatInputNumber(value);
+  if (config.placeholder) input.placeholder = config.placeholder;
   if (type === "number") {
     input.min = "0";
     input.step = field === "actual_crew_size" ? "1" : "0.01";
+    input.inputMode = field === "actual_crew_size" ? "numeric" : "decimal";
   }
   wrap.appendChild(input);
+  if (config.helper) {
+    const helper = document.createElement("small");
+    helper.className = "jobCostingHelp";
+    helper.textContent = config.helper;
+    wrap.appendChild(helper);
+  }
   return wrap;
 }
 
@@ -789,35 +803,56 @@ function createJobCostingPanel(job) {
 
   const note = document.createElement("div");
   note.className = "small muted";
-  note.textContent = "Admin-only advisory feedback. Known-cost margin uses saved final collected, disposal, and fuel costs only; quote calculation is unchanged.";
+  note.textContent = "Admin-only advisory feedback for completed jobs. Payment method is how the customer paid; payment status is whether the money is fully collected. Known-cost profit uses saved final collected, disposal, and fuel costs only; quote calculation is unchanged.";
   panel.appendChild(note);
 
   const form = document.createElement("form");
   form.className = "jobCostingForm";
   form.append(
-    createCostingField("Actual hours", "actual_hours", "number", job.actual_hours),
-    createCostingField("Actual crew size", "actual_crew_size", "number", job.actual_crew_size),
-    createCostingField("Actual disposal cost CAD", "actual_disposal_cost_cad", "number", job.actual_disposal_cost_cad),
-    createCostingField("Actual fuel cost CAD", "actual_fuel_cost_cad", "number", job.actual_fuel_cost_cad),
-    createCostingField("Final amount collected CAD", "final_amount_collected_cad", "number", job.final_amount_collected_cad),
+    createCostingField("Actual hours", "actual_hours", "number", job.actual_hours, null, {
+      placeholder: "e.g. 2.5",
+    }),
+    createCostingField("Actual crew size", "actual_crew_size", "number", job.actual_crew_size, null, {
+      placeholder: "e.g. 2",
+    }),
+    createCostingField("Disposal cost CAD", "actual_disposal_cost_cad", "number", job.actual_disposal_cost_cad, null, {
+      placeholder: "0.00",
+    }),
+    createCostingField("Fuel cost CAD", "actual_fuel_cost_cad", "number", job.actual_fuel_cost_cad, null, {
+      placeholder: "0.00",
+    }),
+    createCostingField("Final collected CAD", "final_amount_collected_cad", "number", job.final_amount_collected_cad, null, {
+      helper: "Cash collected or EMT total actually received.",
+      placeholder: "0.00",
+    }),
     createCostingField("Payment method", "payment_method", "text", job.payment_method, [
       ["cash", "Cash"],
       ["emt", "EMT / e-transfer"],
       ["other", "Other"],
-    ]),
+    ], {
+      helper: "How they paid. This is separate from whether it is paid in full.",
+    }),
     createCostingField("Payment status", "payment_status", "text", job.payment_status, [
       ["not_paid_yet", "Not paid yet"],
       ["partial_payment", "Partial payment"],
       ["paid_in_full", "Paid in full"],
-    ]),
+    ], {
+      helper: "Collection state. Use this even when the method is known.",
+    }),
     createCostingField("Profit status", "job_profit_status", "text", job.job_profit_status, [
-      ["underquoted", "Underquoted"],
-      ["fair", "Fair"],
-      ["profitable", "Profitable"],
-      ["painful", "Painful"],
-    ]),
-    createCostingField("Quote accuracy note", "quote_accuracy_note", "text", job.quote_accuracy_note),
-    createCostingField("Disposal receipt note", "disposal_receipt_note", "text", job.disposal_receipt_note)
+      ["underquoted", "Underquoted - should have charged more"],
+      ["fair", "Fair - about right"],
+      ["profitable", "Profitable - strong margin"],
+      ["painful", "Painful - lost time or money"],
+    ], {
+      helper: "Operator gut check only. This does not change pricing.",
+    }),
+    createCostingField("Quote accuracy note", "quote_accuracy_note", "text", job.quote_accuracy_note, null, {
+      placeholder: "What was different from the estimate?",
+    }),
+    createCostingField("Disposal receipt note", "disposal_receipt_note", "text", job.disposal_receipt_note, null, {
+      placeholder: "Receipt number, dump note, or quick reminder.",
+    })
   );
 
   const actions = document.createElement("div");
