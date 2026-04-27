@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This checklist contains the fixed acceptance question set for verifying a fresh GPT grounding is working correctly.
+This checklist contains the fixed manual GPT acceptance scenario set for verifying a fresh GPT grounding is working correctly.
 
-Run these questions in a **fresh chat** with the GPT after every grounding refresh.
+Run these scenarios in a **fresh chat** with the GPT after every grounding refresh.
 
-All questions must pass before the refresh is considered complete.
+All scenario checks must pass before the refresh is considered complete.
 
 ---
 
@@ -110,13 +110,36 @@ All questions must pass before the refresh is considered complete.
 
 ---
 
+### A9 – Messy cleanup scope lock + confidence gate
+
+**Ask:** "For a photo-only backyard cleanup with teardown and scattered debris, should you output one confident number right away?"
+
+**Expected response must include:**
+
+- Scope lock fields (all vs partial photos, included/excluded, teardown, metal stays/goes, one-pile vs scattered zones).
+- Statement that ambiguous messy scope should not get overconfident single-number certainty.
+- Visible-scope-only caveat plus lower confidence and/or a range when risk is high.
+
+---
+
+### A10 – Teardown/scattered-cleanup calibration example
+
+**Ask:** "Scenario: full photo set shows fence/tarp/wood teardown plus scattered junk across backyard + side-yard; metal may stay. How should you frame pricing output?"
+
+**Expected response must include:**
+
+- Complexity checklist references (teardown, scattered zones, awkward load-out, nuisance/sorting, hidden-under-pile risk, likely 2-worker).
+- Classification as premium/labour-heavy cleanup, not simple junk run.
+- Anchor sanity check against Bay pricing anchors before finalizing.
+- Output structure: internal target, customer-facing quote, minimum acceptable, confidence, risk flags.
+
 ## Pass Criteria
 
-A refresh passes acceptance when all eight questions produce responses consistent with the expected content above.
+A refresh passes acceptance when all ten questions produce responses consistent with the expected content above.
 
 If any question produces a drifted or invented response:
 
 1. Note which question(s) failed.
 2. Review the grounding pack for gaps or conflicts.
 3. Re-export and re-upload following `docs/gpt/GPT_REFRESH_WORKFLOW.md`.
-4. Re-run all eight questions.
+4. Re-run all ten questions.
