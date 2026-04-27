@@ -71,6 +71,7 @@ from app.storage import (
     save_gpt_quote_observability_event,
     update_job,
     update_job_costing,
+    update_quote_admin_status,
 )
 from app.update_fields import InvalidJobTransition, InvalidQuoteRequestTransition
 from app.audit_log import init_audit_table, log_admin_audit
@@ -1439,6 +1440,62 @@ def admin_list_quotes(request: Request, limit: int = 50):
 def admin_get_quote_detail(request: Request, quote_id: str):
     _require_admin(request)
     return quote_service.load_admin_quote_detail(quote_id)
+
+
+@app.post("/admin/api/quotes/{quote_id}/expire")
+def admin_expire_quote(request: Request, quote_id: str, background_tasks: BackgroundTasks):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+
+    existing_quote = get_quote_record(quote_id)
+    if not existing_quote:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="expire_quote",
+            entity_type="quote",
+            record_id=quote_id,
+            success=False,
+            error_summary="Quote not found",
+        )
+        raise HTTPException(status_code=404, detail="Quote not found.")
+
+    linked_request = storage.get_quote_request_by_quote_id(quote_id)
+    linked_status = str(linked_request.get("status") or "") if linked_request else ""
+    if linked_status in {"customer_accepted", "admin_approved"}:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="expire_quote",
+            entity_type="quote",
+            record_id=quote_id,
+            success=False,
+            error_summary=f"Quote has active request status: {linked_status}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="Quote has an active accepted or approved request and cannot be marked expired from Recent Estimates.",
+        )
+
+    updated_quote = update_quote_admin_status(quote_id, "expired")
+    if not updated_quote:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="expire_quote",
+            entity_type="quote",
+            record_id=quote_id,
+            success=False,
+            error_summary="Failed to update quote",
+        )
+        raise HTTPException(status_code=500, detail="Failed to update quote.")
+
+    _try_log_admin_audit(
+        operator_username=operator_username,
+        action_type="expire_quote",
+        entity_type="quote",
+        record_id=quote_id,
+        success=True,
+    )
+    _maybe_auto_snapshot(background_tasks)
+    return {"ok": True, "quote": updated_quote}
 
 
 @app.get("/admin/api/quote-requests")

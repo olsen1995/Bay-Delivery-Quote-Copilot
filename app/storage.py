@@ -33,6 +33,7 @@ ALLOWED_PAYMENT_ATTEMPT_STATUSES = (
     "failed",
     "expired",
 )
+ALLOWED_QUOTE_ADMIN_STATUSES = ("pending", "expired")
 DEPOSIT_STATUS_CHECK_SQL = (
     "deposit_status IS NULL OR deposit_status IN "
     "('not_required', 'required', 'pending', 'paid', 'failed')"
@@ -40,6 +41,7 @@ DEPOSIT_STATUS_CHECK_SQL = (
 PAYMENT_ATTEMPT_STATUS_CHECK_SQL = (
     "status IN ('created', 'pending', 'succeeded', 'failed', 'expired')"
 )
+QUOTE_ADMIN_STATUS_CHECK_SQL = "admin_status IN ('pending', 'expired')"
 ALLOWED_JOB_COSTING_PAYMENT_METHODS = ("cash", "emt", "other")
 ALLOWED_JOB_PAYMENT_STATUSES = ("not_paid_yet", "partial_payment", "paid_in_full")
 ALLOWED_JOB_PROFIT_STATUSES = ("underquoted", "fair", "profitable", "painful")
@@ -100,6 +102,7 @@ class QuoteRecord(TypedDict):
     request: Any
     response: Any
     accept_token: Optional[str]
+    admin_status: NotRequired[str]
     job_type: NotRequired[str]
     total_cad: NotRequired[float]
 
@@ -214,6 +217,13 @@ def _validate_payment_attempt_status(value: Any) -> str:
     if not isinstance(value, str) or value not in ALLOWED_PAYMENT_ATTEMPT_STATUSES:
         allowed = ", ".join(repr(item) for item in ALLOWED_PAYMENT_ATTEMPT_STATUSES)
         raise ValueError(f"payment_attempt.status must be one of: {allowed}")
+    return value
+
+
+def _validate_quote_admin_status(value: Any) -> str:
+    if not isinstance(value, str) or value not in ALLOWED_QUOTE_ADMIN_STATUSES:
+        allowed = ", ".join(repr(item) for item in ALLOWED_QUOTE_ADMIN_STATUSES)
+        raise ValueError(f"quote.admin_status must be one of: {allowed}")
     return value
 
 
@@ -436,6 +446,14 @@ def _normalize_job_payment_fields(row: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
+def _normalize_quote_admin_fields(row: Dict[str, Any]) -> Dict[str, Any]:
+    if row.get("admin_status") in ALLOWED_QUOTE_ADMIN_STATUSES:
+        return row
+    normalized = dict(row)
+    normalized["admin_status"] = "pending"
+    return normalized
+
+
 def init_db() -> None:
     db_path = _resolve_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -448,7 +466,8 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 request_json TEXT NOT NULL,
                 response_json TEXT NOT NULL,
-                accept_token TEXT
+                accept_token TEXT,
+                admin_status TEXT NOT NULL DEFAULT 'pending' CHECK (admin_status IN ('pending', 'expired'))
             )
             """
         )
@@ -608,6 +627,7 @@ def init_db() -> None:
 
         # Backfill: add missing columns if older DB is present
         _try_add_column(conn, "quotes", "accept_token TEXT")
+        _try_add_column(conn, "quotes", f"admin_status TEXT NOT NULL DEFAULT 'pending' CHECK ({QUOTE_ADMIN_STATUS_CHECK_SQL})")
         _try_add_column(conn, "quote_requests", "notes TEXT")
         _try_add_column(conn, "quote_requests", "requested_job_date TEXT")
         _try_add_column(conn, "quote_requests", "requested_time_window TEXT")
@@ -781,6 +801,9 @@ def save_quote(record: Dict[str, Any]) -> None:
         if "accept_token" in cols:
             insert_fields["accept_token"] = record.get("accept_token")
 
+        if "admin_status" in cols:
+            insert_fields["admin_status"] = _validate_quote_admin_status(record.get("admin_status", "pending"))
+
         # Forward-compat derived columns
         if "job_type" in cols:
             insert_fields["job_type"] = _derive_quote_job_type(record)
@@ -845,6 +868,8 @@ def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
         "response": response_obj,
         "accept_token": row_dict.get("accept_token"),
     }
+    if "admin_status" in row_dict:
+        out["admin_status"] = row_dict.get("admin_status") or "pending"
 
     if "job_type" in row_dict:
         out["job_type"] = row_dict["job_type"]
@@ -854,13 +879,15 @@ def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
     return cast(QuoteRecord, out)
 
 
-def list_quotes(limit: int = 50) -> List[QuoteRecord]:
+def list_quotes(limit: int = 50, *, include_expired: bool = False) -> List[QuoteRecord]:
     conn = _connect()
     try:
+        where_sql = "" if include_expired else "WHERE COALESCE(admin_status, 'pending') != 'expired'"
         rows = conn.execute(
-            """
+            f"""
             SELECT *
             FROM quotes
+            {where_sql}
             ORDER BY datetime(created_at) DESC
             LIMIT ?
             """,
@@ -887,6 +914,8 @@ def list_quotes(limit: int = 50) -> List[QuoteRecord]:
             "response": resp,
             "accept_token": r["accept_token"] if "accept_token" in r.keys() else None,
         }
+        if "admin_status" in r.keys():
+            item["admin_status"] = r["admin_status"] or "pending"
         if "job_type" in r.keys():
             item["job_type"] = r["job_type"]
         if "total_cad" in r.keys():
@@ -894,6 +923,28 @@ def list_quotes(limit: int = 50) -> List[QuoteRecord]:
         out.append(item)
 
     return out
+
+
+def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:
+    normalized_status = _validate_quote_admin_status(admin_status)
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT quote_id FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
+        if not row:
+            return None
+        conn.execute(
+            """
+            UPDATE quotes
+            SET admin_status = ?
+            WHERE quote_id = ?
+            """,
+            (normalized_status, quote_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_quote_record(quote_id)
 
 
 # =========================
@@ -2211,6 +2262,8 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
 
                 if safe_table == "jobs":
                     raw = _normalize_job_payment_fields(raw)
+                if safe_table == "quotes":
+                    raw = _normalize_quote_admin_fields(raw)
 
                 row_vals: List[Any] = []
                 for col in cols:
