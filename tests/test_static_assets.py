@@ -416,6 +416,28 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "/costing" not in mobile_js
 
 
+def test_desktop_admin_includes_pending_estimate_cleanup_controls_only() -> None:
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    assert "Mark expired" in admin_js
+    assert "This keeps the record but removes it from active review." in admin_js
+    assert "async function fetchJSON(path, options = {})" in admin_js
+    assert "Object.assign({}, options, { headers })" in admin_js
+    assert "/admin/api/quotes/${encodeURIComponent(quoteId)}/expire" in admin_js
+    expire_function = re.search(r"async function expireQuote\(quoteId\) \{(?P<body>.*?)\n\}\n\nfunction renderQuotes", admin_js, re.S)
+    assert expire_function is not None
+    expire_body = expire_function.group("body")
+    assert "/admin/api/quotes/${encodeURIComponent(quoteId)}/expire" in expire_body
+    assert 'method: "POST"' in expire_body
+    assert 'expired: "Expired"' in admin_js
+    assert "Mark expired" not in mobile_html
+    assert "Mark expired" not in mobile_js
+    assert "/expire" not in mobile_html
+    assert "/expire" not in mobile_js
+
+
 def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
     mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")

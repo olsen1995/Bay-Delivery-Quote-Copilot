@@ -230,8 +230,9 @@ function addEmptyState(container, text) {
   container.appendChild(div);
 }
 
-async function fetchJSON(path) {
-  const res = await fetch(path, { headers: authHeaders() });
+async function fetchJSON(path, options = {}) {
+  const headers = Object.assign({}, authHeaders(), options.headers || {});
+  const res = await fetch(path, Object.assign({}, options, { headers }));
 
   // Some auth failures come back non-JSON; handle safely.
   const text = await res.text();
@@ -263,7 +264,8 @@ function statusLabel(status) {
     completed: "Completed",
     scheduled: "Scheduled",
     cancelled: "Cancelled",
-    rejected: "Rejected"
+    rejected: "Rejected",
+    expired: "Expired"
   };
   return map[(status || "").toLowerCase()] || (status || "unknown");
 }
@@ -500,6 +502,26 @@ async function toggleQuoteDetails(quoteId) {
   }
 }
 
+async function expireQuote(quoteId) {
+  if (!quoteId) return;
+  const confirmed = window.confirm("Mark this estimate expired? This keeps the record but removes it from active review.");
+  if (!confirmed) return;
+
+  statusLine.textContent = "Marking estimate expired...";
+
+  try {
+    await fetchJSON(`/admin/api/quotes/${encodeURIComponent(quoteId)}/expire`, {
+      method: "POST"
+    });
+    setLine(statusLine, "ok", "Marked expired:", quoteId);
+    await refreshAll();
+  } catch (err) {
+    const parsed = parseApiError(err);
+    setLine(statusLine, "bad", "Could not mark expired:");
+    statusLine.appendChild(document.createTextNode(" " + (safeGet(parsed, "data.detail", parsed.raw || JSON.stringify(parsed.data || {})))));
+  }
+}
+
 function renderQuotes(items) {
   currentQuoteItems = items || [];
   const box = document.getElementById("quotesBox");
@@ -521,7 +543,7 @@ function renderQuotes(items) {
     tdId.append(code, created);
 
     const tdStatus = document.createElement("td");
-    const quoteStatus = safeGet(q, "request.status", q.status || "pending");
+    const quoteStatus = q.admin_status || safeGet(q, "request.status", q.status || "pending");
     tdStatus.appendChild(makeStatusBadge(quoteStatus));
 
     const tdCustomer = document.createElement("td");
@@ -550,6 +572,16 @@ function renderQuotes(items) {
     detailBtn.disabled = !q.quote_id;
     detailBtn.addEventListener("click", () => toggleQuoteDetails(q.quote_id || ""));
     tdActions.appendChild(detailBtn);
+
+    if ((q.admin_status || "pending") !== "expired") {
+      const expireBtn = document.createElement("button");
+      expireBtn.type = "button";
+      expireBtn.className = "secondaryAction btnSpacer";
+      expireBtn.textContent = "Mark expired";
+      expireBtn.disabled = !q.quote_id;
+      expireBtn.addEventListener("click", () => expireQuote(q.quote_id || ""));
+      tdActions.appendChild(expireBtn);
+    }
 
     tr.append(tdId, tdStatus, tdCustomer, tdSvc, tdAddress, tdTotal, tdActions);
     tbody.appendChild(tr);
