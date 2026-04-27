@@ -180,18 +180,18 @@ def test_admin_audit_log_survives_round_trip_backup_restore(tmp_path: pytest.Tem
         storage.DB_PATH = original_db_path
 
 
-def test_db_export_uses_resolved_runtime_db_path_in_metadata(
+def test_db_export_omits_runtime_db_path_from_metadata(
     client: TestClient,
     admin_creds: tuple[str, str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     username, password = admin_creds
-    monkeypatch.setattr("app.main.export_db_to_json", lambda: {"meta": {}, "tables": {}})
+    monkeypatch.setattr("app.main.export_db_to_json", lambda: {"meta": {"db_path": "local.sqlite3"}, "tables": {}})
 
     resp = client.get("/admin/api/db/export", headers=make_basic_auth(username, password))
 
     assert resp.status_code == 200
-    assert resp.json()["meta"]["db_path"] == str(storage._resolve_db_path())
+    assert "db_path" not in resp.json()["meta"]
 
 
 def test_db_import_success_writes_admin_audit_log(
@@ -333,7 +333,7 @@ def test_drive_snapshot_writes_admin_audit_log(
     assert entry["error_summary"] is None
 
 
-def test_drive_snapshot_uses_resolved_runtime_db_path_in_metadata(
+def test_drive_snapshot_omits_runtime_db_path_from_metadata(
     client: TestClient,
     admin_creds: tuple[str, str],
     monkeypatch: pytest.MonkeyPatch,
@@ -350,7 +350,7 @@ def test_drive_snapshot_uses_resolved_runtime_db_path_in_metadata(
         )
 
     monkeypatch.setattr("app.main._drive_enabled", lambda: True)
-    monkeypatch.setattr("app.main.export_db_to_json", lambda: {"meta": {}, "tables": {}})
+    monkeypatch.setattr("app.main.export_db_to_json", lambda: {"meta": {"db_path": "local.sqlite3"}, "tables": {}})
     monkeypatch.setattr(
         "app.main.gdrive.ensure_vault_subfolders",
         lambda: {"db_backups": "db-backups-folder"},
@@ -363,7 +363,7 @@ def test_drive_snapshot_uses_resolved_runtime_db_path_in_metadata(
 
     assert resp.status_code == 200
     assert len(uploaded_payloads) == 1
-    assert uploaded_payloads[0]["meta"]["db_path"] == str(storage._resolve_db_path())
+    assert "db_path" not in uploaded_payloads[0]["meta"]
 
 
 def test_admin_audit_logging_is_best_effort_for_db_export(
