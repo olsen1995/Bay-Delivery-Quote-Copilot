@@ -50,7 +50,7 @@ Architecture rules
 - Preferred structure is:
   - routes in `app/main.py`
   - business logic in `app/services/`
-  - persistence and SQL in `app/storage/`
+  - persistence and SQL in `app/storage.py`
   - external API wrappers in `app/integrations/`
 - SQLite is the source of truth.
 - Google Calendar is a mirror only.
