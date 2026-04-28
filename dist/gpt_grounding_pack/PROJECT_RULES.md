@@ -26,7 +26,7 @@ Business logic belongs in:
 
 SQL and persistence logic belong in:
 
-- app/storage/
+- app/storage.py
 
 External API wrappers belong in:
 
@@ -73,7 +73,7 @@ Services must not:
 
 ### Storage
 
-All SQL belongs in app/storage.
+All SQL belongs in app/storage.py.
 
 Storage code may:
 
@@ -159,7 +159,7 @@ Do not mix refactors with pricing, deployment hardening, or schema-tightening wo
 
 ## Storage Layer Rules
 
-All SQL belongs in app/storage.
+All SQL belongs in app/storage.py.
 
 Rules:
 
