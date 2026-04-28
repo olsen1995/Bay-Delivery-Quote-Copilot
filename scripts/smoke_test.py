@@ -121,6 +121,23 @@ def clone_payload(base: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
     return out
 
 
+def _stateful_haul_away_quote_payload() -> Dict[str, Any]:
+    return {
+        "service_type": "haul_away",
+        "customer_name": "Smoke Test",
+        "customer_phone": "555-0100",
+        "job_address": "123 Demo St",
+        "description": "smoke quote",
+        "estimated_hours": 1.0,
+        "crew_size": 1,
+        "garbage_bag_count": 0,
+        "trailer_fill_estimate": "under_quarter",
+        "mattresses_count": 0,
+        "box_springs_count": 0,
+        "scrap_pickup_location": "curbside",
+    }
+
+
 def _admin_creds_configured() -> bool:
     return bool(os.getenv("ADMIN_USERNAME", "").strip() and os.getenv("ADMIN_PASSWORD", "").strip())
 
@@ -271,19 +288,7 @@ def _run_stateful_workflow_smoke() -> int:
     health = _run_health_check()
     _run_public_customer_page_checks()
 
-    quote_payload = {
-        "service_type": "haul_away",
-        "customer_name": "Smoke Test",
-        "customer_phone": "555-0100",
-        "job_address": "123 Demo St",
-        "description": "smoke quote",
-        "estimated_hours": 1.0,
-        "crew_size": 1,
-        "garbage_bag_count": 0,
-        "mattresses_count": 0,
-        "box_springs_count": 0,
-        "scrap_pickup_location": "curbside",
-    }
+    quote_payload = _stateful_haul_away_quote_payload()
 
     status, quote = api("POST", "/quote/calculate", payload=quote_payload)
     require(status == 200, f"POST /quote/calculate expected 200, got {status}")
