@@ -15,9 +15,14 @@
 - Diagnose root cause before fixing issues; if CI fails, inspect the logs before applying any fix.
 - Documentation tasks stay documentation-only unless a tiny consistency tweak is clearly required.
 
+- Use VS Code agents for read-only post-merge verification by default.
+- Use Codex mainly for implementation PRs, audit/planning tasks, and branch/PR creation.
+- Post-merge verification must be read-only: no file modifications, no commits, no PRs.
+
 ## Scope Boundaries
 
 - There is one pricing engine only: `app/quote_engine.py`.
+- Storage implementation currently lives in `app/storage.py`.
 - Admin surfaces (`/admin`, `/admin/mobile`, `/admin/uploads`) are ops-only, not customer quote intake.
 - GPT is internal-only for Austin + Dan; it is not a customer-facing pricing path.
 - Do not change pricing logic, auth, quote behavior, customer-facing flows, or architecture unless explicitly requested.
@@ -29,6 +34,7 @@
 - Default validation for repo tasks:
   - `python tools/check_version_parity.py`
   - `pytest -q`
+
 - If validation fails, separate failures caused by your change from pre-existing environment or unrelated issues.
 
 ## PR / Reporting
