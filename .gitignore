@@ -116,3 +116,6 @@ scripts/inspect_*.py
 
 # local QA artifacts
 qa_report.txt
+.playwright-cli/
+output/playwright/
+tmp/
