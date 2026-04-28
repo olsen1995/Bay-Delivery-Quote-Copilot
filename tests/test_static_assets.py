@@ -164,9 +164,13 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Most jobs are 5–10 bags. Adjust if needed." in quote_html
     assert "Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more." in quote_html
     assert "Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access." in quote_html
-    assert "Prefer to send photos after the estimate? You can add them later to help confirm accuracy." in quote_html
-    assert "Prefer to send photos after the estimate? Add them here if they help confirm the scope or access." in quote_html
+    assert "Optional photos can be added after the estimate to help Bay Delivery review the job" in quote_html
+    assert "After pricing appears, optional photos can help Bay Delivery review the job and improve follow-up accuracy." in quote_html
+    assert "Prefer to send photos after the estimate? You can add them later to help Bay Delivery review the job and improve follow-up accuracy." in quote_html
+    assert "Prefer to send photos after the estimate? Add them here if they help Bay Delivery review the job and improve follow-up accuracy." in quote_html
     assert "After you see your estimate, review what is included and compare Cash vs EMT totals." in quote_html
+    assert "Booking requests and optional photos come after acceptance." not in quote_html
+    assert "Optional photos come after that." not in quote_html
     assert "Step 1 of 4" not in quote_html
     assert "Step 2 of 4" not in quote_html
     assert "Step 3 of 4" not in quote_html
@@ -176,7 +180,7 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
     assert "Estimate Confidence" in quote_js
-    assert "Photos are optional after the estimate if they help confirm scope or access." in quote_js
+    assert "Photos are optional after the estimate if they help Bay Delivery review the job and improve follow-up accuracy." in quote_js
     assert "Accept Estimate & Continue" in quote_js
     assert "Your job is not booked until Bay Delivery reviews and confirms it." in quote_js
     assert "quoteResultIncluded" in quote_css
