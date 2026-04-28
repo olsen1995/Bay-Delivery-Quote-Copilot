@@ -118,4 +118,5 @@ scripts/inspect_*.py
 qa_report.txt
 .playwright-cli/
 output/playwright/
+output/pdf/
 tmp/
