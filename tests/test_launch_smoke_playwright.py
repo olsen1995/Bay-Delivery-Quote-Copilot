@@ -216,7 +216,7 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#quoteForm")).to_contain_text("A full kitchen garbage bag = 1. If unsure, estimate slightly higher.")
     await expect(page.locator("#quoteForm")).to_contain_text("Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.")
     await expect(page.locator("#quoteForm")).to_contain_text("Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access.")
-    await expect(page.locator("#quoteForm")).to_contain_text("Prefer to send photos after the estimate? You can add them later to help confirm accuracy.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Prefer to send photos after the estimate? You can add them later to help Bay Delivery review the job and improve follow-up accuracy.")
 
     await page.locator("#customer_name").fill("Playwright Decline Smoke")
     await page.locator("#customer_phone").fill("705-555-0112")
@@ -243,11 +243,11 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("Photos are optional after the estimate if they help confirm scope or access.")
+    await expect(page.locator("#resultBox")).to_contain_text("Photos are optional after the estimate if they help Bay Delivery review the job and improve follow-up accuracy.")
     await expect(page.locator("#resultBox")).to_contain_text("Next step: decide whether this estimate works for you. Accept Estimate & Continue opens the booking request form.")
     await expect(page.locator("#resultBox")).to_contain_text("Your job is not booked until Bay Delivery reviews and confirms it.")
     await expect(page.locator("#decisionCard")).to_be_visible()
-    await expect(page.locator("#uploadCard")).to_contain_text("Prefer to send photos after the estimate? Add them here if they help confirm the scope or access.")
+    await expect(page.locator("#uploadCard")).to_contain_text("Prefer to send photos after the estimate? Add them here if they help Bay Delivery review the job and improve follow-up accuracy.")
 
     await page.locator("#btnDecline").click()
 
