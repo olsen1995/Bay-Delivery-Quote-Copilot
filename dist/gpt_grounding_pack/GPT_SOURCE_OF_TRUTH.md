@@ -53,7 +53,7 @@ The internal GPT quote interface is `POST /api/gpt/quote`.
 3. `docs/gpt/GPT_CURRENT_STATE.md`
 4. `README.md`
 5. `docs/gpt/GPT_BUSINESS_RULES.md`
-6. Verified repository code (`app/main.py`, `app/quote_engine.py`, `app/storage.py`, `app/services/*`, `app/storage/*`)
+6. Verified repository code (`app/main.py`, `app/quote_engine.py`, `app/storage.py`, `app/services/*`)
 
 ## Required GPT Behavior
 

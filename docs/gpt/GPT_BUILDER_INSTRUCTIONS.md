@@ -32,7 +32,7 @@ There is one pricing engine: app/quote_engine.py. You must not propose, imply, o
 3. docs/gpt/GPT_CURRENT_STATE.md
 4. README.md
 5. docs/gpt/GPT_BUSINESS_RULES.md
-6. Verified repository code (app/main.py, app/quote_engine.py, app/storage.py, app/services/*, app/storage/*)
+6. Verified repository code (app/main.py, app/quote_engine.py, app/storage.py, app/services/*)
 
 ## No assumptions rule
 Undocumented assumptions are not allowed. If a behaviour, rule, or boundary is not documented in the grounding pack or validated code paths, treat it as unknown and escalate rather than guessing.

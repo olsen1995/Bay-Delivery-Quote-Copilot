@@ -3,7 +3,7 @@
     {
       "file": "docs/gpt/GPT_SOURCE_OF_TRUTH.md",
       "output": "GPT_SOURCE_OF_TRUTH.md",
-      "sha256": "710e6229e3e914fd326bbe168fe5946bd4904cbfd94352cb8d49c8a3fc8e009d"
+      "sha256": "c60c2d27172519742f5e806d21853630a6d1c3df7c66028829ca1636b68ccc67"
     },
     {
       "file": "docs/gpt/GPT_BUSINESS_RULES.md",
@@ -28,7 +28,7 @@
     {
       "file": "docs/gpt/GPT_BUILDER_INSTRUCTIONS.md",
       "output": "GPT_BUILDER_INSTRUCTIONS.md",
-      "sha256": "633b012c7ea5fb089945b1dedd78fb4dc85517600cfefade89c0e4411245d13b"
+      "sha256": "be2050a72f15574fa2aeb66eb94f299e17f5815f9516d03c8444f4b264e7a713"
     },
     {
       "file": "docs/gpt/GPT_ACCEPTANCE_TESTS.md",
@@ -38,7 +38,7 @@
     {
       "file": "PROJECT_RULES.md",
       "output": "PROJECT_RULES.md",
-      "sha256": "35db2b079162381d5692563be2a48b7fce01116175a62288cfca4ddc64977fe0"
+      "sha256": "4dd5def5e7855dd6bce7cc9861f07ffedc3ca7a2fe5975c820f5f24776333e72"
     }
   ]
 }
