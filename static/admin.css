@@ -101,6 +101,7 @@ label {
 #quotesBox,
 #requestsBox,
 #jobsBox,
+#opsQueueBox,
 #auditLogBox,
 #assistantHistoryBox {
 	overflow-x: auto;
@@ -138,6 +139,79 @@ label {
 .adminShell {
 	display: grid;
 	gap: 18px;
+}
+
+.opsQueueCard {
+	margin-top: 18px;
+}
+
+.opsQueueGrid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.opsQueueSection {
+	border: 1px solid var(--line-soft);
+	border-radius: 12px;
+	padding: 12px;
+	background: var(--surface-alt);
+	min-width: 0;
+}
+
+.opsQueueSectionHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+
+.opsQueueSectionTitle {
+	font-weight: 800;
+	font-size: 0.95rem;
+}
+
+.opsQueueCount {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 26px;
+	height: 26px;
+	border-radius: 999px;
+	background: rgba(193, 44, 39, 0.2);
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	font-weight: 800;
+	color: var(--ink-strong);
+}
+
+.opsQueueList {
+	display: grid;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.opsQueueItem {
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	padding-top: 8px;
+}
+
+.opsQueueItem:first-child {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.opsQueueItemTitle {
+	color: var(--ink-strong);
+	font-weight: 700;
+	line-height: 1.3;
+}
+
+.opsQueueItemMeta,
+.opsQueueItemHint {
+	margin-top: 3px;
 }
 
 .protectedDashboard {
@@ -624,7 +698,8 @@ textarea:focus {
 
 @media (max-width: 980px) {
 	.row,
-	.dashboardGrid {
+	.dashboardGrid,
+	.opsQueueGrid {
 		grid-template-columns: 1fr;
 	}
 }

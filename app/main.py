@@ -47,6 +47,7 @@ from app.abuse_controls import (
 )
 from app import gcalendar, gdrive, storage
 from app.services import (
+    admin_ops_queue,
     booking_service,
     job_scheduling_service,
     quote_service,
@@ -1541,6 +1542,12 @@ def admin_expire_quote(request: Request, quote_id: str, background_tasks: Backgr
 def admin_list_quote_requests(request: Request, limit: int = 50):
     _require_admin(request)
     return {"items": list_quote_requests(limit=_cap_admin_list_limit(limit), include_followup_status=True)}
+
+
+@app.get("/admin/api/ops-queue")
+def admin_ops_queue_summary(request: Request):
+    _require_admin(request)
+    return admin_ops_queue.build_admin_ops_queue()
 
 
 @app.post("/admin/api/quote-requests/{request_id}/followup-status")
