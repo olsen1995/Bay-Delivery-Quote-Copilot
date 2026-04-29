@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app import storage
 from app.main import app
-from app.services.admin_ops_queue import SECTION_ITEM_LIMIT
+from app.services.admin_ops_queue import SECTION_ITEM_LIMIT, SOURCE_LIST_LIMIT
 
 
 @pytest.fixture
@@ -205,13 +205,14 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     admin_headers: dict[str, str],
     isolated_db: Path,
 ) -> None:
-    for index in range(SECTION_ITEM_LIMIT + 2):
+    total_records = SOURCE_LIST_LIMIT + 2
+    for index in range(total_records):
         quote_id = f"q-cap-{index:02d}"
-        _seed_quote(quote_id, created_at=f"2026-04-28T09:{index:02d}:00")
+        _seed_quote(quote_id, created_at=f"2099-04-{(index % 28) + 1:02d}T09:00:00")
         _seed_request(
             f"req-cap-{index:02d}",
             quote_id=quote_id,
-            created_at=f"2026-04-28T10:{index:02d}:00",
+            created_at=f"2099-04-{(index % 28) + 1:02d}T10:00:00",
         )
 
     before_requests = storage.list_quote_requests(limit=50, include_followup_status=True)
@@ -225,7 +226,7 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     assert second.status_code == 200
     first_sections = _sections(first.json())
     second_sections = _sections(second.json())
-    assert first.json()["counts"]["accepted_needing_approval"] == SECTION_ITEM_LIMIT + 2
+    assert first.json()["counts"]["accepted_needing_approval"] == total_records
     assert len(first_sections["accepted_needing_approval"]["items"]) == SECTION_ITEM_LIMIT
     assert first_sections["accepted_needing_approval"]["items"] == second_sections["accepted_needing_approval"]["items"]
     assert storage.list_quote_requests(limit=50, include_followup_status=True) == before_requests
@@ -233,7 +234,27 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     assert storage.list_quotes(limit=50) == before_quotes
 
 
-def test_completed_job_with_costing_is_not_marked_missing(
+def test_completed_job_with_partial_core_costing_still_appears(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_job(
+        "job-partial-costing",
+        quote_id="q-partial-costing",
+        request_id="req-partial-costing",
+        status="completed",
+        costing={"payment_status": "paid_in_full"},
+    )
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    section = _sections(resp.json())["completed_missing_costing"]
+    assert any(item["job_id"] == "job-partial-costing" for item in section["items"])
+
+
+def test_completed_job_with_core_costing_is_not_marked_missing(
     client: TestClient,
     admin_headers: dict[str, str],
     isolated_db: Path,
@@ -246,10 +267,7 @@ def test_completed_job_with_costing_is_not_marked_missing(
         costing={
             "actual_hours": 2.5,
             "actual_crew_size": 2,
-            "actual_disposal_cost_cad": 40.0,
-            "actual_fuel_cost_cad": 15.0,
             "final_amount_collected_cad": 260.0,
-            "payment_method": "cash",
             "payment_status": "paid_in_full",
             "job_profit_status": "profitable",
         },
@@ -260,3 +278,24 @@ def test_completed_job_with_costing_is_not_marked_missing(
     assert resp.status_code == 200
     section = _sections(resp.json())["completed_missing_costing"]
     assert all(item["job_id"] != "job-costed" for item in section["items"])
+
+
+def test_old_stale_pending_estimate_beyond_prior_source_cap_is_counted(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    for index in range(SOURCE_LIST_LIMIT):
+        _seed_quote(
+            f"q-new-{index:05d}",
+            created_at=f"2099-04-{(index % 28) + 1:02d}T09:00:00",
+        )
+    _seed_quote("q-old-stale", created_at="2000-01-01T09:00:00")
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    section = _sections(resp.json())["stale_pending_estimates"]
+    assert resp.json()["counts"]["stale_pending_estimates"] >= 1
+    assert any(item["quote_id"] == "q-old-stale" for item in section["items"])
+    assert len(section["items"]) <= SECTION_ITEM_LIMIT

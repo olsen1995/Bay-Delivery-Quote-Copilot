@@ -7,6 +7,7 @@ from app.storage import list_jobs, list_quote_requests, list_quotes
 
 STALE_PENDING_ESTIMATE_DAYS = 7
 SOURCE_LIST_LIMIT = 100
+MAX_SOURCE_LIST_LIMIT = 100000
 SECTION_ITEM_LIMIT = 10
 
 OPEN_FOLLOWUP_STATUSES = {
@@ -28,12 +29,20 @@ COUNT_KEYS = (
     "stale_pending_estimates",
 )
 
+CORE_COSTING_FIELDS = (
+    "actual_hours",
+    "actual_crew_size",
+    "final_amount_collected_cad",
+    "payment_status",
+    "job_profit_status",
+)
+
 
 def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
     generated_at = _utc_now(now)
-    quotes = list_quotes(limit=SOURCE_LIST_LIMIT)
-    requests = list_quote_requests(limit=SOURCE_LIST_LIMIT, include_followup_status=True)
-    jobs = list_jobs(limit=SOURCE_LIST_LIMIT)
+    quotes = _load_available(lambda limit: list_quotes(limit=limit))
+    requests = _load_available(lambda limit: list_quote_requests(limit=limit, include_followup_status=True))
+    jobs = _load_available(lambda limit: list_jobs(limit=limit))
 
     section_defs = [
         (
@@ -147,6 +156,15 @@ def _utc_now(now: datetime | None) -> datetime:
     return now.astimezone(timezone.utc)
 
 
+def _load_available(fetcher: Any) -> list[dict[str, Any]]:
+    limit = SOURCE_LIST_LIMIT
+    while True:
+        items = fetcher(limit)
+        if len(items) < limit or limit >= MAX_SOURCE_LIST_LIMIT:
+            return items
+        limit = min(limit * 2, MAX_SOURCE_LIST_LIMIT)
+
+
 def _parse_datetime(value: Any) -> datetime | None:
     if not value:
         return None
@@ -211,19 +229,7 @@ def _label_followup_status(value: Any) -> str:
 
 
 def _job_costing_missing(job: dict[str, Any]) -> bool:
-    costing_fields = (
-        "actual_hours",
-        "actual_crew_size",
-        "actual_disposal_cost_cad",
-        "actual_fuel_cost_cad",
-        "final_amount_collected_cad",
-        "payment_method",
-        "payment_status",
-        "job_profit_status",
-        "quote_accuracy_note",
-        "disposal_receipt_note",
-    )
-    return all(job.get(field) in (None, "") for field in costing_fields)
+    return any(job.get(field) in (None, "") for field in CORE_COSTING_FIELDS)
 
 
 def _missing_booking_preferences(job: dict[str, Any]) -> bool:
