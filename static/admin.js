@@ -195,7 +195,7 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
+  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
@@ -330,6 +330,81 @@ function makeStatusBadge(status) {
   badge.className = "statusBadge status-" + key;
   badge.textContent = statusLabel(status);
   return badge;
+}
+
+function renderOpsQueue(queue) {
+  const box = document.getElementById("opsQueueBox");
+  if (!box) return;
+  clearNode(box);
+
+  const sections = Array.isArray(queue && queue.sections) ? queue.sections : [];
+  if (!sections.length) {
+    return addEmptyState(box, "No Daily Ops Queue sections available.");
+  }
+
+  const grid = document.createElement("div");
+  grid.className = "opsQueueGrid";
+
+  sections.forEach((section) => {
+    const card = document.createElement("section");
+    card.className = "opsQueueSection";
+
+    const header = document.createElement("div");
+    header.className = "opsQueueSectionHeader";
+
+    const title = document.createElement("div");
+    title.className = "opsQueueSectionTitle";
+    title.textContent = section.title || section.id || "Queue";
+
+    const count = document.createElement("span");
+    count.className = "opsQueueCount";
+    count.textContent = String(section.count || 0);
+
+    header.append(title, count);
+    card.appendChild(header);
+
+    const items = Array.isArray(section.items) ? section.items : [];
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "small muted";
+      empty.textContent = "No attention items in this section.";
+      card.appendChild(empty);
+      grid.appendChild(card);
+      return;
+    }
+
+    const list = document.createElement("ul");
+    list.className = "opsQueueList";
+    items.forEach((item) => {
+      const li = document.createElement("li");
+      li.className = "opsQueueItem";
+
+      const titleLine = document.createElement("div");
+      titleLine.className = "opsQueueItemTitle";
+      titleLine.textContent = item.customer_name || item.job_address || item.id || "Admin item";
+
+      const meta = document.createElement("div");
+      meta.className = "small muted opsQueueItemMeta";
+      const idText = item.job_id || item.request_id || item.quote_id || item.id || "";
+      const serviceText = item.service_type ? ` • ${item.service_type}` : "";
+      meta.textContent = `${statusLabel(item.status)}${serviceText}${idText ? " • " + idText : ""}`;
+
+      const reason = document.createElement("div");
+      reason.className = "small";
+      reason.textContent = item.reason || "";
+
+      const hint = document.createElement("div");
+      hint.className = "small muted opsQueueItemHint";
+      hint.textContent = item.action_hint || "Use the existing admin sections for manual action.";
+
+      li.append(titleLine, meta, reason, hint);
+      list.appendChild(li);
+    });
+    card.appendChild(list);
+    grid.appendChild(card);
+  });
+
+  box.appendChild(grid);
 }
 
 function formatConfidenceLevel(level) {
@@ -1610,6 +1685,9 @@ async function refreshAll() {
     setProtectedDashboardVisible(false);
     setLoading(true);
     statusLine.textContent = "Authenticating and loading admin data...";
+
+    const opsQueue = await fetchJSON("/admin/api/ops-queue");
+    renderOpsQueue(opsQueue);
 
     const quotes = await fetchJSON("/admin/api/quotes");
     renderQuotes((quotes.items || []));
