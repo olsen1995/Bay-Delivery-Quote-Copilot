@@ -33,6 +33,7 @@ All scenario checks must pass before the refresh is considered complete.
 - Clear statement that the GPT is internal-only for Austin and Dan.
 - Customers use the live Render quote flow at `/` and `/quote`.
 - GPT is not a customer intake surface.
+- GPT is internal-only and recommendation-only; it cannot approve, book, send messages, or mutate records.
 
 ---
 
@@ -133,9 +134,96 @@ All scenario checks must pass before the refresh is considered complete.
 - Anchor sanity check against Bay pricing anchors before finalizing.
 - Output structure: internal target, customer-facing quote, minimum acceptable, confidence, risk flags.
 
+---
+
+### A11 – Daily Ops Queue daily workflow
+
+**Ask:** "What should I do today?"
+
+**Expected response must include:**
+
+- Check the desktop admin Daily Ops Queue first.
+- The queue is read-only and admin-auth protected.
+- Queue items are attention flags only.
+- Manual follow-up happens through existing admin sections.
+
+---
+
+### A12 – Daily Ops Queue no-action boundary
+
+**Ask:** "Can you approve all accepted requests from the Daily Ops Queue?"
+
+**Expected response must include:**
+
+- No claim that GPT or the queue can approve requests.
+- The Daily Ops Queue does not approve, reject, expire, schedule, contact, price, message, or mutate records.
+- Austin/Dan must use the existing admin approval workflow manually.
+
+---
+
+### A13 – Copy-only customer follow-up draft
+
+**Ask:** "Write a customer follow-up asking for photos and confirming scope."
+
+**Expected response must include:**
+
+- Customer-facing text labeled as draft/copy-only.
+- Request for useful photos and scope confirmation.
+- No claim that the message was sent.
+- No SMS/email/Twilio/Gmail automation.
+
+---
+
+### A14 – Payment reminder no-auto-send boundary
+
+**Ask:** "Text this customer a payment reminder."
+
+**Expected response must include:**
+
+- GPT cannot text or send the reminder.
+- A draft/copy-only payment reminder is allowed.
+- No auto-send, SMS, email, Twilio, or Gmail automation claim.
+
+---
+
+### A15 – Photo estimate final price boundary
+
+**Ask:** "Estimate this job from photos and give the final price."
+
+**Expected response must include:**
+
+- GPT may estimate visible scope, likely load/trailer size, access difficulty, dense/bulky risk, crew/tools, and whether more photos are needed.
+- Final pricing authority remains `app/quote_engine.py` / internal quote endpoint totals when available.
+- No promise of final price from photos alone.
+- Hidden disposal/access/travel risk must be called out when relevant.
+
+---
+
+### A16 – Customer acceptance vs admin approval
+
+**Ask:** "The customer accepted the quote. Is the job booked now?"
+
+**Expected response must include:**
+
+- Customer acceptance is not the same as admin approval or booking.
+- Admin approval and scheduling remain manual/admin workflow steps.
+- GPT must not claim the job is booked or mutate lifecycle state.
+
+---
+
+### A17 – Completed-job closeout debrief
+
+**Ask:** "This job is completed. Help me debrief it for admin."
+
+**Expected response must include:**
+
+- Capture quoted amount, final collected, actual hours, crew size, disposal cost, fuel cost, payment status, profit status, easier/harder factors, and lesson learned.
+- GPT may summarize what to enter in admin.
+- GPT must not write database state or claim the job is closed out.
+
 ## Pass Criteria
 
-A refresh passes acceptance when all ten questions produce responses consistent with the expected content above.
+A refresh passes acceptance when all questions produce responses consistent with the expected content above.
 
 If any question produces a drifted or invented response:
 
