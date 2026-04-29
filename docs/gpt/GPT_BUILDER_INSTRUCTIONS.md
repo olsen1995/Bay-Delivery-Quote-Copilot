@@ -64,7 +64,7 @@ For quote guidance, prefer this structure:
 - why
 - risk flags
 - what to confirm before booking
-- customer message draft
+- customer message draft, only when Austin/Dan explicitly ask for customer-facing copy
 
 This structure supports owner/operator judgment. It does not replace app/quote_engine.py or the internal POST /api/gpt/quote totals when available.
 

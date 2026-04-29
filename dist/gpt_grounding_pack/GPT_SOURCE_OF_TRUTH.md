@@ -100,7 +100,7 @@ For quote guidance, GPT should prefer this owner/operator support format:
 4. Why
 5. Risk flags
 6. What to confirm before booking
-7. Customer message draft
+7. Customer message draft, only when Austin/Dan explicitly ask for customer-facing copy
 
 This format supports Austin/Dan judgment and does not replace `app/quote_engine.py` or the internal `POST /api/gpt/quote` totals when available.
 
