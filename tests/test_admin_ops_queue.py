@@ -100,12 +100,13 @@ def _seed_job(
     quote_id: str,
     request_id: str,
     status: str = "approved",
+    created_at: str = "2026-04-28T11:00:00",
     scheduled_start: str | None = None,
     costing: dict[str, Any] | None = None,
 ) -> None:
     record: dict[str, Any] = {
         "job_id": job_id,
-        "created_at": "2026-04-28T11:00:00",
+        "created_at": created_at,
         "status": status,
         "quote_id": quote_id,
         "request_id": request_id,
@@ -130,6 +131,29 @@ def _seed_job(
 
 def _sections(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {section["id"]: section for section in payload["sections"]}
+
+
+def test_storage_list_helpers_offset_zero_preserves_default_order_and_offset_one_advances(
+    isolated_db: Path,
+) -> None:
+    _seed_quote("q-old", created_at="2026-04-28T09:00:00")
+    _seed_quote("q-new", created_at="2026-04-28T10:00:00")
+    _seed_request("req-old", quote_id="q-old", created_at="2026-04-28T09:05:00")
+    _seed_request("req-new", quote_id="q-new", created_at="2026-04-28T10:05:00")
+    _seed_job("job-old", quote_id="q-old", request_id="req-old", created_at="2026-04-28T09:10:00")
+    _seed_job("job-new", quote_id="q-new", request_id="req-new", created_at="2026-04-28T10:10:00")
+
+    assert storage.list_quotes(limit=1) == storage.list_quotes(limit=1, offset=0)
+    assert storage.list_quote_requests(limit=1, include_followup_status=True) == storage.list_quote_requests(
+        limit=1,
+        include_followup_status=True,
+        offset=0,
+    )
+    assert storage.list_quote_requests(limit=1) == storage.list_quote_requests(limit=1, offset=0)
+    assert storage.list_jobs(limit=1) == storage.list_jobs(limit=1, offset=0)
+    assert storage.list_quotes(limit=1, offset=1)[0]["quote_id"] == "q-old"
+    assert storage.list_quote_requests(limit=1, include_followup_status=True, offset=1)[0]["request_id"] == "req-old"
+    assert storage.list_jobs(limit=1, offset=1)[0]["job_id"] == "job-old"
 
 
 def test_admin_ops_queue_requires_auth(client: TestClient, isolated_db: Path) -> None:

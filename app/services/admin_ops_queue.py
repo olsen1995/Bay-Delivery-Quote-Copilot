@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 from app.storage import list_jobs, list_quote_requests, list_quotes
 
 STALE_PENDING_ESTIMATE_DAYS = 7
 SOURCE_LIST_LIMIT = 100
-MAX_SOURCE_LIST_LIMIT = 100000
+MAX_SOURCE_RECORDS = 100000
 SECTION_ITEM_LIMIT = 10
 
 OPEN_FOLLOWUP_STATUSES = {
@@ -40,9 +40,15 @@ CORE_COSTING_FIELDS = (
 
 def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
     generated_at = _utc_now(now)
-    quotes = _load_available(lambda limit: list_quotes(limit=limit))
-    requests = _load_available(lambda limit: list_quote_requests(limit=limit, include_followup_status=True))
-    jobs = _load_available(lambda limit: list_jobs(limit=limit))
+    quotes = _load_available(lambda limit, offset: list_quotes(limit=limit, offset=offset))
+    requests = _load_available(
+        lambda limit, offset: list_quote_requests(
+            limit=limit,
+            include_followup_status=True,
+            offset=offset,
+        )
+    )
+    jobs = _load_available(lambda limit, offset: list_jobs(limit=limit, offset=offset))
 
     section_defs = [
         (
@@ -156,13 +162,20 @@ def _utc_now(now: datetime | None) -> datetime:
     return now.astimezone(timezone.utc)
 
 
-def _load_available(fetcher: Any) -> list[dict[str, Any]]:
-    limit = SOURCE_LIST_LIMIT
+def _load_available(fetcher: Callable[[int, int], list[Any]]) -> list[Any]:
+    out: list[Any] = []
+    offset = 0
     while True:
-        items = fetcher(limit)
-        if len(items) < limit or limit >= MAX_SOURCE_LIST_LIMIT:
-            return items
-        limit = min(limit * 2, MAX_SOURCE_LIST_LIMIT)
+        remaining = MAX_SOURCE_RECORDS - len(out)
+        if remaining <= 0:
+            return out
+
+        limit = min(SOURCE_LIST_LIMIT, remaining)
+        batch = fetcher(limit, offset)
+        out.extend(batch)
+        if len(batch) < limit:
+            return out
+        offset += len(batch)
 
 
 def _parse_datetime(value: Any) -> datetime | None:

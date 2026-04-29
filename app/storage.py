@@ -910,7 +910,7 @@ def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
     return cast(QuoteRecord, out)
 
 
-def list_quotes(limit: int = 50, *, include_expired: bool = False) -> List[QuoteRecord]:
+def list_quotes(limit: int = 50, *, include_expired: bool = False, offset: int = 0) -> List[QuoteRecord]:
     conn = _connect()
     try:
         where_sql = "" if include_expired else "WHERE COALESCE(admin_status, 'pending') != 'expired'"
@@ -920,9 +920,9 @@ def list_quotes(limit: int = 50, *, include_expired: bool = False) -> List[Quote
             FROM quotes
             {where_sql}
             ORDER BY datetime(created_at) DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
-            (int(limit),),
+            (int(limit), int(offset)),
         ).fetchall()
     finally:
         conn.close()
@@ -1131,7 +1131,12 @@ def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
     return get_quote_request(row["request_id"])
 
 
-def list_quote_requests(limit: int = 50, *, include_followup_status: bool = False) -> List[QuoteRequest]:
+def list_quote_requests(
+    limit: int = 50,
+    *,
+    include_followup_status: bool = False,
+    offset: int = 0,
+) -> List[QuoteRequest]:
     conn = _connect()
     try:
         rows = conn.execute(
@@ -1139,9 +1144,9 @@ def list_quote_requests(limit: int = 50, *, include_followup_status: bool = Fals
             SELECT request_id
             FROM quote_requests
             ORDER BY datetime(created_at) DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
-            (int(limit),),
+            (int(limit), int(offset)),
         ).fetchall()
     finally:
         conn.close()
@@ -1613,7 +1618,7 @@ def get_job_by_quote_id(quote_id: str) -> Optional[Job]:
     return get_job(row["job_id"])
 
 
-def list_jobs(limit: int = 50) -> List[Job]:
+def list_jobs(limit: int = 50, *, offset: int = 0) -> List[Job]:
     conn = _connect()
     try:
         rows = conn.execute(
@@ -1621,9 +1626,9 @@ def list_jobs(limit: int = 50) -> List[Job]:
             SELECT job_id
             FROM jobs
             ORDER BY datetime(created_at) DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
-            (int(limit),),
+            (int(limit), int(offset)),
         ).fetchall()
     finally:
         conn.close()
