@@ -67,11 +67,15 @@ components:
           maxLength: 1000
           description: Customer-visible job details or internal scope notes to price.
         pickup_address:
-          type: string
+          type:
+            - string
+            - "null"
           maxLength: 250
           description: Required with dropoff_address for small_move and item_delivery.
         dropoff_address:
-          type: string
+          type:
+            - string
+            - "null"
           maxLength: 250
           description: Required with pickup_address for small_move and item_delivery.
         estimated_hours:
@@ -90,28 +94,37 @@ components:
           default: 0
           description: Number of garbage bags for haul_away load detail.
         bag_type:
-          type: string
+          type:
+            - string
+            - "null"
           enum:
             - light
             - heavy_mixed
             - construction_debris
+            - null
           description: Bag material class for haul_away.
         trailer_fill_estimate:
-          type: string
+          type:
+            - string
+            - "null"
           enum:
             - under_quarter
             - quarter
             - half
             - three_quarter
             - full
+            - null
           description: Trailer space estimate for haul_away load detail.
         trailer_class:
-          type: string
+          type:
+            - string
+            - "null"
           enum:
             - single_axle_open_aluminum
             - double_axle_open_aluminum
             - older_enclosed
             - newer_enclosed
+            - null
           description: Trailer type when it materially affects the quote.
         mattresses_count:
           type: integer
@@ -151,10 +164,13 @@ components:
           default: false
           description: Whether dense or heavy materials are present.
         load_mode:
-          type: string
+          type:
+            - string
+            - "null"
           enum:
             - standard
             - space_fill
+            - null
           default: standard
           description: Use space_fill only for haul_away trailer-space style estimates.
     GptQuoteResponse:
