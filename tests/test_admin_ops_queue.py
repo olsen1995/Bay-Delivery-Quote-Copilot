@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app import storage
 from app.main import app
-from app.services.admin_ops_queue import SECTION_ITEM_LIMIT, SOURCE_LIST_LIMIT
+from app.services.admin_ops_queue import SECTION_ITEM_LIMIT
 
 
 @pytest.fixture
@@ -229,7 +229,7 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     admin_headers: dict[str, str],
     isolated_db: Path,
 ) -> None:
-    total_records = SOURCE_LIST_LIMIT + 2
+    total_records = SECTION_ITEM_LIMIT + 2
     for index in range(total_records):
         quote_id = f"q-cap-{index:02d}"
         _seed_quote(quote_id, created_at=f"2099-04-{(index % 28) + 1:02d}T09:00:00")
@@ -256,6 +256,33 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     assert storage.list_quote_requests(limit=50, include_followup_status=True) == before_requests
     assert storage.list_jobs(limit=50) == before_jobs
     assert storage.list_quotes(limit=50) == before_quotes
+
+
+def test_admin_ops_queue_does_not_require_full_item_hydration(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_quote("q-targeted")
+    _seed_request("req-targeted", quote_id="q-targeted")
+    _seed_job("job-targeted", quote_id="q-targeted", request_id="req-targeted", status="completed")
+
+    def fail_hydration(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("ops queue should use targeted source queries")
+
+    monkeypatch.setattr(storage, "get_quote_request_record", fail_hydration)
+    monkeypatch.setattr(storage, "get_quote_request", fail_hydration)
+    monkeypatch.setattr(storage, "get_job", fail_hydration)
+    monkeypatch.setattr(storage, "list_quotes", fail_hydration)
+    monkeypatch.setattr(storage, "list_quote_requests", fail_hydration)
+    monkeypatch.setattr(storage, "list_jobs", fail_hydration)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["accepted_needing_approval"] == 1
+    assert resp.json()["counts"]["completed_missing_costing"] == 1
 
 
 def test_completed_job_with_partial_core_costing_still_appears(
@@ -304,22 +331,24 @@ def test_completed_job_with_core_costing_is_not_marked_missing(
     assert all(item["job_id"] != "job-costed" for item in section["items"])
 
 
-def test_old_stale_pending_estimate_beyond_prior_source_cap_is_counted(
+def test_stale_pending_estimates_beyond_display_cap_are_counted(
     client: TestClient,
     admin_headers: dict[str, str],
     isolated_db: Path,
 ) -> None:
-    for index in range(SOURCE_LIST_LIMIT):
+    total_stale = SECTION_ITEM_LIMIT + 2
+    for index in range(total_stale):
         _seed_quote(
-            f"q-new-{index:05d}",
-            created_at=f"2099-04-{(index % 28) + 1:02d}T09:00:00",
+            f"q-stale-{index:05d}",
+            created_at=f"2000-01-{(index % 28) + 1:02d}T09:00:00",
         )
-    _seed_quote("q-old-stale", created_at="2000-01-01T09:00:00")
+    _seed_quote("q-expired-stale", created_at="2000-01-01T09:00:00", admin_status="expired")
 
     resp = client.get("/admin/api/ops-queue", headers=admin_headers)
 
     assert resp.status_code == 200
     section = _sections(resp.json())["stale_pending_estimates"]
-    assert resp.json()["counts"]["stale_pending_estimates"] >= 1
-    assert any(item["quote_id"] == "q-old-stale" for item in section["items"])
-    assert len(section["items"]) <= SECTION_ITEM_LIMIT
+    assert resp.json()["counts"]["stale_pending_estimates"] == total_stale
+    assert section["count"] == total_stale
+    assert len(section["items"]) == SECTION_ITEM_LIMIT
+    assert all(item["quote_id"] != "q-expired-stale" for item in section["items"])

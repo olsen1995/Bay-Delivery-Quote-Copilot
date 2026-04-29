@@ -482,6 +482,13 @@ def test_desktop_admin_includes_daily_ops_queue_only() -> None:
     assert "Daily Ops Queue" in admin_html
     assert "Nothing is approved, expired, scheduled, or contacted from this queue." in admin_html
     assert 'const opsQueue = await fetchJSON("/admin/api/ops-queue");' in admin_js
+    assert "async function refreshOpsQueueBestEffort()" in admin_js
+    assert "function renderOpsQueueError()" in admin_js
+    assert "Daily Ops Queue could not load. Core admin data is still available." in admin_js
+    assert "void refreshOpsQueueBestEffort();" in admin_js
+    refresh_all = re.search(r"async function refreshAll\(\) \{(?P<body>.*?)\n\}\n\nfunction handleCredsKeydown", admin_js, re.S)
+    assert refresh_all is not None
+    assert "/admin/api/ops-queue" not in refresh_all.group("body")
     assert "function renderOpsQueue(queue)" in admin_js
     assert ".opsQueueGrid" in admin_css
     assert ".opsQueueSection" in admin_css

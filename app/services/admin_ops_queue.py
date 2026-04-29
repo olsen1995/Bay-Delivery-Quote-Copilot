@@ -1,24 +1,13 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable
+from typing import Any
 
-from app.storage import list_jobs, list_quote_requests, list_quotes
+from app.storage import load_admin_ops_queue_sources
 
 STALE_PENDING_ESTIMATE_DAYS = 7
-SOURCE_LIST_LIMIT = 100
-MAX_SOURCE_RECORDS = 100000
 SECTION_ITEM_LIMIT = 10
-
-OPEN_FOLLOWUP_STATUSES = {
-    "needs_followup",
-    "contacted",
-    "waiting_on_customer",
-    "not_ready",
-}
-
-OPEN_JOB_STATUSES = {"approved", "scheduled", "in_progress"}
-SCHEDULE_EXPECTED_STATUSES = {"approved", "scheduled"}
 
 COUNT_KEYS = (
     "accepted_needing_approval",
@@ -29,26 +18,16 @@ COUNT_KEYS = (
     "stale_pending_estimates",
 )
 
-CORE_COSTING_FIELDS = (
-    "actual_hours",
-    "actual_crew_size",
-    "final_amount_collected_cad",
-    "payment_status",
-    "job_profit_status",
-)
-
 
 def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
     generated_at = _utc_now(now)
-    quotes = _load_available(lambda limit, offset: list_quotes(limit=limit, offset=offset))
-    requests = _load_available(
-        lambda limit, offset: list_quote_requests(
-            limit=limit,
-            include_followup_status=True,
-            offset=offset,
-        )
+    stale_pending_before = generated_at - timedelta(days=STALE_PENDING_ESTIMATE_DAYS)
+    sources = load_admin_ops_queue_sources(
+        item_limit=SECTION_ITEM_LIMIT,
+        stale_pending_before_iso=stale_pending_before.isoformat(),
     )
-    jobs = _load_available(lambda limit, offset: list_jobs(limit=limit, offset=offset))
+    source_counts = sources["counts"]
+    source_items = sources["items"]
 
     section_defs = [
         (
@@ -60,8 +39,7 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
                     reason="Customer accepted the estimate and is waiting for admin review.",
                     action_hint="Review Booking Requests, then approve or reject from the existing table.",
                 )
-                for request in requests
-                if request.get("status") == "customer_accepted"
+                for request in source_items.get("accepted_needing_approval", [])
             ],
         ),
         (
@@ -73,8 +51,7 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
                     reason=f"Follow-up marker: {_label_followup_status(request.get('followup_status'))}.",
                     action_hint="Use Booking Requests to review the marker, contact status, and next manual step.",
                 )
-                for request in requests
-                if str(request.get("followup_status") or "") in OPEN_FOLLOWUP_STATUSES
+                for request in source_items.get("followup_marked", [])
             ],
         ),
         (
@@ -86,8 +63,7 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
                     reason="Job is completed, but completed-job costing has not been filled in.",
                     action_hint="Use Jobs to enter actual hours, costs, payment status, and quote accuracy notes.",
                 )
-                for job in jobs
-                if job.get("status") == "completed" and _job_costing_missing(job)
+                for job in source_items.get("completed_missing_costing", [])
             ],
         ),
         (
@@ -99,8 +75,7 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
                     reason="Job is open and has no scheduled start time.",
                     action_hint="Use Jobs to schedule or reschedule from the existing controls.",
                 )
-                for job in jobs
-                if str(job.get("status") or "") in SCHEDULE_EXPECTED_STATUSES and not job.get("scheduled_start")
+                for job in source_items.get("jobs_missing_schedule", [])
             ],
         ),
         (
@@ -112,8 +87,7 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
                     reason=_missing_booking_preferences_reason(job),
                     action_hint="Review the linked request context and follow up manually before scheduling.",
                 )
-                for job in jobs
-                if str(job.get("status") or "") in OPEN_JOB_STATUSES and _missing_booking_preferences(job)
+                for job in source_items.get("jobs_missing_booking_preferences", [])
             ],
         ),
         (
@@ -125,8 +99,7 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
                     reason=f"Pending estimate is older than {STALE_PENDING_ESTIMATE_DAYS} days.",
                     action_hint="Review Recent Estimates manually; this queue does not expire records.",
                 )
-                for quote in quotes
-                if _is_stale_pending_quote(quote, generated_at)
+                for quote in source_items.get("stale_pending_estimates", [])
             ],
         ),
     ]
@@ -134,13 +107,13 @@ def build_admin_ops_queue(*, now: datetime | None = None) -> dict[str, Any]:
     counts: dict[str, int] = {}
     sections: list[dict[str, Any]] = []
     for section_id, title, items in section_defs:
-        counts[section_id] = len(items)
+        counts[section_id] = int(source_counts.get(section_id, len(items)))
         sections.append(
             {
                 "id": section_id,
                 "title": title,
-                "count": len(items),
-                "items": items[:SECTION_ITEM_LIMIT],
+                "count": counts[section_id],
+                "items": items,
             }
         )
 
@@ -160,39 +133,6 @@ def _utc_now(now: datetime | None) -> datetime:
     if now.tzinfo is None:
         return now.replace(tzinfo=timezone.utc)
     return now.astimezone(timezone.utc)
-
-
-def _load_available(fetcher: Callable[[int, int], list[Any]]) -> list[Any]:
-    out: list[Any] = []
-    offset = 0
-    while True:
-        remaining = MAX_SOURCE_RECORDS - len(out)
-        if remaining <= 0:
-            return out
-
-        limit = min(SOURCE_LIST_LIMIT, remaining)
-        batch = fetcher(limit, offset)
-        out.extend(batch)
-        if len(batch) < limit:
-            return out
-        offset += len(batch)
-
-
-def _parse_datetime(value: Any) -> datetime | None:
-    if not value:
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
 
 
 def _base_item(kind: str, record: dict[str, Any], *, reason: str, action_hint: str) -> dict[str, Any]:
@@ -221,7 +161,7 @@ def _job_item(job: dict[str, Any], *, reason: str, action_hint: str) -> dict[str
 
 
 def _quote_item(quote: dict[str, Any], *, reason: str, action_hint: str) -> dict[str, Any]:
-    request = quote.get("request") if isinstance(quote.get("request"), dict) else {}
+    request = _quote_request_payload(quote)
     merged = {
         **request,
         "quote_id": quote.get("quote_id"),
@@ -241,34 +181,29 @@ def _label_followup_status(value: Any) -> str:
     return labels.get(str(value or ""), str(value or "Marked"))
 
 
-def _job_costing_missing(job: dict[str, Any]) -> bool:
-    return any(job.get(field) in (None, "") for field in CORE_COSTING_FIELDS)
-
-
-def _missing_booking_preferences(job: dict[str, Any]) -> bool:
-    context = job.get("scheduling_context")
-    if isinstance(context, dict):
-        missing = context.get("missing_fields")
-        if isinstance(missing, list):
-            return bool(missing)
-        return not context.get("requested_job_date") or not context.get("requested_time_window")
-    return False
+def _quote_request_payload(quote: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(quote.get("request"), dict):
+        return quote["request"]
+    request_json = quote.get("request_json")
+    if isinstance(request_json, dict):
+        return request_json
+    if isinstance(request_json, str):
+        try:
+            parsed = json.loads(request_json)
+        except ValueError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 
 
 def _missing_booking_preferences_reason(job: dict[str, Any]) -> str:
-    context = job.get("scheduling_context")
-    if not isinstance(context, dict):
-        return "Linked booking preference context is unavailable."
-    missing = context.get("missing_fields")
-    if isinstance(missing, list) and missing:
-        return "Missing booking preference fields: " + ", ".join(str(item) for item in missing) + "."
+    missing: list[str] = []
+    if job.get("missing_quote_request"):
+        missing.append("quote_request")
+    if job.get("missing_requested_job_date"):
+        missing.append("requested_job_date")
+    if job.get("missing_requested_time_window"):
+        missing.append("requested_time_window")
+    if missing:
+        return "Missing booking preference fields: " + ", ".join(missing) + "."
     return "Booking preference date or time window is missing."
-
-
-def _is_stale_pending_quote(quote: dict[str, Any], now: datetime) -> bool:
-    if quote.get("admin_status", "pending") != "pending":
-        return False
-    created_at = _parse_datetime(quote.get("created_at"))
-    if created_at is None:
-        return False
-    return created_at <= now - timedelta(days=STALE_PENDING_ESTIMATE_DAYS)

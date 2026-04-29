@@ -407,6 +407,28 @@ function renderOpsQueue(queue) {
   box.appendChild(grid);
 }
 
+function renderOpsQueueError() {
+  const box = document.getElementById("opsQueueBox");
+  if (!box) return;
+  clearNode(box);
+  const div = document.createElement("div");
+  div.className = "emptyState";
+  const msg = document.createElement("span");
+  msg.className = "bad";
+  msg.textContent = "Daily Ops Queue could not load. Core admin data is still available.";
+  div.appendChild(msg);
+  box.appendChild(div);
+}
+
+async function refreshOpsQueueBestEffort() {
+  try {
+    const opsQueue = await fetchJSON("/admin/api/ops-queue");
+    renderOpsQueue(opsQueue);
+  } catch {
+    renderOpsQueueError();
+  }
+}
+
 function formatConfidenceLevel(level) {
   const normalized = String(level || "").trim().toLowerCase();
   if (!normalized) return "Unknown";
@@ -1686,9 +1708,6 @@ async function refreshAll() {
     setLoading(true);
     statusLine.textContent = "Authenticating and loading admin data...";
 
-    const opsQueue = await fetchJSON("/admin/api/ops-queue");
-    renderOpsQueue(opsQueue);
-
     const quotes = await fetchJSON("/admin/api/quotes");
     renderQuotes((quotes.items || []));
 
@@ -1715,6 +1734,7 @@ async function refreshAll() {
     }
 
     setProtectedDashboardVisible(true);
+    void refreshOpsQueueBestEffort();
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
     adminSessionReady = false;

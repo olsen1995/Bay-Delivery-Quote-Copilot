@@ -219,6 +219,11 @@ class GptQuoteObservabilityRecord(TypedDict):
     caller_grounding_revision: Optional[str]
 
 
+class AdminOpsQueueSources(TypedDict):
+    counts: Dict[str, int]
+    items: Dict[str, List[Dict[str, Any]]]
+
+
 def _validate_deposit_status(value: Any) -> None:
     if value is None:
         return
@@ -954,6 +959,180 @@ def list_quotes(limit: int = 50, *, include_expired: bool = False, offset: int =
         out.append(item)
 
     return out
+
+
+ADMIN_OPS_QUEUE_SECTION_IDS = (
+    "accepted_needing_approval",
+    "followup_marked",
+    "completed_missing_costing",
+    "jobs_missing_schedule",
+    "jobs_missing_booking_preferences",
+    "stale_pending_estimates",
+)
+
+
+def _admin_ops_row_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    return dict(row)
+
+
+def _count_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...] = ()) -> int:
+    row = conn.execute(sql, params).fetchone()
+    return int(row[0]) if row else 0
+
+
+def _list_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...]) -> List[Dict[str, Any]]:
+    return [_admin_ops_row_dict(row) for row in conn.execute(sql, params).fetchall()]
+
+
+def load_admin_ops_queue_sources(*, item_limit: int, stale_pending_before_iso: str) -> AdminOpsQueueSources:
+    """Return targeted read-only counts and capped source rows for the admin ops queue."""
+    capped_limit = max(0, int(item_limit))
+    section_items: Dict[str, List[Dict[str, Any]]] = {section_id: [] for section_id in ADMIN_OPS_QUEUE_SECTION_IDS}
+    section_counts: Dict[str, int] = {section_id: 0 for section_id in ADMIN_OPS_QUEUE_SECTION_IDS}
+
+    accepted_where = "status = 'customer_accepted'"
+    followup_where = (
+        "followup_status IN ('needs_followup', 'contacted', 'waiting_on_customer', 'not_ready')"
+    )
+    completed_missing_costing_where = (
+        "status = 'completed' AND ("
+        "actual_hours IS NULL OR actual_crew_size IS NULL OR "
+        "final_amount_collected_cad IS NULL OR "
+        "payment_status IS NULL OR TRIM(payment_status) = '' OR "
+        "job_profit_status IS NULL OR TRIM(job_profit_status) = ''"
+        ")"
+    )
+    jobs_missing_schedule_where = (
+        "status IN ('approved', 'scheduled') AND "
+        "(scheduled_start IS NULL OR TRIM(scheduled_start) = '')"
+    )
+    stale_pending_where = (
+        "COALESCE(admin_status, 'pending') = 'pending' AND datetime(created_at) <= datetime(?)"
+    )
+
+    conn = _connect()
+    try:
+        section_counts["accepted_needing_approval"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM quote_requests WHERE {accepted_where}",
+        )
+        section_items["accepted_needing_approval"] = _list_query(
+            conn,
+            f"""
+            SELECT request_id, created_at, status, quote_id, customer_name, customer_phone,
+                   job_address, service_type
+            FROM quote_requests
+            WHERE {accepted_where}
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        )
+
+        section_counts["followup_marked"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM quote_requests WHERE {followup_where}",
+        )
+        section_items["followup_marked"] = _list_query(
+            conn,
+            f"""
+            SELECT request_id, created_at, status, quote_id, customer_name, customer_phone,
+                   job_address, service_type, followup_status
+            FROM quote_requests
+            WHERE {followup_where}
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        )
+
+        section_counts["completed_missing_costing"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM jobs WHERE {completed_missing_costing_where}",
+        )
+        section_items["completed_missing_costing"] = _list_query(
+            conn,
+            f"""
+            SELECT job_id, created_at, status, quote_id, request_id, customer_name, customer_phone,
+                   job_address, service_type
+            FROM jobs
+            WHERE {completed_missing_costing_where}
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        )
+
+        section_counts["jobs_missing_schedule"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM jobs WHERE {jobs_missing_schedule_where}",
+        )
+        section_items["jobs_missing_schedule"] = _list_query(
+            conn,
+            f"""
+            SELECT job_id, created_at, status, quote_id, request_id, customer_name, customer_phone,
+                   job_address, service_type
+            FROM jobs
+            WHERE {jobs_missing_schedule_where}
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        )
+
+        missing_prefs_from = (
+            "jobs AS j LEFT JOIN quote_requests AS qr ON j.request_id = qr.request_id"
+        )
+        missing_prefs_where = (
+            "j.status IN ('approved', 'scheduled', 'in_progress') AND "
+            "(qr.request_id IS NULL OR qr.requested_job_date IS NULL OR "
+            "TRIM(qr.requested_job_date) = '' OR qr.requested_time_window IS NULL OR "
+            "TRIM(qr.requested_time_window) = '')"
+        )
+        section_counts["jobs_missing_booking_preferences"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM {missing_prefs_from} WHERE {missing_prefs_where}",
+        )
+        section_items["jobs_missing_booking_preferences"] = _list_query(
+            conn,
+            f"""
+            SELECT j.job_id, j.created_at, j.status, j.quote_id, j.request_id,
+                   j.customer_name, j.customer_phone, j.job_address, j.service_type,
+                   qr.requested_job_date, qr.requested_time_window,
+                   CASE WHEN qr.request_id IS NULL THEN 1 ELSE 0 END AS missing_quote_request,
+                   CASE WHEN qr.request_id IS NULL OR qr.requested_job_date IS NULL OR TRIM(qr.requested_job_date) = ''
+                        THEN 1 ELSE 0 END AS missing_requested_job_date,
+                   CASE WHEN qr.request_id IS NULL OR qr.requested_time_window IS NULL OR TRIM(qr.requested_time_window) = ''
+                        THEN 1 ELSE 0 END AS missing_requested_time_window
+            FROM {missing_prefs_from}
+            WHERE {missing_prefs_where}
+            ORDER BY datetime(j.created_at) DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        )
+
+        section_counts["stale_pending_estimates"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM quotes WHERE {stale_pending_where}",
+            (stale_pending_before_iso,),
+        )
+        section_items["stale_pending_estimates"] = _list_query(
+            conn,
+            f"""
+            SELECT quote_id, created_at, COALESCE(admin_status, 'pending') AS status,
+                   request_json
+            FROM quotes
+            WHERE {stale_pending_where}
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (stale_pending_before_iso, capped_limit),
+        )
+    finally:
+        conn.close()
+
+    return {"counts": section_counts, "items": section_items}
 
 
 def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:
