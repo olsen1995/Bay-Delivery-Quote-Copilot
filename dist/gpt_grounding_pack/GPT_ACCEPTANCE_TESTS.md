@@ -230,4 +230,4 @@ If any question produces a drifted or invented response:
 1. Note which question(s) failed.
 2. Review the grounding pack for gaps or conflicts.
 3. Re-export and re-upload following `docs/gpt/GPT_REFRESH_WORKFLOW.md`.
-4. Re-run all ten questions.
+4. Re-run all acceptance questions.
