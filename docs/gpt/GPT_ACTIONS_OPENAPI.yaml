@@ -1,0 +1,196 @@
+openapi: 3.1.0
+info:
+  title: Bay Delivery Internal GPT Quote Action
+  version: 0.10.1
+  description: Source schema for the internal Bay Delivery GPT Builder quote action.
+servers:
+  - url: https://bay-delivery-quote-copilot.onrender.com
+security:
+  - bearerAuth: []
+paths:
+  /api/gpt/quote:
+    post:
+      operationId: getGptQuote
+      summary: Get internal quote totals
+      description: Internal Bay Delivery quote calculation. Uses backend pricing, returns totals and risk context, and does not persist a quote.
+      x-openai-isConsequential: false
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GptQuoteRequest"
+      responses:
+        "200":
+          description: Authoritative quote totals and internal risk context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GptQuoteResponse"
+        "400":
+          description: Invalid business-rule input, such as an unknown service type or missing required load details.
+        "401":
+          description: Missing or invalid internal bearer token.
+        "422":
+          description: Request body does not match the action schema.
+        "429":
+          description: Internal GPT quote rate limit exceeded.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: internal-token
+      description: Internal bearer token expected by the backend. Do not store token values in this schema.
+  schemas:
+    GptQuoteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - service_type
+        - description
+      properties:
+        service_type:
+          type: string
+          enum:
+            - haul_away
+            - small_move
+            - item_delivery
+            - demolition
+            - scrap_pickup
+          description: "Use canonical backend values only. Map dump run, junk removal, haul-away, haul away, curbside pickup, garbage bags, couches, mattresses, general removal to haul_away; small moving job to small_move; item delivery, marketplace delivery, pickup/drop-off to item_delivery; demolition, tear-out, floor removal, structure teardown labour to demolition; scrap metal pickup to scrap_pickup."
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Customer-visible job details or internal scope notes to price.
+        pickup_address:
+          type: string
+          maxLength: 250
+          description: Required with dropoff_address for small_move and item_delivery.
+        dropoff_address:
+          type: string
+          maxLength: 250
+          description: Required with pickup_address for small_move and item_delivery.
+        estimated_hours:
+          type: number
+          minimum: 0
+          default: 0
+          description: Estimated labour hours when relevant.
+        crew_size:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Crew size to evaluate when relevant.
+        garbage_bag_count:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of garbage bags for haul_away load detail.
+        bag_type:
+          type: string
+          enum:
+            - light
+            - heavy_mixed
+            - construction_debris
+          description: Bag material class for haul_away.
+        trailer_fill_estimate:
+          type: string
+          enum:
+            - under_quarter
+            - quarter
+            - half
+            - three_quarter
+            - full
+          description: Trailer space estimate for haul_away load detail.
+        trailer_class:
+          type: string
+          enum:
+            - single_axle_open_aluminum
+            - double_axle_open_aluminum
+            - older_enclosed
+            - newer_enclosed
+          description: Trailer type when it materially affects the quote.
+        mattresses_count:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of mattresses in the haul-away scope.
+        box_springs_count:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of box springs in the haul-away scope.
+        scrap_pickup_location:
+          type: string
+          enum:
+            - curbside
+            - inside
+          default: curbside
+          description: Pickup location for scrap_pickup.
+        travel_zone:
+          type: string
+          enum:
+            - in_town
+            - surrounding
+            - out_of_town
+          default: in_town
+          description: Travel zone for margin-protected travel adders.
+        access_difficulty:
+          type: string
+          enum:
+            - normal
+            - difficult
+            - extreme
+          default: normal
+          description: Access difficulty for stairs, long carry, tight access, or similar constraints.
+        has_dense_materials:
+          type: boolean
+          default: false
+          description: Whether dense or heavy materials are present.
+        load_mode:
+          type: string
+          enum:
+            - standard
+            - space_fill
+          default: standard
+          description: Use space_fill only for haul_away trailer-space style estimates.
+    GptQuoteResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - cash_total_cad
+        - emt_total_cad
+        - disclaimer
+        - normalized_service_type
+        - confidence_level
+        - risk_flags
+      properties:
+        cash_total_cad:
+          type: number
+          description: Authoritative cash total in CAD from backend pricing.
+        emt_total_cad:
+          type: number
+          description: Authoritative EMT/e-transfer total in CAD from backend pricing.
+        disclaimer:
+          type: string
+          description: Backend quote disclaimer.
+        normalized_service_type:
+          type: string
+          enum:
+            - haul_away
+            - small_move
+            - item_delivery
+            - demolition
+            - scrap_pickup
+          description: Canonical service type returned by the backend.
+        confidence_level:
+          type: string
+          description: Internal quote confidence signal from backend risk assessment.
+        risk_flags:
+          type: array
+          items:
+            type: string
+          description: Internal risk flags from backend risk assessment.
