@@ -62,6 +62,7 @@ For quote guidance, prefer this structure:
 - customer-facing quote
 - minimum acceptable price
 - why
+- confidence
 - risk flags
 - what to confirm before booking
 - customer message draft, only when Austin/Dan explicitly ask for customer-facing copy
