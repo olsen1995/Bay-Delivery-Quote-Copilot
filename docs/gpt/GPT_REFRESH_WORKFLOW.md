@@ -59,6 +59,8 @@ If `docs/gpt/GPT_BUILDER_INSTRUCTIONS.md` changed in this release:
 - Open the **Instructions** field in GPT Builder.
 - Replace the existing block with the updated block from `docs/gpt/GPT_BUILDER_INSTRUCTIONS.md`.
 
+When rebuilding or refreshing GPT Builder Actions, verify the Action schema against `docs/gpt/GPT_ACTIONS_OPENAPI.yaml`.
+
 ### 6. Save and publish
 
 Save and publish the updated GPT in Builder.
