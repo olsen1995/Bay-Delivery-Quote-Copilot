@@ -57,6 +57,8 @@ DEFAULT_EXTS = {
     ".py", ".md", ".txt", ".html", ".css", ".js", ".json", ".yml", ".yaml",
 }
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 DEFAULT_PATHS = (
     "app",
     "static",
@@ -82,7 +84,7 @@ DEFAULT_PATHS = (
 
 def _iter_files(paths: Sequence[str]) -> Iterator[Path]:
     if not paths:
-        paths = DEFAULT_PATHS
+        paths = tuple(str(REPO_ROOT / relative_path) for relative_path in DEFAULT_PATHS)
 
     for raw in paths:
         p = Path(raw)
