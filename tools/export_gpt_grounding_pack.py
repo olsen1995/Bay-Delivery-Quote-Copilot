@@ -9,8 +9,8 @@ and writes a manifest.json with SHA-256 hashes for auditability.
 Usage:
     python tools/export_gpt_grounding_pack.py --output-dir dist/gpt_grounding_pack
 
-The output directory is suitable for manual upload to GPT Builder.
-Do NOT commit the output directory to the repository.
+The dist/gpt_grounding_pack output is generated but repo-tracked. Commit it only
+when intentionally refreshing the GPT Builder upload package.
 """
 
 import argparse
