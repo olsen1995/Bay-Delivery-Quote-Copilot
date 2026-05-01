@@ -9,6 +9,9 @@ Commands:
   python tools/unicode_guard.py check [paths...]
   python tools/unicode_guard.py fix [--rewrite] [paths...]
 
+When no paths are provided, the guard scans the repo's source, docs, tooling,
+and root text/config files. Pass explicit paths to scan a custom scope.
+
 Behavior:
 - Detects/removes:
   * Bidi controls: U+061C, U+200E, U+200F, U+202A..U+202E, U+2066..U+2069
@@ -54,16 +57,34 @@ DEFAULT_EXTS = {
     ".py", ".md", ".txt", ".html", ".css", ".js", ".json", ".yml", ".yaml",
 }
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+DEFAULT_PATHS = (
+    "app",
+    "static",
+    "tests",
+    "tools",
+    "scripts",
+    "docs",
+    ".github",
+    ".claude",
+    "README.md",
+    "AGENTS.md",
+    "PROJECT_RULES.md",
+    "DEPLOYMENT_NOTES.md",
+    "render.yaml",
+    "requirements.txt",
+    "requirements.lock.txt",
+    "VERSION",
+    "canon_versions.txt",
+    ".gitignore",
+    ".gitattributes",
+)
+
 
 def _iter_files(paths: Sequence[str]) -> Iterator[Path]:
     if not paths:
-        root = Path(".")
-        for p in root.rglob("*"):
-            if not p.is_file():
-                continue
-            if p.suffix.lower() in DEFAULT_EXTS:
-                yield p
-        return
+        paths = tuple(str(REPO_ROOT / relative_path) for relative_path in DEFAULT_PATHS)
 
     for raw in paths:
         p = Path(raw)
@@ -217,11 +238,19 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_check = sub.add_parser("check", help="scan for hidden/bidi/control characters")
-    p_check.add_argument("paths", nargs="*", help="files/dirs to scan (default: repo-wide)")
+    p_check.add_argument(
+        "paths",
+        nargs="*",
+        help="files/dirs to scan (default: source/docs/tooling scope)",
+    )
 
     p_fix = sub.add_parser("fix", help="remove hidden/bidi/control characters")
     p_fix.add_argument("--rewrite", action="store_true", help="rewrite files cleanly even if 0 chars removed")
-    p_fix.add_argument("paths", nargs="*", help="files/dirs to fix (default: repo-wide)")
+    p_fix.add_argument(
+        "paths",
+        nargs="*",
+        help="files/dirs to fix (default: source/docs/tooling scope)",
+    )
     return parser
 
 

@@ -172,7 +172,7 @@ def _right_column(styles: dict[str, ParagraphStyle]):
                 "<font name='Courier'>python -m pip install --upgrade pip</font>",
                 "<font name='Courier'>pip install -r requirements.txt</font>",
                 "<font name='Courier'>uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload</font>",
-                "Open <font name='Courier'>http://127.0.0.1:8000/</font>. Optional admin credentials are present in repo root <font name='Courier'>.env</font>; Google Drive/Calendar env setup steps are <b>Not found in repo</b> as a single local run guide.",
+                "Open <font name='Courier'>http://127.0.0.1:8000/</font>. Optional local-only admin credentials may live in an untracked repo root <font name='Courier'>.env</font>; production secrets belong in Render environment settings. Google Drive/Calendar env setup steps are <b>Not found in repo</b> as a single local run guide.",
             ],
             styles["code"],
         ),
