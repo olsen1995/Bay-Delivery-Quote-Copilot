@@ -477,8 +477,12 @@ def _drive_enabled() -> bool:
 def _health_commit_fingerprint() -> str | None:
     for env_name in _DEPLOY_COMMIT_ENV_VARS:
         commit = os.getenv(env_name, "").strip()
-        if commit:
-            return commit[:12]
+        if len(commit) < 12:
+            continue
+
+        fingerprint = commit[:12]
+        if re.fullmatch(r"[0-9a-fA-F]{12}", fingerprint):
+            return fingerprint.lower()
     return None
 
 
