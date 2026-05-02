@@ -11,7 +11,13 @@ from fastapi.testclient import TestClient
 
 def _reload_main_with_env(env_vars: dict[str, str]) -> object:
     # clear both envs then set provided ones
-    for var in ("BAYDELIVERY_CORS_ORIGINS", "CORS_ORIGINS", "LOCAL_TIMEZONE"):
+    for var in (
+        "BAYDELIVERY_CORS_ORIGINS",
+        "CORS_ORIGINS",
+        "LOCAL_TIMEZONE",
+        "BAYDELIVERY_COMMIT_SHA",
+        "RENDER_GIT_COMMIT",
+    ):
         os.environ.pop(var, None)
     os.environ.update(env_vars)
     # reload module so CORS middleware is reconfigured
@@ -83,6 +89,47 @@ def test_cors_default(monkeypatch):
     with TestClient(main.app) as client:
         resp = client.get("/", headers={"Origin": "http://localhost:3000"})
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_health_commit_is_null_when_commit_envs_missing() -> None:
+    main = _reload_main_with_env({"BAYDELIVERY_CORS_ORIGINS": "https://foo"})
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json()["commit"] is None
+
+
+def test_health_commit_prefers_explicit_baydelivery_commit_sha() -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "BAYDELIVERY_COMMIT_SHA": "1234567890abcdef1234567890abcdef12345678",
+            "RENDER_GIT_COMMIT": "abcdef1234567890abcdef1234567890abcdef12",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json()["commit"] == "1234567890ab"
+
+
+def test_health_commit_falls_back_to_render_git_commit() -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "RENDER_GIT_COMMIT": "abcdef1234567890abcdef1234567890abcdef12",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json()["commit"] == "abcdef123456"
 
 
 def _admin_basic_header() -> str:
