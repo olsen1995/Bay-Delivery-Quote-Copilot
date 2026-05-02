@@ -70,6 +70,8 @@ Run live-safe smoke when:
 Preferred path:
 
 - Trigger GitHub Actions workflow: `.github/workflows/production_live_safe_smoke.yml`
+  - This path runs the existing GPT observability live-safe assertion and then verifies deployed `/health.version` matches the checked-out repo `VERSION`.
+  - Treat that as deployed `VERSION` alignment only, not exact deployed commit SHA proof.
 
 Manual path:
 
@@ -79,7 +81,7 @@ python scripts/smoke_test.py --mode live-safe
 
 Practical pass/fail interpretation:
 
-- **Pass**: `/health`, admin markers, auth-protected checks, and configured Drive-backed checks succeed.
+- **Pass**: `/health`, admin markers, auth-protected checks, configured Drive-backed checks, and deployed `VERSION` alignment all succeed.
 - **Fail**: treat as a verification failure; log failure area and open follow-up before marking release verified.
 
 Reference: `.github/workflows/production_live_safe_smoke.yml`, `README.md` (Smoke test usage), `DEPLOYMENT_NOTES.md`.
