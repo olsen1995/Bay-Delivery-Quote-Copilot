@@ -47,11 +47,17 @@ jobs:
           python - <<'PY'
           import json
           import os
+          import subprocess
           import urllib.request
           from pathlib import Path
 
           base_url = os.environ["BASE_URL"].rstrip("/")
           expected_version = Path("VERSION").read_text(encoding="utf-8").strip()
+          full_commit = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"],
+              text=True,
+          ).strip()
+          expected_commit = full_commit[:12].lower()
 
           with urllib.request.urlopen(f"{base_url}/health", timeout=20) as response:
               health = json.loads(response.read().decode("utf-8"))
@@ -63,4 +69,14 @@ jobs:
               )
 
           print(f"Deployed VERSION aligned: {live_version}")
+
+          live_commit = str(health.get("commit") or "").strip()
+          if live_commit:
+              if live_commit != expected_commit:
+                  raise SystemExit(
+                      f"Deployed commit mismatch: expected {expected_commit}, got {live_commit}"
+                  )
+              print(f"Deployed commit aligned: {live_commit}")
+          else:
+              print("Deployed commit fingerprint unavailable; skipped exact commit match.")
           PY

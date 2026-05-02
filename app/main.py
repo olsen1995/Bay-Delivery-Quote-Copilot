@@ -83,6 +83,8 @@ APP_VERSION = (Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERS
 logger = logging.getLogger(__name__)
 _DEFAULT_LOCAL_TIMEZONE = "UTC"
 _DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8000"
+_DEPLOY_COMMIT_ENV_VARS = ("BAYDELIVERY_COMMIT_SHA", "RENDER_GIT_COMMIT")
+_DEPLOY_COMMIT_HEX_RE = re.compile(r"^[0-9a-fA-F]{12,64}$")
 
 # Initialize audit table at startup
 init_audit_table()
@@ -471,6 +473,14 @@ def _now_local_iso() -> str:
 
 def _drive_enabled() -> bool:
     return gdrive.is_configured()
+
+
+def _health_commit_fingerprint() -> str | None:
+    for env_name in _DEPLOY_COMMIT_ENV_VARS:
+        commit = os.getenv(env_name, "").strip()
+        if commit and _DEPLOY_COMMIT_HEX_RE.fullmatch(commit):
+            return commit[:12].lower()
+    return None
 
 
 def _enforce_admin_post_origin(request: Request) -> None:
@@ -964,7 +974,12 @@ def admin_uploads_page():
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": APP_VERSION, "drive_configured": _drive_enabled()}
+    return {
+        "ok": True,
+        "version": APP_VERSION,
+        "drive_configured": _drive_enabled(),
+        "commit": _health_commit_fingerprint(),
+    }
 
 
 # =========================
