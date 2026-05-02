@@ -84,6 +84,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_LOCAL_TIMEZONE = "UTC"
 _DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8000"
 _DEPLOY_COMMIT_ENV_VARS = ("BAYDELIVERY_COMMIT_SHA", "RENDER_GIT_COMMIT")
+_DEPLOY_COMMIT_HEX_RE = re.compile(r"^[0-9a-fA-F]{12,64}$")
 
 # Initialize audit table at startup
 init_audit_table()
@@ -477,12 +478,8 @@ def _drive_enabled() -> bool:
 def _health_commit_fingerprint() -> str | None:
     for env_name in _DEPLOY_COMMIT_ENV_VARS:
         commit = os.getenv(env_name, "").strip()
-        if len(commit) < 12:
-            continue
-
-        fingerprint = commit[:12]
-        if re.fullmatch(r"[0-9a-fA-F]{12}", fingerprint):
-            return fingerprint.lower()
+        if commit and _DEPLOY_COMMIT_HEX_RE.fullmatch(commit):
+            return commit[:12].lower()
     return None
 
 

@@ -105,7 +105,7 @@ def test_health_commit_prefers_explicit_baydelivery_commit_sha() -> None:
     main = _reload_main_with_env(
         {
             "BAYDELIVERY_CORS_ORIGINS": "https://foo",
-            "BAYDELIVERY_COMMIT_SHA": "1234567890abcdef1234567890abcdef12345678",
+            "BAYDELIVERY_COMMIT_SHA": "ABCDEF1234567890ABCDEF1234567890ABCDEF12",
             "RENDER_GIT_COMMIT": "abcdef1234567890abcdef1234567890abcdef12",
         }
     )
@@ -114,13 +114,59 @@ def test_health_commit_prefers_explicit_baydelivery_commit_sha() -> None:
         resp = client.get("/health")
 
     assert resp.status_code == 200
-    assert resp.json()["commit"] == "1234567890ab"
+    assert resp.json()["commit"] == "abcdef123456"
+
+
+def test_health_commit_returns_null_for_short_explicit_commit() -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "BAYDELIVERY_COMMIT_SHA": "abcdef12345",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json()["commit"] is None
+
+
+def test_health_commit_returns_null_for_non_hex_explicit_commit() -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "BAYDELIVERY_COMMIT_SHA": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json()["commit"] is None
 
 
 def test_health_commit_falls_back_to_render_git_commit() -> None:
     main = _reload_main_with_env(
         {
             "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "RENDER_GIT_COMMIT": "abcdef1234567890abcdef1234567890abcdef12",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
+    assert resp.json()["commit"] == "abcdef123456"
+
+
+def test_health_commit_falls_back_when_explicit_commit_invalid() -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "BAYDELIVERY_COMMIT_SHA": "not-a-valid-commit",
             "RENDER_GIT_COMMIT": "abcdef1234567890abcdef1234567890abcdef12",
         }
     )

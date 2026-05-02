@@ -57,7 +57,7 @@ jobs:
               ["git", "rev-parse", "HEAD"],
               text=True,
           ).strip()
-          expected_commit = full_commit[:12]
+          expected_commit = full_commit[:12].lower()
 
           with urllib.request.urlopen(f"{base_url}/health", timeout=20) as response:
               health = json.loads(response.read().decode("utf-8"))
