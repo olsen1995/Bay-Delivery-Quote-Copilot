@@ -448,7 +448,7 @@ function renderQuoteResult(data, quoteResponse) {
   noteTitle.textContent = "About this estimate";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after the estimate if they help Bay Delivery review the job and improve follow-up accuracy.";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after you submit the booking request if they help Bay Delivery review the job and improve follow-up accuracy.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
@@ -633,7 +633,6 @@ function showPersistedQuoteReview(data, acceptToken) {
   populateQuoteFormFromRequest(requestData);
   setPersistedReviewMode(true);
 
-  revealCard("uploadCard");
   revealCard("decisionCard");
   revealCard("quoteSummaryCard");
   setFlowStage(3);
@@ -923,7 +922,6 @@ el("btnCalc").addEventListener("click", async () => {
 
     lastQuoteId = data.quote_id;
     lastAcceptToken = data.accept_token;
-    revealCard("uploadCard");
     revealCard("decisionCard");
     revealCard("quoteSummaryCard");
     setFlowStage(3);
