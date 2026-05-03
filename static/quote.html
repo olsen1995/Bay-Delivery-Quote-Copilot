@@ -86,7 +86,7 @@
             </div>
             <div>
               <label for="customer_phone">Customer phone</label>
-              <input id="customer_phone" name="customer_phone" placeholder="705-___-____" required />
+              <input id="customer_phone" name="customer_phone" placeholder="705-___-____" inputmode="tel" required />
             </div>
           </div>
 
@@ -194,7 +194,7 @@
 
             <div class="row" id="loadCountRow">
               <div>
-                <label for="garbage_bag_count">Bag-equivalent count</label>
+                <label for="garbage_bag_count">Approximate garbage bag count</label>
                 <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
                 <div class="helperText">A full kitchen garbage bag = 1. If unsure, estimate slightly higher.</div>
                 <div class="helperText hidden" id="bagCountNudge">Most jobs are 5–10 bags. Adjust if needed.</div>
@@ -233,6 +233,7 @@
               <div>
                 <label for="box_springs_count">Box springs</label>
                 <input id="box_springs_count" name="box_springs_count" type="number" min="0" step="1" value="0" />
+                <div class="helperText">Box springs are bulky and incur a per-unit disposal fee. Count each one separately.</div>
               </div>
               <div>
                 <label class="muted">Photo tip</label>

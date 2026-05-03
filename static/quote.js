@@ -445,7 +445,7 @@ function renderQuoteResult(data, quoteResponse) {
   const note = document.createElement("div");
   note.className = "quoteResultNote";
   const noteTitle = document.createElement("h3");
-  noteTitle.textContent = "Estimate Confidence";
+  noteTitle.textContent = "About this estimate";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
   noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after the estimate if they help Bay Delivery review the job and improve follow-up accuracy.";
