@@ -635,6 +635,15 @@ function showPersistedQuoteReview(data, acceptToken) {
 
   revealCard("decisionCard");
   revealCard("quoteSummaryCard");
+  const hasSubmittedBooking = Boolean(
+    data.requested_job_date ||
+    data.requested_time_window ||
+    data.booking_submitted ||
+    ["admin_approved", "rejected"].includes((data.quote_request_status || "").toLowerCase())
+  );
+  if (hasSubmittedBooking) {
+    revealCard("uploadCard", true);
+  }
   setFlowStage(3);
 
   el("summaryService").textContent = el("service_type").selectedOptions[0].textContent;
