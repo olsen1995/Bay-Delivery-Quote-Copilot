@@ -179,7 +179,7 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "syncBagCountNudge" in quote_js
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
-    assert "Estimate Confidence" in quote_js
+    assert "About this estimate" in quote_js
     assert "Photos are optional after the estimate if they help Bay Delivery review the job and improve follow-up accuracy." in quote_js
     assert "Accept Estimate & Continue" in quote_js
     assert "Your job is not booked until Bay Delivery reviews and confirms it." in quote_js
