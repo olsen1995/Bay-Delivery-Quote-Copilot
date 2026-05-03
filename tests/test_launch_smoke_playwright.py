@@ -239,7 +239,7 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("What this estimate includes")
     await expect(page.locator("#resultBox")).to_contain_text("What happens next")
     await expect(page.locator("#resultBox")).to_contain_text("Estimate Details")
-    await expect(page.locator("#resultBox")).to_contain_text("Estimate Confidence")
+    await expect(page.locator("#resultBox")).to_contain_text("About this estimate")
     await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
     await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
