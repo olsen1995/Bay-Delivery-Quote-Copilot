@@ -1,5 +1,5 @@
 sandbox_mode = "workspace-write"
 approval_policy = "never"
 
-[projects."C:\\Users\\austi\\Documents\\Bay-Delivery-Quote-Copilot"]
+[projects."C:\Repos\Bay-Delivery-Quote-Copilot"]
 trusted = true
