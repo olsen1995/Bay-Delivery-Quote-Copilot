@@ -1,5 +1,11 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
 sandbox_mode = "workspace-write"
-approval_policy = "never"
 
-[projects."C:\Repos\Bay-Delivery-Quote-Copilot"]
-trusted = true
+[sandbox_workspace_write]
+network_access = false
+writable_roots = ["C:\\Repos\\Bay-Delivery-Quote-Copilot"]
+
+[projects."C:\\Repos\\Bay-Delivery-Quote-Copilot"]
+trust_level = "trusted"
