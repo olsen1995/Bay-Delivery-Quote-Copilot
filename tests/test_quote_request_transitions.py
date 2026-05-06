@@ -41,7 +41,7 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
         storage.save_quote(
             {
                 "quote_id": quote_id,
-                "created_at": "2026-02-26T10:00:00",
+                "created_at": datetime.now().isoformat(),
                 "request": {
                     "customer_name": "Test",
                     "customer_phone": "555-0101",
@@ -84,6 +84,54 @@ class QuoteRequestTransitionsTests(unittest.TestCase):
                 "booking_token_created_at": "2026-02-26T10:00:00" if booking_token else None,
             }
         )
+
+    def test_quote_review_view_marks_submitted_booking_preferences(self) -> None:
+        quote_id = "q_review_submitted_booking"
+        request_id = "req_review_submitted_booking"
+        accept_token = "review-submitted-token"
+        self._seed_quote(quote_id, accept_token=accept_token)
+        self._seed_request(
+            request_id,
+            quote_id,
+            "customer_accepted",
+            accept_token=accept_token,
+            booking_token="booking-token",
+        )
+        updated = storage.update_quote_request(
+            request_id,
+            requested_job_date=FUTURE_BOOKING_DATE,
+            requested_time_window="morning",
+        )
+        self.assertIsNotNone(updated)
+
+        resp = self.client.get(
+            f"/quote/{quote_id}/view",
+            headers={"Authorization": f"Bearer {accept_token}"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["quote_request_status"], "customer_accepted")
+        self.assertTrue(body["booking_submitted"])
+        self.assertEqual(body["requested_job_date"], FUTURE_BOOKING_DATE)
+        self.assertEqual(body["requested_time_window"], "morning")
+
+    def test_quote_review_view_marks_estimate_only_as_not_submitted(self) -> None:
+        quote_id = "q_review_estimate_only"
+        accept_token = "review-estimate-token"
+        self._seed_quote(quote_id, accept_token=accept_token)
+
+        resp = self.client.get(
+            f"/quote/{quote_id}/view",
+            headers={"Authorization": f"Bearer {accept_token}"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIsNone(body["quote_request_status"])
+        self.assertFalse(body["booking_submitted"])
+        self.assertIsNone(body["requested_job_date"])
+        self.assertIsNone(body["requested_time_window"])
 
     def test_allowed_pending_to_accepted(self) -> None:
         # Get the quote first to retrieve accept_token and quote_id
