@@ -71,12 +71,17 @@ def load_quote_for_customer_review(quote_id: str, *, accept_token: str) -> dict[
     _validate_accept_token_for_quote(quote=quote, accept_token=accept_token)
 
     existing = get_quote_request_by_quote_id(quote_id)
+    requested_job_date = existing.get("requested_job_date") if existing else None
+    requested_time_window = existing.get("requested_time_window") if existing else None
     return {
         "quote_id": quote["quote_id"],
         "created_at": quote["created_at"],
         "request": quote["request"],
         "response": quote["response"],
         "quote_request_status": existing["status"] if existing else None,
+        "requested_job_date": requested_job_date,
+        "requested_time_window": requested_time_window,
+        "booking_submitted": bool(requested_job_date or requested_time_window),
     }
 
 

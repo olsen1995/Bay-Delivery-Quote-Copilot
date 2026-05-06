@@ -77,6 +77,8 @@ def test_quote_page_supports_persisted_review_mode() -> None:
     assert '/view?accept_token=' not in quote_js
     assert 'loadPersistedQuoteReview();' in quote_js
     assert 'showPersistedQuoteReview' in quote_js
+    assert 'data.booking_submitted' in quote_js
+    assert 'revealCard("uploadCard", true);' in quote_js
     assert "You are reviewing a saved estimate prepared for you. Review the pricing and request details here, and contact Bay Delivery if anything needs to be updated." in quote_js
     assert 'const res = await fetch("/quote/calculate"' in quote_js
 
