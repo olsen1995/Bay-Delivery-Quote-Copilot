@@ -98,8 +98,10 @@ class Job(TypedDict):
     closeout_notes: Optional[str]
     actual_hours: Optional[float]
     actual_crew_size: Optional[int]
+    actual_labor_cost_cad: Optional[float]
     actual_disposal_cost_cad: Optional[float]
     actual_fuel_cost_cad: Optional[float]
+    actual_other_costs_cad: Optional[float]
     final_amount_collected_cad: Optional[float]
     payment_method: Optional[str]
     payment_status: Optional[str]
@@ -561,8 +563,10 @@ def init_db() -> None:
                 notes TEXT,
                 actual_hours REAL,
                 actual_crew_size INTEGER,
+                actual_labor_cost_cad REAL,
                 actual_disposal_cost_cad REAL,
                 actual_fuel_cost_cad REAL,
+                actual_other_costs_cad REAL,
                 final_amount_collected_cad REAL,
                 payment_method TEXT CHECK ({JOB_COSTING_PAYMENT_METHOD_CHECK_SQL}),
                 payment_status TEXT CHECK ({JOB_PAYMENT_STATUS_CHECK_SQL}),
@@ -693,8 +697,10 @@ def init_db() -> None:
         _try_add_column(conn, "jobs", "closeout_notes TEXT")
         _try_add_column(conn, "jobs", "actual_hours REAL")
         _try_add_column(conn, "jobs", "actual_crew_size INTEGER")
+        _try_add_column(conn, "jobs", "actual_labor_cost_cad REAL")
         _try_add_column(conn, "jobs", "actual_disposal_cost_cad REAL")
         _try_add_column(conn, "jobs", "actual_fuel_cost_cad REAL")
+        _try_add_column(conn, "jobs", "actual_other_costs_cad REAL")
         _try_add_column(conn, "jobs", "final_amount_collected_cad REAL")
         _try_add_column(conn, "jobs", f"payment_method TEXT CHECK ({JOB_COSTING_PAYMENT_METHOD_CHECK_SQL})")
         _try_add_column(conn, "jobs", f"payment_status TEXT CHECK ({JOB_PAYMENT_STATUS_CHECK_SQL})")
@@ -1672,10 +1678,11 @@ def save_job(job: Dict[str, Any]) -> None:
              scheduled_start, scheduled_end, google_calendar_event_id,
              calendar_sync_status, calendar_last_error, started_at,
              completed_at, cancelled_at, closeout_notes,
-             actual_hours, actual_crew_size, actual_disposal_cost_cad,
-             actual_fuel_cost_cad, final_amount_collected_cad, payment_method,
+             actual_hours, actual_crew_size, actual_labor_cost_cad,
+             actual_disposal_cost_cad, actual_fuel_cost_cad, actual_other_costs_cad,
+             final_amount_collected_cad, payment_method,
              payment_status, job_profit_status, quote_accuracy_note, disposal_receipt_note)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job["job_id"],
@@ -1704,8 +1711,10 @@ def save_job(job: Dict[str, Any]) -> None:
                 job.get("closeout_notes"),
                 job.get("actual_hours"),
                 job.get("actual_crew_size"),
+                job.get("actual_labor_cost_cad"),
                 job.get("actual_disposal_cost_cad"),
                 job.get("actual_fuel_cost_cad"),
+                job.get("actual_other_costs_cad"),
                 job.get("final_amount_collected_cad"),
                 job.get("payment_method"),
                 job.get("payment_status"),
@@ -1763,8 +1772,10 @@ def get_job(job_id: str) -> Optional[Job]:
         "closeout_notes": row_dict["closeout_notes"] if "closeout_notes" in row_dict else None,
         "actual_hours": row_dict["actual_hours"] if "actual_hours" in row_dict else None,
         "actual_crew_size": row_dict["actual_crew_size"] if "actual_crew_size" in row_dict else None,
+        "actual_labor_cost_cad": row_dict["actual_labor_cost_cad"] if "actual_labor_cost_cad" in row_dict else None,
         "actual_disposal_cost_cad": row_dict["actual_disposal_cost_cad"] if "actual_disposal_cost_cad" in row_dict else None,
         "actual_fuel_cost_cad": row_dict["actual_fuel_cost_cad"] if "actual_fuel_cost_cad" in row_dict else None,
+        "actual_other_costs_cad": row_dict["actual_other_costs_cad"] if "actual_other_costs_cad" in row_dict else None,
         "final_amount_collected_cad": row_dict["final_amount_collected_cad"] if "final_amount_collected_cad" in row_dict else None,
         "payment_method": row_dict["payment_method"] if "payment_method" in row_dict else None,
         "payment_status": row_dict["payment_status"] if "payment_status" in row_dict else None,
@@ -1946,8 +1957,10 @@ def update_job(
 _JOB_COSTING_FIELDS = {
     "actual_hours",
     "actual_crew_size",
+    "actual_labor_cost_cad",
     "actual_disposal_cost_cad",
     "actual_fuel_cost_cad",
+    "actual_other_costs_cad",
     "final_amount_collected_cad",
     "payment_method",
     "payment_status",
@@ -2000,8 +2013,10 @@ def update_job_costing(job_id: str, **fields: Any) -> Optional[Job]:
     for field_name, raw_value in fields.items():
         if field_name in {
             "actual_hours",
+            "actual_labor_cost_cad",
             "actual_disposal_cost_cad",
             "actual_fuel_cost_cad",
+            "actual_other_costs_cad",
             "final_amount_collected_cad",
         }:
             normalized[field_name] = _nullable_nonnegative_float(raw_value, field_name)

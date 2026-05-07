@@ -104,8 +104,10 @@ def test_job_costing_schema_backfills_nullable_fields(monkeypatch: pytest.Monkey
     for field in [
         "actual_hours",
         "actual_crew_size",
+        "actual_labor_cost_cad",
         "actual_disposal_cost_cad",
         "actual_fuel_cost_cad",
+        "actual_other_costs_cad",
         "final_amount_collected_cad",
         "payment_method",
         "payment_status",
@@ -124,8 +126,10 @@ def test_save_and_read_job_costing_data(isolated_db: Path) -> None:
         "job-costing",
         actual_hours=3.5,
         actual_crew_size=2,
+        actual_labor_cost_cad=105.0,
         actual_disposal_cost_cad=42.25,
         actual_fuel_cost_cad=18.75,
+        actual_other_costs_cad=12.5,
         final_amount_collected_cad=260.0,
         payment_method="emt",
         payment_status="paid_in_full",
@@ -137,8 +141,10 @@ def test_save_and_read_job_costing_data(isolated_db: Path) -> None:
     assert updated is not None
     assert updated["actual_hours"] == 3.5
     assert updated["actual_crew_size"] == 2
+    assert updated["actual_labor_cost_cad"] == 105.0
     assert updated["actual_disposal_cost_cad"] == 42.25
     assert updated["actual_fuel_cost_cad"] == 18.75
+    assert updated["actual_other_costs_cad"] == 12.5
     assert updated["final_amount_collected_cad"] == 260.0
     assert updated["payment_method"] == "emt"
     assert updated["payment_status"] == "paid_in_full"
@@ -167,6 +173,16 @@ def test_admin_job_costing_validates_numeric_and_vocab_fields(
         headers=admin_headers,
         json={"actual_disposal_cost_cad": -1},
     )
+    bad_labor_cost = client.post(
+        "/admin/api/jobs/job-costing/costing",
+        headers=admin_headers,
+        json={"actual_labor_cost_cad": -1},
+    )
+    bad_other_cost = client.post(
+        "/admin/api/jobs/job-costing/costing",
+        headers=admin_headers,
+        json={"actual_other_costs_cad": -1},
+    )
     bad_payment = client.post(
         "/admin/api/jobs/job-costing/costing",
         headers=admin_headers,
@@ -184,6 +200,8 @@ def test_admin_job_costing_validates_numeric_and_vocab_fields(
     )
 
     assert bad_numeric.status_code == 422
+    assert bad_labor_cost.status_code == 422
+    assert bad_other_cost.status_code == 422
     assert bad_payment.status_code == 422
     assert bad_payment_status.status_code == 422
     assert bad_profit.status_code == 422
@@ -285,7 +303,9 @@ def test_admin_job_costing_preserves_quoted_totals(
         headers=admin_headers,
         json={
             "final_amount_collected_cad": 275.0,
+            "actual_labor_cost_cad": 85.0,
             "actual_disposal_cost_cad": 60.0,
+            "actual_other_costs_cad": 15.0,
             "payment_method": "cash",
             "payment_status": "partial_payment",
             "job_profit_status": "fair",
@@ -301,6 +321,8 @@ def test_admin_job_costing_preserves_quoted_totals(
     assert stored["cash_total_cad"] == 240.0
     assert stored["emt_total_cad"] == 271.2
     assert stored["final_amount_collected_cad"] == 275.0
+    assert stored["actual_labor_cost_cad"] == 85.0
+    assert stored["actual_other_costs_cad"] == 15.0
     assert stored["payment_status"] == "partial_payment"
 
 
@@ -314,8 +336,10 @@ def test_job_costing_backup_export_import_round_trip(
         "job-costing",
         actual_hours=4,
         actual_crew_size=2,
+        actual_labor_cost_cad=120,
         actual_disposal_cost_cad=55.5,
         actual_fuel_cost_cad=20,
+        actual_other_costs_cad=8.25,
         final_amount_collected_cad=300,
         payment_method="other",
         payment_status="not_paid_yet",
@@ -328,6 +352,8 @@ def test_job_costing_backup_export_import_round_trip(
     job_rows = payload["tables"]["jobs"]
     exported = next(row for row in job_rows if row["job_id"] == "job-costing")
     assert exported["actual_hours"] == 4.0
+    assert exported["actual_labor_cost_cad"] == 120.0
+    assert exported["actual_other_costs_cad"] == 8.25
     assert exported["payment_status"] == "not_paid_yet"
     assert exported["job_profit_status"] == "underquoted"
 
@@ -342,8 +368,10 @@ def test_job_costing_backup_export_import_round_trip(
     restored = storage.require_job("job-costing")
     assert restored["actual_hours"] == 4.0
     assert restored["actual_crew_size"] == 2
+    assert restored["actual_labor_cost_cad"] == 120.0
     assert restored["actual_disposal_cost_cad"] == 55.5
     assert restored["actual_fuel_cost_cad"] == 20.0
+    assert restored["actual_other_costs_cad"] == 8.25
     assert restored["final_amount_collected_cad"] == 300.0
     assert restored["payment_method"] == "other"
     assert restored["payment_status"] == "not_paid_yet"

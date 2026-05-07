@@ -418,14 +418,20 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "Actual costs recorded" in admin_js
     assert "Advisory known-cost profit" in admin_js
     assert "Needs revenue and costs" in admin_js
-    assert "Record final collected and actual disposal/fuel costs to review known-cost profit." in admin_js
+    assert "Record final collected and actual costs to review known-cost profit." in admin_js
+    assert "Missing actual cost fields reduce confidence in this advisory margin." in admin_js
     assert "Admin-only advisory feedback for completed jobs." in admin_js
     assert "Payment method is how the customer paid; payment status is whether the money is fully collected." in admin_js
+    assert "Known-cost profit uses saved final collected, labor, disposal, fuel, and other costs only; quote calculation is unchanged." in admin_js
     assert "input.inputMode = field === \"actual_crew_size\" ? \"numeric\" : \"decimal\";" in admin_js
     assert "/admin/api/jobs/${jobId}/costing" in admin_js
     assert 'if (j.status === "completed")' in admin_js
     assert "Labor used" in admin_js
     assert "Actual costs" in admin_js
+    assert "Labor cost CAD" in admin_js
+    assert "actual_labor_cost_cad" in admin_js
+    assert "Other costs CAD" in admin_js
+    assert "actual_other_costs_cad" in admin_js
     assert "Payment collection" in admin_js
     assert "Profit and notes" in admin_js
     assert "Separate how the customer paid from whether money is fully collected." in admin_js

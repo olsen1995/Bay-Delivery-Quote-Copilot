@@ -304,18 +304,30 @@ function selectedValue(value) {
   return value === null || value === undefined ? "" : String(value);
 }
 
+const costingCostFields = [
+  ["actual_labor_cost_cad", "labor"],
+  ["actual_disposal_cost_cad", "disposal"],
+  ["actual_fuel_cost_cad", "fuel"],
+  ["actual_other_costs_cad", "other"]
+];
+
 function costingKnownCosts(job) {
-  const disposal = nullableNumber(job.actual_disposal_cost_cad);
-  const fuel = nullableNumber(job.actual_fuel_cost_cad);
-  if (disposal === null && fuel === null) return null;
-  return (disposal || 0) + (fuel || 0);
+  return costingCostFields.reduce((total, [field]) => {
+    const value = nullableNumber(job[field]);
+    return total + (value || 0);
+  }, 0);
+}
+
+function missingCostLabels(job) {
+  return costingCostFields
+    .filter(([field]) => nullableNumber(job[field]) === null)
+    .map(([, label]) => label);
 }
 
 function advisoryKnownCostProfit(job) {
   const collected = nullableNumber(job.final_amount_collected_cad);
-  const costs = costingKnownCosts(job);
-  if (collected === null || costs === null) return null;
-  return collected - costs;
+  if (collected === null) return null;
+  return collected - costingKnownCosts(job);
 }
 
 function normalizeStatusKey(status) {
@@ -969,6 +981,7 @@ function createJobCostingPanel(job) {
   const knownCosts = costingKnownCosts(job);
   const profit = advisoryKnownCostProfit(job);
   const margin = collected && profit !== null ? `${((profit / collected) * 100).toFixed(1)}%` : "-";
+  const missingCosts = missingCostLabels(job);
 
   const summary = document.createElement("div");
   summary.className = "jobCostingSummary";
@@ -977,8 +990,8 @@ function createJobCostingPanel(job) {
     ["Quoted cash", formatMoneyOrDash(job.cash_total_cad)],
     ["Quoted EMT", formatMoneyOrDash(job.emt_total_cad)],
     ["Collected revenue", formatMoneyOrDash(job.final_amount_collected_cad)],
-    ["Known costs", knownCosts === null ? "Not recorded" : formatMoney(knownCosts)],
-    ["Actual costs recorded", knownCosts === null ? "-" : formatMoney(knownCosts)],
+    ["Known costs", formatMoney(knownCosts)],
+    ["Actual costs recorded", missingCosts.length ? `Missing: ${missingCosts.join(", ")}` : formatMoney(knownCosts)],
     ["Advisory profit", profit === null ? "Needs revenue and costs" : formatMoney(profit)],
     ["Advisory known-cost profit", profit === null ? "-" : formatMoney(profit)],
     ["Advisory known-cost margin", margin],
@@ -993,16 +1006,18 @@ function createJobCostingPanel(job) {
   });
   panel.appendChild(summary);
 
-  if (profit === null) {
+  if (profit === null || missingCosts.length) {
     const missing = document.createElement("div");
     missing.className = "jobCostingState";
-    missing.textContent = "Record final collected and actual disposal/fuel costs to review known-cost profit.";
+    missing.textContent = profit === null
+      ? "Record final collected and actual costs to review known-cost profit."
+      : `Missing actual cost fields reduce confidence in this advisory margin. Missing: ${missingCosts.join(", ")}.`;
     panel.appendChild(missing);
   }
 
   const note = document.createElement("div");
   note.className = "small muted";
-  note.textContent = "Admin-only advisory feedback for completed jobs. Payment method is how the customer paid; payment status is whether the money is fully collected. Known-cost profit uses saved final collected, disposal, and fuel costs only; quote calculation is unchanged.";
+  note.textContent = "Admin-only advisory feedback for completed jobs. Payment method is how the customer paid; payment status is whether the money is fully collected. Known-cost profit uses saved final collected, labor, disposal, fuel, and other costs only; quote calculation is unchanged.";
   panel.appendChild(note);
 
   const form = document.createElement("form");
@@ -1015,12 +1030,20 @@ function createJobCostingPanel(job) {
       createCostingField("Actual crew size", "actual_crew_size", "number", job.actual_crew_size, null, {
         placeholder: "e.g. 2",
       }),
+      createCostingField("Labor cost CAD", "actual_labor_cost_cad", "number", job.actual_labor_cost_cad, null, {
+        helper: "Admin-recorded actual labor cost for the completed job.",
+        placeholder: "0.00",
+      }),
     ]),
     createCostingGroup("Actual costs", "Out-of-pocket costs recorded after completion.", [
       createCostingField("Disposal cost CAD", "actual_disposal_cost_cad", "number", job.actual_disposal_cost_cad, null, {
         placeholder: "0.00",
       }),
       createCostingField("Fuel cost CAD", "actual_fuel_cost_cad", "number", job.actual_fuel_cost_cad, null, {
+        placeholder: "0.00",
+      }),
+      createCostingField("Other costs CAD", "actual_other_costs_cad", "number", job.actual_other_costs_cad, null, {
+        helper: "Miscellaneous actual costs not included in labor, disposal, or fuel.",
         placeholder: "0.00",
       }),
     ]),
@@ -1409,8 +1432,10 @@ function costingPayloadFromForm(form) {
   return {
     actual_hours: numberField("actual_hours"),
     actual_crew_size: numberField("actual_crew_size"),
+    actual_labor_cost_cad: numberField("actual_labor_cost_cad"),
     actual_disposal_cost_cad: numberField("actual_disposal_cost_cad"),
     actual_fuel_cost_cad: numberField("actual_fuel_cost_cad"),
+    actual_other_costs_cad: numberField("actual_other_costs_cad"),
     final_amount_collected_cad: numberField("final_amount_collected_cad"),
     payment_method: textField("payment_method"),
     payment_status: textField("payment_status"),
