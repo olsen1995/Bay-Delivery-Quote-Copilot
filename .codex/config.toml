@@ -2,12 +2,9 @@ model = "gpt-5.5"
 model_reasoning_effort = "medium"
 personality = "pragmatic"
 
+allow_login_shell = false
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
 network_access = false
-writable_roots = ["C:\\Repos\\Bay-Delivery-Quote-Copilot"]
-
-[projects."C:\\Repos\\Bay-Delivery-Quote-Copilot"]
-trust_level = "trusted"
