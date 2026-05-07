@@ -410,14 +410,26 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
     assert "Completed Job Costing" in admin_js
     assert "Quoted cash" in admin_js
     assert "Quoted EMT" in admin_js
+    assert "Quoted totals" in admin_js
+    assert "Collected revenue" in admin_js
+    assert "Known costs" in admin_js
+    assert "Advisory profit" in admin_js
     assert "Final collected CAD" in admin_js
     assert "Actual costs recorded" in admin_js
     assert "Advisory known-cost profit" in admin_js
+    assert "Needs revenue and costs" in admin_js
+    assert "Record final collected and actual disposal/fuel costs to review known-cost profit." in admin_js
     assert "Admin-only advisory feedback for completed jobs." in admin_js
     assert "Payment method is how the customer paid; payment status is whether the money is fully collected." in admin_js
     assert "input.inputMode = field === \"actual_crew_size\" ? \"numeric\" : \"decimal\";" in admin_js
     assert "/admin/api/jobs/${jobId}/costing" in admin_js
     assert 'if (j.status === "completed")' in admin_js
+    assert "Labor used" in admin_js
+    assert "Actual costs" in admin_js
+    assert "Payment collection" in admin_js
+    assert "Profit and notes" in admin_js
+    assert "Separate how the customer paid from whether money is fully collected." in admin_js
+    assert "Operator feedback for future review; pricing is unchanged." in admin_js
     assert "Payment method" in admin_js
     assert "payment_method" in admin_js
     assert "How they paid. This is separate from whether it is paid in full." in admin_js
@@ -446,6 +458,10 @@ def test_desktop_admin_includes_completed_job_costing_controls_only() -> None:
         assert profit_label in admin_js
     assert "Operator gut check only. This does not change pricing." in admin_js
     assert ".jobCostingPanel" in admin_css
+    assert ".jobCostingGroup" in admin_css
+    assert ".jobCostingGroupHeader" in admin_css
+    assert ".jobCostingGroupGrid" in admin_css
+    assert ".jobCostingState" in admin_css
     assert ".jobCostingHelp" in admin_css
     assert "/costing" not in mobile_html
     assert "/costing" not in mobile_js
