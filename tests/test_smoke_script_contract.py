@@ -7,6 +7,25 @@ from app.services.quote_service import build_quote_artifacts
 from scripts import smoke_test
 
 
+def _post_deploy_responses(path: str) -> object:
+    responses = {
+        "/health": {"ok": True, "version": "0.10.1", "commit": "3544537f1c36"},
+        "/": '<html><a href="/quote">Get a Quote</a></html>',
+        "/quote": '<html><form id="quoteForm"></form></html>',
+        "/admin": (
+            '<html><h2>Admin Access</h2><input id="adminUsername" />'
+            '<input id="adminPassword" /><button id="refreshBtn"></button>'
+            '<div id="adminProtectedDashboard" hidden aria-hidden="true" style="display:none"></div></html>'
+        ),
+        "/admin/mobile": (
+            '<html><h2>Mobile Login</h2><input id="mobileAdminUsername" />'
+            '<input id="mobileAdminPassword" /><button id="loginBtn"></button>'
+            '<div id="authenticatedShell" hidden></div></html>'
+        ),
+    }
+    return responses[path]
+
+
 def test_stateful_smoke_haul_away_payload_matches_quote_contract() -> None:
     payload = smoke_test._stateful_haul_away_quote_payload()
 
@@ -51,3 +70,67 @@ def test_stateful_smoke_uses_contract_valid_haul_away_payload(monkeypatch: pytes
     assert smoke_test._run_stateful_workflow_smoke() == 0
     assert quote_payloads[0]["service_type"] == "haul_away"
     assert quote_payloads[0]["trailer_fill_estimate"] == "under_quarter"
+
+
+def test_post_deploy_smoke_checks_health_public_pages_and_pre_auth_admin(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_api(method: str, path: str, payload: dict | None = None, headers: dict | None = None):
+        del payload, headers
+        calls.append((method, path))
+        assert method == "GET"
+        assert not path.startswith("/admin/api/")
+        assert "upload" not in path
+        assert "booking" not in path
+        assert "decision" not in path
+        return 200, _post_deploy_responses(path)
+
+    monkeypatch.setattr(smoke_test, "api", fake_api)
+
+    assert smoke_test._run_post_deploy_live_smoke() == 0
+    assert calls == [
+        ("GET", "/health"),
+        ("GET", "/"),
+        ("GET", "/quote"),
+        ("GET", "/admin"),
+        ("GET", "/admin/mobile"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "health",
+    [
+        {"ok": False, "version": "0.10.1", "commit": "3544537f1c36"},
+        {"ok": True, "commit": "3544537f1c36"},
+        {"ok": True, "version": "0.10.1"},
+    ],
+)
+def test_post_deploy_smoke_requires_health_ok_version_and_commit(
+    monkeypatch: pytest.MonkeyPatch,
+    health: dict,
+) -> None:
+    def fake_api(method: str, path: str, payload: dict | None = None, headers: dict | None = None):
+        del method, payload, headers
+        if path == "/health":
+            return 200, health
+        return 200, _post_deploy_responses(path)
+
+    monkeypatch.setattr(smoke_test, "api", fake_api)
+
+    with pytest.raises(AssertionError):
+        smoke_test._run_post_deploy_live_smoke()
+
+
+def test_post_deploy_mode_dispatches_to_post_deploy_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    called = False
+
+    def fake_post_deploy() -> int:
+        nonlocal called
+        called = True
+        return 0
+
+    monkeypatch.setattr(smoke_test, "_run_post_deploy_live_smoke", fake_post_deploy)
+    monkeypatch.setattr(smoke_test.sys, "argv", ["smoke_test.py", "--mode", "post-deploy"])
+
+    assert smoke_test.main() == 0
+    assert called is True

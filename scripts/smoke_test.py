@@ -168,6 +168,49 @@ def _run_public_customer_page_checks() -> None:
     print("[ok] /quote page marker checks")
 
 
+def _run_post_deploy_public_page_checks() -> None:
+    status, homepage = api("GET", "/")
+    require(status == 200, f"GET / expected 200, got {status}")
+    require(isinstance(homepage, str), "GET / expected HTML response")
+    require("Get a Quote" in homepage, "GET / missing homepage quote CTA marker")
+    print("[ok] / post-deploy page marker checks")
+
+    status, quote_page = api("GET", "/quote")
+    require(status == 200, f"GET /quote expected 200, got {status}")
+    require(isinstance(quote_page, str), "GET /quote expected HTML response")
+    require('id="quoteForm"' in quote_page, "GET /quote missing quote form marker")
+    print("[ok] /quote post-deploy page marker checks")
+
+
+def _run_post_deploy_admin_page_checks() -> None:
+    status, admin_page = api("GET", "/admin")
+    require(status == 200, f"GET /admin expected 200, got {status}")
+    require(isinstance(admin_page, str), "GET /admin expected HTML response")
+    for marker in (
+        "Admin Access",
+        'id="adminUsername"',
+        'id="adminPassword"',
+        'id="refreshBtn"',
+        'id="adminProtectedDashboard"',
+        "hidden aria-hidden=\"true\"",
+    ):
+        require(marker in admin_page, f"GET /admin missing pre-auth marker: {marker}")
+    print("[ok] /admin post-deploy pre-auth marker checks")
+
+    status, mobile_admin_page = api("GET", "/admin/mobile")
+    require(status == 200, f"GET /admin/mobile expected 200, got {status}")
+    require(isinstance(mobile_admin_page, str), "GET /admin/mobile expected HTML response")
+    for marker in (
+        "Mobile Login",
+        'id="mobileAdminUsername"',
+        'id="mobileAdminPassword"',
+        'id="loginBtn"',
+        'id="authenticatedShell" hidden',
+    ):
+        require(marker in mobile_admin_page, f"GET /admin/mobile missing pre-auth marker: {marker}")
+    print("[ok] /admin/mobile post-deploy pre-auth marker checks")
+
+
 def _run_admin_read_checks(health: Dict[str, Any], *, check_gpt_observability: bool = False) -> None:
     # --- Admin page and auth behavior ---
     creds_configured = _admin_creds_configured()
@@ -282,6 +325,18 @@ def _run_live_safe_smoke(*, check_gpt_observability: bool = False) -> int:
     return 0
 
 
+def _run_post_deploy_live_smoke() -> int:
+    print(f"Smoke test target: {base_url()} (mode=post-deploy)")
+    health = _run_health_check()
+    require(bool(str(health.get("version") or "").strip()), "GET /health expected non-empty version")
+    require(bool(str(health.get("commit") or "").strip()), "GET /health expected non-empty commit")
+    print("[ok] /health version and commit markers")
+    _run_post_deploy_public_page_checks()
+    _run_post_deploy_admin_page_checks()
+    print("Post-deploy live smoke test passed.")
+    return 0
+
+
 def _run_stateful_workflow_smoke() -> int:
     print(f"Smoke test target: {base_url()} (mode=stateful)")
 
@@ -370,12 +425,15 @@ def _run_stateful_workflow_smoke() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run smoke checks in live-safe or stateful mode.")
+    parser = argparse.ArgumentParser(description="Run smoke checks in post-deploy, live-safe, or stateful mode.")
     parser.add_argument(
         "--mode",
-        choices=("live-safe", "stateful"),
+        choices=("post-deploy", "live-safe", "stateful"),
         default="live-safe",
-        help="Smoke mode: live-safe (read-only) or stateful (creates quote workflow records).",
+        help=(
+            "Smoke mode: post-deploy (manual no-secret route checks), "
+            "live-safe (read-only auth/admin checks), or stateful (creates quote workflow records)."
+        ),
     )
     parser.add_argument(
         "--check-gpt-observability",
@@ -386,6 +444,8 @@ def main() -> int:
 
     if args.mode == "stateful":
         return _run_stateful_workflow_smoke()
+    if args.mode == "post-deploy":
+        return _run_post_deploy_live_smoke()
     return _run_live_safe_smoke(check_gpt_observability=args.check_gpt_observability)
 
 
