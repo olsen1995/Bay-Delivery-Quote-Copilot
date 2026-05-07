@@ -62,6 +62,14 @@ Reference: `render.yaml`, `DEPLOYMENT_NOTES.md`.
 
 ## 4) Live-Safe Smoke Verification
 
+Manual post-deploy route smoke:
+
+```bash
+BASE_URL=https://bay-delivery-quote-copilot.onrender.com python scripts/smoke_test.py --mode post-deploy
+```
+
+This mode needs network access but no admin credentials. It checks `/health` status and JSON markers (`ok`, `version`, `commit`), public customer pages, and the pre-auth desktop/mobile admin shells. A pass means the deployed app is reachable and the basic customer/admin entry points are serving the expected protected shell HTML. It intentionally does not check quote calculation, uploads, booking submission, accepted quote flow, admin APIs, backups, imports, exports, restores, or any destructive/admin mutation.
+
 Run live-safe smoke when:
 
 - a production release just completed, or

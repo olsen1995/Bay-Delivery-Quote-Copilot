@@ -198,6 +198,7 @@ Refresh it whenever `requirements.txt` changes by running the manual GitHub Acti
 
 Smoke script: `scripts/smoke_test.py`
 
+- `post-deploy` mode: manual no-secret Render reachability check for `/health`, public pages, and pre-auth admin shells. It performs only GET requests and does not create quote, booking, upload, admin, backup, import, export, or restore records.
 - `live-safe` mode (default): read-only validation for health/admin/auth surfaces; no quote workflow records are intentionally created.
 - `stateful` mode: exercises quote workflow routes and creates quote records (`POST /quote/calculate`), and may create quote-request state when decision routes are available.
 
@@ -206,6 +207,7 @@ If `/health` reports `"drive_configured": true`, set `ADMIN_USERNAME` and `ADMIN
 Examples:
 
 ```powershell
+python scripts/smoke_test.py --mode post-deploy
 python scripts/smoke_test.py --mode live-safe
 python scripts/smoke_test.py --mode stateful
 ```
@@ -214,6 +216,7 @@ Common deploy target env var:
 
 ```powershell
 $env:BASE_URL = "https://your-render-service.onrender.com"
+python scripts/smoke_test.py --mode post-deploy
 python scripts/smoke_test.py --mode live-safe
 ```
 
