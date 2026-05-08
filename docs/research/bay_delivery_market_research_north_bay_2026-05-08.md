@@ -69,6 +69,8 @@ Demolition creates another local floor. The City’s demolition checklist shows 
 
 The clearest market signal on moving is that professionals charge minimum time blocks and crew-size ladders. Bay Delivery can absolutely compete on small moves, but only if it stops treating them like “delivery with some lifting.” That distinction is where margin lives.
 
+The lower posted mover rates in this section are external market comparators only, not Bay Delivery recommended pricing targets. Bay recommended targets for two-person truck work are set in the operating-cost-aligned table below.
+
 ### Verified small-moving benchmarks
 
 | Source | Market | Posted rate | Minimums / access terms | What it means |
@@ -152,7 +154,7 @@ North Bay is the right first reference, but it is not enough on its own. The loc
 | Service family | North Bay signal | Ontario signal | Canada-wide / upper reference | Takeaway |
 |---|---|---|---|---|
 | Junk removal | $75–$100 minimum; $194–$350 quarter; $299–$450 half; $499–$700 full | Common mid-market posted band roughly $98–$149 minimum, $258–$309 quarter, $398–$449 half, $538–$699 full | 1-800-GOT-JUNK Canada guide shows $107–$396 small, $396–$600 medium, $600–$1,099 large | Bay should sit above casuals, around low-to-mid pro pricing, and below premium operators only on easy jobs. |
-| Small moving | No public North Bay rate card found from established movers | 2 movers + truck commonly $129–$139/hr with 3-hour minimum; 3 movers around $175/hr | Canada benchmark $120–$200/hr for 2-person truck crew | Bay likely needs higher moving minimums than it currently uses. |
+| Small moving | No public North Bay rate card found from established movers | External comparator only: 2 movers + truck commonly $129–$139/hr with 3-hour minimum; 3 movers around $175/hr | Canada benchmark $120–$200/hr for 2-person truck crew | Bay likely needs higher moving minimums than it currently uses; these lower posted rates are not the Bay recommended target. |
 | Large-item delivery | Local retail free delivery only on bigger-ticket purchases | ULOADIT from $49+; IKEA in-home from $49/$59; Whirlpool basic appliance delivery $99 plus access surcharges | Big-box material delivery around $60–$75 before timed-window add-ons | Delivery is cheapest only when it is truly one-person and low-friction. |
 | Flooring / rip-out | No strong North Bay posted rate found | Carpet $0.75–$1.50/sq ft; laminate/vinyl $1–$2; tile $2–$4; hardwood $1.50/sq ft + $75 haul-away | Interior demolition in Canada often benchmarked at $2–$7/sq ft for non-structural work | Bay should use sqft + disposal, not flat “small job” pricing, on flooring rip-outs. |
 | Demolition / room gut | Local practice is permit- and quote-based | Small sheds $300–$600; bathrooms around $1,000–$5,500; kitchens around $3,500–$8,500; heavy debris priced separately | Partial demolition commonly benchmarked around $4–$15/sq ft in Ontario-style guides | Bay should auto-price only the lightest non-structural tear-outs. |
@@ -160,6 +162,8 @@ North Bay is the right first reference, but it is not enough on its own. The loc
 ## Bay Delivery pricing implications and quote-system rules
 
 The tables below are **recommendations and estimates**, not direct competitor quotes. They are derived from the local North Bay price anchors, municipal disposal fees, posted Ontario mover minimums, and Ontario demolition/rip-out benchmarks above. Bay Delivery’s business rule that cash quotes exclude HST and EMT/e-transfer quotes add 13% HST is applied directly in the recommended EMT bands below.
+
+Moving-rate consistency note: The lower posted Ontario mover rates are preserved as market comparators only. Bay Delivery’s recommended two-person truck rate for calibration should follow the operating-cost model because the lower rates do not include enough margin protection for local mobilization, truck/trailer wear, admin time, utilization loss, and risk.
 
 ### Recommended cash target bands for Bay Delivery
 
@@ -173,9 +177,9 @@ The tables below are **recommendations and estimates**, not direct competitor qu
 | Full household junk / trailer-equivalent easy job | $549–$649 | $620–$733 | Under premium/pro-franchise reference while protecting margin. |
 | One-person furniture/appliance delivery, curb-to-curb, easy local | $80–$110 | $90–$124 | Sits above urban low-end delivery references but below full moving-crew economics. |
 | One bulky item with in-home placement or awkward carry | $120–$180 | $136–$203 | Matches Ontario single-item moving signals better than junk-run pricing. |
-| 2 movers + truck equivalent, local small moving | $119–$129/hr, 3-hour minimum | $134–$146/hr, 3-hour minimum | Slightly under posted Ottawa 2-mover truck rates while staying professional. |
-| 2 movers + truck, apartment / stairs / surrounding-area small move | $129–$149/hr, 3-hour minimum | $146–$168/hr, 3-hour minimum | Needed once access or travel risk increases. |
-| One-bedroom style small move, packed/staged, local predictable scope | $280–$380 flat or hourly equivalent | $316–$429 | Consistent with 3-hour professional minimum logic. |
+| 2 people + truck, simple/staged local small move | $165–$195/hr, 2-hour minimum | $186–$220/hr, 2-hour minimum | Standard Bay recommended target from the operating-cost model; lower posted Ontario mover rates are external comparators only. |
+| 2 people + truck, apartment / stairs / surrounding-area small move | $175–$210/hr, 3-hour minimum or manual review | $198–$237/hr, 3-hour minimum or manual review | Needed once access, travel, uncertainty, or utilization risk increases. |
+| One-bedroom packed/staged local move | $495–$585 baseline if using a 3-hour 2-person minimum | $559–$661 baseline | Baseline follows the operating-cost model; adjust upward for stairs, access, waiting, travel, and scope uncertainty. |
 | Light rip-out / small demo cleanup, no structural work, easy access | $175–$250 minimum | $198–$282 | Demo should carry a higher minimum than junk because setup + PPE + disposal risk are real. |
 | Half-day light demo labour, labour-only | $280–$360 solo, or $480–$600 for 2 people | $316–$407 solo, or $542–$678 for 2 people | Derived from Ontario labour wages and posted extra-labour rules. |
 | Construction/debris cleanup, disposal-heavy | $250+ minimum before heavy-material adjustments | $283+ | Weight and disposal risk make low minimums dangerous. |
