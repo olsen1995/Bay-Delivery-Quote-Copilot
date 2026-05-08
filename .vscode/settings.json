@@ -70,8 +70,6 @@
   ],
   "python-envs.defaultEnvManager": "ms-python.python:system",
   "chat.tools.terminal.autoApprove": {
-
-
     "cd": true,
     "echo": true,
     "ls": true,
@@ -193,7 +191,8 @@
     "xargs": false,
     "eval": false,
     "Invoke-Expression": false,
-    "iex": false
+    "iex": false,
+    ".\\.venv\\Scripts\\python.exe": true
   },
   "chat.checkpoints.showFileChanges": true,
   "chat.editing.explainChanges.enabled": true,
