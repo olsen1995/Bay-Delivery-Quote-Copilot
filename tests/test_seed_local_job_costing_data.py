@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -166,3 +169,42 @@ def test_seed_does_not_create_quote_request_rows(isolated_db: Path) -> None:
         conn.close()
 
     assert count == 0
+
+
+def test_seed_script_runs_directly_from_repo_root_with_temp_db(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "direct-seed.sqlite3"
+    env = os.environ.copy()
+    env["BAYDELIVERY_DB_PATH"] = str(db_path)
+    for marker in seed_script.RENDER_ENV_MARKERS:
+        env.pop(marker, None)
+
+    seed_result = subprocess.run(
+        [sys.executable, "scripts/seed_local_job_costing_data.py"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert seed_result.returncode == 0, seed_result.stderr
+    assert "ModuleNotFoundError" not in seed_result.stderr
+    assert str(db_path) in seed_result.stdout
+    assert "CREATED test-simulated-local-dump-run" in seed_result.stdout
+
+    cleanup_result = subprocess.run(
+        [sys.executable, "scripts/seed_local_job_costing_data.py", "--cleanup"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert cleanup_result.returncode == 0, cleanup_result.stderr
+    assert "ModuleNotFoundError" not in cleanup_result.stderr
+    assert str(db_path) in cleanup_result.stdout
+    assert "DELETED test-simulated-local-dump-run" in cleanup_result.stdout
