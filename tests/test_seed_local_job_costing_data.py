@@ -14,8 +14,8 @@ def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     db_path = tmp_path / "seed-job-costing.sqlite3"
     monkeypatch.setattr(storage, "DB_PATH", storage.DEFAULT_DB_PATH)
     monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
-    monkeypatch.delenv("RENDER", raising=False)
-    monkeypatch.delenv("RENDER_SERVICE_ID", raising=False)
+    for marker in seed_script.RENDER_ENV_MARKERS:
+        monkeypatch.delenv(marker, raising=False)
     storage._TABLE_COL_CACHE.clear()
     storage.init_db()
     return db_path
