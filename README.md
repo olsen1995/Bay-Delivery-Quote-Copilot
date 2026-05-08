@@ -192,6 +192,28 @@ CI, production live-safe smoke, and Render production install app dependencies f
 CI checks that `requirements.lock.txt` is current before installing locked dependencies.
 Refresh it whenever `requirements.txt` changes by running the manual GitHub Actions workflow `.github/workflows/generate_requirements_lock.yml` on the target branch; the workflow uses `pip-compile` from `requirements.txt` and commits only `requirements.lock.txt` when the lockfile changes.
 
+### Local simulated completed-job costing data
+
+For desktop admin costing review, create three local-only completed jobs labeled `TEST / SIMULATED`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\seed_local_job_costing_data.py
+```
+
+The script uses `BAYDELIVERY_DB_PATH` when set, otherwise the repo default local SQLite database. It refuses Render-like environments and creates only deterministic rows in the local `jobs` table:
+
+- `test-simulated-local-dump-run`
+- `test-simulated-small-move`
+- `test-simulated-demo-debris-cleanup`
+
+Rerunning the script skips existing seed jobs and does not overwrite local admin edits. To remove only these labeled deterministic seed jobs from the local database:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\seed_local_job_costing_data.py --cleanup
+```
+
+Cleanup checks the deterministic job ID and the `TEST / SIMULATED` label before deleting. If a matching ID exists without the seed label, it is protected and left in place.
+
 ---
 
 ## Smoke test usage
