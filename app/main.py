@@ -1357,8 +1357,10 @@ class JobCloseoutPayload(BaseModel):
 class JobCostingPayload(BaseModel):
     actual_hours: Optional[float] = Field(None, ge=0)
     actual_crew_size: Optional[int] = Field(None, ge=1)
+    actual_labor_cost_cad: Optional[float] = Field(None, ge=0)
     actual_disposal_cost_cad: Optional[float] = Field(None, ge=0)
     actual_fuel_cost_cad: Optional[float] = Field(None, ge=0)
+    actual_other_costs_cad: Optional[float] = Field(None, ge=0)
     final_amount_collected_cad: Optional[float] = Field(None, ge=0)
     payment_method: Optional[Literal["cash", "emt", "other"]] = None
     payment_status: Optional[Literal["not_paid_yet", "partial_payment", "paid_in_full"]] = None
