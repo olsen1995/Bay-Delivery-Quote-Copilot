@@ -22,11 +22,30 @@ class MockCosts:
 
 
 @dataclass(frozen=True)
+class MarketTarget:
+    target_cash_floor: float
+    target_cash_range: str
+
+
+@dataclass(frozen=True)
+class EquipmentGuidance:
+    equipment_type: str
+    trailer_type: str
+    recommended_trailer: str
+    trailer_reason: str
+    load_weight_class: str
+    disposal_fee_mode: str
+    equipment_disposal_risk_note: str
+
+
+@dataclass(frozen=True)
 class CalibrationScenario:
     category: str
     name: str
     payload: dict[str, Any]
     costs: MockCosts
+    market_target: MarketTarget | None
+    equipment: EquipmentGuidance
 
 
 @dataclass(frozen=True)
@@ -35,6 +54,14 @@ class Profitability:
     estimated_gross_profit: float
     estimated_gross_margin_pct: float | None
     risk_flag: str
+
+
+@dataclass(frozen=True)
+class MarketPosition:
+    target_cash_floor: float | None
+    target_cash_range: str
+    gap_to_target_floor: float | None
+    market_price_flag: str
 
 
 @dataclass(frozen=True)
@@ -48,6 +75,8 @@ class CalibrationResult:
     estimated_gross_profit: float
     estimated_gross_margin_pct: float | None
     risk_flag: str
+    market_position: MarketPosition
+    equipment: EquipmentGuidance
 
 
 @dataclass(frozen=True)
@@ -59,9 +88,37 @@ class CategorySummary:
     highest_margin_scenario: str
     average_profit: float
     recommendation: str
+    market_underpriced_count: int
+    largest_gap_to_target_floor: float
+    largest_gap_scenario: str
+    risk_profile: str
+    single_axle_count: int
+    double_axle_count: int
+    older_enclosed_count: int
+    newer_enclosed_count: int
+    weighed_tonnage_count: int
+    mixed_tonnage_count: int
+    manual_review_count: int
+
+
+@dataclass(frozen=True)
+class OwnerReviewEntry:
+    result: CalibrationResult
+    triggers: list[str]
 
 
 QuoteFunc = Callable[[dict[str, Any]], dict[str, Any]]
+
+PROFIT_RISK_FLAGS = {"LOSS", "BAD", "WATCH"}
+DISPOSAL_RISK_MODES = {"weighed_tonnage", "mixed_tonnage", "manual_review"}
+TRAILER_REASON_REVIEW_PHRASES = (
+    "escalate",
+    "manual review",
+    "weather",
+    "capacity",
+    "protected",
+    "protection",
+)
 
 
 def _payload(**overrides: Any) -> dict[str, Any]:
@@ -88,6 +145,31 @@ def _payload(**overrides: Any) -> dict[str, Any]:
     return payload
 
 
+def _market(floor: float, target_range: str) -> MarketTarget:
+    return MarketTarget(target_cash_floor=floor, target_cash_range=target_range)
+
+
+def _equipment(
+    *,
+    equipment_type: str,
+    trailer_type: str,
+    recommended_trailer: str,
+    trailer_reason: str,
+    load_weight_class: str,
+    disposal_fee_mode: str,
+    equipment_disposal_risk_note: str,
+) -> EquipmentGuidance:
+    return EquipmentGuidance(
+        equipment_type=equipment_type,
+        trailer_type=trailer_type,
+        recommended_trailer=recommended_trailer,
+        trailer_reason=trailer_reason,
+        load_weight_class=load_weight_class,
+        disposal_fee_mode=disposal_fee_mode,
+        equipment_disposal_risk_note=equipment_disposal_risk_note,
+    )
+
+
 SCENARIOS: tuple[CalibrationScenario, ...] = (
     CalibrationScenario(
         category="dump runs",
@@ -100,6 +182,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             bag_type="light",
         ),
         costs=MockCosts(labor=18.0, disposal=18.0, fuel_wear=12.0, other=0.0),
+        market_target=_market(95.0, "95-115"),
+        equipment=_equipment(
+            equipment_type="truck_only",
+            trailer_type="none",
+            recommended_trailer="none",
+            trailer_reason="Truck-only or no trailer needed for tiny curbside bag run.",
+            load_weight_class="light",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low disposal/equipment risk.",
+        ),
     ),
     CalibrationScenario(
         category="dump runs",
@@ -112,6 +204,19 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             bag_type="light",
         ),
         costs=MockCosts(labor=25.0, disposal=35.0, fuel_wear=15.0, other=0.0),
+        market_target=_market(119.0, "119-149"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="older_enclosed",
+            trailer_reason=(
+                "Older enclosed is useful for mattresses/box springs or dirty bulky items; "
+                "single axle is also acceptable for normal bulky junk."
+            ),
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Watch mattress/box spring disposal fees and weather/containment needs.",
+        ),
     ),
     CalibrationScenario(
         category="dump runs",
@@ -125,6 +230,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             trailer_class="single_axle",
         ),
         costs=MockCosts(labor=48.0, disposal=45.0, fuel_wear=22.0, other=5.0),
+        market_target=_market(219.0, "219-279"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Default trailer for light/normal household junk.",
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low-medium risk unless dense/heavy material is present.",
+        ),
     ),
     CalibrationScenario(
         category="dump runs",
@@ -139,6 +254,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             trailer_fill_estimate="half",
         ),
         costs=MockCosts(labor=72.0, disposal=75.0, fuel_wear=28.0, other=5.0),
+        market_target=_market(329.0, "329-399"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Single axle is suitable for normal household junk; escalate if heavy or near capacity.",
+            load_weight_class="normal",
+            disposal_fee_mode="double_load_flat_fee",
+            equipment_disposal_risk_note="Watch capacity and mixed-load fees.",
+        ),
     ),
     CalibrationScenario(
         category="dump runs",
@@ -153,6 +278,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             trailer_fill_estimate="full",
         ),
         costs=MockCosts(labor=108.0, disposal=125.0, fuel_wear=35.0, other=10.0),
+        market_target=_market(549.0, "549-649"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Full light household volume can use single axle; heavy/full loads may need double axle.",
+            load_weight_class="normal",
+            disposal_fee_mode="double_load_flat_fee",
+            equipment_disposal_risk_note="Volume is high; confirm density before dispatch.",
+        ),
     ),
     CalibrationScenario(
         category="dump runs",
@@ -167,6 +302,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             has_dense_materials=True,
         ),
         costs=MockCosts(labor=80.0, disposal=95.0, fuel_wear=25.0, other=10.0),
+        market_target=_market(300.0, "300-450"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="double_axle_aluminum",
+            recommended_trailer="double_axle_aluminum",
+            trailer_reason="Heavy construction/demo material belongs on double axle.",
+            load_weight_class="dense",
+            disposal_fee_mode="weighed_tonnage",
+            equipment_disposal_risk_note="High disposal risk; volume-based pricing may be unsafe.",
+        ),
     ),
     CalibrationScenario(
         category="small moves",
@@ -181,6 +326,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             dropoff_address="22 Dropoff Ave",
         ),
         costs=MockCosts(labor=96.0, disposal=0.0, fuel_wear=18.0, other=0.0),
+        market_target=_market(180.0, "180-300"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Customer-owned item should be protected from weather/damage.",
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low disposal risk; damage/weather risk matters.",
+        ),
     ),
     CalibrationScenario(
         category="small moves",
@@ -195,6 +350,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             dropoff_address="42 Apartment Ave",
         ),
         costs=MockCosts(labor=192.0, disposal=0.0, fuel_wear=24.0, other=10.0),
+        market_target=_market(500.0, "500-650"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Moving job with customer belongings needs newer enclosed trailer and scope review.",
+            load_weight_class="normal",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Labour/access/scope risk; usually should not be priced like simple delivery.",
+        ),
     ),
     CalibrationScenario(
         category="small moves",
@@ -209,6 +374,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             dropoff_address="52 Local Rd",
         ),
         costs=MockCosts(labor=144.0, disposal=0.0, fuel_wear=22.0, other=8.0),
+        market_target=_market(500.0, "500-600"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Standard moving work should use newer enclosed trailer.",
+            load_weight_class="normal",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Labour-hour risk; compare against moving market minimums.",
+        ),
     ),
     CalibrationScenario(
         category="small moves",
@@ -224,6 +399,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             access_difficulty="extreme",
         ),
         costs=MockCosts(labor=216.0, disposal=0.0, fuel_wear=28.0, other=12.0),
+        market_target=_market(600.0, "600-750"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Difficult access moving job needs protected trailer and manual review.",
+            load_weight_class="heavy",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="High labour/access risk.",
+        ),
     ),
     CalibrationScenario(
         category="small moves",
@@ -238,6 +423,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             dropoff_address="82 Buyer Ave",
         ),
         costs=MockCosts(labor=90.0, disposal=0.0, fuel_wear=12.0, other=0.0),
+        market_target=_market(180.0, "180-300"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Marketplace furniture usually benefits from newer enclosed trailer, especially in bad weather.",
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low disposal risk; watch damage/weather/access.",
+        ),
     ),
     CalibrationScenario(
         category="demolition",
@@ -251,6 +446,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             garbage_bag_count=6,
         ),
         costs=MockCosts(labor=96.0, disposal=35.0, fuel_wear=18.0, other=10.0),
+        market_target=_market(300.0, "300-500"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Small rip-out debris may fit single axle but still needs weight awareness.",
+            load_weight_class="heavy",
+            disposal_fee_mode="weighed_tonnage",
+            equipment_disposal_risk_note="Flooring debris can be heavier than it looks.",
+        ),
     ),
     CalibrationScenario(
         category="demolition",
@@ -264,6 +469,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             garbage_bag_count=8,
         ),
         costs=MockCosts(labor=100.0, disposal=50.0, fuel_wear=20.0, other=5.0),
+        market_target=_market(300.0, "300-450"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Light demo debris can use single axle if not too dense.",
+            load_weight_class="heavy",
+            disposal_fee_mode="weighed_tonnage",
+            equipment_disposal_risk_note="Escalate to double axle if dense or large.",
+        ),
     ),
     CalibrationScenario(
         category="demolition",
@@ -278,6 +493,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             has_dense_materials=True,
         ),
         costs=MockCosts(labor=150.0, disposal=110.0, fuel_wear=30.0, other=15.0),
+        market_target=_market(500.0, "500-800"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="double_axle_aluminum",
+            recommended_trailer="double_axle_aluminum",
+            trailer_reason="Heavy demolition debris belongs on double axle.",
+            load_weight_class="dense",
+            disposal_fee_mode="weighed_tonnage",
+            equipment_disposal_risk_note="High disposal and equipment risk.",
+        ),
     ),
     CalibrationScenario(
         category="demolition",
@@ -291,6 +516,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             garbage_bag_count=10,
         ),
         costs=MockCosts(labor=200.0, disposal=65.0, fuel_wear=28.0, other=20.0),
+        market_target=_market(550.0, "550-750"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="double_axle_aluminum",
+            recommended_trailer="double_axle_aluminum",
+            trailer_reason="Demo labour with debris needs manual review and likely double axle.",
+            load_weight_class="dense",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Labour + disposal risk; should not be auto-priced casually.",
+        ),
     ),
     CalibrationScenario(
         category="demolition",
@@ -305,6 +540,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             access_difficulty="extreme",
         ),
         costs=MockCosts(labor=230.0, disposal=70.0, fuel_wear=30.0, other=20.0),
+        market_target=_market(650.0, "650-950"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="double_axle_aluminum",
+            recommended_trailer="double_axle_aluminum",
+            trailer_reason="Awkward/heavy demo is double-axle/manual-review work.",
+            load_weight_class="dense",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="High access, labour, and disposal risk.",
+        ),
     ),
     CalibrationScenario(
         category="item / appliance / material delivery",
@@ -319,6 +564,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             dropoff_address="202 Buyer Road",
         ),
         costs=MockCosts(labor=35.0, disposal=0.0, fuel_wear=18.0, other=0.0),
+        market_target=_market(120.0, "120-180"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Couch delivery should be protected from weather/damage.",
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low disposal risk; damage/weather risk matters.",
+        ),
     ),
     CalibrationScenario(
         category="item / appliance / material delivery",
@@ -334,6 +589,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             access_difficulty="difficult",
         ),
         costs=MockCosts(labor=70.0, disposal=0.0, fuel_wear=20.0, other=5.0),
+        market_target=_market(160.0, "160-250"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Customer appliance delivery needs protection and 2-worker/access review.",
+            load_weight_class="heavy",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Heavy item and access risk.",
+        ),
     ),
     CalibrationScenario(
         category="item / appliance / material delivery",
@@ -349,6 +614,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             trailer_class="open_trailer",
         ),
         costs=MockCosts(labor=45.0, disposal=0.0, fuel_wear=24.0, other=5.0),
+        market_target=_market(140.0, "140-220"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="double_axle_aluminum",
+            recommended_trailer="double_axle_aluminum",
+            trailer_reason="Building materials/heavy material delivery should use double axle.",
+            load_weight_class="heavy",
+            disposal_fee_mode="weighed_tonnage",
+            equipment_disposal_risk_note="Weight/capacity risk.",
+        ),
     ),
     CalibrationScenario(
         category="item / appliance / material delivery",
@@ -363,6 +638,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             dropoff_address="808 Dropoff Ave",
         ),
         costs=MockCosts(labor=25.0, disposal=0.0, fuel_wear=10.0, other=0.0),
+        market_target=_market(100.0, "100-150"),
+        equipment=_equipment(
+            equipment_type="truck_only",
+            trailer_type="none",
+            recommended_trailer="none",
+            trailer_reason="Truck-only is fine for small local delivery unless item needs protection.",
+            load_weight_class="light",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low risk.",
+        ),
     ),
     CalibrationScenario(
         category="item / appliance / material delivery",
@@ -378,6 +663,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             travel_zone="surrounding",
         ),
         costs=MockCosts(labor=55.0, disposal=0.0, fuel_wear=38.0, other=5.0),
+        market_target=_market(160.0, "160-250"),
+        equipment=_equipment(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Longer delivery needs route/scope review and protected trailer for customer goods.",
+            load_weight_class="normal",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Travel and scope risk.",
+        ),
     ),
     CalibrationScenario(
         category="scrap pickups",
@@ -390,6 +685,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             scrap_pickup_location="curbside",
         ),
         costs=MockCosts(labor=12.0, disposal=0.0, fuel_wear=10.0, other=0.0, scrap_recovery=8.0),
+        market_target=_market(0.0, "0-free if pure/easy/route-compatible"),
+        equipment=_equipment(
+            equipment_type="truck_only",
+            trailer_type="none",
+            recommended_trailer="none",
+            trailer_reason="Easy curbside scrap may not need trailer.",
+            load_weight_class="light",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Only free/cheap if pure, easy, and route-compatible.",
+        ),
     ),
     CalibrationScenario(
         category="scrap pickups",
@@ -402,6 +707,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             scrap_pickup_location="inside",
         ),
         costs=MockCosts(labor=35.0, disposal=0.0, fuel_wear=14.0, other=0.0, scrap_recovery=15.0),
+        market_target=_market(60.0, "60-100"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Inside appliance removal is heavy labour; single axle usually enough unless volume/heavy.",
+            load_weight_class="heavy",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Labour/access risk; watch refrigerant appliance rules.",
+        ),
     ),
     CalibrationScenario(
         category="scrap pickups",
@@ -415,6 +730,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             access_difficulty="difficult",
         ),
         costs=MockCosts(labor=50.0, disposal=0.0, fuel_wear=15.0, other=0.0, scrap_recovery=20.0),
+        market_target=_market(100.0, "100-175"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Basement scrap requires labour/access review; trailer depends on volume.",
+            load_weight_class="heavy",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Access risk.",
+        ),
     ),
     CalibrationScenario(
         category="scrap pickups",
@@ -427,6 +752,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             scrap_pickup_location="curbside",
         ),
         costs=MockCosts(labor=24.0, disposal=20.0, fuel_wear=12.0, other=0.0, scrap_recovery=12.0),
+        market_target=_market(100.0, "100-175"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="single_axle_aluminum",
+            recommended_trailer="single_axle_aluminum",
+            trailer_reason="Mixed scrap/garbage needs disposal awareness and normal open trailer.",
+            load_weight_class="normal",
+            disposal_fee_mode="double_load_flat_fee",
+            equipment_disposal_risk_note="Mixed load risk; scrap recovery may not offset garbage disposal.",
+        ),
     ),
     CalibrationScenario(
         category="scrap pickups",
@@ -440,6 +775,16 @@ SCENARIOS: tuple[CalibrationScenario, ...] = (
             access_difficulty="extreme",
         ),
         costs=MockCosts(labor=70.0, disposal=0.0, fuel_wear=18.0, other=5.0, scrap_recovery=25.0),
+        market_target=_market(125.0, "125-200"),
+        equipment=_equipment(
+            equipment_type="truck_plus_trailer",
+            trailer_type="double_axle_aluminum",
+            recommended_trailer="double_axle_aluminum",
+            trailer_reason="Big/heavy scrap loads belong on double axle.",
+            load_weight_class="heavy",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Labour/access/equipment risk.",
+        ),
     ),
 )
 
@@ -476,6 +821,29 @@ def _calculate_profitability(*, cash_quote: float, costs: MockCosts) -> Profitab
     )
 
 
+def _calculate_market_position(
+    *,
+    cash_quote: float,
+    market_target: MarketTarget | None,
+) -> MarketPosition:
+    if market_target is None:
+        return MarketPosition(
+            target_cash_floor=None,
+            target_cash_range="N/A",
+            gap_to_target_floor=None,
+            market_price_flag="N/A",
+        )
+
+    gap = round(max(float(market_target.target_cash_floor) - float(cash_quote), 0.0), 2)
+    flag = "MARKET_UNDERPRICED" if cash_quote < market_target.target_cash_floor else "TARGET_OK"
+    return MarketPosition(
+        target_cash_floor=float(market_target.target_cash_floor),
+        target_cash_range=market_target.target_cash_range,
+        gap_to_target_floor=gap,
+        market_price_flag=flag,
+    )
+
+
 def _run_scenario(scenario: CalibrationScenario, quote_func: QuoteFunc | None = None) -> CalibrationResult:
     quote_builder = quote_func or build_quote_artifacts
     try:
@@ -490,6 +858,10 @@ def _run_scenario(scenario: CalibrationScenario, quote_func: QuoteFunc | None = 
     cash_quote = float(response["cash_total_cad"])
     emt_quote = float(response["emt_total_cad"])
     profitability = _calculate_profitability(cash_quote=cash_quote, costs=scenario.costs)
+    market_position = _calculate_market_position(
+        cash_quote=cash_quote,
+        market_target=scenario.market_target,
+    )
     return CalibrationResult(
         category=scenario.category,
         scenario_name=scenario.name,
@@ -500,7 +872,33 @@ def _run_scenario(scenario: CalibrationScenario, quote_func: QuoteFunc | None = 
         estimated_gross_profit=profitability.estimated_gross_profit,
         estimated_gross_margin_pct=profitability.estimated_gross_margin_pct,
         risk_flag=profitability.risk_flag,
+        market_position=market_position,
+        equipment=scenario.equipment,
     )
+
+
+def _summary_risk_profile(results: list[CalibrationResult]) -> str:
+    labels: list[str] = []
+    if any(result.risk_flag in PROFIT_RISK_FLAGS for result in results):
+        labels.append("profit")
+    if any(result.market_position.market_price_flag == "MARKET_UNDERPRICED" for result in results):
+        labels.append("market")
+    if any(
+        result.equipment.disposal_fee_mode in DISPOSAL_RISK_MODES
+        or result.equipment.load_weight_class in {"heavy", "dense"}
+        for result in results
+    ):
+        labels.append("equipment/disposal")
+    if any(
+        result.equipment.recommended_trailer == "double_axle_aluminum"
+        or (
+            result.equipment.recommended_trailer != result.equipment.trailer_type
+            and result.equipment.recommended_trailer != "none"
+        )
+        for result in results
+    ):
+        labels.append("recommended-trailer")
+    return ", ".join(labels) if labels else "none"
 
 
 def _summarize_category(category: str, results: list[CalibrationResult]) -> CategorySummary:
@@ -530,6 +928,18 @@ def _summarize_category(category: str, results: list[CalibrationResult]) -> Cate
     else:
         recommendation = "keep"
 
+    market_underpriced_count = sum(
+        1 for result in results if result.market_position.market_price_flag == "MARKET_UNDERPRICED"
+    )
+    gap_results = [result for result in results if result.market_position.gap_to_target_floor is not None]
+    if gap_results:
+        largest_gap_result = max(gap_results, key=lambda result: float(result.market_position.gap_to_target_floor))
+        largest_gap = float(largest_gap_result.market_position.gap_to_target_floor or 0.0)
+        largest_gap_scenario = largest_gap_result.scenario_name
+    else:
+        largest_gap = 0.0
+        largest_gap_scenario = "N/A"
+
     return CategorySummary(
         category=category,
         scenario_count=len(results),
@@ -538,11 +948,58 @@ def _summarize_category(category: str, results: list[CalibrationResult]) -> Cate
         highest_margin_scenario=highest_name,
         average_profit=average_profit,
         recommendation=recommendation,
+        market_underpriced_count=market_underpriced_count,
+        largest_gap_to_target_floor=largest_gap,
+        largest_gap_scenario=largest_gap_scenario,
+        risk_profile=_summary_risk_profile(results),
+        single_axle_count=sum(
+            1 for result in results if result.equipment.recommended_trailer == "single_axle_aluminum"
+        ),
+        double_axle_count=sum(
+            1 for result in results if result.equipment.recommended_trailer == "double_axle_aluminum"
+        ),
+        older_enclosed_count=sum(
+            1 for result in results if result.equipment.recommended_trailer == "older_enclosed"
+        ),
+        newer_enclosed_count=sum(
+            1 for result in results if result.equipment.recommended_trailer == "newer_enclosed"
+        ),
+        weighed_tonnage_count=sum(1 for result in results if result.equipment.disposal_fee_mode == "weighed_tonnage"),
+        mixed_tonnage_count=sum(1 for result in results if result.equipment.disposal_fee_mode == "mixed_tonnage"),
+        manual_review_count=sum(1 for result in results if result.equipment.disposal_fee_mode == "manual_review"),
     )
+
+
+def _owner_review_entries(results: list[CalibrationResult]) -> list[OwnerReviewEntry]:
+    entries: list[OwnerReviewEntry] = []
+    for result in results:
+        triggers: list[str] = []
+        if result.risk_flag in PROFIT_RISK_FLAGS:
+            triggers.append(result.risk_flag)
+        if result.market_position.market_price_flag == "MARKET_UNDERPRICED":
+            triggers.append("MARKET_UNDERPRICED")
+        if result.equipment.recommended_trailer == "double_axle_aluminum":
+            triggers.append("double_axle_aluminum")
+        if result.equipment.disposal_fee_mode in DISPOSAL_RISK_MODES:
+            triggers.append(result.equipment.disposal_fee_mode)
+        if result.equipment.load_weight_class == "dense":
+            triggers.append("dense")
+        reason = result.equipment.trailer_reason.lower()
+        if any(phrase in reason for phrase in TRAILER_REASON_REVIEW_PHRASES):
+            triggers.append("trailer_reason")
+        if triggers:
+            entries.append(OwnerReviewEntry(result=result, triggers=triggers))
+    return entries
 
 
 def _money(value: float) -> str:
     return f"${value:,.2f}"
+
+
+def _money_or_na(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return _money(value)
 
 
 def _margin(value: float | None) -> str:
@@ -554,18 +1011,27 @@ def _margin(value: float | None) -> str:
 def _print_table(results: list[CalibrationResult]) -> None:
     headers = [
         "category",
-        "scenario name",
-        "customer cash quote",
-        "customer EMT/e-transfer quote",
-        "mock labor cost",
-        "mock disposal cost",
-        "mock fuel/wear cost",
-        "mock other cost",
-        "mock scrap recovery",
-        "total mock cost",
-        "estimated gross profit",
-        "estimated gross margin %",
-        "risk flag",
+        "scenario",
+        "cash",
+        "emt",
+        "labor",
+        "disposal",
+        "fuel/wear",
+        "other",
+        "scrap",
+        "cost",
+        "profit",
+        "margin",
+        "risk",
+        "target cash floor",
+        "target cash range",
+        "gap to target floor",
+        "market flag",
+        "equipment type",
+        "trailer type",
+        "rec trailer",
+        "load weight",
+        "disposal mode",
     ]
     rows = [
         [
@@ -582,6 +1048,15 @@ def _print_table(results: list[CalibrationResult]) -> None:
             _money(result.estimated_gross_profit),
             _margin(result.estimated_gross_margin_pct),
             result.risk_flag,
+            _money_or_na(result.market_position.target_cash_floor),
+            result.market_position.target_cash_range,
+            _money_or_na(result.market_position.gap_to_target_floor),
+            result.market_position.market_price_flag,
+            result.equipment.equipment_type,
+            result.equipment.trailer_type,
+            result.equipment.recommended_trailer,
+            result.equipment.load_weight_class,
+            result.equipment.disposal_fee_mode,
         ]
         for result in results
     ]
@@ -610,21 +1085,73 @@ def _print_summaries(results: list[CalibrationResult]) -> list[CategorySummary]:
             f"lowest margin scenario={summary.lowest_margin_scenario}, "
             f"highest margin scenario={summary.highest_margin_scenario}, "
             f"average profit={_money(summary.average_profit)}, "
-            f"recommendation={summary.recommendation}"
+            f"recommendation={summary.recommendation}, "
+            f"market underpriced={summary.market_underpriced_count}, "
+            f"largest target gap={_money(summary.largest_gap_to_target_floor)} "
+            f"({summary.largest_gap_scenario}), "
+            f"risks={summary.risk_profile}, "
+            "rec trailers="
+            f"single:{summary.single_axle_count}/"
+            f"double:{summary.double_axle_count}/"
+            f"older:{summary.older_enclosed_count}/"
+            f"newer:{summary.newer_enclosed_count}, "
+            "disposal modes="
+            f"weighed:{summary.weighed_tonnage_count}/"
+            f"mixed:{summary.mixed_tonnage_count}/"
+            f"manual:{summary.manual_review_count}"
         )
     return summaries
+
+
+def _print_owner_review(results: list[CalibrationResult]) -> None:
+    entries = _owner_review_entries(results)
+    print()
+    print("Owner review scenarios")
+    print("----------------------")
+    if not entries:
+        print("No scenarios require owner review.")
+        return
+
+    headers = [
+        "scenario",
+        "triggers",
+        "target gap",
+        "rec trailer",
+        "trailer reason",
+        "equipment/disposal risk note",
+    ]
+    rows = [
+        [
+            entry.result.scenario_name,
+            ", ".join(entry.triggers),
+            _money_or_na(entry.result.market_position.gap_to_target_floor),
+            entry.result.equipment.recommended_trailer,
+            entry.result.equipment.trailer_reason,
+            entry.result.equipment.equipment_disposal_risk_note,
+        ]
+        for entry in entries
+    ]
+    widths = [len(header) for header in headers]
+    for row in rows:
+        widths = [max(width, len(cell)) for width, cell in zip(widths, row)]
+
+    print(" | ".join(header.ljust(width) for header, width in zip(headers, widths)))
+    print("-+-".join("-" * width for width in widths))
+    for row in rows:
+        print(" | ".join(cell.ljust(width) for cell, width in zip(row, widths)))
 
 
 def main() -> int:
     print("Bay Delivery Price Calibration Mock Harness")
     print("Local-only TEST / SIMULATED analysis. Quote totals come from build_quote_artifacts().")
-    print("Mock costs and scrap recovery are analysis-only and do not feed pricing.")
+    print("Mock costs, market targets, trailer guidance, and scrap recovery are analysis-only.")
     print("Margin note: cash quote <= 0 displays as N/A and is never divided by.")
     print()
 
     results = [_run_scenario(scenario) for scenario in SCENARIOS]
     _print_table(results)
     _print_summaries(results)
+    _print_owner_review(results)
     return 0
 
 
