@@ -67,6 +67,43 @@ EXPECTED_TARGETS = {
 }
 
 
+def test_operating_cost_assumptions_are_research_backed_and_calibration_only() -> None:
+    assumptions = calibration.OPERATING_COST_ASSUMPTIONS
+
+    assert assumptions.calibration_only is True
+    assert assumptions.helper_fully_loaded_hourly_range == (21.0, 24.0)
+    assert assumptions.owner_operator_hourly_range == (25.0, 28.0)
+    assert assumptions.truck_operating_reserve_per_hour == 12.0
+    assert assumptions.admin_overhead_pct_of_revenue == 12.0
+    assert assumptions.contribution_margin_floor_pct == 20.0
+
+    assert calibration.CREW_RATE_TARGETS[1].customer_facing_hourly_range == (95.0, 115.0)
+    assert calibration.CREW_RATE_TARGETS[2].customer_facing_hourly_range == (165.0, 195.0)
+    assert calibration.CREW_RATE_TARGETS[3].customer_facing_hourly_range == (220.0, 250.0)
+    assert calibration.EXTRA_HELPER_CUSTOMER_FACING_HOURLY_RANGE == (55.0, 70.0)
+    assert calibration.LOCAL_MOBILIZATION_TARGETS["one_person"] == (55.0, 65.0)
+    assert calibration.LOCAL_MOBILIZATION_TARGETS["two_person"] == (75.0, 95.0)
+
+
+def test_old_helper_anchor_is_not_used_for_operating_cost_labour_model() -> None:
+    assert calibration.OPERATING_COST_ASSUMPTIONS.helper_fully_loaded_midpoint != 16.0
+    assert calibration.OPERATING_COST_ASSUMPTIONS.helper_fully_loaded_midpoint == 22.5
+    assert calibration.OPERATING_COST_ASSUMPTIONS.owner_operator_midpoint == 26.5
+
+
+def test_disposal_research_anchors_are_analysis_only_and_source_conflicts_manual() -> None:
+    anchors = calibration.DISPOSAL_RESEARCH_ANCHORS
+
+    assert anchors.six_bags_or_less == 10.0
+    assert anchors.seven_plus_bags_half_ton_or_trailer == 25.0
+    assert anchors.residential_double_load_vehicle_plus_trailer == 35.0
+    assert anchors.mattress_box_spring_or_foam_top_each == 30.0
+    assert anchors.refrigerant_appliance_each == 25.0
+    assert anchors.weighed_dual_axle_mode == "manual_confirmation_source_conflict"
+    assert anchors.ici_commercial_mode == "manual_confirmation_source_conflict"
+    assert anchors.calibration_only is True
+
+
 def test_required_categories_and_scenarios_are_represented() -> None:
     scenarios_by_category: dict[str, set[str]] = {}
     for scenario in calibration.SCENARIOS:
@@ -162,6 +199,17 @@ def test_category_summary_skips_na_margins() -> None:
             estimated_gross_margin_pct=None,
             risk_flag="NO_REVENUE",
             market_position=calibration.MarketPosition(None, "N/A", None, "N/A"),
+            operating_cost_position=calibration.OperatingCostPosition(
+                mock_internal_cost=0.0,
+                contribution_margin_pct=None,
+                operating_cost_target_floor=None,
+                operating_cost_target_gap=None,
+                labour_rate_risk="NO_REVENUE",
+                mobilization_risk="N/A",
+                disposal_manual_review_risk="LOW",
+                moving_underpricing_risk="N/A",
+                demolition_premium_risk="N/A",
+            ),
             equipment=calibration.EquipmentGuidance(
                 equipment_type="truck_only",
                 trailer_type="none",
@@ -183,6 +231,17 @@ def test_category_summary_skips_na_margins() -> None:
             estimated_gross_margin_pct=40.0,
             risk_flag="STRONG",
             market_position=calibration.MarketPosition(60.0, "60-100", 0.0, "TARGET_OK"),
+            operating_cost_position=calibration.OperatingCostPosition(
+                mock_internal_cost=60.0,
+                contribution_margin_pct=40.0,
+                operating_cost_target_floor=75.0,
+                operating_cost_target_gap=0.0,
+                labour_rate_risk="TARGET_OK",
+                mobilization_risk="TARGET_OK",
+                disposal_manual_review_risk="LOW",
+                moving_underpricing_risk="N/A",
+                demolition_premium_risk="N/A",
+            ),
             equipment=calibration.EquipmentGuidance(
                 equipment_type="truck_plus_trailer",
                 trailer_type="single_axle_aluminum",
@@ -202,6 +261,8 @@ def test_category_summary_skips_na_margins() -> None:
     assert summary.highest_margin_scenario == "inside appliance removal"
     assert summary.market_underpriced_count == 0
     assert summary.manual_review_count == 0
+    assert summary.under_operating_cost_target_count == 0
+    assert summary.below_contribution_margin_count == 0
 
 
 def test_trailer_and_disposal_guidance_represent_required_values() -> None:
@@ -238,6 +299,105 @@ def test_owner_review_summary_includes_market_and_equipment_risk_scenarios() -> 
     assert scenarios["couch or mattress simple pickup"].result.equipment.recommended_trailer == "older_enclosed"
 
 
+def test_operating_cost_position_flags_margin_and_target_gap() -> None:
+    scenario = calibration.CalibrationScenario(
+        category="small moves",
+        name="low two-person move",
+        payload=calibration._payload(
+            service_type="small_move",
+            estimated_hours=2.0,
+            crew_size=2,
+            access_difficulty="normal",
+        ),
+        costs=calibration.MockCosts(disposal=0.0, fuel_wear=0.0, other=0.0),
+        market_target=calibration.MarketTarget(330.0, "165-195/hr"),
+        equipment=calibration.EquipmentGuidance(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Moving job should use protected trailer.",
+            load_weight_class="normal",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="Moving scope risk.",
+        ),
+    )
+
+    result = calibration._run_scenario(
+        scenario,
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 100.0,
+                "emt_total_cad": 113.0,
+            },
+        },
+    )
+
+    assert result.operating_cost_position.mock_internal_cost == 134.0
+    assert result.operating_cost_position.contribution_margin_pct == -34.0
+    assert result.operating_cost_position.operating_cost_target_floor == 167.5
+    assert result.operating_cost_position.operating_cost_target_gap == 67.5
+    assert result.operating_cost_position.labour_rate_risk == "UNDER_CREW_RATE_TARGET"
+    assert result.operating_cost_position.mobilization_risk == "UNDER_LOCAL_MOBILIZATION_TARGET"
+    assert result.operating_cost_position.moving_underpricing_risk == "MOVING_UNDERPRICED"
+
+
+def test_access_difficulty_move_uses_harder_moving_target() -> None:
+    scenario = calibration.CalibrationScenario(
+        category="small moves",
+        name="stairs move",
+        payload=calibration._payload(
+            service_type="small_move",
+            estimated_hours=3.0,
+            crew_size=2,
+            access_difficulty="extreme",
+        ),
+        costs=calibration.MockCosts(disposal=0.0, fuel_wear=0.0, other=0.0),
+        market_target=calibration.MarketTarget(525.0, "175-210/hr"),
+        equipment=calibration.EquipmentGuidance(
+            equipment_type="enclosed_trailer",
+            trailer_type="newer_enclosed",
+            recommended_trailer="newer_enclosed",
+            trailer_reason="Difficult access moving job needs manual review.",
+            load_weight_class="heavy",
+            disposal_fee_mode="manual_review",
+            equipment_disposal_risk_note="High labour/access risk.",
+        ),
+    )
+
+    result = calibration._run_scenario(
+        scenario,
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 500.0,
+                "emt_total_cad": 565.0,
+            },
+        },
+    )
+
+    assert result.operating_cost_position.moving_underpricing_risk == "HARD_MOVE_UNDERPRICED"
+
+
+def test_summary_counts_new_risk_categories() -> None:
+    results = [
+        calibration._run_scenario(scenario)
+        for scenario in calibration.SCENARIOS
+    ]
+
+    summaries = {
+        summary.category: summary
+        for summary in (
+            calibration._summarize_category(category, [result for result in results if result.category == category])
+            for category in dict.fromkeys(result.category for result in results)
+        )
+    }
+
+    assert summaries["small moves"].moving_underpricing_count >= 1
+    assert summaries["demolition"].demolition_premium_risk_count >= 1
+    assert summaries["dump runs"].manual_review_disposal_risk_count >= 1
+    assert sum(summary.under_operating_cost_target_count for summary in summaries.values()) >= 1
+    assert sum(summary.below_contribution_margin_count for summary in summaries.values()) >= 1
+
+
 def test_quote_totals_are_sourced_from_build_quote_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict] = []
 
@@ -259,6 +419,7 @@ def test_quote_totals_are_sourced_from_build_quote_artifacts(monkeypatch: pytest
     assert calls == [calibration.SCENARIOS[0].payload]
     assert result.cash_quote == 125.0
     assert result.emt_quote == 141.25
+    assert result.operating_cost_position.mock_internal_cost >= 0.0
 
 
 def test_script_does_not_directly_import_storage_or_call_db_writes() -> None:
@@ -313,6 +474,13 @@ def test_script_runs_directly_without_creating_db_file(tmp_path: Path) -> None:
     assert "Bay Delivery Price Calibration Mock Harness" in result.stdout
     assert "target floor" in result.stdout
     assert "market flag" in result.stdout
+    assert "op cost target floor" in result.stdout
+    assert "op cost gap" in result.stdout
+    assert "contribution margin" in result.stdout
+    assert "labour risk" in result.stdout
+    assert "mobilization risk" in result.stdout
+    assert "disposal risk" in result.stdout
+    assert "moving risk" in result.stdout
     assert "equipment" in result.stdout
     assert "rec trailer" in result.stdout
     assert "Owner review scenarios" in result.stdout
@@ -323,6 +491,11 @@ def test_script_runs_directly_without_creating_db_file(tmp_path: Path) -> None:
     assert "older_enclosed" in result.stdout
     assert "weighed_tonnage" in result.stdout
     assert "manual_review" in result.stdout
+    assert "MOVING_UNDERPRICED" in result.stdout
+    assert "MANUAL_REVIEW" in result.stdout
+    assert "demo premium risk" in result.stdout
+    assert "under operating-cost target" in result.stdout
+    assert "below contribution margin" in result.stdout
     assert "Category summaries" in result.stdout
     assert "N/A" in result.stdout
     assert not db_path.exists()
