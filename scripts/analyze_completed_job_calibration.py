@@ -97,7 +97,7 @@ def _resolved_db_path() -> Path:
 
 
 def _read_only_connection(db_path: Path) -> sqlite3.Connection:
-    uri = f"{db_path.resolve().as_uri()}?mode=ro&immutable=1"
+    uri = f"{db_path.resolve().as_uri()}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA query_only = ON")

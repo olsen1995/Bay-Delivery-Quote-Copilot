@@ -137,6 +137,34 @@ def test_missing_db_exits_cleanly_without_creating_file(
     assert not db_path.exists()
 
 
+def test_read_only_connection_uses_mode_ro_without_immutable_and_query_only(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeConnection:
+        row_factory: object | None = None
+
+        def execute(self, sql: str) -> None:
+            captured.setdefault("statements", []).append(sql)
+
+    def fake_connect(database: str, **kwargs: Any) -> FakeConnection:
+        captured["database"] = database
+        captured["kwargs"] = kwargs
+        return FakeConnection()
+
+    monkeypatch.setattr(analysis.sqlite3, "connect", fake_connect)
+
+    conn = analysis._read_only_connection(tmp_path / "readonly.sqlite3")
+
+    assert isinstance(conn, FakeConnection)
+    assert captured["database"].endswith("?mode=ro")
+    assert "immutable=1" not in captured["database"]
+    assert captured["kwargs"] == {"uri": True}
+    assert captured["statements"] == ["PRAGMA query_only = ON"]
+
+
 def test_existing_db_analysis_does_not_create_sqlite_sidecar_files(tmp_path: Path) -> None:
     db_path = tmp_path / "existing-readonly.sqlite3"
     _create_minimal_completed_jobs_db(db_path)
