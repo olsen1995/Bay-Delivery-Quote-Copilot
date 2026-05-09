@@ -22,6 +22,43 @@ class MockCosts:
 
 
 @dataclass(frozen=True)
+class OperatingCostAssumptions:
+    calibration_only: bool
+    helper_fully_loaded_hourly_range: tuple[float, float]
+    owner_operator_hourly_range: tuple[float, float]
+    truck_operating_reserve_per_hour: float
+    admin_overhead_pct_of_revenue: float
+    contribution_margin_floor_pct: float
+
+    @property
+    def helper_fully_loaded_midpoint(self) -> float:
+        return round(sum(self.helper_fully_loaded_hourly_range) / 2.0, 2)
+
+    @property
+    def owner_operator_midpoint(self) -> float:
+        return round(sum(self.owner_operator_hourly_range) / 2.0, 2)
+
+
+@dataclass(frozen=True)
+class CrewRateTarget:
+    crew_size: int
+    customer_facing_hourly_range: tuple[float, float]
+    minimum_billable_hours: float
+
+
+@dataclass(frozen=True)
+class DisposalResearchAnchors:
+    calibration_only: bool
+    six_bags_or_less: float
+    seven_plus_bags_half_ton_or_trailer: float
+    residential_double_load_vehicle_plus_trailer: float
+    mattress_box_spring_or_foam_top_each: float
+    refrigerant_appliance_each: float
+    weighed_dual_axle_mode: str
+    ici_commercial_mode: str
+
+
+@dataclass(frozen=True)
 class MarketTarget:
     target_cash_floor: float
     target_cash_range: str
@@ -65,6 +102,19 @@ class MarketPosition:
 
 
 @dataclass(frozen=True)
+class OperatingCostPosition:
+    mock_internal_cost: float
+    contribution_margin_pct: float | None
+    operating_cost_target_floor: float | None
+    operating_cost_target_gap: float | None
+    labour_rate_risk: str
+    mobilization_risk: str
+    disposal_manual_review_risk: str
+    moving_underpricing_risk: str
+    demolition_premium_risk: str
+
+
+@dataclass(frozen=True)
 class CalibrationResult:
     category: str
     scenario_name: str
@@ -76,6 +126,7 @@ class CalibrationResult:
     estimated_gross_margin_pct: float | None
     risk_flag: str
     market_position: MarketPosition
+    operating_cost_position: OperatingCostPosition
     equipment: EquipmentGuidance
 
 
@@ -99,6 +150,11 @@ class CategorySummary:
     weighed_tonnage_count: int
     mixed_tonnage_count: int
     manual_review_count: int
+    under_operating_cost_target_count: int
+    below_contribution_margin_count: int
+    manual_review_disposal_risk_count: int
+    demolition_premium_risk_count: int
+    moving_underpricing_count: int
 
 
 @dataclass(frozen=True)
@@ -111,6 +167,36 @@ QuoteFunc = Callable[[dict[str, Any]], dict[str, Any]]
 
 PROFIT_RISK_FLAGS = {"LOSS", "BAD", "WATCH"}
 DISPOSAL_RISK_MODES = {"weighed_tonnage", "mixed_tonnage", "manual_review"}
+OPERATING_COST_ASSUMPTIONS = OperatingCostAssumptions(
+    calibration_only=True,
+    helper_fully_loaded_hourly_range=(21.0, 24.0),
+    owner_operator_hourly_range=(25.0, 28.0),
+    truck_operating_reserve_per_hour=12.0,
+    admin_overhead_pct_of_revenue=12.0,
+    contribution_margin_floor_pct=20.0,
+)
+CREW_RATE_TARGETS = {
+    1: CrewRateTarget(crew_size=1, customer_facing_hourly_range=(95.0, 115.0), minimum_billable_hours=1.0),
+    2: CrewRateTarget(crew_size=2, customer_facing_hourly_range=(165.0, 195.0), minimum_billable_hours=2.0),
+    3: CrewRateTarget(crew_size=3, customer_facing_hourly_range=(220.0, 250.0), minimum_billable_hours=3.0),
+}
+EXTRA_HELPER_CUSTOMER_FACING_HOURLY_RANGE = (55.0, 70.0)
+LOCAL_MOBILIZATION_TARGETS = {
+    "one_person": (55.0, 65.0),
+    "two_person": (75.0, 95.0),
+}
+LOW_END_MOVER_EXTERNAL_COMPARATOR_RANGE = (119.0, 129.0)
+HARD_MOVE_CUSTOMER_FACING_HOURLY_RANGE = (175.0, 210.0)
+DISPOSAL_RESEARCH_ANCHORS = DisposalResearchAnchors(
+    calibration_only=True,
+    six_bags_or_less=10.0,
+    seven_plus_bags_half_ton_or_trailer=25.0,
+    residential_double_load_vehicle_plus_trailer=35.0,
+    mattress_box_spring_or_foam_top_each=30.0,
+    refrigerant_appliance_each=25.0,
+    weighed_dual_axle_mode="manual_confirmation_source_conflict",
+    ici_commercial_mode="manual_confirmation_source_conflict",
+)
 TRAILER_REASON_REVIEW_PHRASES = (
     "escalate",
     "manual review",
@@ -844,6 +930,209 @@ def _calculate_market_position(
     )
 
 
+def _operating_cost_labour_total(
+    payload: dict[str, Any],
+    *,
+    fallback_mock_labor_cost: float = 0.0,
+) -> float:
+    hours = max(float(payload.get("estimated_hours") or 0.0), 0.0)
+    crew_size = max(int(payload.get("crew_size") or 0), 0)
+    if hours <= 0.0 or crew_size <= 0:
+        return round(max(float(fallback_mock_labor_cost), 0.0), 2)
+
+    owner_cost = OPERATING_COST_ASSUMPTIONS.owner_operator_midpoint * hours
+    helper_count = max(crew_size - 1, 0)
+    helper_cost = helper_count * OPERATING_COST_ASSUMPTIONS.helper_fully_loaded_midpoint * hours
+    return round(owner_cost + helper_cost, 2)
+
+
+def _operating_cost_base_cost(
+    *,
+    labour_total: float,
+    truck_reserve: float,
+    costs: MockCosts,
+) -> float:
+    return round(
+        max(
+            labour_total
+            + truck_reserve
+            + costs.disposal
+            + costs.fuel_wear
+            + costs.other
+            - costs.scrap_recovery,
+            0.0,
+        ),
+        2,
+    )
+
+
+def _operating_cost_target_floor(base_cost: float) -> float | None:
+    overhead_pct = OPERATING_COST_ASSUMPTIONS.admin_overhead_pct_of_revenue / 100.0
+    contribution_margin_pct = OPERATING_COST_ASSUMPTIONS.contribution_margin_floor_pct / 100.0
+    denominator = 1.0 - overhead_pct - contribution_margin_pct
+    if denominator <= 0.0:
+        return None
+    return round(base_cost / denominator, 2)
+
+
+def _crew_rate_target_floor(payload: dict[str, Any]) -> float | None:
+    hours = max(float(payload.get("estimated_hours") or 0.0), 0.0)
+    crew_size = max(int(payload.get("crew_size") or 0), 0)
+    if hours <= 0.0 or crew_size <= 0:
+        return None
+
+    base_target = CREW_RATE_TARGETS.get(min(crew_size, 3))
+    if base_target is None:
+        return None
+
+    target_hours = max(hours, base_target.minimum_billable_hours)
+    target_floor = base_target.customer_facing_hourly_range[0] * target_hours
+    if crew_size > 3:
+        extra_helpers = crew_size - 3
+        target_floor += extra_helpers * EXTRA_HELPER_CUSTOMER_FACING_HOURLY_RANGE[0] * target_hours
+    return round(target_floor, 2)
+
+
+def _mobilization_target_floor(payload: dict[str, Any]) -> float | None:
+    crew_rate_floor = _crew_rate_target_floor(payload)
+    if crew_rate_floor is None:
+        return None
+
+    crew_size = max(int(payload.get("crew_size") or 0), 0)
+    if crew_size <= 1:
+        mobilization_floor = LOCAL_MOBILIZATION_TARGETS["one_person"][0]
+    else:
+        mobilization_floor = LOCAL_MOBILIZATION_TARGETS["two_person"][0]
+    return round(crew_rate_floor + mobilization_floor, 2)
+
+
+def _is_harder_move(scenario: CalibrationScenario) -> bool:
+    payload = scenario.payload
+    name = scenario.name.lower()
+    access = str(payload.get("access_difficulty") or "").lower()
+    return (
+        access in {"difficult", "extreme"}
+        or "apartment" in name
+        or "stairs" in name
+        or "surrounding" in name
+    )
+
+
+def _moving_underpricing_risk(*, scenario: CalibrationScenario, cash_quote: float) -> str:
+    if scenario.category != "small moves" and scenario.payload.get("service_type") != "small_move":
+        return "N/A"
+
+    hours = max(float(scenario.payload.get("estimated_hours") or 0.0), 0.0)
+    crew_size = max(int(scenario.payload.get("crew_size") or 0), 0)
+    if hours <= 0.0 or crew_size <= 0:
+        return "N/A"
+
+    if _is_harder_move(scenario):
+        target_floor = HARD_MOVE_CUSTOMER_FACING_HOURLY_RANGE[0] * max(hours, 3.0)
+        return "HARD_MOVE_UNDERPRICED" if cash_quote < target_floor else "TARGET_OK"
+
+    if crew_size == 2:
+        target_floor = CREW_RATE_TARGETS[2].customer_facing_hourly_range[0] * max(hours, 2.0)
+        return "MOVING_UNDERPRICED" if cash_quote < target_floor else "TARGET_OK"
+
+    crew_floor = _crew_rate_target_floor(scenario.payload)
+    if crew_floor is None:
+        return "N/A"
+    return "MOVING_UNDERPRICED" if cash_quote < crew_floor else "TARGET_OK"
+
+
+def _disposal_manual_review_risk(scenario: CalibrationScenario) -> str:
+    description = " ".join(
+        str(scenario.payload.get(key) or "")
+        for key in ("description", "job_description_customer")
+    ).lower()
+    if (
+        scenario.equipment.disposal_fee_mode in DISPOSAL_RISK_MODES
+        or scenario.equipment.load_weight_class in {"heavy", "dense"}
+        or bool(scenario.payload.get("has_dense_materials"))
+        or "mixed" in description
+        or "construction" in description
+        or "demo" in description
+        or scenario.costs.scrap_recovery > 0.0
+    ):
+        return "MANUAL_REVIEW"
+    return "LOW"
+
+
+def _demolition_premium_risk(*, scenario: CalibrationScenario, cash_quote: float) -> str:
+    if scenario.category != "demolition" and scenario.payload.get("service_type") != "demolition":
+        return "N/A"
+    if (
+        cash_quote < 175.0
+        or scenario.equipment.load_weight_class in {"heavy", "dense"}
+        or scenario.equipment.disposal_fee_mode in DISPOSAL_RISK_MODES
+        or bool(scenario.payload.get("has_dense_materials"))
+    ):
+        return "DEMO_PREMIUM_RISK"
+    return "TARGET_OK"
+
+
+def _calculate_operating_cost_position(
+    *,
+    scenario: CalibrationScenario,
+    cash_quote: float,
+) -> OperatingCostPosition:
+    payload = scenario.payload
+    hours = max(float(payload.get("estimated_hours") or 0.0), 0.0)
+    labour_total = _operating_cost_labour_total(
+        payload,
+        fallback_mock_labor_cost=scenario.costs.labor,
+    )
+    truck_reserve = OPERATING_COST_ASSUMPTIONS.truck_operating_reserve_per_hour * hours
+    overhead = cash_quote * (OPERATING_COST_ASSUMPTIONS.admin_overhead_pct_of_revenue / 100.0)
+    base_cost = _operating_cost_base_cost(
+        labour_total=labour_total,
+        truck_reserve=truck_reserve,
+        costs=scenario.costs,
+    )
+    mock_internal_cost = round(base_cost + overhead, 2)
+    operating_cost_target_floor = _operating_cost_target_floor(base_cost)
+    if operating_cost_target_floor is None:
+        operating_cost_target_gap = None
+    else:
+        operating_cost_target_gap = round(max(operating_cost_target_floor - cash_quote, 0.0), 2)
+
+    if cash_quote <= 0.0:
+        contribution_margin_pct = None
+        labour_rate_risk = "NO_REVENUE"
+        mobilization_risk = "NO_REVENUE"
+    else:
+        contribution_margin_pct = round(((cash_quote - mock_internal_cost) / cash_quote) * 100.0, 1)
+
+        crew_floor = _crew_rate_target_floor(payload)
+        if crew_floor is None:
+            labour_rate_risk = "N/A"
+        elif cash_quote < crew_floor:
+            labour_rate_risk = "UNDER_CREW_RATE_TARGET"
+        else:
+            labour_rate_risk = "TARGET_OK"
+
+        mobilization_floor = _mobilization_target_floor(payload)
+        if mobilization_floor is None:
+            mobilization_risk = "N/A"
+        elif cash_quote < mobilization_floor:
+            mobilization_risk = "UNDER_LOCAL_MOBILIZATION_TARGET"
+        else:
+            mobilization_risk = "TARGET_OK"
+
+    return OperatingCostPosition(
+        mock_internal_cost=mock_internal_cost,
+        contribution_margin_pct=contribution_margin_pct,
+        operating_cost_target_floor=operating_cost_target_floor,
+        operating_cost_target_gap=operating_cost_target_gap,
+        labour_rate_risk=labour_rate_risk,
+        mobilization_risk=mobilization_risk,
+        disposal_manual_review_risk=_disposal_manual_review_risk(scenario),
+        moving_underpricing_risk=_moving_underpricing_risk(scenario=scenario, cash_quote=cash_quote),
+        demolition_premium_risk=_demolition_premium_risk(scenario=scenario, cash_quote=cash_quote),
+    )
+
+
 def _run_scenario(scenario: CalibrationScenario, quote_func: QuoteFunc | None = None) -> CalibrationResult:
     quote_builder = quote_func or build_quote_artifacts
     try:
@@ -862,6 +1151,10 @@ def _run_scenario(scenario: CalibrationScenario, quote_func: QuoteFunc | None = 
         cash_quote=cash_quote,
         market_target=scenario.market_target,
     )
+    operating_cost_position = _calculate_operating_cost_position(
+        scenario=scenario,
+        cash_quote=cash_quote,
+    )
     return CalibrationResult(
         category=scenario.category,
         scenario_name=scenario.name,
@@ -873,6 +1166,7 @@ def _run_scenario(scenario: CalibrationScenario, quote_func: QuoteFunc | None = 
         estimated_gross_margin_pct=profitability.estimated_gross_margin_pct,
         risk_flag=profitability.risk_flag,
         market_position=market_position,
+        operating_cost_position=operating_cost_position,
         equipment=scenario.equipment,
     )
 
@@ -881,14 +1175,29 @@ def _summary_risk_profile(results: list[CalibrationResult]) -> str:
     labels: list[str] = []
     if any(result.risk_flag in PROFIT_RISK_FLAGS for result in results):
         labels.append("profit")
+    if any(
+        (result.operating_cost_position.operating_cost_target_gap or 0.0) > 0.0
+        or (
+            result.operating_cost_position.contribution_margin_pct is not None
+            and result.operating_cost_position.contribution_margin_pct
+            < OPERATING_COST_ASSUMPTIONS.contribution_margin_floor_pct
+        )
+        for result in results
+    ):
+        labels.append("operating-cost")
     if any(result.market_position.market_price_flag == "MARKET_UNDERPRICED" for result in results):
         labels.append("market")
     if any(
         result.equipment.disposal_fee_mode in DISPOSAL_RISK_MODES
         or result.equipment.load_weight_class in {"heavy", "dense"}
+        or result.operating_cost_position.disposal_manual_review_risk == "MANUAL_REVIEW"
         for result in results
     ):
         labels.append("equipment/disposal")
+    if any(result.operating_cost_position.moving_underpricing_risk not in {"N/A", "TARGET_OK"} for result in results):
+        labels.append("moving")
+    if any(result.operating_cost_position.demolition_premium_risk == "DEMO_PREMIUM_RISK" for result in results):
+        labels.append("demo-premium")
     if any(
         result.equipment.recommended_trailer == "double_axle_aluminum"
         or (
@@ -967,6 +1276,27 @@ def _summarize_category(category: str, results: list[CalibrationResult]) -> Cate
         weighed_tonnage_count=sum(1 for result in results if result.equipment.disposal_fee_mode == "weighed_tonnage"),
         mixed_tonnage_count=sum(1 for result in results if result.equipment.disposal_fee_mode == "mixed_tonnage"),
         manual_review_count=sum(1 for result in results if result.equipment.disposal_fee_mode == "manual_review"),
+        under_operating_cost_target_count=sum(
+            1 for result in results if (result.operating_cost_position.operating_cost_target_gap or 0.0) > 0.0
+        ),
+        below_contribution_margin_count=sum(
+            1
+            for result in results
+            if result.operating_cost_position.contribution_margin_pct is not None
+            and result.operating_cost_position.contribution_margin_pct
+            < OPERATING_COST_ASSUMPTIONS.contribution_margin_floor_pct
+        ),
+        manual_review_disposal_risk_count=sum(
+            1 for result in results if result.operating_cost_position.disposal_manual_review_risk == "MANUAL_REVIEW"
+        ),
+        demolition_premium_risk_count=sum(
+            1 for result in results if result.operating_cost_position.demolition_premium_risk == "DEMO_PREMIUM_RISK"
+        ),
+        moving_underpricing_count=sum(
+            1
+            for result in results
+            if result.operating_cost_position.moving_underpricing_risk not in {"N/A", "TARGET_OK"}
+        ),
     )
 
 
@@ -978,10 +1308,24 @@ def _owner_review_entries(results: list[CalibrationResult]) -> list[OwnerReviewE
             triggers.append(result.risk_flag)
         if result.market_position.market_price_flag == "MARKET_UNDERPRICED":
             triggers.append("MARKET_UNDERPRICED")
+        if (result.operating_cost_position.operating_cost_target_gap or 0.0) > 0.0:
+            triggers.append("UNDER_OPERATING_COST_TARGET")
+        if (
+            result.operating_cost_position.contribution_margin_pct is not None
+            and result.operating_cost_position.contribution_margin_pct
+            < OPERATING_COST_ASSUMPTIONS.contribution_margin_floor_pct
+        ):
+            triggers.append("BELOW_CONTRIBUTION_MARGIN")
         if result.equipment.recommended_trailer == "double_axle_aluminum":
             triggers.append("double_axle_aluminum")
         if result.equipment.disposal_fee_mode in DISPOSAL_RISK_MODES:
             triggers.append(result.equipment.disposal_fee_mode)
+        if result.operating_cost_position.disposal_manual_review_risk == "MANUAL_REVIEW":
+            triggers.append("DISPOSAL_MANUAL_REVIEW")
+        if result.operating_cost_position.moving_underpricing_risk not in {"N/A", "TARGET_OK"}:
+            triggers.append(result.operating_cost_position.moving_underpricing_risk)
+        if result.operating_cost_position.demolition_premium_risk == "DEMO_PREMIUM_RISK":
+            triggers.append("DEMO_PREMIUM_RISK")
         if result.equipment.load_weight_class == "dense":
             triggers.append("dense")
         reason = result.equipment.trailer_reason.lower()
@@ -1023,6 +1367,15 @@ def _print_table(results: list[CalibrationResult]) -> None:
         "profit",
         "margin",
         "risk",
+        "mock internal cost",
+        "contribution margin",
+        "op cost target floor",
+        "op cost gap",
+        "labour risk",
+        "mobilization risk",
+        "disposal risk",
+        "moving risk",
+        "demo premium risk",
         "target cash floor",
         "target cash range",
         "gap to target floor",
@@ -1048,6 +1401,15 @@ def _print_table(results: list[CalibrationResult]) -> None:
             _money(result.estimated_gross_profit),
             _margin(result.estimated_gross_margin_pct),
             result.risk_flag,
+            _money(result.operating_cost_position.mock_internal_cost),
+            _margin(result.operating_cost_position.contribution_margin_pct),
+            _money_or_na(result.operating_cost_position.operating_cost_target_floor),
+            _money_or_na(result.operating_cost_position.operating_cost_target_gap),
+            result.operating_cost_position.labour_rate_risk,
+            result.operating_cost_position.mobilization_risk,
+            result.operating_cost_position.disposal_manual_review_risk,
+            result.operating_cost_position.moving_underpricing_risk,
+            result.operating_cost_position.demolition_premium_risk,
             _money_or_na(result.market_position.target_cash_floor),
             result.market_position.target_cash_range,
             _money_or_na(result.market_position.gap_to_target_floor),
@@ -1087,6 +1449,11 @@ def _print_summaries(results: list[CalibrationResult]) -> list[CategorySummary]:
             f"average profit={_money(summary.average_profit)}, "
             f"recommendation={summary.recommendation}, "
             f"market underpriced={summary.market_underpriced_count}, "
+            f"under operating-cost target={summary.under_operating_cost_target_count}, "
+            f"below contribution margin={summary.below_contribution_margin_count}, "
+            f"manual-review disposal risk={summary.manual_review_disposal_risk_count}, "
+            f"demo premium risk={summary.demolition_premium_risk_count}, "
+            f"moving underpricing risk={summary.moving_underpricing_count}, "
             f"largest target gap={_money(summary.largest_gap_to_target_floor)} "
             f"({summary.largest_gap_scenario}), "
             f"risks={summary.risk_profile}, "
@@ -1116,6 +1483,8 @@ def _print_owner_review(results: list[CalibrationResult]) -> None:
         "scenario",
         "triggers",
         "target gap",
+        "op cost gap",
+        "contribution margin",
         "rec trailer",
         "trailer reason",
         "equipment/disposal risk note",
@@ -1125,6 +1494,8 @@ def _print_owner_review(results: list[CalibrationResult]) -> None:
             entry.result.scenario_name,
             ", ".join(entry.triggers),
             _money_or_na(entry.result.market_position.gap_to_target_floor),
+            _money_or_na(entry.result.operating_cost_position.operating_cost_target_gap),
+            _margin(entry.result.operating_cost_position.contribution_margin_pct),
             entry.result.equipment.recommended_trailer,
             entry.result.equipment.trailer_reason,
             entry.result.equipment.equipment_disposal_risk_note,
@@ -1145,6 +1516,15 @@ def main() -> int:
     print("Bay Delivery Price Calibration Mock Harness")
     print("Local-only TEST / SIMULATED analysis. Quote totals come from build_quote_artifacts().")
     print("Mock costs, market targets, trailer guidance, and scrap recovery are analysis-only.")
+    print("Operating-cost assumptions are calibration-only and do not change production pricing.")
+    print(
+        "Lower $119-$129/hr mover rates are external comparators only; Bay targets use "
+        "$165-$195/hr for normal 2-person truck work."
+    )
+    print(
+        "Weighed dual-axle and ICI/commercial disposal rates are manual-confirmation "
+        "source-conflict areas before automation."
+    )
     print("Margin note: cash quote <= 0 displays as N/A and is never divided by.")
     print()
 
