@@ -364,6 +364,29 @@ def _operating_cost_base_cost_scenario() -> calibration.CalibrationScenario:
     )
 
 
+def _scrap_recovery_operating_cost_scenario(*, scrap_recovery: float) -> calibration.CalibrationScenario:
+    return calibration.CalibrationScenario(
+        category="scrap recovery regression",
+        name="scrap recovery net cost",
+        payload=calibration._payload(
+            service_type="scrap_pickup",
+            estimated_hours=0.0,
+            crew_size=1,
+        ),
+        costs=calibration.MockCosts(labor=80.0, fuel_wear=20.0, scrap_recovery=scrap_recovery),
+        market_target=None,
+        equipment=calibration.EquipmentGuidance(
+            equipment_type="truck_only",
+            trailer_type="none",
+            recommended_trailer="none",
+            trailer_reason="Synthetic calibration-only scrap recovery regression scenario.",
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Scrap recovery remains manual-review analysis only.",
+        ),
+    )
+
+
 def test_operating_cost_target_floor_solves_from_revenue_independent_base_cost() -> None:
     result = calibration._run_scenario(
         _operating_cost_base_cost_scenario(),
@@ -409,6 +432,64 @@ def test_operating_cost_target_floor_stays_stable_when_cash_quote_changes() -> N
     assert high_quote.operating_cost_position.operating_cost_target_floor == 147.06
     assert low_quote.operating_cost_position.operating_cost_target_gap == 47.06
     assert high_quote.operating_cost_position.operating_cost_target_gap == 0.0
+
+
+def test_scrap_recovery_reduces_mock_internal_cost_and_improves_margin() -> None:
+    without_scrap = calibration._run_scenario(
+        _scrap_recovery_operating_cost_scenario(scrap_recovery=0.0),
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 100.0,
+                "emt_total_cad": 113.0,
+            },
+        },
+    )
+    with_scrap = calibration._run_scenario(
+        _scrap_recovery_operating_cost_scenario(scrap_recovery=30.0),
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 100.0,
+                "emt_total_cad": 113.0,
+            },
+        },
+    )
+
+    assert without_scrap.operating_cost_position.mock_internal_cost == 112.0
+    assert without_scrap.operating_cost_position.contribution_margin_pct == -12.0
+    assert with_scrap.operating_cost_position.mock_internal_cost == 82.0
+    assert with_scrap.operating_cost_position.contribution_margin_pct == 18.0
+    assert (
+        without_scrap.operating_cost_position.mock_internal_cost
+        - with_scrap.operating_cost_position.mock_internal_cost
+        == 30.0
+    )
+    assert with_scrap.operating_cost_position.operating_cost_target_floor == 102.94
+    assert with_scrap.operating_cost_position.operating_cost_target_gap == 2.94
+
+
+def test_scrap_recovery_net_base_cost_clamps_before_overhead() -> None:
+    scenario = _scrap_recovery_operating_cost_scenario(scrap_recovery=150.0)
+    base_cost = calibration._operating_cost_base_cost(
+        labour_total=80.0,
+        truck_reserve=0.0,
+        costs=scenario.costs,
+    )
+
+    result = calibration._run_scenario(
+        scenario,
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 100.0,
+                "emt_total_cad": 113.0,
+            },
+        },
+    )
+
+    assert base_cost == 0.0
+    assert result.operating_cost_position.mock_internal_cost == 12.0
+    assert result.operating_cost_position.contribution_margin_pct == 88.0
+    assert result.operating_cost_position.operating_cost_target_floor == 0.0
+    assert result.operating_cost_position.operating_cost_target_gap == 0.0
 
 
 def test_zero_hour_operating_cost_labour_uses_positive_mock_labor_fallback() -> None:
@@ -472,8 +553,8 @@ def test_existing_zero_hour_scrap_scenario_uses_mock_labor_in_operating_cost() -
 
     assert scenario.payload["estimated_hours"] == 0.0
     assert scenario.costs.labor == 35.0
-    assert result.operating_cost_position.mock_internal_cost == 56.2
-    assert result.operating_cost_position.contribution_margin_pct == 6.3
+    assert result.operating_cost_position.mock_internal_cost == 41.2
+    assert result.operating_cost_position.contribution_margin_pct == 31.3
     assert result.operating_cost_position.operating_cost_target_floor == 50.0
     assert result.operating_cost_position.operating_cost_target_gap == 0.0
 

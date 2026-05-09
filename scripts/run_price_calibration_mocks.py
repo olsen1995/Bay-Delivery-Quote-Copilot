@@ -1090,15 +1090,7 @@ def _calculate_operating_cost_position(
         truck_reserve=truck_reserve,
         costs=scenario.costs,
     )
-    mock_internal_cost = round(
-        labour_total
-        + truck_reserve
-        + scenario.costs.disposal
-        + scenario.costs.fuel_wear
-        + scenario.costs.other
-        + overhead,
-        2,
-    )
+    mock_internal_cost = round(base_cost + overhead, 2)
     operating_cost_target_floor = _operating_cost_target_floor(base_cost)
     if operating_cost_target_floor is None:
         operating_cost_target_gap = None
