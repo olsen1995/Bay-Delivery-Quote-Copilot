@@ -930,11 +930,15 @@ def _calculate_market_position(
     )
 
 
-def _operating_cost_labour_total(payload: dict[str, Any]) -> float:
+def _operating_cost_labour_total(
+    payload: dict[str, Any],
+    *,
+    fallback_mock_labor_cost: float = 0.0,
+) -> float:
     hours = max(float(payload.get("estimated_hours") or 0.0), 0.0)
     crew_size = max(int(payload.get("crew_size") or 0), 0)
     if hours <= 0.0 or crew_size <= 0:
-        return 0.0
+        return round(max(float(fallback_mock_labor_cost), 0.0), 2)
 
     owner_cost = OPERATING_COST_ASSUMPTIONS.owner_operator_midpoint * hours
     helper_count = max(crew_size - 1, 0)
@@ -1046,7 +1050,10 @@ def _calculate_operating_cost_position(
 ) -> OperatingCostPosition:
     payload = scenario.payload
     hours = max(float(payload.get("estimated_hours") or 0.0), 0.0)
-    labour_total = _operating_cost_labour_total(payload)
+    labour_total = _operating_cost_labour_total(
+        payload,
+        fallback_mock_labor_cost=scenario.costs.labor,
+    )
     truck_reserve = OPERATING_COST_ASSUMPTIONS.truck_operating_reserve_per_hour * hours
     overhead = cash_quote * (OPERATING_COST_ASSUMPTIONS.admin_overhead_pct_of_revenue / 100.0)
     mock_internal_cost = round(

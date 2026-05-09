@@ -341,6 +341,73 @@ def test_operating_cost_position_flags_margin_and_target_gap() -> None:
     assert result.operating_cost_position.moving_underpricing_risk == "MOVING_UNDERPRICED"
 
 
+def test_zero_hour_operating_cost_labour_uses_positive_mock_labor_fallback() -> None:
+    payload = calibration._payload(
+        estimated_hours=0.0,
+        crew_size=1,
+    )
+
+    result = calibration._operating_cost_labour_total(
+        payload,
+        fallback_mock_labor_cost=35.0,
+    )
+
+    assert result == 35.0
+
+
+def test_zero_hour_operating_cost_labour_without_mock_labor_stays_zero() -> None:
+    payload = calibration._payload(
+        estimated_hours=0.0,
+        crew_size=1,
+    )
+
+    result = calibration._operating_cost_labour_total(
+        payload,
+        fallback_mock_labor_cost=0.0,
+    )
+
+    assert result == 0.0
+
+
+def test_positive_hour_operating_cost_labour_uses_calculated_assumption_not_fallback() -> None:
+    payload = calibration._payload(
+        estimated_hours=2.0,
+        crew_size=2,
+    )
+
+    result = calibration._operating_cost_labour_total(
+        payload,
+        fallback_mock_labor_cost=999.0,
+    )
+
+    assert result == 98.0
+
+
+def test_existing_zero_hour_scrap_scenario_uses_mock_labor_in_operating_cost() -> None:
+    scenario = next(
+        scenario
+        for scenario in calibration.SCENARIOS
+        if scenario.name == "inside appliance removal"
+    )
+
+    result = calibration._run_scenario(
+        scenario,
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 60.0,
+                "emt_total_cad": 67.80,
+            },
+        },
+    )
+
+    assert scenario.payload["estimated_hours"] == 0.0
+    assert scenario.costs.labor == 35.0
+    assert result.operating_cost_position.mock_internal_cost == 56.2
+    assert result.operating_cost_position.contribution_margin_pct == 6.3
+    assert result.operating_cost_position.operating_cost_target_floor == 70.25
+    assert result.operating_cost_position.operating_cost_target_gap == 10.25
+
+
 def test_access_difficulty_move_uses_harder_moving_target() -> None:
     scenario = calibration.CalibrationScenario(
         category="small moves",
