@@ -946,6 +946,35 @@ def _operating_cost_labour_total(
     return round(owner_cost + helper_cost, 2)
 
 
+def _operating_cost_base_cost(
+    *,
+    labour_total: float,
+    truck_reserve: float,
+    costs: MockCosts,
+) -> float:
+    return round(
+        max(
+            labour_total
+            + truck_reserve
+            + costs.disposal
+            + costs.fuel_wear
+            + costs.other
+            - costs.scrap_recovery,
+            0.0,
+        ),
+        2,
+    )
+
+
+def _operating_cost_target_floor(base_cost: float) -> float | None:
+    overhead_pct = OPERATING_COST_ASSUMPTIONS.admin_overhead_pct_of_revenue / 100.0
+    contribution_margin_pct = OPERATING_COST_ASSUMPTIONS.contribution_margin_floor_pct / 100.0
+    denominator = 1.0 - overhead_pct - contribution_margin_pct
+    if denominator <= 0.0:
+        return None
+    return round(base_cost / denominator, 2)
+
+
 def _crew_rate_target_floor(payload: dict[str, Any]) -> float | None:
     hours = max(float(payload.get("estimated_hours") or 0.0), 0.0)
     crew_size = max(int(payload.get("crew_size") or 0), 0)
@@ -1056,6 +1085,11 @@ def _calculate_operating_cost_position(
     )
     truck_reserve = OPERATING_COST_ASSUMPTIONS.truck_operating_reserve_per_hour * hours
     overhead = cash_quote * (OPERATING_COST_ASSUMPTIONS.admin_overhead_pct_of_revenue / 100.0)
+    base_cost = _operating_cost_base_cost(
+        labour_total=labour_total,
+        truck_reserve=truck_reserve,
+        costs=scenario.costs,
+    )
     mock_internal_cost = round(
         labour_total
         + truck_reserve
@@ -1065,18 +1099,18 @@ def _calculate_operating_cost_position(
         + overhead,
         2,
     )
+    operating_cost_target_floor = _operating_cost_target_floor(base_cost)
+    if operating_cost_target_floor is None:
+        operating_cost_target_gap = None
+    else:
+        operating_cost_target_gap = round(max(operating_cost_target_floor - cash_quote, 0.0), 2)
 
     if cash_quote <= 0.0:
         contribution_margin_pct = None
-        operating_cost_target_floor = None
-        operating_cost_target_gap = None
         labour_rate_risk = "NO_REVENUE"
         mobilization_risk = "NO_REVENUE"
     else:
         contribution_margin_pct = round(((cash_quote - mock_internal_cost) / cash_quote) * 100.0, 1)
-        margin_floor = 1.0 - (OPERATING_COST_ASSUMPTIONS.contribution_margin_floor_pct / 100.0)
-        operating_cost_target_floor = round(mock_internal_cost / margin_floor, 2)
-        operating_cost_target_gap = round(max(operating_cost_target_floor - cash_quote, 0.0), 2)
 
         crew_floor = _crew_rate_target_floor(payload)
         if crew_floor is None:

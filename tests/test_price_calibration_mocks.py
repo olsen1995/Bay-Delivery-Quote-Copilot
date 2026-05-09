@@ -334,11 +334,81 @@ def test_operating_cost_position_flags_margin_and_target_gap() -> None:
 
     assert result.operating_cost_position.mock_internal_cost == 134.0
     assert result.operating_cost_position.contribution_margin_pct == -34.0
-    assert result.operating_cost_position.operating_cost_target_floor == 167.5
-    assert result.operating_cost_position.operating_cost_target_gap == 67.5
+    assert result.operating_cost_position.operating_cost_target_floor == 179.41
+    assert result.operating_cost_position.operating_cost_target_gap == 79.41
     assert result.operating_cost_position.labour_rate_risk == "UNDER_CREW_RATE_TARGET"
     assert result.operating_cost_position.mobilization_risk == "UNDER_LOCAL_MOBILIZATION_TARGET"
     assert result.operating_cost_position.moving_underpricing_risk == "MOVING_UNDERPRICED"
+
+
+def _operating_cost_base_cost_scenario() -> calibration.CalibrationScenario:
+    return calibration.CalibrationScenario(
+        category="target floor regression",
+        name="100 dollar base cost",
+        payload=calibration._payload(
+            service_type="haul_away",
+            estimated_hours=0.0,
+            crew_size=1,
+        ),
+        costs=calibration.MockCosts(labor=70.0, disposal=20.0, fuel_wear=10.0, other=0.0),
+        market_target=None,
+        equipment=calibration.EquipmentGuidance(
+            equipment_type="truck_only",
+            trailer_type="none",
+            recommended_trailer="none",
+            trailer_reason="Synthetic calibration-only operating cost regression scenario.",
+            load_weight_class="normal",
+            disposal_fee_mode="small_flat_fee",
+            equipment_disposal_risk_note="Low risk.",
+        ),
+    )
+
+
+def test_operating_cost_target_floor_solves_from_revenue_independent_base_cost() -> None:
+    result = calibration._run_scenario(
+        _operating_cost_base_cost_scenario(),
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 100.0,
+                "emt_total_cad": 113.0,
+            },
+        },
+    )
+
+    assert result.operating_cost_position.mock_internal_cost == 112.0
+    assert result.operating_cost_position.operating_cost_target_floor == 147.06
+    assert result.operating_cost_position.operating_cost_target_floor != 140.0
+    assert result.operating_cost_position.operating_cost_target_gap == 47.06
+
+
+def test_operating_cost_target_floor_stays_stable_when_cash_quote_changes() -> None:
+    scenario = _operating_cost_base_cost_scenario()
+
+    low_quote = calibration._run_scenario(
+        scenario,
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 100.0,
+                "emt_total_cad": 113.0,
+            },
+        },
+    )
+    high_quote = calibration._run_scenario(
+        scenario,
+        quote_func=lambda payload: {
+            "response": {
+                "cash_total_cad": 200.0,
+                "emt_total_cad": 226.0,
+            },
+        },
+    )
+
+    assert low_quote.operating_cost_position.mock_internal_cost == 112.0
+    assert high_quote.operating_cost_position.mock_internal_cost == 124.0
+    assert low_quote.operating_cost_position.operating_cost_target_floor == 147.06
+    assert high_quote.operating_cost_position.operating_cost_target_floor == 147.06
+    assert low_quote.operating_cost_position.operating_cost_target_gap == 47.06
+    assert high_quote.operating_cost_position.operating_cost_target_gap == 0.0
 
 
 def test_zero_hour_operating_cost_labour_uses_positive_mock_labor_fallback() -> None:
@@ -404,8 +474,8 @@ def test_existing_zero_hour_scrap_scenario_uses_mock_labor_in_operating_cost() -
     assert scenario.costs.labor == 35.0
     assert result.operating_cost_position.mock_internal_cost == 56.2
     assert result.operating_cost_position.contribution_margin_pct == 6.3
-    assert result.operating_cost_position.operating_cost_target_floor == 70.25
-    assert result.operating_cost_position.operating_cost_target_gap == 10.25
+    assert result.operating_cost_position.operating_cost_target_floor == 50.0
+    assert result.operating_cost_position.operating_cost_target_gap == 0.0
 
 
 def test_access_difficulty_move_uses_harder_moving_target() -> None:
