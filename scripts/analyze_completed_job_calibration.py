@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import UTC, datetime
+import json
 from pathlib import Path
 import sqlite3
 import sys
@@ -97,7 +99,7 @@ def _resolved_db_path() -> Path:
 
 
 def _read_only_connection(db_path: Path) -> sqlite3.Connection:
-    uri = f"{db_path.resolve().as_uri()}?mode=ro&immutable=1"
+    uri = f"{db_path.resolve().as_uri()}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA query_only = ON")
@@ -343,6 +345,76 @@ def _risk_sort_key(result: CompletedJobAnalysis) -> tuple[int, float, float]:
     return (len(result.risk_flags), target_gap, profit_loss)
 
 
+def _job_json(result: CompletedJobAnalysis) -> dict[str, Any]:
+    return {
+        "job_id": result.job_id,
+        "service_type": result.service_type,
+        "final_amount_collected_cad": result.final_amount_collected,
+        "known_cost_cad": result.known_cost,
+        "known_profit_cad": result.known_profit,
+        "known_margin_pct": result.known_margin_pct,
+        "operating_cost_target_floor_cad": result.operating_cost_target_floor,
+        "operating_cost_target_gap_cad": result.operating_cost_target_gap,
+        "payment_status": result.payment_status,
+        "job_profit_status": result.job_profit_status,
+        "missing_fields": list(result.missing_fields),
+        "risk_flags": list(result.risk_flags),
+        "owner_review": result.owner_review,
+    }
+
+
+def _category_summary_json(results: Sequence[CompletedJobAnalysis]) -> list[dict[str, Any]]:
+    category_rows: list[dict[str, Any]] = []
+    for service_type in sorted({result.service_type for result in results}):
+        service_results = [result for result in results if result.service_type == service_type]
+        service_summary = summarize(service_results)
+        category_rows.append(
+            {
+                "service_type": service_type,
+                "total_completed_jobs": service_summary.job_count,
+                "average_collected_cad": service_summary.average_collected,
+                "average_known_profit_cad": service_summary.average_known_profit,
+                "average_known_margin_pct": service_summary.average_known_margin_pct,
+                "owner_review_count": service_summary.owner_review_count,
+            }
+        )
+    return category_rows
+
+
+def build_json_payload(results: Sequence[CompletedJobAnalysis], *, db_path: Path) -> dict[str, Any]:
+    summary = summarize(results)
+    db_exists = db_path.exists()
+    no_data_reason: str | None = None
+    if not db_exists:
+        no_data_reason = "database_missing"
+    elif not results:
+        no_data_reason = "no_completed_jobs"
+
+    review_rows = [result for result in results if result.owner_review]
+    return {
+        "metadata": {
+            "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "analysis_mode": "local_read_only",
+            "db_exists": db_exists,
+            "no_data_reason": no_data_reason,
+        },
+        "db_path": str(db_path),
+        "total_completed_jobs": summary.job_count,
+        "average_collected_cad": summary.average_collected,
+        "average_known_cost_cad": summary.average_known_cost,
+        "average_known_profit_cad": summary.average_known_profit,
+        "average_known_margin_pct": summary.average_known_margin_pct,
+        "below_margin_count": summary.below_margin_count,
+        "missing_cost_count": summary.missing_cost_count,
+        "owner_review_count": summary.owner_review_count,
+        "jobs": [_job_json(result) for result in results],
+        "category_summary": _category_summary_json(results),
+        "highest_risk_jobs": [
+            _job_json(result) for result in sorted(review_rows, key=_risk_sort_key, reverse=True)[:5]
+        ],
+    }
+
+
 def print_report(results: Sequence[CompletedJobAnalysis], *, db_path: Path) -> None:
     print("Bay Delivery Completed Job Calibration Analysis")
     print("Local/read-only analysis. No quote totals, app pricing, or production records are changed.")
@@ -467,6 +539,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional SQLite database path. Defaults to BAYDELIVERY_DB_PATH or the repo local DB path.",
     )
+    parser.add_argument(
+        "--format",
+        choices=("console", "json"),
+        default="console",
+        help="Output format. Defaults to the existing human-readable console report.",
+    )
     return parser
 
 
@@ -474,7 +552,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     db_path = args.db_path or _resolved_db_path()
     results = analyze_completed_jobs(db_path)
-    print_report(results, db_path=db_path)
+    if args.format == "json":
+        json.dump(build_json_payload(results, db_path=db_path), sys.stdout, indent=2, sort_keys=True)
+        print()
+    else:
+        print_report(results, db_path=db_path)
     return 0
 
 
