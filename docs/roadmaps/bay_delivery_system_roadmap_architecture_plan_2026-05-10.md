@@ -38,33 +38,33 @@ The recommended build path is intentionally conservative:
 
 ## Target System Architecture
 
-| Layer | Purpose | Boundary Rule |
-|---|---|---|
-| Customer Quote Page | Collect simple job facts | Use plain customer language. Do not show internal risk or pricing jargon. |
-| Simple Intake Translator | Turn answers into structured internal facts | Advisory only. It supports risk review but does not set prices. |
-| Quote Service | Validate and route quote requests | Backend remains source of truth for request handling. |
-| Protected Pricing Engine | Own all final quote totals | Only app/quote_engine.py can calculate authoritative pricing. |
-| Storage / Jobs / Requests | Persist quotes, requests, jobs, statuses, and costing | SQLite remains source of truth. Calendar/Drive are supporting tools only. |
-| Admin Daily Ops Board | Show what needs attention now | Simple daily view for Austin/Dan: leads, bookings, costs, follow-ups, risk. |
-| Risk Summary + Follow-Up | Explain what is risky and what to ask next | Internal-only guidance. No automatic price changes. |
-| Completed Job Reporting | Learn from actual profit, cost, and margin data | Evidence for owner review and future pricing PRs. |
-| Internal GPT Layer | Summarize, draft messages, and explain risk | Internal-only and recommendation-only. Never pricing authority. |
+| Layer                     | Purpose                                               | Boundary Rule                                                               |
+|---------------------------|-------------------------------------------------------|-----------------------------------------------------------------------------|
+| Customer Quote Page       | Collect simple job facts                              | Use plain customer language. Do not show internal risk or pricing jargon.   |
+| Simple Intake Translator  | Turn answers into structured internal facts           | Advisory only. It supports risk review but does not set prices.             |
+| Quote Service             | Validate and route quote requests                     | Backend remains source of truth for request handling.                       |
+| Protected Pricing Engine  | Own all final quote totals                            | Only app/quote_engine.py can calculate authoritative pricing.               |
+| Storage / Jobs / Requests | Persist quotes, requests, jobs, statuses, and costing | SQLite remains source of truth. Calendar/Drive are supporting tools only.   |
+| Admin Daily Ops Board     | Show what needs attention now                         | Simple daily view for Austin/Dan: leads, bookings, costs, follow-ups, risk. |
+| Risk Summary + Follow-Up  | Explain what is risky and what to ask next            | Internal-only guidance. No automatic price changes.                         |
+| Completed Job Reporting   | Learn from actual profit, cost, and margin data       | Evidence for owner review and future pricing PRs.                           |
+| Internal GPT Layer        | Summarize, draft messages, and explain risk           | Internal-only and recommendation-only. Never pricing authority.             |
 
 ## Roadmap Phases
 
-| Phase | Build | Purpose / Scope |
-|---|---|---|
-| 0 | Current-state verification | Confirm main, tests, Render /health, public quote, admin/mobile gates, version parity, and GPT pack parity before new work. |
-| 1 | Admin Daily Ops Board | Create read-only cards for new requests, follow-ups, accepted-not-booked, upcoming jobs, missing costs, owner review, and stale quotes. |
-| 2 | Admin Action Shortcuts | Add practical buttons after the board proves useful: ask follow-up, mark contacted, waiting, not ready, create job, enter costs, close/archive. |
-| 3 | Customer Quote Flow Simplification | Make the public form calm, fast, and human. Keep risk fields in the background. Preserve payload compatibility. |
-| 4 | Internal Quote Risk Summary | Translate structured intake fields into admin-only risk level, missing info, suggested action, crew/trailer suggestions, and pricing caution. |
-| 5 | Completed Job Profit Review Report | Surface completed-job profit/margin, missing-cost counts, owner-review counts, and category breakdown inside admin. |
-| 6 | Follow-Up Message Helper | Generate copy-ready customer messages for no reply, need photos, accepted-not-booked, cheaper request, completed job, and review request. |
-| 7 | Scheduling Fields + Accepted Not Booked Queue | Track confirmed date/window, duration estimate, crew, and truck/trailer setup. Keep SQLite as source of truth. |
-| 8+ | Pricing PRs by Service Category | Only after real reporting/risk visibility: demolition, moving, dense dump runs, scrap access risk, delivery distance/weather. |
-| 9 | Internal GPT Upgrade | Let GPT summarize ops board, risk, follow-ups, and calibration findings. Still internal-only and advisory. |
-| 10 | Photo Evidence / Photo Assistant | Attach photos and use advisory image notes later. Do not let image AI auto-price or override quote_engine.py. |
+| Phase | Build                                         | Purpose / Scope                                                                                                                                 |
+|-------|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0     | Current-state verification                    | Confirm main, tests, Render /health, public quote, admin/mobile gates, version parity, and GPT pack parity before new work.                     |
+| 1     | Admin Daily Ops Board                         | Create read-only cards for new requests, follow-ups, accepted-not-booked, upcoming jobs, missing costs, owner review, and stale quotes.         |
+| 2     | Admin Action Shortcuts                        | Add practical buttons after the board proves useful: ask follow-up, mark contacted, waiting, not ready, create job, enter costs, close/archive. |
+| 3     | Customer Quote Flow Simplification            | Make the public form calm, fast, and human. Keep risk fields in the background. Preserve payload compatibility.                                 |
+| 4     | Internal Quote Risk Summary                   | Translate structured intake fields into admin-only risk level, missing info, suggested action, crew/trailer suggestions, and pricing caution.   |
+| 5     | Completed Job Profit Review Report            | Surface completed-job profit/margin, missing-cost counts, owner-review counts, and category breakdown inside admin.                             |
+| 6     | Follow-Up Message Helper                      | Generate copy-ready customer messages for no reply, need photos, accepted-not-booked, cheaper request, completed job, and review request.       |
+| 7     | Scheduling Fields + Accepted Not Booked Queue | Track confirmed date/window, duration estimate, crew, and truck/trailer setup. Keep SQLite as source of truth.                                  |
+| 8+    | Pricing PRs by Service Category               | Only after real reporting/risk visibility: demolition, moving, dense dump runs, scrap access risk, delivery distance/weather.                   |
+| 9     | Internal GPT Upgrade                          | Let GPT summarize ops board, risk, follow-ups, and calibration findings. Still internal-only and advisory.                                      |
+| 10    | Photo Evidence / Photo Assistant              | Attach photos and use advisory image notes later. Do not let image AI auto-price or override quote_engine.py.                                   |
 
 ## Customer Flow Design
 
@@ -132,56 +132,56 @@ Rules:
 
 ### Add
 
-| Item | Why |
-|---|---|
-| Lead source tracking | Add simple source options: Facebook, Google, referral, Marketplace, repeat customer, other. Helps know what marketing works. |
-| Repeat customer marker | Show previous job count/last job on admin cards. Helps trust good customers and spot patterns. |
-| Internal customer notes | Track good customer, slow payer, no-show risk, heavy items underestimated before, needs clear quote. |
-| Job difficulty score | Internal 1-5 difficulty score to simplify triage: easy curbside through manual-review risk. |
-| Missing-info detector | Show exactly what to ask for: photos, item count, access details, disposal type, preferred date. |
-| Job closeout checklist | Collected amount, payment method, actual labour/disposal/fuel/other costs, underpriced marker, notes. |
-| Review request helper | Generate and track review requests after completed jobs. |
+| Item                    | Why                                                                                                                          |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| Lead source tracking    | Add simple source options: Facebook, Google, referral, Marketplace, repeat customer, other. Helps know what marketing works. |
+| Repeat customer marker  | Show previous job count/last job on admin cards. Helps trust good customers and spot patterns.                               |
+| Internal customer notes | Track good customer, slow payer, no-show risk, heavy items underestimated before, needs clear quote.                         |
+| Job difficulty score    | Internal 1-5 difficulty score to simplify triage: easy curbside through manual-review risk.                                  |
+| Missing-info detector   | Show exactly what to ask for: photos, item count, access details, disposal type, preferred date.                             |
+| Job closeout checklist  | Collected amount, payment method, actual labour/disposal/fuel/other costs, underpriced marker, notes.                        |
+| Review request helper   | Generate and track review requests after completed jobs.                                                                     |
 
 ### Fix / Refine
 
-| Area | Refinement |
-|---|---|
-| Admin hierarchy | Top: Daily Ops Board. Middle: Requests/Jobs/Costing. Bottom: Reports/Backup/Settings/Developer tools. |
-| Customer copy | Use local, helpful wording: Tell us what you need help with. Photos help us quote faster and avoid surprises. |
-| Risk wording | Use practical wording: Review before approving, ask for photos, likely 2-person job, disposal uncertain. |
-| Mobile admin | Keep it lean: today jobs, customer phone/address, notes, status, mark completed, maybe collected amount. |
+| Area            | Refinement                                                                                                    |
+|-----------------|---------------------------------------------------------------------------------------------------------------|
+| Admin hierarchy | Top: Daily Ops Board. Middle: Requests/Jobs/Costing. Bottom: Reports/Backup/Settings/Developer tools.         |
+| Customer copy   | Use local, helpful wording: Tell us what you need help with. Photos help us quote faster and avoid surprises. |
+| Risk wording    | Use practical wording: Review before approving, ask for photos, likely 2-person job, disposal uncertain.      |
+| Mobile admin    | Keep it lean: today jobs, customer phone/address, notes, status, mark completed, maybe collected amount.      |
 
 ### Remove / Avoid
 
-| Thing | Reason |
-|---|---|
-| Admin-side quote drafting | Keep admin as operations. Use public quote flow and internal GPT separately for drafts. |
-| Raw JSON in main workflow | Hide raw request payloads/details behind a details/developer section. |
-| Customer-facing risk jargon | Do not show pricing risk, manual review, recommended trailer, under-margin, or operating-cost gap to customers. |
-| Automatic smart price adjustment | Avoid until enough completed-job evidence exists. Pricing changes must be deliberate PRs. |
-| Customer accounts/login | Too much friction for local service jobs. Customers should not need passwords for a dump run. |
+| Thing                            | Reason                                                                                                          |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| Admin-side quote drafting        | Keep admin as operations. Use public quote flow and internal GPT separately for drafts.                         |
+| Raw JSON in main workflow        | Hide raw request payloads/details behind a details/developer section.                                           |
+| Customer-facing risk jargon      | Do not show pricing risk, manual review, recommended trailer, under-margin, or operating-cost gap to customers. |
+| Automatic smart price adjustment | Avoid until enough completed-job evidence exists. Pricing changes must be deliberate PRs.                       |
+| Customer accounts/login          | Too much friction for local service jobs. Customers should not need passwords for a dump run.                   |
 
 ## Pricing Change Order
 
-| Order | Category | Reason |
-|---|---|---|
-| 1 | Demolition / rip-out | Highest risk. Add premium/manual-review floors and strong minimum protections first. |
-| 2 | Moving labour | Protect 2-worker minimums, stairs, long carry, inside work, and heavy/customer-belonging risk. |
-| 3 | Heavy/dense dump runs | Protect against concrete, tile, bricks, dirt, wet debris, shingles, drywall, and scale/disposal uncertainty. |
-| 4 | Scrap pickups | Protect inside/basement/heavy/awkward scrap jobs while keeping curbside scrap simple. |
-| 5 | Delivery | Add protections for distance, weather, stairs, item value/care, and enclosed trailer needs. |
+| Order | Category              | Reason                                                                                                       |
+|-------|-----------------------|--------------------------------------------------------------------------------------------------------------|
+| 1     | Demolition / rip-out  | Highest risk. Add premium/manual-review floors and strong minimum protections first.                         |
+| 2     | Moving labour         | Protect 2-worker minimums, stairs, long carry, inside work, and heavy/customer-belonging risk.               |
+| 3     | Heavy/dense dump runs | Protect against concrete, tile, bricks, dirt, wet debris, shingles, drywall, and scale/disposal uncertainty. |
+| 4     | Scrap pickups         | Protect inside/basement/heavy/awkward scrap jobs while keeping curbside scrap simple.                        |
+| 5     | Delivery              | Add protections for distance, weather, stairs, item value/care, and enclosed trailer needs.                  |
 
 ## Exact PR Sequence
 
-| Order | PR Title | Scope |
-|---|---|---|
-| 1 | create admin daily ops board read model | Desktop admin read-only summary cards. No pricing, customer, schema, Render, workflow, or GPT changes. |
-| 2 | create admin ops board action shortcuts | Add follow-up/status shortcuts after the board is confirmed useful. |
-| 3 | create customer quote flow simplification | Improve public wording and layout using progressive disclosure. Keep quote behavior compatible. |
-| 4 | create internal quote risk summary | Admin-only risk card from structured intake fields. No quote total changes. |
-| 5 | create completed job profit review report | Admin report using completed-job costing data and analyzer concepts. Internal-only. |
-| 6 | create follow up message helper | Copy-ready message drafts for common customer situations. No automated sending yet. |
-| 7 | create job scheduling fields and accepted not booked queue | Booking/date/window fields and queue visibility. SQLite remains source of truth. |
+| Order | PR Title                                                   | Scope                                                                                                  |
+|-------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| 1     | create admin daily ops board read model                    | Desktop admin read-only summary cards. No pricing, customer, schema, Render, workflow, or GPT changes. |
+| 2     | create admin ops board action shortcuts                    | Add follow-up/status shortcuts after the board is confirmed useful.                                    |
+| 3     | create customer quote flow simplification                  | Improve public wording and layout using progressive disclosure. Keep quote behavior compatible.        |
+| 4     | create internal quote risk summary                         | Admin-only risk card from structured intake fields. No quote total changes.                            |
+| 5     | create completed job profit review report                  | Admin report using completed-job costing data and analyzer concepts. Internal-only.                    |
+| 6     | create follow up message helper                            | Copy-ready message drafts for common customer situations. No automated sending yet.                    |
+| 7     | create job scheduling fields and accepted not booked queue | Booking/date/window fields and queue visibility. SQLite remains source of truth.                       |
 
 ## Best Immediate Next PR
 
