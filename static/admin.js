@@ -91,6 +91,41 @@ const quoteRequestFollowupOptions = [
   ["not_ready", "Not ready"],
   ["closed_no_followup", "Closed - no follow-up"]
 ];
+const structuredIntakeFields = [
+  ["stairs_count", "Stairs"],
+  ["floor_count", "Floors above/below entry"],
+  ["basement_or_inside_removal", "Basement/inside removal"],
+  ["demolition_ripout", "Demolition/rip-out"],
+  ["construction_debris_type", "Construction debris"],
+  ["dense_material_type", "Dense material"],
+  ["mixed_load", "Mixed load"],
+  ["contains_scrap", "Contains scrap"],
+  ["contains_garbage", "Contains garbage"],
+  ["has_refrigerant_appliance", "Refrigerant appliance"],
+  ["appliance_type", "Appliance type"],
+  ["weather_protection_required", "Weather protection"]
+];
+const structuredIntakeLabels = {
+  drywall: "Drywall",
+  wood: "Wood",
+  tile: "Tile",
+  concrete: "Concrete",
+  shingles: "Shingles",
+  soil: "Soil",
+  brick: "Brick",
+  stone: "Stone",
+  mixed: "Mixed",
+  other: "Other",
+  fridge: "Fridge",
+  freezer: "Freezer",
+  air_conditioner: "Air conditioner",
+  dehumidifier: "Dehumidifier",
+  washer: "Washer",
+  dryer: "Dryer",
+  stove: "Stove",
+  dishwasher: "Dishwasher",
+  water_heater: "Water heater"
+};
 
 function setAssistantDraftLocked(isLocked) {
   // Desktop assistant is read-only; no draft controls to lock/unlock.
@@ -477,6 +512,37 @@ function createQuoteMetaRow(label, value, extraNode) {
   return row;
 }
 
+function hasStructuredIntakeValue(request, field) {
+  if (!Object.prototype.hasOwnProperty.call(request, field)) return false;
+  const value = request[field];
+  return value !== null && value !== undefined && value !== "";
+}
+
+function formatStructuredIntakeValue(value) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  const normalized = String(value || "").trim();
+  return structuredIntakeLabels[normalized] || normalized || "—";
+}
+
+function createStructuredIntakeSection(request) {
+  const rows = structuredIntakeFields.filter(([field]) => hasStructuredIntakeValue(request, field));
+  if (!rows.length) return null;
+
+  const section = document.createElement("section");
+  section.className = "quoteRiskSection";
+
+  const title = document.createElement("div");
+  title.className = "quoteDetailTitle";
+  title.textContent = "Structured Intake";
+  section.appendChild(title);
+
+  rows.forEach(([field, label]) => {
+    section.appendChild(createQuoteMetaRow(label, formatStructuredIntakeValue(request[field])));
+  });
+
+  return section;
+}
+
 function createQuoteDetailPanel(detail) {
   const panel = document.createElement("div");
   panel.className = "quoteDetailPanel";
@@ -507,6 +573,11 @@ function createQuoteDetailPanel(detail) {
     meta.appendChild(createQuoteMetaRow(label, value));
   });
   panel.appendChild(meta);
+
+  const structuredIntakeSection = createStructuredIntakeSection(safeRequest);
+  if (structuredIntakeSection) {
+    panel.appendChild(structuredIntakeSection);
+  }
 
   const assessment = detail.internal_risk_assessment || null;
   const riskFlags = Array.isArray(safeGet(assessment, "risk_flags", null))

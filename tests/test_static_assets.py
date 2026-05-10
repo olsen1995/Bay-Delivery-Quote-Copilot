@@ -496,6 +496,38 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     assert "/followup-status" not in mobile_js
 
 
+def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    for field in [
+        "stairs_count",
+        "floor_count",
+        "basement_or_inside_removal",
+        "demolition_ripout",
+        "construction_debris_type",
+        "dense_material_type",
+        "mixed_load",
+        "contains_scrap",
+        "contains_garbage",
+        "has_refrigerant_appliance",
+        "appliance_type",
+        "weather_protection_required",
+    ]:
+        assert field in quote_html or field in quote_js
+        assert field in admin_js
+        assert field not in mobile_html
+        assert field not in mobile_js
+
+    assert "Structured Intake" in admin_js
+    assert "function createStructuredIntakeSection(" in admin_js
+    assert "if (!rows.length) return null;" in admin_js
+    assert "if (structuredIntakeSection)" in admin_js
+
+
 def test_desktop_admin_includes_daily_ops_queue_only() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")

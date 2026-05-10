@@ -88,6 +88,33 @@ function getSelectedBagType() {
   return (el("bag_type").value || "").trim();
 }
 
+function optionalSelectValue(id) {
+  const value = (el(id).value || "").trim();
+  return value || null;
+}
+
+function optionalNonNegativeInt(id) {
+  const value = (el(id).value || "").trim();
+  if (!value) return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+function addOptionalInt(payload, field) {
+  const value = optionalNonNegativeInt(field);
+  if (value !== null) payload[field] = value;
+}
+
+function addOptionalSelect(payload, field) {
+  const value = optionalSelectValue(field);
+  if (value) payload[field] = value;
+}
+
+function addCheckedFlag(payload, field) {
+  if (el(field).checked) payload[field] = true;
+}
+
 function hasHaulAwayStructuredLoadDetail() {
   return (
     parseInt(el("garbage_bag_count").value || "0", 10) > 0 ||
@@ -271,7 +298,19 @@ function persistedReviewFields() {
     "box_springs_count",
     "scrap_pickup_location",
     "bag_type",
-    "trailer_fill_estimate"
+    "trailer_fill_estimate",
+    "stairs_count",
+    "floor_count",
+    "basement_or_inside_removal",
+    "demolition_ripout",
+    "construction_debris_type",
+    "dense_material_type",
+    "mixed_load",
+    "contains_scrap",
+    "contains_garbage",
+    "has_refrigerant_appliance",
+    "appliance_type",
+    "weather_protection_required"
   ].map((id) => el(id)).filter(Boolean);
 }
 
@@ -492,6 +531,8 @@ function resetInapplicableServiceFields(serviceType) {
   const isScrap = serviceType === "scrap_pickup";
   const usesLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
   const isHaulAway = serviceType === "haul_away";
+  const isDemolition = serviceType === "demolition";
+  const showRoute = serviceType === "small_move" || serviceType === "item_delivery";
 
   if (isScrap) {
     el("estimated_hours").value = "0";
@@ -506,11 +547,26 @@ function resetInapplicableServiceFields(serviceType) {
     el("garbage_bag_count").value = "0";
     el("mattresses_count").value = "0";
     el("box_springs_count").value = "0";
+    el("construction_debris_type").value = "";
+    el("dense_material_type").value = "";
+    el("mixed_load").checked = false;
+    el("contains_scrap").checked = false;
+    el("contains_garbage").checked = false;
+  }
+
+  if (!isDemolition) {
+    el("demolition_ripout").checked = false;
   }
 
   if (!isHaulAway) {
     el("bag_type").value = "";
     el("trailer_fill_estimate").value = "";
+    el("has_refrigerant_appliance").checked = false;
+    el("appliance_type").value = "";
+  }
+
+  if (!showRoute) {
+    el("weather_protection_required").checked = false;
   }
 }
 
@@ -522,6 +578,7 @@ function syncServiceFields() {
   const showLoadCounts = serviceType === "haul_away" || serviceType === "demolition";
   const showDenseMaterials = showLoadCounts;
   const showLabor = !showScrap;
+  const showDemolitionRipout = serviceType === "demolition";
 
   resetInapplicableServiceFields(serviceType);
 
@@ -530,11 +587,25 @@ function syncServiceFields() {
   el("scrapLocationGroup").classList.toggle("hidden", !showScrap);
   el("loadCountRow").classList.toggle("hidden", !showLoadCounts);
   el("haulAwayDetailsRow").classList.toggle("hidden", !showHaulAwayDetails);
+  el("applianceDetailsRow").classList.toggle("hidden", !showHaulAwayDetails);
   el("denseMaterialsGroup").classList.toggle("hidden", !showDenseMaterials);
+  el("structuredMaterialsRow").classList.toggle("hidden", !showLoadCounts);
+  el("structuredLoadFlagsRow").classList.toggle("hidden", !showLoadCounts);
+  el("demolitionRipoutGroup").classList.toggle("hidden", !showDemolitionRipout);
+  el("weatherProtectionGroup").classList.toggle("hidden", !showRoute);
   el("scrap_pickup_location").disabled = !showScrap;
   el("bag_type").disabled = !showHaulAwayDetails;
   el("trailer_fill_estimate").disabled = !showHaulAwayDetails;
+  el("has_refrigerant_appliance").disabled = !showHaulAwayDetails;
+  el("appliance_type").disabled = !showHaulAwayDetails;
   el("has_dense_materials").disabled = !showDenseMaterials;
+  el("construction_debris_type").disabled = !showLoadCounts;
+  el("dense_material_type").disabled = !showLoadCounts;
+  el("mixed_load").disabled = !showLoadCounts;
+  el("contains_scrap").disabled = !showLoadCounts;
+  el("contains_garbage").disabled = !showLoadCounts;
+  el("demolition_ripout").disabled = !showDemolitionRipout;
+  el("weather_protection_required").disabled = !showRoute;
   if (!showDenseMaterials) {
     el("has_dense_materials").checked = false;
   }
@@ -620,6 +691,18 @@ function populateQuoteFormFromRequest(requestData) {
   setFieldValue("bag_type", requestData.bag_type || "");
   setFieldValue("trailer_fill_estimate", requestData.trailer_fill_estimate || "");
   setFieldValue("has_dense_materials", Boolean(requestData.has_dense_materials));
+  setFieldValue("stairs_count", requestData.stairs_count ?? "");
+  setFieldValue("floor_count", requestData.floor_count ?? "");
+  setFieldValue("basement_or_inside_removal", Boolean(requestData.basement_or_inside_removal));
+  setFieldValue("demolition_ripout", Boolean(requestData.demolition_ripout));
+  setFieldValue("construction_debris_type", requestData.construction_debris_type || "");
+  setFieldValue("dense_material_type", requestData.dense_material_type || "");
+  setFieldValue("mixed_load", Boolean(requestData.mixed_load));
+  setFieldValue("contains_scrap", Boolean(requestData.contains_scrap));
+  setFieldValue("contains_garbage", Boolean(requestData.contains_garbage));
+  setFieldValue("has_refrigerant_appliance", Boolean(requestData.has_refrigerant_appliance));
+  setFieldValue("appliance_type", requestData.appliance_type || "");
+  setFieldValue("weather_protection_required", Boolean(requestData.weather_protection_required));
   syncRouteFields();
   syncServiceFields();
 }
@@ -899,6 +982,27 @@ el("btnCalc").addEventListener("click", async () => {
       if (trailerFillEstimate) {
         payload.trailer_fill_estimate = trailerFillEstimate;
       }
+    }
+
+    addOptionalInt(payload, "stairs_count");
+    addOptionalInt(payload, "floor_count");
+    addCheckedFlag(payload, "basement_or_inside_removal");
+    if (usesLoadCounts) {
+      addOptionalSelect(payload, "construction_debris_type");
+      addOptionalSelect(payload, "dense_material_type");
+      addCheckedFlag(payload, "mixed_load");
+      addCheckedFlag(payload, "contains_scrap");
+      addCheckedFlag(payload, "contains_garbage");
+    }
+    if (serviceType === "demolition") {
+      addCheckedFlag(payload, "demolition_ripout");
+    }
+    if (isHaulAway) {
+      addCheckedFlag(payload, "has_refrigerant_appliance");
+      addOptionalSelect(payload, "appliance_type");
+    }
+    if (requiresRouteFields(serviceType)) {
+      addCheckedFlag(payload, "weather_protection_required");
     }
 
     const controller = new AbortController();

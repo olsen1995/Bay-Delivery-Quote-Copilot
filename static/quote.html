@@ -169,6 +169,34 @@
               </div>
             </div>
 
+            <div class="row" id="structuredAccessRow">
+              <div>
+                <label for="stairs_count">Stairs</label>
+                <input id="stairs_count" name="stairs_count" type="number" min="0" step="1" placeholder="0" />
+                <div class="helperText">Optional. Count stair sets or notable steps.</div>
+              </div>
+              <div>
+                <label for="floor_count">Floors above/below entry</label>
+                <input id="floor_count" name="floor_count" type="number" min="0" step="1" placeholder="0" />
+                <div class="helperText">Optional. Use 0 for main floor or curbside.</div>
+              </div>
+            </div>
+
+            <div class="row" id="insideRemovalRow">
+              <div class="checkboxWrap">
+                <label class="checkboxLabel" for="basement_or_inside_removal">
+                  <input id="basement_or_inside_removal" name="basement_or_inside_removal" type="checkbox" />
+                  <span>Items need basement or inside removal.</span>
+                </label>
+              </div>
+              <div class="checkboxWrap hidden" id="weatherProtectionGroup">
+                <label class="checkboxLabel" for="weather_protection_required">
+                  <input id="weather_protection_required" name="weather_protection_required" type="checkbox" />
+                  <span>Weather protection is needed during moving or delivery.</span>
+                </label>
+              </div>
+            </div>
+
             <div class="row" id="denseMaterialsGroup">
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="has_dense_materials">
@@ -176,6 +204,64 @@
                   <span>This job includes heavy or dense materials (for example drywall, concrete, tile, shingles, soil, wet debris, or similar).</span>
                 </label>
                 <div class="helperText">Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.</div>
+              </div>
+            </div>
+
+            <div class="row" id="structuredMaterialsRow">
+              <div>
+                <label for="construction_debris_type">Construction debris type</label>
+                <select id="construction_debris_type" name="construction_debris_type">
+                  <option value="" selected>Not sure / not applicable</option>
+                  <option value="drywall">Drywall</option>
+                  <option value="wood">Wood</option>
+                  <option value="tile">Tile</option>
+                  <option value="concrete">Concrete</option>
+                  <option value="shingles">Shingles</option>
+                  <option value="mixed">Mixed construction debris</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label for="dense_material_type">Dense material type</label>
+                <select id="dense_material_type" name="dense_material_type">
+                  <option value="" selected>Not sure / not applicable</option>
+                  <option value="drywall">Drywall</option>
+                  <option value="tile">Tile</option>
+                  <option value="concrete">Concrete</option>
+                  <option value="shingles">Shingles</option>
+                  <option value="soil">Soil</option>
+                  <option value="brick">Brick</option>
+                  <option value="stone">Stone</option>
+                  <option value="mixed">Mixed dense materials</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row" id="structuredLoadFlagsRow">
+              <div class="checkboxWrap hidden" id="demolitionRipoutGroup">
+                <label class="checkboxLabel" for="demolition_ripout">
+                  <input id="demolition_ripout" name="demolition_ripout" type="checkbox" />
+                  <span>This includes rip-out or demolition removal.</span>
+                </label>
+              </div>
+              <div class="checkboxWrap">
+                <label class="checkboxLabel" for="mixed_load">
+                  <input id="mixed_load" name="mixed_load" type="checkbox" />
+                  <span>This is a mixed load.</span>
+                </label>
+              </div>
+              <div class="checkboxWrap">
+                <label class="checkboxLabel" for="contains_scrap">
+                  <input id="contains_scrap" name="contains_scrap" type="checkbox" />
+                  <span>Load contains scrap metal.</span>
+                </label>
+              </div>
+              <div class="checkboxWrap">
+                <label class="checkboxLabel" for="contains_garbage">
+                  <input id="contains_garbage" name="contains_garbage" type="checkbox" />
+                  <span>Load contains garbage.</span>
+                </label>
               </div>
             </div>
 
@@ -225,6 +311,31 @@
                   <option value="half">About 1/2 trailer (half load)</option>
                   <option value="three_quarter">About 3/4 trailer (large load)</option>
                   <option value="full">Full trailer (packed full)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row" id="applianceDetailsRow">
+              <div class="checkboxWrap">
+                <label class="checkboxLabel" for="has_refrigerant_appliance">
+                  <input id="has_refrigerant_appliance" name="has_refrigerant_appliance" type="checkbox" />
+                  <span>Load includes a fridge, freezer, air conditioner, or other refrigerant appliance.</span>
+                </label>
+              </div>
+              <div>
+                <label for="appliance_type">Appliance type</label>
+                <select id="appliance_type" name="appliance_type">
+                  <option value="" selected>Not sure / not applicable</option>
+                  <option value="fridge">Fridge</option>
+                  <option value="freezer">Freezer</option>
+                  <option value="air_conditioner">Air conditioner</option>
+                  <option value="dehumidifier">Dehumidifier</option>
+                  <option value="washer">Washer</option>
+                  <option value="dryer">Dryer</option>
+                  <option value="stove">Stove</option>
+                  <option value="dishwasher">Dishwasher</option>
+                  <option value="water_heater">Water heater</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
             </div>

@@ -1,0 +1,211 @@
+from __future__ import annotations
+
+import base64
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app import main as main_module
+from app import storage
+from app.main import app
+from app.services import quote_service
+
+
+def _admin_headers() -> dict[str, str]:
+    token = base64.b64encode(b"admin:secret").decode("utf-8")
+    return {"Authorization": f"Basic {token}"}
+
+
+def _base_payload(**overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "customer_name": "Structured Intake",
+        "customer_phone": "705-555-0133",
+        "job_address": "133 Intake Rd",
+        "description": "Small mixed load with optional structured facts",
+        "service_type": "haul_away",
+        "payment_method": "cash",
+        "estimated_hours": 1.0,
+        "crew_size": 1,
+        "garbage_bag_count": 0,
+        "trailer_fill_estimate": "under_quarter",
+        "mattresses_count": 0,
+        "box_springs_count": 0,
+        "scrap_pickup_location": "curbside",
+        "travel_zone": "in_town",
+        "access_difficulty": "normal",
+        "has_dense_materials": False,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _structured_fields() -> dict[str, Any]:
+    return {
+        "stairs_count": 2,
+        "floor_count": 1,
+        "basement_or_inside_removal": True,
+        "demolition_ripout": True,
+        "construction_debris_type": "drywall",
+        "dense_material_type": "concrete",
+        "mixed_load": True,
+        "contains_scrap": True,
+        "contains_garbage": True,
+        "has_refrigerant_appliance": True,
+        "appliance_type": "fridge",
+        "weather_protection_required": True,
+    }
+
+
+@pytest.fixture()
+def temp_quote_db(monkeypatch: pytest.MonkeyPatch):
+    original_db_path = storage.DB_PATH
+    original_cache = dict(storage._TABLE_COL_CACHE)
+    main_module._admin_failed_attempts.clear()
+    monkeypatch.setenv("ADMIN_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        storage.DB_PATH = Path(tmp_dir) / "structured-intake.sqlite3"
+        storage._TABLE_COL_CACHE.clear()
+        storage.init_db()
+        yield
+
+    main_module._admin_failed_attempts.clear()
+    storage.DB_PATH = original_db_path
+    storage._TABLE_COL_CACHE.clear()
+    storage._TABLE_COL_CACHE.update(original_cache)
+
+
+@pytest.fixture()
+def client(temp_quote_db: None):
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_old_quote_payload_still_returns_quote(client: TestClient) -> None:
+    response = client.post("/quote/calculate", json=_base_payload())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["response"]["cash_total_cad"] > 0
+    assert body["response"]["emt_total_cad"] > body["response"]["cash_total_cad"]
+
+
+def test_structured_intake_fields_are_accepted_and_returned(client: TestClient) -> None:
+    response = client.post("/quote/calculate", json=_base_payload(**_structured_fields()))
+
+    assert response.status_code == 200
+    request = response.json()["request"]
+    for field, expected in _structured_fields().items():
+        assert request[field] == expected
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("construction_debris_type", "unknown_debris"),
+        ("dense_material_type", "lead"),
+        ("appliance_type", "tv"),
+    ],
+)
+def test_structured_intake_invalid_enums_are_rejected(client: TestClient, field: str, value: str) -> None:
+    response = client.post("/quote/calculate", json=_base_payload(**{field: value}))
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("field", ["stairs_count", "floor_count"])
+def test_structured_intake_negative_counts_are_rejected(client: TestClient, field: str) -> None:
+    response = client.post("/quote/calculate", json=_base_payload(**{field: -1}))
+
+    assert response.status_code == 422
+
+
+def test_structured_intake_blank_optional_selects_normalize_to_none(client: TestClient) -> None:
+    response = client.post(
+        "/quote/calculate",
+        json=_base_payload(
+            construction_debris_type="",
+            dense_material_type="   ",
+            appliance_type="",
+        ),
+    )
+
+    assert response.status_code == 200
+    request = response.json()["request"]
+    assert request["construction_debris_type"] is None
+    assert request["dense_material_type"] is None
+    assert request["appliance_type"] is None
+
+
+def test_structured_intake_fields_do_not_change_quote_totals(client: TestClient) -> None:
+    baseline = client.post("/quote/calculate", json=_base_payload()).json()["response"]
+    enriched = client.post("/quote/calculate", json=_base_payload(**_structured_fields())).json()["response"]
+
+    assert enriched["cash_total_cad"] == baseline["cash_total_cad"]
+    assert enriched["emt_total_cad"] == baseline["emt_total_cad"]
+
+
+def test_structured_intake_fields_are_not_quote_engine_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_calculate_quote = quote_service.calculate_quote
+    seen_kwargs: list[dict[str, Any]] = []
+
+    def capture_calculate_quote(**kwargs: Any) -> dict[str, Any]:
+        seen_kwargs.append(dict(kwargs))
+        return original_calculate_quote(**kwargs)
+
+    monkeypatch.setattr(quote_service, "calculate_quote", capture_calculate_quote)
+
+    artifacts = quote_service.build_quote_artifacts(_base_payload(**_structured_fields()))
+
+    assert artifacts["response"]["cash_total_cad"] > 0
+    assert len(seen_kwargs) == 2
+    for kwargs in seen_kwargs:
+        for field in _structured_fields():
+            assert field not in kwargs
+
+
+def test_structured_intake_fields_are_stored_in_quote_request_json(client: TestClient) -> None:
+    quote_response = client.post("/quote/calculate", json=_base_payload(**_structured_fields()))
+    assert quote_response.status_code == 200
+    quote_id = quote_response.json()["quote_id"]
+
+    saved_quote = storage.get_quote_record(quote_id)
+    assert saved_quote is not None
+    for field, expected in _structured_fields().items():
+        assert saved_quote["request"][field] == expected
+
+
+def test_structured_intake_fields_persist_through_request_and_job_json(client: TestClient) -> None:
+    quote_response = client.post("/quote/calculate", json=_base_payload(**_structured_fields()))
+    assert quote_response.status_code == 200
+    quote_body = quote_response.json()
+    quote_id = quote_body["quote_id"]
+    accept_token = quote_body["accept_token"]
+
+    accept_response = client.post(
+        f"/quote/{quote_id}/decision",
+        json={"action": "accept", "accept_token": accept_token},
+    )
+    assert accept_response.status_code == 200
+    request_id = accept_response.json()["request_id"]
+
+    saved_request = storage.get_quote_request_record(request_id)
+    assert saved_request is not None
+    for field, expected in _structured_fields().items():
+        assert saved_request["request_json"][field] == expected
+
+    approval_response = client.post(
+        f"/admin/api/quote-requests/{request_id}/decision",
+        headers=_admin_headers(),
+        json={"action": "approve"},
+    )
+    assert approval_response.status_code == 200
+
+    saved_job = storage.get_job_by_quote_id(quote_id)
+    assert saved_job is not None
+    for field, expected in _structured_fields().items():
+        assert saved_job["request_json"][field] == expected
