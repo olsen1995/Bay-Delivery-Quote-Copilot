@@ -273,7 +273,7 @@ def test_simulated_seed_jobs_are_analyzed_without_mutation(
         "quote_requests": _table_count(isolated_db, "quote_requests"),
     }
 
-    assert before_counts == {"jobs": 3, "quotes": 0, "quote_requests": 0}
+    assert before_counts == {"jobs": 4, "quotes": 0, "quote_requests": 0}
     assert after_counts == before_counts
     assert "test-simulated-local-dump-run" in output
     assert "$153.00" in output
@@ -281,6 +281,24 @@ def test_simulated_seed_jobs_are_analyzed_without_mutation(
     assert "30.5%" in output
     assert "test-simulated-small-move" in output
     assert "test-simulated-demo-debris-cleanup" in output
+    assert "test-simulated-labour-underpriced-move" in output
+
+    rows = analysis.analyze_completed_jobs(isolated_db)
+    flags_by_job = {r.job_id: r.risk_flags for r in rows}
+
+    # Seeded jobs with actuals must not all be flagged for missing cost data.
+    missing_count = sum("MISSING_COST_DATA" in flags for flags in flags_by_job.values())
+    assert missing_count == 0, "All seeded jobs have actuals — none should flag MISSING_COST_DATA"
+
+    # Small-move (2h/2-person) is the clean/healthy path: collected $339 > crew floor $330.
+    small_move_flags = flags_by_job.get("test-simulated-small-move", ())
+    assert not small_move_flags, f"test-simulated-small-move expected no risk flags, got {small_move_flags}"
+
+    # Demo debris cleanup exercises DISPOSAL_HEAVY_RISK.
+    assert "DISPOSAL_HEAVY_RISK" in flags_by_job.get("test-simulated-demo-debris-cleanup", ())
+
+    # Labour-underpriced move exercises LABOUR_UNDERPRICED_RISK.
+    assert "LABOUR_UNDERPRICED_RISK" in flags_by_job.get("test-simulated-labour-underpriced-move", ())
 
 
 def test_script_runs_directly_from_repo_root(

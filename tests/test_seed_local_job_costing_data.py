@@ -24,17 +24,18 @@ def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return db_path
 
 
-def test_seed_creates_three_completed_simulated_jobs_and_is_idempotent(
+def test_seed_creates_four_completed_simulated_jobs_and_is_idempotent(
     isolated_db: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert seed_script.main([]) == 0
     first_output = capsys.readouterr().out
 
-    assert first_output.count("CREATED") == 3
+    assert first_output.count("CREATED") == 4
     assert "TEST / Simulated local dump run" in first_output
     assert "TEST / Simulated small move" in first_output
     assert "TEST / Simulated demo debris cleanup" in first_output
+    assert "TEST / Simulated labour-underpriced move" in first_output
 
     expected_costing = {
         "test-simulated-local-dump-run": {
@@ -44,6 +45,8 @@ def test_seed_creates_three_completed_simulated_jobs_and_is_idempotent(
             "actual_disposal_cost_cad": 58.0,
             "actual_fuel_cost_cad": 40.0,
             "actual_other_costs_cad": 5.0,
+            "actual_hours": 1.5,
+            "actual_crew_size": 1,
         },
         "test-simulated-small-move": {
             "final_amount_collected_cad": 339.0,
@@ -52,6 +55,8 @@ def test_seed_creates_three_completed_simulated_jobs_and_is_idempotent(
             "actual_disposal_cost_cad": 0.0,
             "actual_fuel_cost_cad": 40.0,
             "actual_other_costs_cad": 10.0,
+            "actual_hours": 2.0,
+            "actual_crew_size": 2,
         },
         "test-simulated-demo-debris-cleanup": {
             "final_amount_collected_cad": 475.0,
@@ -60,6 +65,18 @@ def test_seed_creates_three_completed_simulated_jobs_and_is_idempotent(
             "actual_disposal_cost_cad": 96.0,
             "actual_fuel_cost_cad": 55.0,
             "actual_other_costs_cad": 15.0,
+            "actual_hours": 2.0,
+            "actual_crew_size": 2,
+        },
+        "test-simulated-labour-underpriced-move": {
+            "final_amount_collected_cad": 350.0,
+            "payment_method": "emt",
+            "actual_labor_cost_cad": 100.0,
+            "actual_disposal_cost_cad": 0.0,
+            "actual_fuel_cost_cad": 40.0,
+            "actual_other_costs_cad": 10.0,
+            "actual_hours": 2.5,
+            "actual_crew_size": 2,
         },
     }
 
@@ -70,8 +87,6 @@ def test_seed_creates_three_completed_simulated_jobs_and_is_idempotent(
         assert job["job_description_customer"].startswith("TEST / Simulated")
         assert job["payment_status"] == "paid_in_full"
         assert job["job_profit_status"] == "profitable"
-        assert job["actual_hours"] is None
-        assert job["actual_crew_size"] is None
         for field, value in expected.items():
             assert job[field] == value
 
@@ -83,7 +98,7 @@ def test_seed_creates_three_completed_simulated_jobs_and_is_idempotent(
     assert seed_script.main([]) == 0
     second_output = capsys.readouterr().out
 
-    assert second_output.count("SKIPPED existing") == 3
+    assert second_output.count("SKIPPED existing") == 4
     assert storage.require_job("test-simulated-local-dump-run")["quote_accuracy_note"] == (
         "Local admin edit must survive rerun."
     )
@@ -110,10 +125,11 @@ def test_cleanup_removes_only_labeled_deterministic_seed_jobs(
     output = capsys.readouterr().out
 
     assert "PROTECTED collision test-simulated-local-dump-run" in output
-    assert output.count("DELETED") == 2
+    assert output.count("DELETED") == 3
     assert storage.get_job(protected_id) is not None
     assert storage.get_job("test-simulated-small-move") is None
     assert storage.get_job("test-simulated-demo-debris-cleanup") is None
+    assert storage.get_job("test-simulated-labour-underpriced-move") is None
 
 
 def test_cleanup_does_not_delete_non_seed_jobs(
@@ -208,3 +224,18 @@ def test_seed_script_runs_directly_from_repo_root_with_temp_db(
     assert "ModuleNotFoundError" not in cleanup_result.stderr
     assert str(db_path) in cleanup_result.stdout
     assert "DELETED test-simulated-local-dump-run" in cleanup_result.stdout
+
+
+def test_seeded_simulated_jobs_have_actual_hours_and_crew_size(
+    isolated_db: Path,
+) -> None:
+    assert seed_script.main([]) == 0
+
+    for seed in seed_script.SEED_JOBS:
+        job = storage.require_job(seed["job_id"])
+        assert job["actual_hours"] is not None, (
+            f"{seed['job_id']} is missing actual_hours after seeding"
+        )
+        assert job["actual_crew_size"] is not None, (
+            f"{seed['job_id']} is missing actual_crew_size after seeding"
+        )
