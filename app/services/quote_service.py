@@ -15,7 +15,7 @@ from app.quote_engine import (
     calculate_quote,
     load_config,
 )
-from app.services.quote_risk_scoring import build_quote_risk_assessment
+from app.services.quote_risk_scoring import build_quote_risk_advisory, build_quote_risk_assessment
 from app.storage import get_quote_record, save_quote
 
 logger = logging.getLogger(__name__)
@@ -254,6 +254,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         normalized_request=normalized_request,
         engine_quote=baseline_engine_quote,
     )
+    quote_risk_advisory = build_quote_risk_advisory(normalized_request)
     engine_quote = calculate_quote(
         **_quote_engine_inputs(
             normalized_request,
@@ -273,6 +274,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "response": response,
         "engine_quote": engine_quote,
         "internal_risk_assessment": internal_risk_assessment,
+        "quote_risk_advisory": quote_risk_advisory,
     }
 
 
@@ -358,6 +360,7 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Quote not found.")
 
     internal_risk_assessment: dict[str, Any] | None = None
+    quote_risk_advisory: dict[str, Any] | None = None
     try:
         request_payload = quote.get("request")
         if not isinstance(request_payload, dict):
@@ -366,6 +369,9 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
         assessment = artifacts.get("internal_risk_assessment")
         if isinstance(assessment, dict):
             internal_risk_assessment = assessment
+        advisory = artifacts.get("quote_risk_advisory")
+        if isinstance(advisory, dict):
+            quote_risk_advisory = advisory
     except Exception:
         logger.warning(
             "Failed to re-derive internal risk assessment for admin quote detail %s",
@@ -376,4 +382,5 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
     return {
         **quote,
         "internal_risk_assessment": internal_risk_assessment,
+        "quote_risk_advisory": quote_risk_advisory,
     }

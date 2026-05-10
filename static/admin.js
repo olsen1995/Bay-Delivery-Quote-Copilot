@@ -124,7 +124,9 @@ const structuredIntakeLabels = {
   dryer: "Dryer",
   stove: "Stove",
   dishwasher: "Dishwasher",
-  water_heater: "Water heater"
+  water_heater: "Water heater",
+  double_axle_open_aluminum: "Double axle open aluminum",
+  newer_enclosed: "Newer enclosed"
 };
 
 function setAssistantDraftLocked(isLocked) {
@@ -543,6 +545,87 @@ function createStructuredIntakeSection(request) {
   return section;
 }
 
+function formatRiskAdvisoryLevel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "Unknown";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function createQuoteRiskAdvisorySection(advisory) {
+  if (!advisory || typeof advisory !== "object") return null;
+
+  const flags = Array.isArray(advisory.risk_flags)
+    ? advisory.risk_flags.filter((flag) => flag && typeof flag === "object" && String(flag.code || "").trim())
+    : [];
+  const actions = Array.isArray(advisory.suggested_actions)
+    ? advisory.suggested_actions.filter((action) => String(action || "").trim())
+    : [];
+  const hasRecommendedTrailer = String(advisory.recommended_trailer || "").trim();
+  if (!flags.length && !actions.length && !hasRecommendedTrailer) return null;
+
+  const section = document.createElement("section");
+  section.className = "quoteRiskSection";
+
+  const title = document.createElement("div");
+  title.className = "quoteDetailTitle";
+  title.textContent = "Quote Risk Advisory";
+  section.appendChild(title);
+
+  section.appendChild(createQuoteMetaRow("Scope", "Internal advisory only - no pricing effect"));
+  section.appendChild(createQuoteMetaRow("Risk level", formatRiskAdvisoryLevel(advisory.risk_level)));
+  section.appendChild(
+    createQuoteMetaRow("Manual review", advisory.manual_review_recommended ? "Recommended" : "Not flagged")
+  );
+  section.appendChild(createQuoteMetaRow("Pricing effect", advisory.pricing_effect || "none"));
+
+  if (hasRecommendedTrailer) {
+    section.appendChild(
+      createQuoteMetaRow("Recommended trailer", formatStructuredIntakeValue(advisory.recommended_trailer))
+    );
+  }
+
+  if (flags.length) {
+    const flagsRow = document.createElement("div");
+    flagsRow.className = "quoteDetailMetaRow";
+    const flagsLabel = document.createElement("strong");
+    flagsLabel.textContent = "Advisory flags:";
+    flagsRow.appendChild(flagsLabel);
+
+    const list = document.createElement("ul");
+    list.className = "quoteRiskFlags";
+    flags.forEach((flag) => {
+      const item = document.createElement("li");
+      const label = String(flag.label || flag.code || "").trim();
+      const severity = formatRiskAdvisoryLevel(flag.severity);
+      const note = String(flag.operator_note || "").trim();
+      item.textContent = note ? `${label} (${severity}): ${note}` : `${label} (${severity})`;
+      list.appendChild(item);
+    });
+    flagsRow.appendChild(list);
+    section.appendChild(flagsRow);
+  }
+
+  if (actions.length) {
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "quoteDetailMetaRow";
+    const actionsLabel = document.createElement("strong");
+    actionsLabel.textContent = "Suggested actions:";
+    actionsRow.appendChild(actionsLabel);
+
+    const list = document.createElement("ul");
+    list.className = "quoteRiskFlags";
+    actions.forEach((action) => {
+      const item = document.createElement("li");
+      item.textContent = String(action || "").trim();
+      list.appendChild(item);
+    });
+    actionsRow.appendChild(list);
+    section.appendChild(actionsRow);
+  }
+
+  return section;
+}
+
 function createQuoteDetailPanel(detail) {
   const panel = document.createElement("div");
   panel.className = "quoteDetailPanel";
@@ -577,6 +660,11 @@ function createQuoteDetailPanel(detail) {
   const structuredIntakeSection = createStructuredIntakeSection(safeRequest);
   if (structuredIntakeSection) {
     panel.appendChild(structuredIntakeSection);
+  }
+
+  const advisorySection = createQuoteRiskAdvisorySection(detail.quote_risk_advisory || null);
+  if (advisorySection) {
+    panel.appendChild(advisorySection);
   }
 
   const assessment = detail.internal_risk_assessment || null;
