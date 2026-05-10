@@ -29,6 +29,21 @@ _HAUL_AWAY_LOAD_DETAIL_MSG = (
     "Please add at least one load detail so we can estimate your junk removal properly. "
     "Examples: bags, trailer space used, mattresses, box springs, or dense materials."
 )
+_STRUCTURED_INTAKE_FIELDS = (
+    "stairs_count",
+    "floor_count",
+    "basement_or_inside_removal",
+    "demolition_ripout",
+    "construction_debris_type",
+    "dense_material_type",
+    "mixed_load",
+    "contains_scrap",
+    "contains_garbage",
+    "has_refrigerant_appliance",
+    "appliance_type",
+    "weather_protection_required",
+)
+_STRUCTURED_INTAKE_SUPPLIED_KEY = "_structured_intake_fields_supplied"
 
 
 def _normalize_customer_phone(value: str | None) -> str | None:
@@ -182,6 +197,15 @@ def _quote_engine_inputs(
     }
 
 
+def _structured_intake_values(request_payload: dict[str, Any]) -> dict[str, Any]:
+    supplied = request_payload.get(_STRUCTURED_INTAKE_SUPPLIED_KEY)
+    if isinstance(supplied, (list, tuple, set)):
+        field_names = [field for field in _STRUCTURED_INTAKE_FIELDS if field in supplied]
+    else:
+        field_names = [field for field in _STRUCTURED_INTAKE_FIELDS if field in request_payload]
+    return {field: request_payload.get(field) for field in field_names}
+
+
 def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     _validate_quote_boundary(request_payload)
     requested_service_type = str(request_payload.get("service_type", "")).strip()
@@ -224,6 +248,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
         "load_mode": normalized_load_mode,
     }
+    normalized_request.update(_structured_intake_values(request_payload))
 
     internal_risk_assessment = build_quote_risk_assessment(
         normalized_request=normalized_request,

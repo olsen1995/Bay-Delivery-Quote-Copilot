@@ -986,6 +986,22 @@ def health():
 # Quote APIs
 # =========================
 
+STRUCTURED_INTAKE_FIELD_NAMES = (
+    "stairs_count",
+    "floor_count",
+    "basement_or_inside_removal",
+    "demolition_ripout",
+    "construction_debris_type",
+    "dense_material_type",
+    "mixed_load",
+    "contains_scrap",
+    "contains_garbage",
+    "has_refrigerant_appliance",
+    "appliance_type",
+    "weather_protection_required",
+)
+
+
 class QuoteRequestPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1011,6 +1027,18 @@ class QuoteRequestPayload(BaseModel):
     access_difficulty: str = Field("normal", max_length=50)
     has_dense_materials: bool = Field(False)
     load_mode: Optional[str] = Field("standard", max_length=20)
+    stairs_count: Optional[int] = Field(None, ge=0)
+    floor_count: Optional[int] = Field(None, ge=0)
+    basement_or_inside_removal: Optional[bool] = Field(None)
+    demolition_ripout: Optional[bool] = Field(None)
+    construction_debris_type: Optional[Literal["drywall", "wood", "tile", "concrete", "shingles", "mixed", "other"]] = Field(None)
+    dense_material_type: Optional[Literal["drywall", "tile", "concrete", "shingles", "soil", "brick", "stone", "mixed", "other"]] = Field(None)
+    mixed_load: Optional[bool] = Field(None)
+    contains_scrap: Optional[bool] = Field(None)
+    contains_garbage: Optional[bool] = Field(None)
+    has_refrigerant_appliance: Optional[bool] = Field(None)
+    appliance_type: Optional[Literal["fridge", "freezer", "air_conditioner", "dehumidifier", "washer", "dryer", "stove", "dishwasher", "water_heater", "other"]] = Field(None)
+    weather_protection_required: Optional[bool] = Field(None)
 
     @field_validator(
         "customer_name",
@@ -1037,6 +1065,21 @@ class QuoteRequestPayload(BaseModel):
             return None
         if isinstance(v, str):
             return v.strip()
+        return v
+
+    @field_validator(
+        "construction_debris_type",
+        "dense_material_type",
+        "appliance_type",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_select(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            value = v.strip().lower()
+            return value or None
         return v
 
 
@@ -1087,6 +1130,12 @@ class GptQuoteRequestPayload(BaseModel):
 @app.post("/quote/calculate")
 async def quote_calculate(payload: QuoteRequestPayload):
     request_payload = payload.model_dump()
+    provided_fields = getattr(payload, "model_fields_set", None)
+    if provided_fields is None:
+        provided_fields = getattr(payload, "__fields_set__", set())
+    request_payload["_structured_intake_fields_supplied"] = [
+        field for field in STRUCTURED_INTAKE_FIELD_NAMES if field in provided_fields
+    ]
     return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
 
 
