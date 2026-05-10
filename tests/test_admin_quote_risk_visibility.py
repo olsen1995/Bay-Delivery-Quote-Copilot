@@ -55,7 +55,7 @@ def temp_quote_db(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_admin_quote_detail_includes_internal_risk_assessment(temp_quote_db: None) -> None:
     with TestClient(app) as client:
-        quote_resp = client.post("/quote/calculate", json=_quote_payload())
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(dense_material_type="concrete"))
         assert quote_resp.status_code == 200
         quote_id = quote_resp.json()["quote_id"]
 
@@ -68,6 +68,11 @@ def test_admin_quote_detail_includes_internal_risk_assessment(temp_quote_db: Non
     assert body["internal_risk_assessment"]["confidence_level"] == "low"
     assert "access_volume_risk" in body["internal_risk_assessment"]["risk_flags"]
     assert "likely_underestimated_volume" in body["internal_risk_assessment"]["risk_flags"]
+    assert body["quote_risk_advisory"]["customer_visible"] is False
+    assert body["quote_risk_advisory"]["pricing_effect"] == "none"
+    assert "DENSE_MATERIAL_RISK" in {
+        flag["code"] for flag in body["quote_risk_advisory"]["risk_flags"]
+    }
 
 
 def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails(temp_quote_db: None) -> None:
@@ -91,6 +96,7 @@ def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails
     body = resp.json()
     assert body["quote_id"] == "legacy-riskless-quote"
     assert body["internal_risk_assessment"] is None
+    assert body["quote_risk_advisory"] is None
 
 
 def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quote_db: None) -> None:
@@ -113,6 +119,7 @@ def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quot
     assert body["request"] is None
     assert body["response"] is None
     assert body["internal_risk_assessment"] is None
+    assert body["quote_risk_advisory"] is None
 
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
     assert "const request = detail?.request ?? {};" in admin_js
@@ -129,6 +136,8 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
         quote_body = quote_resp.json()
         assert "internal_risk_assessment" not in quote_body
         assert "internal_risk_assessment" not in quote_body["response"]
+        assert "quote_risk_advisory" not in quote_body
+        assert "quote_risk_advisory" not in quote_body["response"]
 
         review_resp = client.get(
             f"/quote/{quote_body['quote_id']}/view",
@@ -139,3 +148,5 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
     review_body = review_resp.json()
     assert "internal_risk_assessment" not in review_body
     assert "internal_risk_assessment" not in review_body["response"]
+    assert "quote_risk_advisory" not in review_body
+    assert "quote_risk_advisory" not in review_body["response"]
