@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import sqlite3
 import subprocess
@@ -137,6 +138,30 @@ def test_missing_db_exits_cleanly_without_creating_file(
     assert not db_path.exists()
 
 
+def test_json_missing_db_exits_cleanly_without_creating_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "missing-analysis-json.sqlite3"
+    monkeypatch.setattr(storage, "DB_PATH", storage.DEFAULT_DB_PATH)
+    monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
+
+    assert analysis.main(["--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["metadata"]["analysis_mode"] == "local_read_only"
+    assert payload["metadata"]["db_exists"] is False
+    assert payload["metadata"]["no_data_reason"] == "database_missing"
+    assert payload["db_path"] == str(db_path)
+    assert payload["total_completed_jobs"] == 0
+    assert payload["average_collected_cad"] is None
+    assert payload["jobs"] == []
+    assert payload["category_summary"] == []
+    assert payload["highest_risk_jobs"] == []
+    assert not db_path.exists()
+
+
 def test_existing_db_analysis_does_not_create_sqlite_sidecar_files(tmp_path: Path) -> None:
     db_path = tmp_path / "existing-readonly.sqlite3"
     _create_minimal_completed_jobs_db(db_path)
@@ -157,6 +182,28 @@ def test_no_completed_jobs_exits_cleanly(
 
     assert str(isolated_db) in output
     assert "No completed jobs found" in output
+
+
+def test_json_no_completed_jobs_returns_clean_no_data_payload(
+    isolated_db: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert analysis.main(["--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["metadata"]["db_exists"] is True
+    assert payload["metadata"]["no_data_reason"] == "no_completed_jobs"
+    assert payload["db_path"] == str(isolated_db)
+    assert payload["total_completed_jobs"] == 0
+    assert payload["average_known_cost_cad"] is None
+    assert payload["average_known_profit_cad"] is None
+    assert payload["average_known_margin_pct"] is None
+    assert payload["below_margin_count"] == 0
+    assert payload["missing_cost_count"] == 0
+    assert payload["owner_review_count"] == 0
+    assert payload["jobs"] == []
+    assert payload["category_summary"] == []
+    assert payload["highest_risk_jobs"] == []
 
 
 def test_completed_job_cost_profit_and_margin_math(
@@ -191,6 +238,61 @@ def test_completed_job_cost_profit_and_margin_math(
     assert "Completed Job Calibration Summary" in output
     assert "Average known margin: 55.0%" in output
     assert "job-profitable" in output
+
+
+def test_json_completed_job_summary_and_risk_flags(
+    isolated_db: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _save_completed_job(
+        "job-json-risk",
+        costing={
+            "final_amount_collected_cad": 100.0,
+            "actual_labor_cost_cad": 90.0,
+            "payment_status": "partial_payment",
+            "job_profit_status": "underquoted",
+        },
+    )
+
+    assert analysis.main(["--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["metadata"]["db_exists"] is True
+    assert payload["metadata"]["no_data_reason"] is None
+    assert payload["total_completed_jobs"] == 1
+    assert payload["average_collected_cad"] == 100.0
+    assert payload["average_known_cost_cad"] == 90.0
+    assert payload["average_known_profit_cad"] == 10.0
+    assert payload["average_known_margin_pct"] == 10.0
+    assert payload["below_margin_count"] == 1
+    assert payload["missing_cost_count"] == 1
+    assert payload["owner_review_count"] == 1
+
+    job = payload["jobs"][0]
+    assert job["job_id"] == "job-json-risk"
+    assert job["service_type"] == "dump_run"
+    assert job["final_amount_collected_cad"] == 100.0
+    assert job["known_cost_cad"] == 90.0
+    assert job["known_profit_cad"] == 10.0
+    assert job["known_margin_pct"] == 10.0
+    assert job["payment_status"] == "partial_payment"
+    assert job["job_profit_status"] == "underquoted"
+    assert job["owner_review"] is True
+    assert "BELOW_CONTRIBUTION_MARGIN" in job["risk_flags"]
+    assert "MISSING_COST_DATA" in job["risk_flags"]
+    assert "PAYMENT_NOT_FULLY_COLLECTED" in job["risk_flags"]
+    assert "OPERATOR_MARKED_UNDERPRICED" in job["risk_flags"]
+    assert payload["category_summary"] == [
+        {
+            "service_type": "dump_run",
+            "total_completed_jobs": 1,
+            "average_collected_cad": 100.0,
+            "average_known_profit_cad": 10.0,
+            "average_known_margin_pct": 10.0,
+            "owner_review_count": 1,
+        }
+    ]
+    assert payload["highest_risk_jobs"][0]["job_id"] == "job-json-risk"
 
 
 def test_below_margin_missing_cost_and_owner_review_flags(isolated_db: Path) -> None:
@@ -301,6 +403,44 @@ def test_simulated_seed_jobs_are_analyzed_without_mutation(
     assert "LABOUR_UNDERPRICED_RISK" in flags_by_job.get("test-simulated-labour-underpriced-move", ())
 
 
+def test_seeded_jobs_json_output_without_mutation(
+    isolated_db: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert seed_script.main([]) == 0
+    capsys.readouterr()
+    before_counts = {
+        "jobs": _table_count(isolated_db, "jobs"),
+        "quotes": _table_count(isolated_db, "quotes"),
+        "quote_requests": _table_count(isolated_db, "quote_requests"),
+    }
+
+    assert analysis.main(["--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    after_counts = {
+        "jobs": _table_count(isolated_db, "jobs"),
+        "quotes": _table_count(isolated_db, "quotes"),
+        "quote_requests": _table_count(isolated_db, "quote_requests"),
+    }
+
+    assert before_counts == {"jobs": 4, "quotes": 0, "quote_requests": 0}
+    assert after_counts == before_counts
+    assert payload["total_completed_jobs"] == 4
+
+    jobs = {job["job_id"]: job for job in payload["jobs"]}
+    assert set(jobs) == {
+        "test-simulated-local-dump-run",
+        "test-simulated-small-move",
+        "test-simulated-demo-debris-cleanup",
+        "test-simulated-labour-underpriced-move",
+    }
+    assert jobs["test-simulated-small-move"]["risk_flags"] == []
+    assert "DISPOSAL_HEAVY_RISK" in jobs["test-simulated-demo-debris-cleanup"]["risk_flags"]
+    assert "LABOUR_UNDERPRICED_RISK" in jobs["test-simulated-labour-underpriced-move"]["risk_flags"]
+    assert payload["category_summary"]
+    assert payload["highest_risk_jobs"]
+
+
 def test_script_runs_directly_from_repo_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -349,3 +489,12 @@ def test_analysis_script_has_no_direct_storage_write_or_quote_calls() -> None:
                 forbidden_calls.append(node.func.attr)
 
     assert forbidden_calls == []
+
+
+def test_analysis_script_does_not_use_sqlite_immutable_mode() -> None:
+    script_path = REPO_ROOT / "scripts" / "analyze_completed_job_calibration.py"
+    script_text = script_path.read_text(encoding="utf-8")
+
+    assert "mode=ro" in script_text
+    assert "PRAGMA query_only = ON" in script_text
+    assert "immutable=1" not in script_text
