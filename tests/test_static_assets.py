@@ -286,6 +286,11 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "Hide Details" in admin_js
     assert "Quote Details" in admin_js
     assert "Quote Risk Assessment" in admin_js
+    assert "Quote Risk Advisory" in admin_js
+    assert 'detail.quote_risk_advisory || null' in admin_js
+    assert "Internal advisory only - no pricing effect" in admin_js
+    assert "Advisory flags:" in admin_js
+    assert "Suggested actions:" in admin_js
     assert 'const assessment = detail.internal_risk_assessment || null;' in admin_js
     assert 'Array.isArray(safeGet(assessment, "risk_flags", null))' in admin_js
     assert 'if (assessment && (assessment.confidence_level || riskFlags.length)) {' in admin_js
@@ -526,6 +531,11 @@ def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:
     assert "function createStructuredIntakeSection(" in admin_js
     assert "if (!rows.length) return null;" in admin_js
     assert "if (structuredIntakeSection)" in admin_js
+    assert "Quote Risk Advisory" in admin_js
+    assert "quote_risk_advisory" not in mobile_html
+    assert "quote_risk_advisory" not in mobile_js
+    assert "Quote Risk Advisory" not in mobile_html
+    assert "Quote Risk Advisory" not in mobile_js
 
 
 def test_desktop_admin_includes_daily_ops_queue_only() -> None:
