@@ -190,6 +190,33 @@ label {
 	line-height: 1.35;
 }
 
+.opsQueueActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.opsQueueShortcut {
+	width: auto;
+	padding: 7px 10px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.08);
+	border-color: rgba(255, 255, 255, 0.16);
+	box-shadow: none;
+	font-size: 0.82rem;
+}
+
+.opsQueueShortcut:hover {
+	background: rgba(255, 255, 255, 0.14);
+}
+
+.adminSectionFocus {
+	outline: 2px solid rgba(255, 255, 255, 0.42);
+	outline-offset: 3px;
+	box-shadow: 0 0 0 4px rgba(193, 44, 39, 0.22), var(--shadow-soft);
+}
+
 .protectedDashboard {
 	display: none;
 	gap: 18px;
@@ -389,6 +416,30 @@ label {
 
 .followupStatusSelect {
 	min-width: 180px;
+}
+
+.followupQuickActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+	max-width: 230px;
+}
+
+.followupQuickAction {
+	width: auto;
+	padding: 6px 8px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.08);
+	border-color: rgba(255, 255, 255, 0.14);
+	box-shadow: none;
+	font-size: 0.76rem;
+	line-height: 1.2;
+}
+
+.followupQuickAction.isActive {
+	background: rgba(52, 211, 153, 0.16);
+	border-color: rgba(52, 211, 153, 0.36);
 }
 
 .dashboardGrid {

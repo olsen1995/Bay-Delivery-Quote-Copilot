@@ -492,13 +492,27 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     assert '["closed_no_followup", "Closed - no follow-up"]' in admin_js
     assert 'createTable(["Request", "Customer", "Job", "Requested", "Follow-up", "Totals", "Actions"])' in admin_js
     assert "function createFollowupStatusControl(item)" in admin_js
+    assert "function createFollowupQuickActions(item)" in admin_js
     assert "/followup-status" in admin_js
     assert "followup_status: followupStatus || null" in admin_js
     assert ".followupStatusControl" in admin_css
     assert ".followupStatusSelect" in admin_css
+    assert ".followupQuickActions" in admin_css
+    quick_actions = re.search(
+        r"function createFollowupQuickActions\(item\) \{(?P<body>.*?)\n\}\n\nfunction createFollowupStatusControl",
+        admin_js,
+        re.S,
+    )
+    assert quick_actions is not None
+    quick_body = quick_actions.group("body")
+    assert 'updateQuoteRequestFollowupStatus(item.request_id || "", value);' in quick_body
+    assert "/followup-status" not in quick_body
+    assert "fetch" not in quick_body
     assert "followup_status" not in mobile_html
     assert "followup_status" not in mobile_js
     assert "/followup-status" not in mobile_js
+    assert "followupQuickActions" not in mobile_html
+    assert "followupQuickActions" not in mobile_js
 
 
 def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:
@@ -546,7 +560,11 @@ def test_desktop_admin_includes_daily_ops_board_only() -> None:
     mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
 
     assert "Daily Ops Board" in admin_html
-    assert "Nothing is approved, expired, scheduled, contacted, or changed from this board." in admin_html
+    assert "Shortcuts only move you to existing admin controls. Changes happen only from explicit row actions." in admin_html
+    assert 'id="adminOpsBoardSection"' in admin_html
+    assert 'id="adminQuotesSection"' in admin_html
+    assert 'id="adminRequestsSection"' in admin_html
+    assert 'id="adminJobsSection"' in admin_html
     assert 'const opsQueue = await fetchJSON("/admin/api/ops-queue");' in admin_js
     assert "async function refreshOpsQueueBestEffort()" in admin_js
     assert "function renderOpsQueueError()" in admin_js
@@ -561,11 +579,56 @@ def test_desktop_admin_includes_daily_ops_board_only() -> None:
     assert "accepted_not_booked" in admin_js
     assert "completed_missing_costs" in admin_js
     assert "owner_review" in admin_js
+    key_order = re.search(r"const dailyOpsBoardCardKeys = \[(?P<body>.*?)\];", admin_js, re.S)
+    assert key_order is not None
+    assert re.findall(r'"([^"]+)"', key_order.group("body")) == [
+        "new_requests",
+        "needs_followup",
+        "accepted_not_booked",
+        "upcoming_jobs",
+        "completed_missing_costs",
+        "owner_review",
+        "stale_quotes",
+    ]
+    assert "const opsBoardShortcutsByKey = {" in admin_js
+    assert "function focusAdminSection(targetId, label)" in admin_js
+    assert "function createOpsQueueShortcutButton(shortcut)" in admin_js
+    assert "data-ops-shortcut" in admin_js
+    assert "Daily Ops Board shortcut opened:" in admin_js
+    assert "Daily Ops Board shortcut target is not available. Refresh admin data and try again." in admin_js
+    shortcut_block = re.search(
+        r"const opsBoardShortcutsByKey = \{(?P<body>.*?)\nfunction renderOpsQueue",
+        admin_js,
+        re.S,
+    )
+    assert shortcut_block is not None
+    shortcut_body = shortcut_block.group("body")
+    for target_id in ["adminRequestsSection", "adminJobsSection", "adminQuotesSection"]:
+        assert target_id in shortcut_body
+    for forbidden in [
+        "fetch(",
+        'method: "POST"',
+        "/followup-status",
+        "/decision",
+        "/expire",
+        "/schedule",
+        "/reschedule",
+        "/costing",
+        "/start",
+        "/complete",
+        "/cancel",
+    ]:
+        assert forbidden not in shortcut_body
     assert ".opsQueueGrid" in admin_css
     assert ".opsQueueCard" in admin_css
+    assert ".opsQueueActions" in admin_css
+    assert ".opsQueueShortcut" in admin_css
+    assert ".adminSectionFocus" in admin_css
     assert "Daily Ops Board" not in mobile_html
     assert "/admin/api/ops-queue" not in mobile_js
     assert "opsQueueBox" not in mobile_js
+    assert "opsQueueShortcut" not in mobile_html
+    assert "opsQueueShortcut" not in mobile_js
 
 
 def test_desktop_admin_includes_pending_estimate_cleanup_controls_only() -> None:

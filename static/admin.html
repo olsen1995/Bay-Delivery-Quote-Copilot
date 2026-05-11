@@ -56,18 +56,18 @@
     </div>
 
 
-    <div class="card dataCard opsQueueCard adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
+    <div id="adminOpsBoardSection" class="card dataCard opsQueueCard adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
       <div class="sectionHeader compact">
         <div>
           <h3>Daily Ops Board</h3>
-          <div class="muted">Read-only summary from existing admin data. Nothing is approved, expired, scheduled, contacted, or changed from this board.</div>
+          <div class="muted">Shortcuts only move you to existing admin controls. Changes happen only from explicit row actions.</div>
         </div>
       </div>
       <div id="opsQueueBox"></div>
     </div>
 
     <div class="dashboardGrid adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
-      <div class="card dataCard">
+      <div id="adminQuotesSection" class="card dataCard">
         <div class="sectionHeader compact">
           <div>
             <h3>Recent Estimates</h3>
@@ -77,7 +77,7 @@
         <div id="quotesBox"></div>
       </div>
 
-      <div class="card dataCard">
+      <div id="adminRequestsSection" class="card dataCard">
         <div class="sectionHeader compact">
           <div>
             <h3>Booking Requests</h3>
@@ -111,7 +111,7 @@
       </div>
     </div>
 
-    <div class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
+    <div id="adminJobsSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
       <div class="sectionHeader compact">
         <div>
           <h3>Jobs</h3>
