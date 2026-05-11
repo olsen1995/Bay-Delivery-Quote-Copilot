@@ -151,15 +151,15 @@ label {
 	gap: 12px;
 }
 
-.opsQueueSection {
+.opsQueueSummaryCard {
 	border: 1px solid var(--line-soft);
-	border-radius: 12px;
+	border-radius: 8px;
 	padding: 12px;
 	background: var(--surface-alt);
 	min-width: 0;
 }
 
-.opsQueueSectionHeader {
+.opsQueueCardHeader {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -167,7 +167,7 @@ label {
 	margin-bottom: 8px;
 }
 
-.opsQueueSectionTitle {
+.opsQueueCardTitle {
 	font-weight: 800;
 	font-size: 0.95rem;
 }
@@ -185,33 +185,9 @@ label {
 	color: var(--ink-strong);
 }
 
-.opsQueueList {
-	display: grid;
-	gap: 8px;
-	margin: 0;
-	padding: 0;
-	list-style: none;
-}
-
-.opsQueueItem {
-	border-top: 1px solid rgba(255, 255, 255, 0.1);
-	padding-top: 8px;
-}
-
-.opsQueueItem:first-child {
-	border-top: 0;
-	padding-top: 0;
-}
-
-.opsQueueItemTitle {
-	color: var(--ink-strong);
-	font-weight: 700;
-	line-height: 1.3;
-}
-
-.opsQueueItemMeta,
-.opsQueueItemHint {
-	margin-top: 3px;
+.opsQueueCardDescription {
+	margin-top: 6px;
+	line-height: 1.35;
 }
 
 .protectedDashboard {
