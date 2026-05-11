@@ -23,10 +23,6 @@ charset-normalizer==3.4.7
     # via requests
 click==8.3.3
     # via uvicorn
-colorama==0.4.6
-    # via
-    #   click
-    #   pytest
 cryptography==47.0.0
     # via google-auth
 fastapi==0.135.1
