@@ -390,6 +390,57 @@ function makeStatusBadge(status) {
   return badge;
 }
 
+const opsBoardShortcutsByKey = {
+  new_requests: [
+    { label: "Open requests", targetId: "adminRequestsSection" }
+  ],
+  needs_followup: [
+    { label: "Open follow-up controls", targetId: "adminRequestsSection" }
+  ],
+  accepted_not_booked: [
+    { label: "Open requests", targetId: "adminRequestsSection" },
+    { label: "Open jobs", targetId: "adminJobsSection" }
+  ],
+  upcoming_jobs: [
+    { label: "Open jobs", targetId: "adminJobsSection" }
+  ],
+  completed_missing_costs: [
+    { label: "Open job costing", targetId: "adminJobsSection" }
+  ],
+  owner_review: [
+    { label: "Open estimates", targetId: "adminQuotesSection" },
+    { label: "Open requests", targetId: "adminRequestsSection" }
+  ],
+  stale_quotes: [
+    { label: "Open estimates", targetId: "adminQuotesSection" }
+  ]
+};
+
+function focusAdminSection(targetId, label) {
+  const target = document.getElementById(targetId);
+  if (!target) {
+    setLine(statusLine, "bad", "Daily Ops Board shortcut target is not available. Refresh admin data and try again.");
+    return;
+  }
+
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.focus({ preventScroll: true });
+  target.classList.add("adminSectionFocus");
+  window.setTimeout(() => target.classList.remove("adminSectionFocus"), 1800);
+  setLine(statusLine, "ok", "Daily Ops Board shortcut opened:", label || "section");
+}
+
+function createOpsQueueShortcutButton(shortcut) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "opsQueueShortcut";
+  button.setAttribute("data-ops-shortcut", shortcut.targetId || "");
+  button.textContent = shortcut.label || "Open";
+  button.addEventListener("click", () => focusAdminSection(shortcut.targetId || "", shortcut.label || ""));
+  return button;
+}
+
 function renderOpsQueue(queue) {
   const box = document.getElementById("opsQueueBox");
   if (!box) return;
@@ -429,6 +480,15 @@ function renderOpsQueue(queue) {
     description.className = "small muted opsQueueCardDescription";
     description.textContent = item.description || "Read-only operational count from existing admin data.";
     card.appendChild(description);
+
+    const shortcuts = opsBoardShortcutsByKey[item.key] || [];
+    if (shortcuts.length) {
+      const actions = document.createElement("div");
+      actions.className = "opsQueueActions";
+      shortcuts.forEach((shortcut) => actions.appendChild(createOpsQueueShortcutButton(shortcut)));
+      card.appendChild(actions);
+    }
+
     grid.appendChild(card);
   });
 
@@ -899,6 +959,25 @@ async function updateQuoteRequestFollowupStatus(requestId, followupStatus) {
   }
 }
 
+function createFollowupQuickActions(item) {
+  const wrap = document.createElement("div");
+  wrap.className = "followupQuickActions";
+
+  quoteRequestFollowupOptions.forEach(([value, text]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "followupQuickAction";
+    if (selectedValue(item.followup_status) === value) button.classList.add("isActive");
+    button.textContent = text;
+    button.addEventListener("click", () => {
+      updateQuoteRequestFollowupStatus(item.request_id || "", value);
+    });
+    wrap.appendChild(button);
+  });
+
+  return wrap;
+}
+
 function createFollowupStatusControl(item) {
   const wrap = document.createElement("label");
   wrap.className = "followupStatusControl";
@@ -1007,6 +1086,7 @@ function renderRequests(items) {
 
     const tdFollowup = document.createElement("td");
     tdFollowup.appendChild(createFollowupStatusControl(r));
+    tdFollowup.appendChild(createFollowupQuickActions(r));
 
     const tdTotals = document.createElement("td");
     const stWrap = document.createElement("div");
