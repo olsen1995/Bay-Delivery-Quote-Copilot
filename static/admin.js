@@ -91,6 +91,15 @@ const quoteRequestFollowupOptions = [
   ["not_ready", "Not ready"],
   ["closed_no_followup", "Closed - no follow-up"]
 ];
+const dailyOpsBoardCardKeys = [
+  "new_requests",
+  "needs_followup",
+  "accepted_not_booked",
+  "upcoming_jobs",
+  "completed_missing_costs",
+  "owner_review",
+  "stale_quotes"
+];
 const structuredIntakeFields = [
   ["stairs_count", "Stairs"],
   ["floor_count", "Floors above/below entry"],
@@ -386,70 +395,40 @@ function renderOpsQueue(queue) {
   if (!box) return;
   clearNode(box);
 
-  const sections = Array.isArray(queue && queue.sections) ? queue.sections : [];
-  if (!sections.length) {
-    return addEmptyState(box, "No Daily Ops Queue sections available.");
+  const cards = Array.isArray(queue && queue.cards) ? queue.cards : [];
+  if (!cards.length) {
+    return addEmptyState(box, "No Daily Ops Board cards available.");
   }
 
   const grid = document.createElement("div");
   grid.className = "opsQueueGrid";
 
-  sections.forEach((section) => {
+  const orderedCards = cards
+    .slice()
+    .sort((a, b) => dailyOpsBoardCardKeys.indexOf(a.key) - dailyOpsBoardCardKeys.indexOf(b.key));
+
+  orderedCards.forEach((item) => {
     const card = document.createElement("section");
-    card.className = "opsQueueSection";
+    card.className = "opsQueueSummaryCard";
 
     const header = document.createElement("div");
-    header.className = "opsQueueSectionHeader";
+    header.className = "opsQueueCardHeader";
 
     const title = document.createElement("div");
-    title.className = "opsQueueSectionTitle";
-    title.textContent = section.title || section.id || "Queue";
+    title.className = "opsQueueCardTitle";
+    title.textContent = item.label || item.key || "Daily ops";
 
     const count = document.createElement("span");
     count.className = "opsQueueCount";
-    count.textContent = String(section.count || 0);
+    count.textContent = String(item.count || 0);
 
     header.append(title, count);
     card.appendChild(header);
 
-    const items = Array.isArray(section.items) ? section.items : [];
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "small muted";
-      empty.textContent = "No attention items in this section.";
-      card.appendChild(empty);
-      grid.appendChild(card);
-      return;
-    }
-
-    const list = document.createElement("ul");
-    list.className = "opsQueueList";
-    items.forEach((item) => {
-      const li = document.createElement("li");
-      li.className = "opsQueueItem";
-
-      const titleLine = document.createElement("div");
-      titleLine.className = "opsQueueItemTitle";
-      titleLine.textContent = item.customer_name || item.job_address || item.id || "Admin item";
-
-      const meta = document.createElement("div");
-      meta.className = "small muted opsQueueItemMeta";
-      const idText = item.job_id || item.request_id || item.quote_id || item.id || "";
-      const serviceText = item.service_type ? ` • ${item.service_type}` : "";
-      meta.textContent = `${statusLabel(item.status)}${serviceText}${idText ? " • " + idText : ""}`;
-
-      const reason = document.createElement("div");
-      reason.className = "small";
-      reason.textContent = item.reason || "";
-
-      const hint = document.createElement("div");
-      hint.className = "small muted opsQueueItemHint";
-      hint.textContent = item.action_hint || "Use the existing admin sections for manual action.";
-
-      li.append(titleLine, meta, reason, hint);
-      list.appendChild(li);
-    });
-    card.appendChild(list);
+    const description = document.createElement("div");
+    description.className = "small muted opsQueueCardDescription";
+    description.textContent = item.description || "Read-only operational count from existing admin data.";
+    card.appendChild(description);
     grid.appendChild(card);
   });
 
@@ -464,7 +443,7 @@ function renderOpsQueueError() {
   div.className = "emptyState";
   const msg = document.createElement("span");
   msg.className = "bad";
-  msg.textContent = "Daily Ops Queue could not load. Core admin data is still available.";
+  msg.textContent = "Daily Ops Board could not load. Core admin data is still available.";
   div.appendChild(msg);
   box.appendChild(div);
 }

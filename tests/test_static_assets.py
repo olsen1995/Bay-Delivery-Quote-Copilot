@@ -538,27 +538,32 @@ def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:
     assert "Quote Risk Advisory" not in mobile_js
 
 
-def test_desktop_admin_includes_daily_ops_queue_only() -> None:
+def test_desktop_admin_includes_daily_ops_board_only() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
     admin_css = Path("static/admin.css").read_text(encoding="utf-8")
     mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
     mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
 
-    assert "Daily Ops Queue" in admin_html
-    assert "Nothing is approved, expired, scheduled, or contacted from this queue." in admin_html
+    assert "Daily Ops Board" in admin_html
+    assert "Nothing is approved, expired, scheduled, contacted, or changed from this board." in admin_html
     assert 'const opsQueue = await fetchJSON("/admin/api/ops-queue");' in admin_js
     assert "async function refreshOpsQueueBestEffort()" in admin_js
     assert "function renderOpsQueueError()" in admin_js
-    assert "Daily Ops Queue could not load. Core admin data is still available." in admin_js
+    assert "Daily Ops Board could not load. Core admin data is still available." in admin_js
     assert "void refreshOpsQueueBestEffort();" in admin_js
     refresh_all = re.search(r"async function refreshAll\(\) \{(?P<body>.*?)\n\}\n\nfunction handleCredsKeydown", admin_js, re.S)
     assert refresh_all is not None
     assert "/admin/api/ops-queue" not in refresh_all.group("body")
     assert "function renderOpsQueue(queue)" in admin_js
+    assert "const cards = Array.isArray(queue && queue.cards) ? queue.cards : [];" in admin_js
+    assert "new_requests" in admin_js
+    assert "accepted_not_booked" in admin_js
+    assert "completed_missing_costs" in admin_js
+    assert "owner_review" in admin_js
     assert ".opsQueueGrid" in admin_css
-    assert ".opsQueueSection" in admin_css
-    assert "Daily Ops Queue" not in mobile_html
+    assert ".opsQueueCard" in admin_css
+    assert "Daily Ops Board" not in mobile_html
     assert "/admin/api/ops-queue" not in mobile_js
     assert "opsQueueBox" not in mobile_js
 

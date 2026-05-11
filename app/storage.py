@@ -223,7 +223,6 @@ class GptQuoteObservabilityRecord(TypedDict):
 
 class AdminOpsQueueSources(TypedDict):
     counts: Dict[str, int]
-    items: Dict[str, List[Dict[str, Any]]]
 
 
 def _validate_deposit_status(value: Any) -> None:
@@ -967,18 +966,15 @@ def list_quotes(limit: int = 50, *, include_expired: bool = False, offset: int =
     return out
 
 
-ADMIN_OPS_QUEUE_SECTION_IDS = (
-    "accepted_needing_approval",
-    "followup_marked",
-    "completed_missing_costing",
-    "jobs_missing_schedule",
-    "jobs_missing_booking_preferences",
-    "stale_pending_estimates",
+ADMIN_OPS_BOARD_COUNT_KEYS = (
+    "new_requests",
+    "needs_followup",
+    "accepted_not_booked",
+    "upcoming_jobs",
+    "completed_missing_costs",
+    "owner_review",
+    "stale_quotes",
 )
-
-
-def _admin_ops_row_dict(row: sqlite3.Row) -> Dict[str, Any]:
-    return dict(row)
 
 
 def _count_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...] = ()) -> int:
@@ -986,159 +982,180 @@ def _count_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...] = (
     return int(row[0]) if row else 0
 
 
-def _list_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...]) -> List[Dict[str, Any]]:
-    return [_admin_ops_row_dict(row) for row in conn.execute(sql, params).fetchall()]
+def _json_truthy(column: str, field_name: str) -> str:
+    return (
+        f"LOWER(TRIM(CAST(json_extract({column}, '$.{field_name}') AS TEXT))) "
+        "IN ('1', 'true', 'yes', 'y', 'on')"
+    )
 
 
-def load_admin_ops_queue_sources(*, item_limit: int, stale_pending_before_iso: str) -> AdminOpsQueueSources:
-    """Return targeted read-only counts and capped source rows for the admin ops queue."""
-    capped_limit = max(0, int(item_limit))
-    section_items: Dict[str, List[Dict[str, Any]]] = {section_id: [] for section_id in ADMIN_OPS_QUEUE_SECTION_IDS}
-    section_counts: Dict[str, int] = {section_id: 0 for section_id in ADMIN_OPS_QUEUE_SECTION_IDS}
+def _json_int(column: str, field_name: str) -> str:
+    return f"CAST(json_extract({column}, '$.{field_name}') AS INTEGER)"
 
-    accepted_where = "status = 'customer_accepted'"
+
+def _json_text_in(column: str, field_name: str, values: Tuple[str, ...]) -> str:
+    quoted_values = ", ".join(f"'{value}'" for value in values)
+    return (
+        f"LOWER(TRIM(CAST(json_extract({column}, '$.{field_name}') AS TEXT))) "
+        f"IN ({quoted_values})"
+    )
+
+
+def _owner_review_manual_signal_filter(alias: str) -> str:
+    request_json = f"{alias}.request_json"
+    return f"""
+        CASE
+            WHEN json_valid({request_json}) = 1 THEN
+                CASE
+                    WHEN {_json_text_in(request_json, "dense_material_type", ("concrete", "brick", "stone", "soil"))}
+                      OR {_json_text_in(request_json, "construction_debris_type", ("concrete",))}
+                      OR ({_json_truthy(request_json, "mixed_load")}
+                          AND {_json_truthy(request_json, "contains_scrap")}
+                          AND {_json_truthy(request_json, "contains_garbage")})
+                      OR {_json_truthy(request_json, "has_refrigerant_appliance")}
+                      OR {_json_text_in(request_json, "appliance_type", ("fridge", "freezer", "air_conditioner", "dehumidifier"))}
+                      OR {_json_int(request_json, "stairs_count")} >= 3
+                      OR ({_json_truthy(request_json, "basement_or_inside_removal")}
+                          AND {_json_int(request_json, "stairs_count")} >= 1)
+                      OR {_json_truthy(request_json, "demolition_ripout")}
+                    THEN 1
+                    ELSE 0
+                END
+            ELSE 0
+        END = 1
+    """
+
+
+def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_start_iso: str) -> AdminOpsQueueSources:
+    """Return targeted read-only counts and risk-advisory candidates for the admin ops board."""
+    counts: Dict[str, int] = {key: 0 for key in ADMIN_OPS_BOARD_COUNT_KEYS}
+
+    new_requests_where = "status = 'customer_pending'"
     followup_where = (
         "followup_status IN ('needs_followup', 'contacted', 'waiting_on_customer', 'not_ready')"
     )
+    accepted_not_booked_request_where = (
+        "qr.status IN ('customer_accepted', 'admin_approved') AND NOT EXISTS ("
+        "SELECT 1 FROM jobs AS j WHERE j.request_id = qr.request_id OR j.quote_id = qr.quote_id"
+        ")"
+    )
+    accepted_not_booked_job_where = (
+        "status IN ('approved', 'scheduled') AND "
+        "(scheduled_start IS NULL OR TRIM(scheduled_start) = '')"
+    )
+    upcoming_jobs_where = (
+        "status = 'scheduled' AND "
+        "scheduled_start IS NOT NULL AND TRIM(scheduled_start) <> '' AND "
+        "datetime(scheduled_start) IS NOT NULL AND "
+        "datetime(scheduled_start) >= datetime(?)"
+    )
     completed_missing_costing_where = (
         "status = 'completed' AND ("
-        "actual_hours IS NULL OR actual_crew_size IS NULL OR "
-        "final_amount_collected_cad IS NULL OR "
+        "actual_hours IS NULL OR TRIM(CAST(actual_hours AS TEXT)) = '' OR "
+        "actual_crew_size IS NULL OR TRIM(CAST(actual_crew_size AS TEXT)) = '' OR "
+        "actual_labor_cost_cad IS NULL OR TRIM(CAST(actual_labor_cost_cad AS TEXT)) = '' OR "
+        "actual_disposal_cost_cad IS NULL OR TRIM(CAST(actual_disposal_cost_cad AS TEXT)) = '' OR "
+        "actual_fuel_cost_cad IS NULL OR TRIM(CAST(actual_fuel_cost_cad AS TEXT)) = '' OR "
+        "actual_other_costs_cad IS NULL OR TRIM(CAST(actual_other_costs_cad AS TEXT)) = '' OR "
+        "final_amount_collected_cad IS NULL OR TRIM(CAST(final_amount_collected_cad AS TEXT)) = '' OR "
         "payment_status IS NULL OR TRIM(payment_status) = '' OR "
         "job_profit_status IS NULL OR TRIM(job_profit_status) = ''"
         ")"
     )
-    jobs_missing_schedule_where = (
-        "status IN ('approved', 'scheduled') AND "
-        "(scheduled_start IS NULL OR TRIM(scheduled_start) = '')"
-    )
     stale_pending_where = (
         "COALESCE(admin_status, 'pending') = 'pending' AND datetime(created_at) <= datetime(?)"
     )
+    owner_review_profit_flags_where = (
+        "status = 'completed' AND job_profit_status IN ('underquoted', 'painful')"
+    )
+    owner_review_job_manual_signal_where = _owner_review_manual_signal_filter("j")
+    owner_review_request_manual_signal_where = _owner_review_manual_signal_filter("qr")
+    owner_review_quote_manual_signal_where = _owner_review_manual_signal_filter("q")
 
     conn = _connect()
     try:
-        section_counts["accepted_needing_approval"] = _count_query(
+        counts["new_requests"] = _count_query(
             conn,
-            f"SELECT COUNT(*) FROM quote_requests WHERE {accepted_where}",
-        )
-        section_items["accepted_needing_approval"] = _list_query(
-            conn,
-            f"""
-            SELECT request_id, created_at, status, quote_id, customer_name, customer_phone,
-                   job_address, service_type
-            FROM quote_requests
-            WHERE {accepted_where}
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
-            """,
-            (capped_limit,),
+            f"SELECT COUNT(*) FROM quote_requests WHERE {new_requests_where}",
         )
 
-        section_counts["followup_marked"] = _count_query(
+        counts["needs_followup"] = _count_query(
             conn,
             f"SELECT COUNT(*) FROM quote_requests WHERE {followup_where}",
         )
-        section_items["followup_marked"] = _list_query(
+
+        counts["accepted_not_booked"] = _count_query(
             conn,
             f"""
-            SELECT request_id, created_at, status, quote_id, customer_name, customer_phone,
-                   job_address, service_type, followup_status
-            FROM quote_requests
-            WHERE {followup_where}
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
+            SELECT COUNT(*) FROM (
+                SELECT 'request:' || qr.request_id AS op_key
+                FROM quote_requests AS qr
+                WHERE {accepted_not_booked_request_where}
+                UNION ALL
+                SELECT 'job:' || j.job_id AS op_key
+                FROM jobs AS j
+                WHERE {accepted_not_booked_job_where}
+            )
             """,
-            (capped_limit,),
         )
 
-        section_counts["completed_missing_costing"] = _count_query(
+        counts["upcoming_jobs"] = _count_query(
+            conn,
+            f"SELECT COUNT(*) FROM jobs WHERE {upcoming_jobs_where}",
+            (upcoming_start_iso,),
+        )
+
+        counts["completed_missing_costs"] = _count_query(
             conn,
             f"SELECT COUNT(*) FROM jobs WHERE {completed_missing_costing_where}",
         )
-        section_items["completed_missing_costing"] = _list_query(
-            conn,
-            f"""
-            SELECT job_id, created_at, status, quote_id, request_id, customer_name, customer_phone,
-                   job_address, service_type
-            FROM jobs
-            WHERE {completed_missing_costing_where}
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
-            """,
-            (capped_limit,),
-        )
 
-        section_counts["jobs_missing_schedule"] = _count_query(
-            conn,
-            f"SELECT COUNT(*) FROM jobs WHERE {jobs_missing_schedule_where}",
-        )
-        section_items["jobs_missing_schedule"] = _list_query(
-            conn,
-            f"""
-            SELECT job_id, created_at, status, quote_id, request_id, customer_name, customer_phone,
-                   job_address, service_type
-            FROM jobs
-            WHERE {jobs_missing_schedule_where}
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
-            """,
-            (capped_limit,),
-        )
-
-        missing_prefs_from = (
-            "jobs AS j LEFT JOIN quote_requests AS qr ON j.request_id = qr.request_id"
-        )
-        missing_prefs_where = (
-            "j.status IN ('approved', 'scheduled', 'in_progress') AND "
-            "(qr.request_id IS NULL OR qr.requested_job_date IS NULL OR "
-            "TRIM(qr.requested_job_date) = '' OR qr.requested_time_window IS NULL OR "
-            "TRIM(qr.requested_time_window) = '')"
-        )
-        section_counts["jobs_missing_booking_preferences"] = _count_query(
-            conn,
-            f"SELECT COUNT(*) FROM {missing_prefs_from} WHERE {missing_prefs_where}",
-        )
-        section_items["jobs_missing_booking_preferences"] = _list_query(
-            conn,
-            f"""
-            SELECT j.job_id, j.created_at, j.status, j.quote_id, j.request_id,
-                   j.customer_name, j.customer_phone, j.job_address, j.service_type,
-                   qr.requested_job_date, qr.requested_time_window,
-                   CASE WHEN qr.request_id IS NULL THEN 1 ELSE 0 END AS missing_quote_request,
-                   CASE WHEN qr.request_id IS NULL OR qr.requested_job_date IS NULL OR TRIM(qr.requested_job_date) = ''
-                        THEN 1 ELSE 0 END AS missing_requested_job_date,
-                   CASE WHEN qr.request_id IS NULL OR qr.requested_time_window IS NULL OR TRIM(qr.requested_time_window) = ''
-                        THEN 1 ELSE 0 END AS missing_requested_time_window
-            FROM {missing_prefs_from}
-            WHERE {missing_prefs_where}
-            ORDER BY datetime(j.created_at) DESC
-            LIMIT ?
-            """,
-            (capped_limit,),
-        )
-
-        section_counts["stale_pending_estimates"] = _count_query(
+        counts["stale_quotes"] = _count_query(
             conn,
             f"SELECT COUNT(*) FROM quotes WHERE {stale_pending_where}",
             (stale_pending_before_iso,),
         )
-        section_items["stale_pending_estimates"] = _list_query(
+
+        counts["owner_review"] = _count_query(
             conn,
             f"""
-            SELECT quote_id, created_at, COALESCE(admin_status, 'pending') AS status,
-                   request_json
-            FROM quotes
-            WHERE {stale_pending_where}
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
+            SELECT COUNT(*) FROM (
+                SELECT 'job-profit:' || j.job_id AS op_key
+                FROM jobs AS j
+                WHERE {owner_review_profit_flags_where}
+                UNION ALL
+                SELECT 'job:' || j.job_id AS op_key
+                FROM jobs AS j
+                WHERE j.status IN ('approved', 'scheduled', 'in_progress')
+                  AND j.request_json IS NOT NULL
+                  AND TRIM(j.request_json) <> ''
+                  AND ({owner_review_job_manual_signal_where})
+                UNION ALL
+                SELECT 'request:' || qr.request_id AS op_key
+                FROM quote_requests AS qr
+                WHERE qr.status IN ('customer_pending', 'customer_accepted', 'admin_approved')
+                  AND qr.request_json IS NOT NULL
+                  AND TRIM(qr.request_json) <> ''
+                  AND ({owner_review_request_manual_signal_where})
+                  AND NOT EXISTS (
+                      SELECT 1 FROM jobs AS j WHERE j.request_id = qr.request_id OR j.quote_id = qr.quote_id
+                  )
+                UNION ALL
+                SELECT 'quote:' || q.quote_id AS op_key
+                FROM quotes AS q
+                WHERE COALESCE(q.admin_status, 'pending') = 'pending'
+                  AND q.request_json IS NOT NULL
+                  AND TRIM(q.request_json) <> ''
+                  AND ({owner_review_quote_manual_signal_where})
+                  AND NOT EXISTS (SELECT 1 FROM quote_requests AS qr WHERE qr.quote_id = q.quote_id)
+                  AND NOT EXISTS (SELECT 1 FROM jobs AS j WHERE j.quote_id = q.quote_id)
+            )
             """,
-            (stale_pending_before_iso, capped_limit),
         )
     finally:
         conn.close()
 
-    return {"counts": section_counts, "items": section_items}
+    return {"counts": counts}
 
 
 def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:
