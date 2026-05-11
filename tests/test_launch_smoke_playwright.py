@@ -172,8 +172,8 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#bookingNotes").fill("Please call when on the way.")
     await page.locator("#btnSubmitBooking").click()
 
-    await expect(page.locator("#bookingStatus")).to_contain_text("Booking submitted successfully.", timeout=20_000)
-    await expect(page.locator("#bookingStatus")).to_contain_text("admin review")
+    await expect(page.locator("#bookingStatus")).to_contain_text("Your preferred timing has been sent to Bay Delivery", timeout=20_000)
+    await expect(page.locator("#bookingStatus")).to_contain_text("We will follow up to confirm the final schedule")
     booking_status_text = await page.locator("#bookingStatus").inner_text()
     request_match = re.search(r"Request ID:\s*([^\s]+)", booking_status_text)
     assert request_match, f"Expected Request ID in booking status text: {booking_status_text}"
