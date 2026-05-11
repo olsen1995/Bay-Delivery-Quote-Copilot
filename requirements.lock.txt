@@ -23,6 +23,10 @@ charset-normalizer==3.4.7
     # via requests
 click==8.3.3
     # via uvicorn
+colorama==0.4.6
+    # via
+    #   click
+    #   pytest
 cryptography==47.0.0
     # via google-auth
 fastapi==0.135.1
@@ -124,7 +128,9 @@ typing-inspection==0.4.2
     #   pydantic
 uritemplate==4.2.0
     # via google-api-python-client
-urllib3==2.6.3
-    # via requests
+urllib3==2.7.0
+    # via
+    #   -r requirements.txt
+    #   requests
 uvicorn==0.41.0
     # via -r requirements.txt
