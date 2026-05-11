@@ -322,7 +322,10 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "Quote Details" in admin_js
     assert "Internal Risk Summary" in admin_js
     assert "function createInternalRiskSummarySection(" in admin_js
+    assert "function normalizeBooleanLike(" in admin_js
     assert "function createInternalRiskSummarySignals(" in admin_js
+    assert "normalizeBooleanLike(request?.basement_or_inside_removal)" in admin_js
+    assert "Boolean(request?.basement_or_inside_removal)" not in admin_js
     assert "Access concern" in admin_js
     assert "Heavy material concern" in admin_js
     assert "Disposal uncertainty" in admin_js

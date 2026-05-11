@@ -590,6 +590,19 @@ function formatRiskAdvisoryLevel(value) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+function normalizeBooleanLike(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1", "on"].includes(lower)) return true;
+    if (["false", "no", "n", "0", "off", ""].includes(lower)) return false;
+    return false;
+  }
+  return false;
+}
+
 function addSummarySignal(signals, text) {
   if (!text) return;
   if (!signals.includes(text)) signals.push(text);
@@ -627,7 +640,7 @@ function createInternalRiskSummarySignals({ advisory, assessment, request }) {
 
   const stairsCount = Number(request?.stairs_count || 0);
   const floorCount = Number(request?.floor_count || 0);
-  const basementInside = Boolean(request?.basement_or_inside_removal);
+  const basementInside = normalizeBooleanLike(request?.basement_or_inside_removal);
   if (
     stairsCount >= 2
     || floorCount >= 2
