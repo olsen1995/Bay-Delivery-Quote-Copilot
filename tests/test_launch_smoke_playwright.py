@@ -161,7 +161,8 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
 
     await page.locator("#btnAccept").click()
     await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
-    await expect(page.locator("#flowStatus")).to_contain_text("Please provide your booking preferences below")
+    await expect(page.locator("#flowStatus")).to_contain_text("Please share your booking preferences below")
+    await expect(page.locator("#flowStatus")).to_contain_text("The job is not booked yet")
     await expect(page.locator("#flowStatus")).to_contain_text("The job is not booked yet.")
     await expect(page.locator("#bookingCard")).to_be_visible()
     await expect(page.locator("#decisionCard")).to_be_hidden()
@@ -171,8 +172,8 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#bookingNotes").fill("Please call when on the way.")
     await page.locator("#btnSubmitBooking").click()
 
-    await expect(page.locator("#bookingStatus")).to_contain_text("Booking submitted successfully.", timeout=20_000)
-    await expect(page.locator("#bookingStatus")).to_contain_text("admin review")
+    await expect(page.locator("#bookingStatus")).to_contain_text("Your preferred timing has been sent to Bay Delivery", timeout=20_000)
+    await expect(page.locator("#bookingStatus")).to_contain_text("We will follow up to confirm the final schedule")
     booking_status_text = await page.locator("#bookingStatus").inner_text()
     request_match = re.search(r"Request ID:\s*([^\s]+)", booking_status_text)
     assert request_match, f"Expected Request ID in booking status text: {booking_status_text}"
@@ -212,11 +213,11 @@ async def test_launch_quote_route_missing_fields_are_named(page: Page, live_serv
 async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server: str) -> None:
     await page.goto(f"{live_server}/quote", wait_until="networkidle")
     await expect(page.locator("#quoteForm")).to_be_visible()
-    await expect(page.locator("#quoteForm")).to_contain_text("Not sure? Give your best estimate. Clear, close guesses are enough to start.")
-    await expect(page.locator("#quoteForm")).to_contain_text("A full kitchen garbage bag = 1. If unsure, estimate slightly higher.")
-    await expect(page.locator("#quoteForm")).to_contain_text("Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.")
-    await expect(page.locator("#quoteForm")).to_contain_text("Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access.")
-    await expect(page.locator("#quoteForm")).to_contain_text("Prefer to send photos after your booking request? You can add them in Step 5 to help Bay Delivery review the job and improve follow-up accuracy.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Simple details help us quote faster and avoid surprises")
+    await expect(page.locator("#quoteForm")).to_contain_text("Use full kitchen-size garbage bags as your rough count.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Heavy items help us plan properly and avoid surprises.")
+    await expect(page.locator("#quoteForm")).to_contain_text("If unsure, choose the closest option and add a quick note below.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Photos help us quote faster and avoid surprises.")
 
     await page.locator("#customer_name").fill("Playwright Decline Smoke")
     await page.locator("#customer_phone").fill("705-555-0112")
@@ -240,12 +241,12 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("What happens next")
     await expect(page.locator("#resultBox")).to_contain_text("Estimate Details")
     await expect(page.locator("#resultBox")).to_contain_text("About this estimate")
-    await expect(page.locator("#resultBox")).to_contain_text("Difficult access")
-    await expect(page.locator("#resultBox")).to_contain_text("Heavy or dense materials included")
+    await expect(page.locator("#resultBox")).to_contain_text("Apartment/stairs/basement or longer carry")
+    await expect(page.locator("#resultBox")).to_contain_text("Heavy materials included")
     await expect(page.locator("#resultBox")).to_contain_text("Disposal included")
-    await expect(page.locator("#resultBox")).to_contain_text("Photos are optional after you submit the booking request if they help Bay Delivery review the job and improve follow-up accuracy.")
+    await expect(page.locator("#resultBox")).to_contain_text("Photos are optional after your booking request if they help Bay Delivery confirm scope and avoid surprises.")
     await expect(page.locator("#resultBox")).to_contain_text("Next step: decide whether this estimate works for you. Accept Estimate & Continue opens the booking request form.")
-    await expect(page.locator("#resultBox")).to_contain_text("Your job is not booked until Bay Delivery reviews and confirms it.")
+    await expect(page.locator("#resultBox")).to_contain_text("Bay Delivery confirms details before anything is booked.")
     await expect(page.locator("#decisionCard")).to_be_visible()
     await expect(page.locator("#uploadCard")).to_be_hidden()
 
@@ -266,13 +267,13 @@ async def test_haul_away_requires_structured_load_detail(page: Page, live_server
     await page.locator("#description").fill("Need help with some stuff.")
     await page.locator("#btnCalc").click()
 
-    await expect(page.locator("#resultBox")).to_contain_text("Please add at least one load detail so we can estimate your junk removal properly.")
-    await expect(page.locator("#resultBox")).to_contain_text("Examples: bags, trailer space used, mattresses, box springs, or dense materials.")
+    await expect(page.locator("#resultBox")).to_contain_text("Please add at least one load detail so we can quote your junk removal.")
+    await expect(page.locator("#resultBox")).to_contain_text("Examples: bags, trailer space used, mattresses, box springs, or heavy materials.")
     await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
 
     await page.locator("#trailer_fill_estimate").select_option("under_quarter")
     await page.locator("#btnCalc").click()
 
     await expect(page.locator("#resultBox")).to_contain_text("Pricing Breakdown", timeout=20_000)
-    await expect(page.locator("#resultBox")).to_contain_text("Estimated junk load (Under 1/4 trailer (few items or a small pile))")
+    await expect(page.locator("#resultBox")).to_contain_text("Estimated junk load (Under 1/4 trailer)")
     await expect(page.locator("#resultBox")).not_to_contain_text("Estimated junk load (0 bags)")
