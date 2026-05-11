@@ -8,5 +8,9 @@
     "not and_ff <= 147",
     "not firefox <= 147",
     "not opera <= 125"
-  ]
+  ],
+  "hints": {
+    "no-inline-styles": "off",
+    "compat-api/html": "off"
+  }
 }
