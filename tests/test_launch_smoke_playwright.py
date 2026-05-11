@@ -161,7 +161,8 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
 
     await page.locator("#btnAccept").click()
     await expect(page.locator("#flowStatus")).to_contain_text("Decision saved successfully.", timeout=20_000)
-    await expect(page.locator("#flowStatus")).to_contain_text("Please provide your booking preferences below")
+    await expect(page.locator("#flowStatus")).to_contain_text("Please share your booking preferences below")
+    await expect(page.locator("#flowStatus")).to_contain_text("The job is not booked yet")
     await expect(page.locator("#flowStatus")).to_contain_text("The job is not booked yet.")
     await expect(page.locator("#bookingCard")).to_be_visible()
     await expect(page.locator("#decisionCard")).to_be_hidden()
@@ -212,7 +213,7 @@ async def test_launch_quote_route_missing_fields_are_named(page: Page, live_serv
 async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server: str) -> None:
     await page.goto(f"{live_server}/quote", wait_until="networkidle")
     await expect(page.locator("#quoteForm")).to_be_visible()
-    await expect(page.locator("#quoteForm")).to_contain_text("Simple details help us quote faster and avoid surprises.")
+    await expect(page.locator("#quoteForm")).to_contain_text("Simple details help us quote faster and avoid surprises")
     await expect(page.locator("#quoteForm")).to_contain_text("Use full kitchen-size garbage bags as your rough count.")
     await expect(page.locator("#quoteForm")).to_contain_text("Heavy items help us plan properly and avoid surprises.")
     await expect(page.locator("#quoteForm")).to_contain_text("If unsure, choose the closest option and add a quick note below.")
