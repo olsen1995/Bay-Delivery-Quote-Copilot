@@ -156,21 +156,19 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
 
     assert "Start with the estimate." in quote_html
-    assert "Share the job details used for your estimate." in quote_html
+    assert "Quick details now. Bay Delivery confirms final booking details" in quote_html
     assert 'id="serviceDetailsSummary"' in quote_html
     assert 'id="serviceDetailsLead"' in quote_html
     assert 'id="serviceDetailsPanel" class="detailPanel" open' in quote_html
-    assert "Not sure? Give your best estimate. Clear, close guesses are enough to start." in quote_html
-    assert "Required for moves and deliveries so the estimate reflects the actual route." in quote_html
-    assert "A full kitchen garbage bag = 1. If unsure, estimate slightly higher." in quote_html
+    assert "Simple details help us quote faster and avoid surprises on arrival." in quote_html
+    assert "Required for moves and deliveries." in quote_html
+    assert "Use full kitchen-size garbage bags as your rough count." in quote_html
     assert "Most jobs are 5–10 bags. Adjust if needed." in quote_html
-    assert "Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more." in quote_html
-    assert "Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access." in quote_html
-    assert "Optional photos can be added after you submit a booking request to help Bay Delivery review the job" in quote_html
-    assert "Optional photos come after the booking request submission to help Bay Delivery review the job and improve follow-up accuracy." in quote_html
-    assert "Prefer to send photos after your booking request? You can add them in Step 5 to help Bay Delivery review the job and improve follow-up accuracy." in quote_html
-    assert "After you submit your booking request, add photos here if they help Bay Delivery review the job and improve follow-up accuracy." in quote_html
-    assert "After you see your estimate, review what is included and compare Cash vs EMT totals." in quote_html
+    assert "Heavy items help us plan properly and avoid surprises." in quote_html
+    assert "If unsure, choose the closest option and add a quick note below." in quote_html
+    assert "Photos help us quote faster and avoid surprises." in quote_html
+    assert "After you submit your booking request, add photos here if they help Bay Delivery confirm scope and avoid surprises." in quote_html
+    assert "After you see your estimate, you can accept and share your preferred day and time window." in quote_html
     assert "Booking requests and optional photos come after acceptance." not in quote_html
     assert "Optional photos come after that." not in quote_html
     assert "Step 1 of 4" not in quote_html
@@ -182,11 +180,34 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "What this estimate includes" in quote_js
     assert "What happens next" in quote_js
     assert "About this estimate" in quote_js
-    assert "Photos are optional after you submit the booking request if they help Bay Delivery review the job and improve follow-up accuracy." in quote_js
+    assert "Photos are optional after your booking request if they help Bay Delivery confirm scope and avoid surprises." in quote_js
     assert "Accept Estimate & Continue" in quote_js
-    assert "Your job is not booked until Bay Delivery reviews and confirms it." in quote_js
+    assert "The job is not booked yet." in quote_js
     assert "quoteResultIncluded" in quote_css
     assert "quoteInfoCard" in quote_css
+
+
+def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8").lower()
+
+    banned_phrases = [
+        "manual review required",
+        "disposal risk",
+        "dense material classification",
+        "recommended trailer",
+        "labour underpriced",
+        "operating-cost target gap",
+        "owner review",
+        "internal risk",
+        "margin",
+        "profit",
+        "quote risk advisory",
+        "internal_risk_assessment",
+        "quote_risk_advisory",
+    ]
+
+    for phrase in banned_phrases:
+        assert phrase not in quote_html
 
 
 def test_quote_page_includes_haul_away_floor_fields() -> None:
@@ -203,8 +224,7 @@ def test_quote_page_includes_haul_away_floor_fields() -> None:
     for option_value in ["under_quarter", "quarter", "half", "three_quarter", "full"]:
         assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
 
-    assert '<option value="" selected>Select bag type if known</option>' in quote_html
-    assert '<option value="" selected>Select trailer space used if known</option>' in quote_html
+    assert '<option value="" selected>Not sure / not applicable</option>' in quote_html
     assert '<option value="light" selected>' not in quote_html
     assert '<option value="under_quarter" selected>' not in quote_html
 

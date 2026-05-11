@@ -126,7 +126,7 @@ function hasHaulAwayStructuredLoadDetail() {
 }
 
 function haulAwayLoadDetailMessage() {
-  return "Please add at least one load detail so we can estimate your junk removal properly. Examples: bags, trailer space used, mattresses, box springs, or dense materials.";
+  return "Please add at least one load detail so we can quote your junk removal. Examples: bags, trailer space used, mattresses, box springs, or heavy materials.";
 }
 
 function trailerFillLabel(value) {
@@ -146,7 +146,7 @@ function missingFieldSummary(missing) {
   });
   if (routeMissing) {
     lines.push("");
-    lines.push("Pickup and dropoff addresses are required for moves and deliveries so the estimate can reflect the route.");
+    lines.push("Pickup and dropoff addresses are required for moves and deliveries.");
   }
   return lines.join("\n");
 }
@@ -154,7 +154,7 @@ function missingFieldSummary(missing) {
 function friendlyQuoteErrorMessage(detail) {
   if (!detail) return "Unknown error";
   if (detail === "pickup_address and dropoff_address are required") {
-    return "Pickup address and dropoff address are required for moves and deliveries. Add both locations in Service-Specific Details and try again.";
+    return "Pickup address and dropoff address are required for moves and deliveries. Add both locations in the job details section and try again.";
   }
   if (detail === "Please enter a valid 10-digit phone number. You can include spaces, dashes, parentheses, or +1.") {
     return detail + " We use it for estimate and booking follow-up only.";
@@ -368,7 +368,7 @@ function buildEstimateDetails() {
     } else if (serviceType === "haul_away" && trailerFillEstimate) {
       details.push("Estimated junk load (" + trailerFillLabel(trailerFillEstimate) + ")");
     } else if (serviceType === "haul_away") {
-      details.push("Load size not specified in structured detail");
+      details.push("Load size not specified");
     }
 
     if (mattresses > 0 || boxSprings > 0) {
@@ -386,15 +386,15 @@ function buildEstimateDetails() {
   details.push("Service selected: " + serviceLabel);
 
   if (access === "normal") {
-    details.push("Easy access");
+    details.push("Curbside or main-floor access");
   } else if (access === "difficult") {
-    details.push("Difficult access (stairs, basement, or long carry)");
+    details.push("Apartment/stairs/basement or longer carry");
   } else {
-    details.push("Extreme access conditions");
+    details.push("Complex access conditions");
   }
 
   if (hasDenseMaterials) {
-    details.push("Heavy or dense materials included");
+    details.push("Heavy materials included");
   }
 
   if (serviceType === "haul_away" || serviceType === "demolition" || serviceType === "scrap_pickup") {
@@ -402,7 +402,7 @@ function buildEstimateDetails() {
   }
 
   if (requiresRouteFields(serviceType)) {
-    details.push("Travel included based on your local pickup and dropoff details");
+    details.push("Route details included from your pickup and dropoff locations");
   } else {
     details.push("Local service area");
   }
@@ -430,7 +430,7 @@ function renderQuoteResult(data, quoteResponse) {
   title.textContent = "Your Estimate";
   const subtitle = document.createElement("p");
   subtitle.className = "muted";
-  subtitle.textContent = "Review the totals, see what is included, and confirm what happens next before deciding whether to continue.";
+  subtitle.textContent = "Review your totals and what is included, then decide if you want to continue.";
   titleWrap.append(title, subtitle);
 
   const meta = document.createElement("div");
@@ -455,14 +455,14 @@ function renderQuoteResult(data, quoteResponse) {
   );
   const amountHint = document.createElement("p");
   amountHint.className = "quoteAmountHint muted";
-  amountHint.textContent = "Cash is tax-free. EMT / e-transfer includes 13% HST. These totals reflect the job details you entered.";
+  amountHint.textContent = "Cash has no HST. EMT / e-transfer includes 13% HST. Totals are based on the details you entered.";
   breakdown.append(breakdownTitle, amountGrid, amountHint);
 
   const included = document.createElement("div");
   included.className = "quoteResultIncluded";
   included.append(
-    createTextBlock("What this estimate includes", "Your estimate reflects the service details you provided, including local travel, labor, and any handling or disposal already captured by this form.", "quoteInfoCard"),
-    createTextBlock("What happens next", "If the estimate works for you, choose Accept Estimate & Continue to open the booking request step. Share your preferred date, time window, and notes, and Bay Delivery will review the request before confirming the job.", "quoteInfoCard")
+    createTextBlock("What this estimate includes", "This estimate reflects the details you shared, including local travel, labour, handling, and disposal where applicable.", "quoteInfoCard"),
+    createTextBlock("What happens next", "If this estimate works for you, choose Accept Estimate & Continue. Then share your preferred date and time window, and Bay Delivery will review and confirm before booking.", "quoteInfoCard")
   );
 
   const estimateDetails = document.createElement("div");
@@ -487,12 +487,12 @@ function renderQuoteResult(data, quoteResponse) {
   noteTitle.textContent = "About this estimate";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after you submit the booking request if they help Bay Delivery review the job and improve follow-up accuracy.";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after your booking request if they help Bay Delivery confirm scope and avoid surprises.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
   nextStep.className = "nextStepCallout";
-  nextStep.textContent = "Next step: decide whether this estimate works for you. Accept Estimate & Continue opens the booking request form. Your job is not booked until Bay Delivery reviews and confirms it.";
+  nextStep.textContent = "Next step: decide whether this estimate works for you. Accept Estimate & Continue opens the booking request form. Bay Delivery confirms details before anything is booked.";
 
   wrapper.append(header, breakdown, included, nextStep, estimateDetails, note);
   box.appendChild(wrapper);
@@ -614,21 +614,21 @@ function syncServiceFields() {
   const detailsSummary = el("serviceDetailsSummary");
   const detailsLead = el("serviceDetailsLead");
   if (showScrap) {
-    help.textContent = "Scrap pickup is usually quick to estimate. Tell us whether the scrap is curbside or inside/on-property so the handling effort is clear.";
-    detailsSummary.textContent = "Details used for your scrap pickup estimate";
-    detailsLead.textContent = "Scrap pickup usually needs only location and access details. Photos are optional later if they help confirm the pile.";
+    help.textContent = "Scrap pickup is usually quick to quote. Tell us whether the scrap is curbside or inside/on-property.";
+    detailsSummary.textContent = "Details for your scrap pickup quote";
+    detailsLead.textContent = "Share location and access details. Photos are optional later if helpful.";
   } else if (showRoute) {
-    help.textContent = "For moves and deliveries, we need both the pickup and dropoff addresses to estimate the route. You still review the estimate before any booking request.";
-    detailsSummary.textContent = "Required route details for your estimate";
-    detailsLead.textContent = "Enter both the pickup address and dropoff address. These fields are required for " + serviceTypeLabel(serviceType).toLowerCase() + " estimates.";
+    help.textContent = "For moves and deliveries, add both pickup and dropoff addresses so we can quote the route.";
+    detailsSummary.textContent = "Required route details";
+    detailsLead.textContent = "Enter both pickup and dropoff addresses. These fields are required for " + serviceTypeLabel(serviceType).toLowerCase() + " jobs.";
   } else if (showLoadCounts) {
-    help.textContent = "Use rough counts, access details, and material notes. Clear, close estimates are fine.";
-    detailsSummary.textContent = "Load, access, and material details for your estimate";
+    help.textContent = "Use rough counts, location/access details, and heavy-item notes. Best estimates are fine.";
+    detailsSummary.textContent = "Load, access, and item details";
     detailsLead.textContent = "Add the closest counts and access details. For loose junk, think in regular garbage bags. For trailer fill, choose the closest space used.";
   } else {
-    help.textContent = "Choose the service first. We will show only the estimate fields used for that job.";
-    detailsSummary.textContent = "Details used for your estimate";
-    detailsLead.textContent = "Fill in the service details that affect estimate accuracy for your job.";
+    help.textContent = "Choose the service first. We will show only the fields needed for that job.";
+    detailsSummary.textContent = "Job details for your estimate";
+    detailsLead.textContent = "Fill in the details that help Bay Delivery prepare an accurate estimate.";
   }
 
   syncBagCountNudge();
@@ -814,7 +814,7 @@ async function submitBooking() {
       return;
     }
 
-    showBox("bookingStatus", "Booking submitted successfully.\nRequest ID: " + data.request_id + "\n\nYour preferred timing has been sent for admin review. Bay Delivery will follow up to confirm the final schedule.");
+    showBox("bookingStatus", "Booking submitted successfully.\nRequest ID: " + data.request_id + "\n\nYour preferred timing has been sent to Bay Delivery. We will follow up to confirm the final schedule.");
     setFlowStage(5);
     revealCard("uploadCard", true);
   } catch (err) {
@@ -858,7 +858,7 @@ async function submitDecision(action) {
 
     if (action === "accept") {
       lastBookingToken = data.booking_token;
-      showBox("flowStatus", confirmation + "\n\nYour estimate is marked accepted. Please provide your booking preferences below so Bay Delivery can review the request and confirm the final booking details with you. The job is not booked yet.");
+      showBox("flowStatus", confirmation + "\n\nYour estimate is marked accepted. Please share your booking preferences below so Bay Delivery can review and confirm details with you. The job is not booked yet.");
       el("decisionCard").classList.add("hidden");
       revealCard("bookingCard", true);
       enforceBookingDateMin();

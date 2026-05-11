@@ -27,20 +27,20 @@
     </div>
 
     <section class="quoteTrustStrip" aria-label="Bay Delivery customer trust indicators">
-      <div class="quoteTrustBadge">Local North Bay service</div>
-      <div class="quoteTrustBadge">Estimate before booking</div>
-      <div class="quoteTrustBadge">Cash and EMT totals shown clearly</div>
-      <div class="quoteTrustBadge">No-pressure decision</div>
+      <div class="quoteTrustBadge">Local North Bay team</div>
+      <div class="quoteTrustBadge">Fast estimate to get started</div>
+      <div class="quoteTrustBadge">Photos help us quote faster</div>
+      <div class="quoteTrustBadge">Bay Delivery confirms before booking</div>
     </section>
 
     <div class="heroCard card quoteHeroShell">
       <p class="eyebrow">Bay Delivery</p>
       <h1>Get an Estimate</h1>
-      <p class="muted heroCopy">Start with a fast estimate, review clear Cash (no HST) and EMT (+13% HST) totals, and continue only if it works for you. Optional photos can be added after you submit a booking request to help Bay Delivery review the job.</p>
+      <p class="muted heroCopy">Tell us what you need moved, removed, delivered, or cleaned up. Add a few details about location and access, and Bay Delivery will send an estimate before anything is booked.</p>
       <div class="heroHighlights" aria-hidden="true">
         <span class="heroHighlight">North Bay service</span>
-        <span class="heroHighlight">Estimate first</span>
-        <span class="heroHighlight">Booking only after acceptance</span>
+        <span class="heroHighlight">Simple form</span>
+        <span class="heroHighlight">Confirmation before booking</span>
       </div>
     </div>
 
@@ -50,7 +50,7 @@
           <p class="sectionEyebrow">Quote Flow</p>
           <h2>What happens next</h2>
         </div>
-        <p class="muted sectionLead">Start with the estimate. If the estimate works for you, continue to the booking request. Optional photos come after the booking request submission to help Bay Delivery review the job and improve follow-up accuracy. Your job is not booked until Bay Delivery reviews and confirms it.</p>
+        <p class="muted sectionLead">Start with the estimate. If it works for you, continue to your booking request, then add photos if helpful. Bay Delivery reviews and confirms details before anything is booked.</p>
       </div>
       <ol class="flowProgress" id="flowProgress" aria-label="Quote progress">
         <li class="flowStep is-active" data-step="1"><span class="flowStepBadge">1</span><span class="flowStepLabel">Job details</span></li>
@@ -67,38 +67,15 @@
           <p class="sectionEyebrow">Customer Estimate</p>
           <h2>Tell us about the job</h2>
         </div>
-        <p class="muted sectionLead">Share the job details used for your estimate. You see pricing before any booking request details.</p>
+        <p class="muted sectionLead">Quick details now. Bay Delivery confirms final booking details after you review your estimate.</p>
       </div>
 
       <form id="quoteForm" class="formWrap" novalidate>
-        <div class="formSection firstStepSection">
-          <div class="sectionHeader compact">
-            <div>
-              <h3 class="formSectionTitle">Contact and job location</h3>
-              <p class="firstStepHint">Start here so we can send your estimate first, then follow up only if you decide to continue.</p>
-            </div>
-          </div>
-
-          <div class="row">
-            <div>
-              <label for="customer_name">Customer name</label>
-              <input id="customer_name" name="customer_name" placeholder="Full name" required />
-            </div>
-            <div>
-              <label for="customer_phone">Customer phone</label>
-              <input id="customer_phone" name="customer_phone" placeholder="705-___-____" inputmode="tel" required />
-            </div>
-          </div>
-
-          <label for="job_address">Job address</label>
-          <input id="job_address" name="job_address" placeholder="North Bay, ON" required />
-        </div>
-
         <div class="formSection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">Choose the service</h3>
-              <p class="startIntro">Pick the job type first so we only show the estimate details that matter.</p>
+              <h3 class="formSectionTitle">1. What do you need help with?</h3>
+              <p class="startIntro">Choose the service that best matches your job.</p>
             </div>
           </div>
 
@@ -112,7 +89,7 @@
                 <option value="item_delivery">Item delivery</option>
                 <option value="demolition">Demolition</option>
               </select>
-              <div class="helperText" id="serviceHelp">Select a service to show only the fields and guidance used for that estimate.</div>
+              <div class="helperText" id="serviceHelp">Select a service and we will show the details needed for a faster estimate.</div>
             </div>
           </div>
         </div>
@@ -120,21 +97,21 @@
         <div class="formSection secondarySection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">Estimate details</h3>
-              <p class="muted sectionLead">Add the service details that affect estimate accuracy and pricing.</p>
+              <h3 class="formSectionTitle">2-5. Job details</h3>
+              <p class="muted sectionLead">Tell us what needs to be moved, removed, delivered, or cleaned up, where it is located, and any heavy or special items.</p>
             </div>
           </div>
 
           <details id="serviceDetailsPanel" class="detailPanel" open>
-            <summary id="serviceDetailsSummary">Details used for your estimate</summary>
-            <p class="panelLead" id="serviceDetailsLead">These details affect pricing. For moves and deliveries, route addresses are required.</p>
-            <p class="helperText">Not sure? Give your best estimate. Clear, close guesses are enough to start.</p>
+            <summary id="serviceDetailsSummary">Job details that help us quote accurately</summary>
+            <p class="panelLead" id="serviceDetailsLead">Share the closest details you can. If you are not sure, that is okay. For moves and deliveries, pickup and dropoff are required.</p>
+            <p class="helperText">Simple details help us quote faster and avoid surprises on arrival.</p>
 
             <div class="row">
               <div id="estimatedHoursGroup">
-                <label for="estimated_hours">Estimated hours</label>
+                <label for="estimated_hours">Estimated time on site (hours)</label>
                 <input id="estimated_hours" name="estimated_hours" type="number" min="0" step="0.25" value="1.0" />
-                <div class="helperText">Use your best guess. If you are unsure, give the closest number and describe the work below.</div>
+                <div class="helperText">Use your best guess. A close estimate is enough to get started.</div>
               </div>
             </div>
 
@@ -147,38 +124,38 @@
                 </select>
               </div>
               <div id="scrapLocationGroup" class="hidden">
-                <label for="scrap_pickup_location">Scrap pickup location</label>
+                <label for="scrap_pickup_location">Where is the scrap located?</label>
                 <select id="scrap_pickup_location" name="scrap_pickup_location">
                   <option value="curbside">Curbside / outside pickup</option>
                   <option value="inside">Inside / on-property pickup</option>
                 </select>
-                <div class="helperText">Tell us whether the scrap is curbside or inside/on-property so the estimate reflects the handling effort.</div>
+                <div class="helperText">This helps us understand carry distance and access.</div>
               </div>
             </div>
 
             <div class="row">
               <div>
-                <label for="access_difficulty">Access difficulty</label>
+                <label for="access_difficulty">Where is it located?</label>
                 <select id="access_difficulty" name="access_difficulty">
-                  <option value="normal" selected>Easy access (main floor, close parking)</option>
-                  <option value="difficult">Difficult access (stairs, basement carry-out, long walk)</option>
-                  <option value="extreme">Extreme access (multiple flights, tight access, difficult parking)</option>
+                  <option value="normal" selected>Curbside or main floor access</option>
+                  <option value="difficult">Apartment, stairs, basement, or longer carry</option>
+                  <option value="extreme">Multiple floors/stairs, tight access, or very long carry</option>
                 </select>
-                <div class="helperText">Choose the closest match. Think about stairs, carry distance, and parking.</div>
-                <div class="helperText">Easy = curbside / garage. Medium = short walk / a few stairs. Hard = basement / long carry / tight access.</div>
+                <div class="helperText">Choose the closest match for stairs, basement access, and carry distance.</div>
+                <div class="helperText">If unsure, choose the closest option and add a quick note below.</div>
               </div>
             </div>
 
             <div class="row" id="structuredAccessRow">
               <div>
-                <label for="stairs_count">Stairs</label>
+                <label for="stairs_count">Stair sets (optional)</label>
                 <input id="stairs_count" name="stairs_count" type="number" min="0" step="1" placeholder="0" />
-                <div class="helperText">Optional. Count stair sets or notable steps.</div>
+                <div class="helperText">Count stair sets or notable stair runs if you know them.</div>
               </div>
               <div>
-                <label for="floor_count">Floors above/below entry</label>
+                <label for="floor_count">Floors away from entry (optional)</label>
                 <input id="floor_count" name="floor_count" type="number" min="0" step="1" placeholder="0" />
-                <div class="helperText">Optional. Use 0 for main floor or curbside.</div>
+                <div class="helperText">Use 0 for curbside or main floor access.</div>
               </div>
             </div>
 
@@ -186,13 +163,13 @@
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="basement_or_inside_removal">
                   <input id="basement_or_inside_removal" name="basement_or_inside_removal" type="checkbox" />
-                  <span>Items need basement or inside removal.</span>
+                  <span>Includes basement or inside removal.</span>
                 </label>
               </div>
               <div class="checkboxWrap hidden" id="weatherProtectionGroup">
                 <label class="checkboxLabel" for="weather_protection_required">
                   <input id="weather_protection_required" name="weather_protection_required" type="checkbox" />
-                  <span>Weather protection is needed during moving or delivery.</span>
+                  <span>Moving/delivery items need weather protection.</span>
                 </label>
               </div>
             </div>
@@ -201,15 +178,15 @@
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="has_dense_materials">
                   <input id="has_dense_materials" name="has_dense_materials" type="checkbox" />
-                  <span>This job includes heavy or dense materials (for example drywall, concrete, tile, shingles, soil, wet debris, or similar).</span>
+                  <span>Includes heavy materials (for example concrete, tile, brick, soil, or similar).</span>
                 </label>
-                <div class="helperText">Examples: drywall, tile, concrete, shingles, soil. These are heavier and cost more.</div>
+                <div class="helperText">Heavy items help us plan properly and avoid surprises.</div>
               </div>
             </div>
 
             <div class="row" id="structuredMaterialsRow">
               <div>
-                <label for="construction_debris_type">Construction debris type</label>
+                <label for="construction_debris_type">Construction debris (if any)</label>
                 <select id="construction_debris_type" name="construction_debris_type">
                   <option value="" selected>Not sure / not applicable</option>
                   <option value="drywall">Drywall</option>
@@ -222,7 +199,7 @@
                 </select>
               </div>
               <div>
-                <label for="dense_material_type">Dense material type</label>
+                <label for="dense_material_type">Heavy material type (if any)</label>
                 <select id="dense_material_type" name="dense_material_type">
                   <option value="" selected>Not sure / not applicable</option>
                   <option value="drywall">Drywall</option>
@@ -242,25 +219,25 @@
               <div class="checkboxWrap hidden" id="demolitionRipoutGroup">
                 <label class="checkboxLabel" for="demolition_ripout">
                   <input id="demolition_ripout" name="demolition_ripout" type="checkbox" />
-                  <span>This includes rip-out or demolition removal.</span>
+                  <span>Includes rip-out or demolition debris.</span>
                 </label>
               </div>
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="mixed_load">
                   <input id="mixed_load" name="mixed_load" type="checkbox" />
-                  <span>This is a mixed load.</span>
+                  <span>It is a mixed load with different material types.</span>
                 </label>
               </div>
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="contains_scrap">
                   <input id="contains_scrap" name="contains_scrap" type="checkbox" />
-                  <span>Load contains scrap metal.</span>
+                  <span>Includes scrap metal.</span>
                 </label>
               </div>
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="contains_garbage">
                   <input id="contains_garbage" name="contains_garbage" type="checkbox" />
-                  <span>Load contains garbage.</span>
+                  <span>Includes household garbage.</span>
                 </label>
               </div>
             </div>
@@ -269,26 +246,26 @@
               <div>
                 <label for="pickup_address">Pickup address</label>
                 <input id="pickup_address" name="pickup_address" placeholder="Pickup location" />
-                <div class="helperText">Required for moves and deliveries so the estimate reflects the actual route.</div>
+                <div class="helperText">Required for moves and deliveries.</div>
               </div>
               <div>
                 <label for="dropoff_address">Dropoff address</label>
                 <input id="dropoff_address" name="dropoff_address" placeholder="Dropoff location" />
-                <div class="helperText">Required for moves and deliveries so the estimate reflects the actual route.</div>
+                <div class="helperText">Required for moves and deliveries.</div>
               </div>
             </div>
 
             <div class="row" id="loadCountRow">
               <div>
-                <label for="garbage_bag_count">Approximate garbage bag count</label>
+                <label for="garbage_bag_count">Approximate bag count</label>
                 <input id="garbage_bag_count" name="garbage_bag_count" type="number" min="0" step="1" value="0" />
-                <div class="helperText">A full kitchen garbage bag = 1. If unsure, estimate slightly higher.</div>
+                <div class="helperText">Use full kitchen-size garbage bags as your rough count.</div>
                 <div class="helperText hidden" id="bagCountNudge">Most jobs are 5–10 bags. Adjust if needed.</div>
               </div>
               <div>
                 <label for="mattresses_count">Mattresses</label>
                 <input id="mattresses_count" name="mattresses_count" type="number" min="0" step="1" value="0" />
-                <div class="helperText">Count bulky items separately so the estimate reflects handling and disposal properly.</div>
+                <div class="helperText">Count large items separately.</div>
               </div>
             </div>
 
@@ -296,21 +273,21 @@
               <div>
                 <label for="bag_type">Bag type</label>
                 <select id="bag_type" name="bag_type">
-                  <option value="" selected>Select bag type if known</option>
-                  <option value="light">Light household bags (clothes, packaging, light trash)</option>
-                  <option value="heavy_mixed">Heavy mixed junk bags (books, tools, mixed junk)</option>
-                  <option value="construction_debris">Construction / debris bags (drywall, tile, shingles, demo debris)</option>
+                  <option value="" selected>Not sure / not applicable</option>
+                  <option value="light">Light household bags</option>
+                  <option value="heavy_mixed">Mixed heavier bags (books, tools, etc.)</option>
+                  <option value="construction_debris">Construction debris bags</option>
                 </select>
               </div>
               <div>
                 <label for="trailer_fill_estimate">Trailer space used</label>
                 <select id="trailer_fill_estimate" name="trailer_fill_estimate">
-                  <option value="" selected>Select trailer space used if known</option>
-                  <option value="under_quarter">Under 1/4 trailer (few items or a small pile)</option>
-                  <option value="quarter">About 1/4 trailer (light partial load)</option>
-                  <option value="half">About 1/2 trailer (half load)</option>
-                  <option value="three_quarter">About 3/4 trailer (large load)</option>
-                  <option value="full">Full trailer (packed full)</option>
+                  <option value="" selected>Not sure / not applicable</option>
+                  <option value="under_quarter">Under 1/4 trailer</option>
+                  <option value="quarter">About 1/4 trailer</option>
+                  <option value="half">About 1/2 trailer</option>
+                  <option value="three_quarter">About 3/4 trailer</option>
+                  <option value="full">Full trailer</option>
                 </select>
               </div>
             </div>
@@ -319,7 +296,7 @@
               <div class="checkboxWrap">
                 <label class="checkboxLabel" for="has_refrigerant_appliance">
                   <input id="has_refrigerant_appliance" name="has_refrigerant_appliance" type="checkbox" />
-                  <span>Load includes a fridge, freezer, air conditioner, or other refrigerant appliance.</span>
+                  <span>Includes a fridge, freezer, air conditioner, or similar appliance.</span>
                 </label>
               </div>
               <div>
@@ -344,11 +321,11 @@
               <div>
                 <label for="box_springs_count">Box springs</label>
                 <input id="box_springs_count" name="box_springs_count" type="number" min="0" step="1" value="0" />
-                <div class="helperText">Box springs are bulky and incur a per-unit disposal fee. Count each one separately.</div>
+                <div class="helperText">Count each box spring separately if included.</div>
               </div>
               <div>
                 <label class="muted">Photo tip</label>
-                <div class="hint">Prefer to send photos after your booking request? You can add them in Step 5 to help Bay Delivery review the job and improve follow-up accuracy.</div>
+                <div class="hint">Photos help us quote faster and avoid surprises. You can upload them after your booking request in Step 5.</div>
               </div>
             </div>
           </details>
@@ -357,23 +334,47 @@
         <div class="formSection">
           <div class="sectionHeader compact">
             <div>
-              <h3 class="formSectionTitle">Anything else we should know?</h3>
-              <p class="muted sectionLead">Add any notes that help us price the work and understand access.</p>
+              <h3 class="formSectionTitle">2. Tell us what needs to be moved, removed, delivered, or cleaned up.</h3>
+              <p class="muted sectionLead">A short description helps us understand scope and access.</p>
             </div>
           </div>
 
           <label for="description">Job description</label>
           <textarea id="description" name="description" rows="4"
-            placeholder="What needs to be hauled/moved/demo’d? Rough size/amount?"
+            placeholder="What needs to be moved, removed, delivered, or cleaned up?"
             required></textarea>
-          <p class="helperText">Helpful details: item type, rough amount, stairs, parking, carry distance, timing notes, and anything unusual.</p>
+          <p class="helperText">Helpful details: rough amount, stairs, parking, carry distance, heavy items, and anything unusual.</p>
+        </div>
+
+        <div class="formSection firstStepSection">
+          <div class="sectionHeader compact">
+            <div>
+              <h3 class="formSectionTitle">6. Name and best contact details</h3>
+              <p class="firstStepHint">Bay Delivery uses this to send your estimate and confirm next steps.</p>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="customer_name">Your name</label>
+              <input id="customer_name" name="customer_name" placeholder="Full name" required />
+            </div>
+            <div>
+              <label for="customer_phone">Phone number</label>
+              <input id="customer_phone" name="customer_phone" placeholder="705-___-____" inputmode="tel" required />
+            </div>
+          </div>
+
+          <label for="job_address">Job address</label>
+          <input id="job_address" name="job_address" placeholder="North Bay, ON" required />
+          <p class="helperText">If the exact address is not confirmed yet, enter the closest location.</p>
         </div>
 
         <div class="btnRow">
-          <button class="btn" id="btnCalc" type="button">Get Estimate Now</button>
+          <button class="btn" id="btnCalc" type="button">See My Estimate</button>
           <button class="btn secondary" id="btnClear" type="button">Clear</button>
         </div>
-        <p class="stepHelper">After you see your estimate, review what is included and compare Cash vs EMT totals. Accepting moves you to a booking request, and optional photos come after you submit that request. Your job is still not confirmed until Bay Delivery follows up.</p>
+        <p class="stepHelper">After you see your estimate, you can accept and share your preferred day and time window. Optional photos come after your booking request. Bay Delivery confirms before anything is booked.</p>
         <div class="loadingState hidden" id="loadingState">
           <span class="spinner"></span>
           <span>Calculating your estimate...</span>
@@ -384,7 +385,7 @@
     <div class="card resultBox hidden" id="resultBox" aria-live="polite"></div>
     <div class="card hidden stageCard" id="quoteSummaryCard">
       <h2>Estimate Summary</h2>
-      <p class="muted sectionLead">Your estimate is based on the job details you provided and follows our current North Bay pricing structure. If you continue, Bay Delivery reviews the booking request and confirms final scheduling details with you.</p>
+      <p class="muted sectionLead">This estimate is based on the details you shared. If you continue, Bay Delivery reviews your booking request and confirms final scheduling with you.</p>
       <div class="quoteSummaryGrid">
         <div><strong>Service:</strong> <span id="summaryService"></span></div>
         <div><strong>Customer:</strong> <span id="summaryCustomer"></span></div>
@@ -392,18 +393,18 @@
       </div>
       <div class="trustCueRow" aria-label="Estimate reassurance">
         <span class="trustCue">Built for local North Bay jobs</span>
-        <span class="trustCue">Final price is confirmed before work begins if conditions differ from details provided</span>
+        <span class="trustCue">Details are confirmed before work begins if anything has changed</span>
       </div>
     </div>
 
     <div class="card hidden stageCard" id="decisionCard">
       <h2>Estimate Decision</h2>
-      <p class="muted sectionLead">If this estimate works for you, accept to continue to the booking request form. This does not confirm the job yet. If not, you can decline and stop here.</p>
+      <p class="muted sectionLead">If this estimate works for you, accept to continue to the booking request. This still does not book the job. You can also decline and stop here.</p>
 
       <div class="formWrap">
         <label for="decisionNotes">Notes (optional)</label>
         <textarea id="decisionNotes" rows="3" placeholder="Parking notes, gate code, extra details..."></textarea>
-        <p class="helperText">Accepting saves your decision and opens the booking request step so you can share your preferred date, time window, and notes for admin review. The job is only confirmed after Bay Delivery follows up.</p>
+        <p class="helperText">Accepting opens the booking request step where you can share preferred day/time and extra notes. Bay Delivery confirms before booking.</p>
 
         <div class="btnRow">
           <button class="btn" id="btnAccept" type="button">Accept Estimate &amp; Continue</button>
@@ -418,7 +419,7 @@
 
     <div class="card hidden stageCard" id="bookingCard">
       <h2>Booking Request</h2>
-      <p class="muted sectionLead">Share your preferred timing and any notes that will help with planning. This is a booking request, not a confirmed appointment, and Bay Delivery will follow up to confirm the final schedule.</p>
+      <p class="muted sectionLead">Share your preferred timing and notes. This is a booking request, not a confirmed appointment. Bay Delivery follows up to confirm schedule details.</p>
 
       <div class="formWrap">
         <p class="muted bookingContactInfo">
@@ -426,7 +427,7 @@
           Name: <span id="bookingNameDisplay"></span><br/>
           Phone: <span id="bookingPhoneDisplay"></span>
         </p>
-        <p class="helperText bookingPreferenceHelper">Your preferred date and time window help us review readiness and follow up with the final confirmation.</p>
+        <p class="helperText bookingPreferenceHelper">Preferred day and time help us review availability and follow up quickly.</p>
 
         <div class="row">
           <div>
@@ -458,12 +459,12 @@
 
     <div class="card hidden stageCard" id="uploadCard">
       <h2>Optional: Upload Photos</h2>
-      <p class="muted sectionLead">After you submit your booking request, add photos here if they help Bay Delivery review the job and improve follow-up accuracy.</p>
+      <p class="muted sectionLead">After you submit your booking request, add photos here if they help Bay Delivery confirm scope and avoid surprises.</p>
 
       <div class="formWrap">
         <label for="photos">Job photos</label>
         <input id="photos" name="photos" type="file" accept="image/*" multiple />
-        <p class="helperText">Tip: wide-angle photos from multiple corners are most useful. Maximum 5 images. Upload them only if they will make the scope, access, or follow-up details clearer.</p>
+        <p class="helperText">Tip: wide-angle photos from multiple corners are most useful. Maximum 5 images.</p>
 
         <div class="btnRow">
           <button class="btn secondary" id="btnUpload" type="button">Upload Photos</button>
