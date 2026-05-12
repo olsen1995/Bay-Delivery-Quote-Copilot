@@ -186,17 +186,17 @@ Rules:
 ## Best Immediate Next PR
 
 ```text
-create admin daily ops board read model
+create follow up message helper
 ```
 
-Scope: desktop admin only, read-only summary cards, no pricing changes, no customer-form changes, no Render/workflow/GPT changes, and no schema change unless strictly necessary.
+Scope: internal/admin drafting helper only, copy-ready message suggestions for common follow-up situations, no automatic sending, no pricing changes, no schema changes, and no customer/mobile behavior changes unless explicitly scoped.
 
-This comes before customer-form cleanup because more customer leads are only useful if admin is clean enough to handle them.
+This comes after the completed-job profit review report and before scheduling refinements. Pricing changes remain later and category-specific after reporting evidence.
 
 ## Codex Prompt Seed
 
 ```text
-Create an Admin Daily Ops Board read model for Bay Delivery Quote Copilot. Plan first, then implement only if the plan stays narrow. Scope is desktop admin only. Add read-only summary cards for new quote requests, needs follow-up, accepted but not booked, upcoming jobs, completed jobs missing costs, owner-review jobs, and stale quotes. Do not change app/quote_engine.py, pricing logic, public quote behavior, GPT grounding, Render config, workflows, requirements, or customer form behavior. Add focused tests for backend/read-model behavior and static admin markers as appropriate. Validate with version parity, GPT grounding parity, compileall, focused tests, and full pytest if practical.
+Create a Follow-Up Message Helper for Bay Delivery Quote Copilot. Plan first, then implement only if the plan stays narrow. Scope is internal/admin helper only. Generate copy-ready message drafts for common situations: no reply, need photos, accepted-not-booked, customer asking for cheaper pricing, completed-job follow-up, and review request. Do not auto-send messages. Do not change app/quote_engine.py, pricing logic, public quote behavior, Render config, workflows, requirements, or schema unless explicitly required. Validate with version parity, GPT grounding parity, compileall, focused tests, and full pytest if practical.
 ```
 
 ## Commit Text
@@ -204,13 +204,13 @@ Create an Admin Daily Ops Board read model for Bay Delivery Quote Copilot. Plan 
 Commit headline:
 
 ```text
-create admin daily ops board read model
+create follow up message helper
 ```
 
 Commit description:
 
 ```text
-Add a desktop-admin read-only Daily Ops Board that surfaces operational queues for new requests, follow-ups, accepted-not-booked leads, upcoming jobs, missing completed-job costs, owner-review items, and stale quotes. Keep the change admin-only and advisory-only with no pricing, customer flow, Render, workflow, or GPT grounding changes.
+Add an internal/admin Follow-Up Message Helper that drafts copy-ready follow-up messages for common customer scenarios. Keep the change advisory-only with no pricing, schema, customer-flow behavior, or auto-send behavior changes.
 ```
 
 ## Final Operating Loop

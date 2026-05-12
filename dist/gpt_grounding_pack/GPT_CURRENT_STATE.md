@@ -16,6 +16,13 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
 - Internal quote risk scoring now exists in the quote artifact pipeline and exposes internal `confidence_level` / `risk_flags` metadata while feeding a narrow pricing-engine margin-protection layer that preserves the customer-facing response shape.
+- The roadmap phases below are complete in sequence:
+	- Admin Daily Ops Board
+	- Admin Ops Board Action Shortcuts
+	- Customer Quote Flow Simplification
+	- Internal Quote Risk Summary
+	- Completed Job Profit Review Report
+- Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
 
 ## Current Priorities
 
@@ -26,6 +33,9 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Maintain clear customer/admin operational boundaries.
 - Keep internal risk assessment downstream to pricing authority and limited to narrow repo-approved margin protection inside `app/quote_engine.py`.
 - Treat Daily Ops Queue items as admin attention flags only; use existing admin surfaces for any manual follow-up.
+- Keep completed-job reporting advisory-only and separate from pricing authority.
+- Keep pricing changes deferred to later category-specific PRs after evidence review.
+- Next roadmap item: Follow-Up Message Helper.
 
 ## What Should Not Happen Next
 
@@ -35,6 +45,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - No unnecessary flow rewrites in stable areas.
 - No mixing unrelated runtime changes into documentation tasks.
 - No GPT or Daily Ops Queue actions that approve, reject, expire, schedule, contact, price, message, or mutate records.
+- No automatic pricing changes from completed-job reporting.
 
 ## GPT Grounding Goal
 
@@ -66,6 +77,17 @@ The desktop admin Daily Ops Queue is a read-only operations attention list.
 For "What should I do today?" style questions, GPT should tell Austin/Dan to check the Daily Ops Queue first, then use the existing admin sections for manual review and follow-up.
 
 The queue does not approve, reject, expire, schedule, contact, price, message, send, or mutate records. It only shows attention flags from existing admin data.
+
+## Completed-Job Profit Review Grounding
+
+The desktop admin Completed Job Profit Review report is internal-only and read-only.
+
+- Endpoint: `GET /admin/api/completed-job-profit-report`.
+- Access: admin-auth required.
+- Surface: desktop `/admin` only; it is not part of customer quote pages or mobile admin.
+- Scope: completed-job costing/report evidence (known cost/profit/margin, missing-cost flags, owner-review signals, category breakdown).
+
+This report informs owner review and later category-specific pricing PR planning. It does not calculate authoritative quote totals and does not override `app/quote_engine.py`.
 
 ## Conservative Truth Rule
 
