@@ -36,8 +36,25 @@ def _is_field_present(value: Any) -> bool:
     return True
 
 
+def _parse_positive_collected_amount(value: Any) -> float | None:
+    """Return collected amount only when it is numeric and greater than zero."""
+    if not _is_field_present(value):
+        return None
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0:
+        return None
+    return amount
+
+
 def _missing_fields(row: dict[str, Any]) -> list[str]:
-    return [f for f in REQUIRED_COMPLETENESS_FIELDS if not _is_field_present(row.get(f))]
+    missing = [f for f in REQUIRED_COMPLETENESS_FIELDS if not _is_field_present(row.get(f))]
+    if _parse_positive_collected_amount(row.get("final_amount_collected_cad")) is None:
+        if "final_amount_collected_cad" not in missing:
+            missing.append("final_amount_collected_cad")
+    return missing
 
 
 def _known_cost(row: dict[str, Any]) -> float | None:
@@ -73,14 +90,15 @@ def _analyze_row(row: dict[str, Any]) -> dict[str, Any]:
     is_complete = len(missing) == 0
 
     collected = row.get("final_amount_collected_cad")
+    collected_float = _parse_positive_collected_amount(collected)
     payment_status = row.get("payment_status") or ""
     profit_status = row.get("job_profit_status") or ""
 
-    # Treat as incomplete if payment_status indicates unpaid/pending or collected is missing/zero
-    unpaid = payment_status in ("not_paid_yet", "partial_payment") or not _is_field_present(collected)
+    # Treat as incomplete if payment_status indicates unpaid/pending or collected is missing/zero.
+    unpaid = payment_status in ("not_paid_yet", "partial_payment")
     if unpaid and "payment_status" not in missing:
         missing = list(missing) + ["payment_status_unpaid"]
-    if unpaid or not _is_field_present(collected):
+    if unpaid or collected_float is None:
         is_complete = False
 
     # Compute trusted figures only when complete and collected > 0
@@ -88,11 +106,6 @@ def _analyze_row(row: dict[str, Any]) -> dict[str, Any]:
     known_profit_val: float | None = None
     known_margin_pct_val: float | None = None
     trusted_margin = False
-
-    try:
-        collected_float = float(collected) if _is_field_present(collected) else None
-    except (TypeError, ValueError):
-        collected_float = None
 
     if is_complete and collected_float is not None and collected_float > 0 and known_cost_val is not None:
         known_profit_val = _known_profit(collected_float, known_cost_val)
@@ -108,7 +121,7 @@ def _analyze_row(row: dict[str, Any]) -> dict[str, Any]:
     if trusted_margin and known_margin_pct_val is not None and known_margin_pct_val < MARGIN_OWNER_REVIEW_THRESHOLD:
         owner_review = True
         owner_review_reasons.append(f"below_{MARGIN_OWNER_REVIEW_THRESHOLD:.0f}pct_margin")
-    if unpaid and _is_field_present(collected):
+    if unpaid and collected_float is not None:
         owner_review = True
         owner_review_reasons.append("payment_incomplete")
 

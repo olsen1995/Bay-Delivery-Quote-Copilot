@@ -537,6 +537,42 @@ def test_completed_job_profit_report_flags_incomplete_rows_and_untrusted_margin(
     assert row["known_margin_pct"] is None
 
 
+@pytest.mark.parametrize("zero_value", [0, "0", "0.00"])
+def test_completed_job_profit_report_treats_zero_collected_amount_as_incomplete_closeout(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    zero_value: Any,
+) -> None:
+    _seed_job(job_id=f"report-zero-{str(zero_value).replace('.', '-')}", status="completed")
+
+    storage.update_job_costing(
+        f"report-zero-{str(zero_value).replace('.', '-')}",
+        actual_labor_cost_cad=80.0,
+        actual_disposal_cost_cad=15.0,
+        actual_fuel_cost_cad=10.0,
+        actual_other_costs_cad=5.0,
+        final_amount_collected_cad=zero_value,
+        payment_status="paid_in_full",
+        job_profit_status="fair",
+    )
+
+    resp = client.get("/admin/api/completed-job-profit-report", headers=admin_headers)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    row = next(item for item in payload["jobs"] if item["job_id"] == f"report-zero-{str(zero_value).replace('.', '-')}")
+
+    assert row["is_complete"] is False
+    assert row["trusted_margin"] is False
+    assert row["known_profit_cad"] is None
+    assert row["known_margin_pct"] is None
+    assert "final_amount_collected_cad" in row["missing_fields"]
+
+    cards = {card["key"]: card for card in payload["summary_cards"]}
+    assert cards["missing_cost_data"]["value"] >= 1
+
+
 def test_completed_job_profit_report_owner_review_margin_and_profit_status_rules(
     client: TestClient,
     admin_headers: dict[str, str],
