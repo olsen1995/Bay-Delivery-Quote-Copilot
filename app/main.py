@@ -49,6 +49,7 @@ from app import gcalendar, gdrive, storage
 from app.services import (
     admin_ops_queue,
     booking_service,
+    completed_job_profit_report,
     job_scheduling_service,
     quote_service,
     screenshot_assistant_service,
@@ -1614,6 +1615,12 @@ def admin_list_quote_requests(request: Request, limit: int = 50):
 def admin_ops_queue_summary(request: Request):
     _require_admin(request)
     return admin_ops_queue.build_admin_ops_queue()
+
+
+@app.get("/admin/api/completed-job-profit-report")
+def admin_completed_job_profit_report(request: Request):
+    _require_admin(request)
+    return completed_job_profit_report.build_completed_job_profit_report()
 
 
 @app.post("/admin/api/quote-requests/{request_id}/followup-status")

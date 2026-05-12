@@ -418,6 +418,60 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'Missing fields:' in admin_js
     assert 'Warnings:' in admin_js
     assert 'No message/OCR-based intake suggestions detected.' in admin_js
+
+
+def test_completed_job_profit_report_desktop_only_assets() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    assert 'id="adminProfitReportSection"' in admin_html
+    assert "Completed Job Profit Review" in admin_html
+    assert "Internal report only." in admin_html
+    assert 'id="profitReportBox"' in admin_html
+    assert 'data-admin-protected="true"' in admin_html
+
+    assert "/admin/api/completed-job-profit-report" in admin_js
+    assert "function renderProfitReport(" in admin_js
+    assert "function refreshProfitReportBestEffort(" in admin_js
+    assert "Category Breakdown" in admin_js
+    assert "Recent Completed Jobs" in admin_js
+    assert "Missing cost data" in admin_js
+    assert "Incomplete closeout" in admin_js
+    assert "Underquoted" in admin_js
+    assert "Painful job" in admin_js
+    assert "Below 20% known margin" in admin_js
+
+    assert ".profitReportSummaryGrid" in admin_css
+    assert ".profitReportTable" in admin_css
+
+    banned_mobile = [
+        "Completed Job Profit Review",
+        "profitReportBox",
+        "/admin/api/completed-job-profit-report",
+        "known_margin_pct",
+        "known_profit_cad",
+    ]
+    for phrase in banned_mobile:
+        assert phrase not in mobile_html
+        assert phrase not in mobile_js
+
+    banned_quote = [
+        "completed job profit review",
+        "/admin/api/completed-job-profit-report",
+        "known_margin_pct",
+        "known_profit_cad",
+        "owner review",
+    ]
+    for phrase in banned_quote:
+        assert phrase not in quote_html.lower()
+        assert phrase not in quote_js.lower()
+        assert phrase not in quote_css.lower()
     assert '["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]' in admin_js
     assert 'ocr_json' in admin_js
     assert 'Click Analyze Intake to save reviewed fields.' not in admin_js
