@@ -679,6 +679,18 @@ button:disabled {
 	margin-top: 4px;
 }
 
+.quoteRiskSummaryList {
+	margin: 8px 0 0 18px;
+	padding: 0;
+	display: grid;
+	gap: 4px;
+}
+
+.quoteRiskSummaryList li {
+	color: var(--ink-strong);
+	font-weight: 600;
+}
+
 input,
 select,
 textarea {

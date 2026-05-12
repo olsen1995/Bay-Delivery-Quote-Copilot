@@ -590,6 +590,147 @@ function formatRiskAdvisoryLevel(value) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+function normalizeBooleanLike(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1", "on"].includes(lower)) return true;
+    if (["false", "no", "n", "0", "off", ""].includes(lower)) return false;
+    return false;
+  }
+  return false;
+}
+
+function addSummarySignal(signals, text) {
+  if (!text) return;
+  if (!signals.includes(text)) signals.push(text);
+}
+
+function createInternalRiskSummarySignals({ advisory, assessment, request }) {
+  const signals = [];
+  const advisoryFlags = Array.isArray(safeGet(advisory, "risk_flags", null))
+    ? advisory.risk_flags.filter((flag) => flag && typeof flag === "object")
+    : [];
+  const advisoryCodes = new Set(
+    advisoryFlags
+      .map((flag) => String(flag.code || "").trim())
+      .filter((code) => code)
+  );
+  const assessmentFlags = new Set(
+    Array.isArray(safeGet(assessment, "risk_flags", null))
+      ? assessment.risk_flags.map((flag) => String(flag || "").trim()).filter((flag) => flag)
+      : []
+  );
+
+  if (advisoryCodes.has("ACCESS_LABOUR_RISK") || assessmentFlags.has("access_volume_risk")) {
+    addSummarySignal(signals, "Access concern");
+  }
+  if (advisoryCodes.has("DENSE_MATERIAL_RISK") || assessmentFlags.has("dense_material_risk")) {
+    addSummarySignal(signals, "Heavy material concern");
+  }
+  if (
+    advisoryCodes.has("MIXED_LOAD_SORTING_RISK")
+    || assessmentFlags.has("mixed_bulky_load_risk")
+    || assessmentFlags.has("likely_underestimated_volume")
+  ) {
+    addSummarySignal(signals, "Disposal uncertainty");
+  }
+
+  const stairsCount = Number(request?.stairs_count || 0);
+  const floorCount = Number(request?.floor_count || 0);
+  const basementInside = normalizeBooleanLike(request?.basement_or_inside_removal);
+  if (
+    stairsCount >= 2
+    || floorCount >= 2
+    || basementInside
+    || advisoryCodes.has("ACCESS_LABOUR_RISK")
+  ) {
+    addSummarySignal(signals, "Stairs/long-carry concern");
+  }
+
+  if (advisoryCodes.has("REFRIGERANT_APPLIANCE_RISK")) {
+    addSummarySignal(signals, "Refrigerant appliance check");
+  }
+  if (advisoryCodes.has("DEMOLITION_SCOPE_RISK")) {
+    addSummarySignal(signals, "Demolition/rip-out caution");
+  }
+  if (
+    assessmentFlags.has("missing_structured_scope")
+    || assessmentFlags.has("low_input_signal")
+    || assessmentFlags.has("likely_underestimated_volume")
+  ) {
+    addSummarySignal(signals, "Photos/details recommended");
+  }
+
+  const suggestedActions = Array.isArray(safeGet(advisory, "suggested_actions", null))
+    ? advisory.suggested_actions.filter((action) => String(action || "").trim())
+    : [];
+  if (suggestedActions.length) {
+    addSummarySignal(signals, "Follow-up recommended");
+  }
+  if (normalizeBooleanLike(advisory?.manual_review_recommended)) {
+    addSummarySignal(signals, "Owner review recommended");
+  }
+
+  return signals;
+}
+
+function createInternalRiskSummarySection({ advisory, assessment, request }) {
+  const hasAdvisory = advisory && typeof advisory === "object";
+  const hasAssessment = assessment && typeof assessment === "object";
+  if (!hasAdvisory && !hasAssessment) return null;
+
+  const section = document.createElement("section");
+  section.className = "quoteRiskSection";
+
+  const title = document.createElement("div");
+  title.className = "quoteDetailTitle";
+  title.textContent = "Internal Risk Summary";
+  section.appendChild(title);
+
+  const riskLevel = formatRiskAdvisoryLevel(safeGet(advisory, "risk_level", ""));
+  if (riskLevel !== "Unknown") {
+    section.appendChild(createQuoteMetaRow("Risk level", riskLevel));
+  }
+
+  const confidenceLevel = String(safeGet(assessment, "confidence_level", "")).trim();
+  if (confidenceLevel) {
+    section.appendChild(createQuoteMetaRow("Confidence", null, makeRiskConfidenceBadge(confidenceLevel)));
+  }
+
+  const recommendedTrailer = String(safeGet(advisory, "recommended_trailer", "")).trim();
+  if (recommendedTrailer) {
+    section.appendChild(createQuoteMetaRow("Trailer note", formatStructuredIntakeValue(recommendedTrailer)));
+  }
+
+  const summarySignals = createInternalRiskSummarySignals({ advisory, assessment, request });
+  const watchOutRow = document.createElement("div");
+  watchOutRow.className = "quoteDetailMetaRow";
+  const watchOutLabel = document.createElement("strong");
+  watchOutLabel.textContent = "Watch-outs:";
+  watchOutRow.appendChild(watchOutLabel);
+
+  if (!summarySignals.length) {
+    watchOutRow.appendChild(document.createTextNode(" No major internal risk signals found."));
+    section.appendChild(watchOutRow);
+    return section;
+  }
+
+  const list = document.createElement("ul");
+  list.className = "quoteRiskSummaryList";
+  summarySignals.forEach((signal) => {
+    const item = document.createElement("li");
+    item.textContent = signal;
+    list.appendChild(item);
+  });
+  watchOutRow.appendChild(list);
+  section.appendChild(watchOutRow);
+
+  return section;
+}
+
 function createQuoteRiskAdvisorySection(advisory) {
   if (!advisory || typeof advisory !== "object") return null;
 
@@ -701,12 +842,21 @@ function createQuoteDetailPanel(detail) {
     panel.appendChild(structuredIntakeSection);
   }
 
+  const assessment = detail.internal_risk_assessment || null;
+  const internalRiskSummarySection = createInternalRiskSummarySection({
+    advisory: detail.quote_risk_advisory || null,
+    assessment,
+    request: safeRequest,
+  });
+  if (internalRiskSummarySection) {
+    panel.appendChild(internalRiskSummarySection);
+  }
+
   const advisorySection = createQuoteRiskAdvisorySection(detail.quote_risk_advisory || null);
   if (advisorySection) {
     panel.appendChild(advisorySection);
   }
 
-  const assessment = detail.internal_risk_assessment || null;
   const riskFlags = Array.isArray(safeGet(assessment, "risk_flags", null))
     ? assessment.risk_flags.filter((flag) => String(flag || "").trim())
     : [];

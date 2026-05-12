@@ -189,8 +189,11 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
 
 def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8").lower()
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8").lower()
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8").lower()
 
     banned_phrases = [
+        "internal risk summary",
         "manual review required",
         "disposal risk",
         "dense material classification",
@@ -206,8 +209,20 @@ def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:
         "quote_risk_advisory",
     ]
 
+    banned_phrases_css = [
+        "internal risk summary",
+        "quote risk advisory",
+        "internal_risk_assessment",
+        "quote_risk_advisory",
+        "owner review",
+    ]
+
     for phrase in banned_phrases:
         assert phrase not in quote_html
+        assert phrase not in quote_js
+
+    for phrase in banned_phrases_css:
+        assert phrase not in quote_css
 
 
 def test_quote_page_includes_haul_away_floor_fields() -> None:
@@ -305,6 +320,25 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "View Details" in admin_js
     assert "Hide Details" in admin_js
     assert "Quote Details" in admin_js
+    assert "Internal Risk Summary" in admin_js
+    assert "function createInternalRiskSummarySection(" in admin_js
+    assert "function normalizeBooleanLike(" in admin_js
+    assert "function createInternalRiskSummarySignals(" in admin_js
+    assert "normalizeBooleanLike(request?.basement_or_inside_removal)" in admin_js
+    assert "normalizeBooleanLike(advisory?.manual_review_recommended)" in admin_js
+    assert "Boolean(request?.basement_or_inside_removal)" not in admin_js
+    assert "Boolean(advisory?.manual_review_recommended)" not in admin_js
+    assert "Access concern" in admin_js
+    assert "Heavy material concern" in admin_js
+    assert "Disposal uncertainty" in admin_js
+    assert "Stairs/long-carry concern" in admin_js
+    assert "Refrigerant appliance check" in admin_js
+    assert "Demolition/rip-out caution" in admin_js
+    assert "Photos/details recommended" in admin_js
+    assert "Follow-up recommended" in admin_js
+    assert "Owner review recommended" in admin_js
+    assert "No major internal risk signals found." in admin_js
+    assert 'const internalRiskSummarySection = createInternalRiskSummarySection({' in admin_js
     assert "Quote Risk Assessment" in admin_js
     assert "Quote Risk Advisory" in admin_js
     assert 'detail.quote_risk_advisory || null' in admin_js
@@ -319,6 +353,7 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert ".quoteDetailPanel" in admin_css
     assert ".quoteRiskSection" in admin_css
     assert ".quoteRiskFlags" in admin_css
+    assert ".quoteRiskSummaryList" in admin_css
     assert ".risk-confidence-medium" in admin_css
 
 
@@ -565,7 +600,10 @@ def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:
     assert "function createStructuredIntakeSection(" in admin_js
     assert "if (!rows.length) return null;" in admin_js
     assert "if (structuredIntakeSection)" in admin_js
+    assert "Internal Risk Summary" in admin_js
     assert "Quote Risk Advisory" in admin_js
+    assert "Internal Risk Summary" not in mobile_html
+    assert "Internal Risk Summary" not in mobile_js
     assert "quote_risk_advisory" not in mobile_html
     assert "quote_risk_advisory" not in mobile_js
     assert "Quote Risk Advisory" not in mobile_html
