@@ -207,6 +207,14 @@ def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:
         "quote risk advisory",
         "internal_risk_assessment",
         "quote_risk_advisory",
+        "follow-up message helper",
+        "completed-job cost info",
+        "known margin",
+        "known profit",
+        "underquoted",
+        "painful",
+        "pricing engine",
+        "risk score",
     ]
 
     banned_phrases_css = [
@@ -622,6 +630,92 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     assert "/followup-status" not in mobile_js
     assert "followupQuickActions" not in mobile_html
     assert "followupQuickActions" not in mobile_js
+
+
+def test_desktop_admin_includes_followup_message_helper_only() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8").lower()
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8").lower()
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8").lower()
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8").lower()
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8").lower()
+
+    assert "Follow-Up Message Helper" in admin_html
+    assert 'id="adminFollowupHelperSection"' in admin_html
+    assert 'id="followupMessageScenario"' in admin_html
+    assert 'id="followupMessageFormat"' in admin_html
+    assert 'id="followupMessageContext"' in admin_html
+    assert 'id="followupMessageContextSummary"' in admin_html
+    assert 'id="followupMessageDraft"' in admin_html
+    assert 'id="followupMessageCopyBtn"' in admin_html
+    assert "Copy-only helper" in admin_html
+    assert "does not send messages or update follow-up status" in admin_html
+
+    for label in [
+        "Need photos",
+        "No reply / gentle follow-up",
+        "Accepted but not booked",
+        "Need access details",
+        "Price concern / customer asking cheaper",
+        "Completed job follow-up",
+        "Review request",
+        "Manual review / unclear job",
+        "Missing completed-job cost info",
+        "Text message",
+        "Email",
+    ]:
+        assert label in admin_js
+
+    assert "const followupMessageScenarioCatalog = [" in admin_js
+    assert "function renderFollowupMessageHelper()" in admin_js
+    assert "function buildFollowupMessageDraft(scenarioKey, format, context)" in admin_js
+    assert "function copyFollowupMessageDraft()" in admin_js
+    assert "navigator.clipboard.writeText" in admin_js
+    assert ".followupHelperGrid" in admin_css
+    assert ".followupHelperSummary" in admin_css
+    assert ".followupHelperActions" in admin_css
+    assert ".followupHelperNote" in admin_css
+
+    copy_function = re.search(r"async function copyFollowupMessageDraft\(\) \{(?P<body>.*?)\n\}\n\nfunction setAssistantDraftLocked", admin_js, re.S)
+    assert copy_function is not None
+    copy_body = copy_function.group("body")
+    assert "fetch(" not in copy_body
+    for forbidden in [
+        "/followup-status",
+        "/decision",
+        "/schedule",
+        "/reschedule",
+        "/costing",
+        "/start",
+        "/complete",
+        "/cancel",
+        "/sms",
+        "/email",
+        "/messages",
+    ]:
+        assert forbidden not in copy_body
+
+    for forbidden in [
+        "follow-up message helper",
+        "completed-job cost info",
+        "known margin",
+        "known profit",
+        "underquoted",
+        "painful",
+        "owner review",
+        "internal risk",
+        "quote_risk_advisory",
+        "internal_risk_assessment",
+        "pricing engine",
+        "risk score",
+    ]:
+        assert forbidden not in quote_html
+        assert forbidden not in quote_js
+        assert forbidden not in quote_css
+        assert forbidden not in mobile_html
+        assert forbidden not in mobile_js
 
 
 def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:

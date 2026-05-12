@@ -111,6 +111,39 @@
       </div>
     </div>
 
+    <div id="adminFollowupHelperSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
+      <div class="sectionHeader compact">
+        <div>
+          <h3>Follow-Up Message Helper</h3>
+          <div class="muted">Copy-only helper for common follow-up drafts. It does not send messages or update follow-up status.</div>
+        </div>
+      </div>
+      <div class="followupHelperGrid">
+        <label class="followupHelperField" for="followupMessageScenario">
+          <span>Scenario</span>
+          <select id="followupMessageScenario" name="followupMessageScenario"></select>
+        </label>
+        <label class="followupHelperField" for="followupMessageFormat">
+          <span>Format</span>
+          <select id="followupMessageFormat" name="followupMessageFormat"></select>
+        </label>
+        <label class="followupHelperField" for="followupMessageContext">
+          <span>Context</span>
+          <select id="followupMessageContext" name="followupMessageContext"></select>
+        </label>
+      </div>
+      <div id="followupMessageContextSummary" class="followupHelperSummary small muted">Using a general draft. Load requests or jobs to reuse existing admin context.</div>
+      <label class="followupHelperField followupHelperDraftField" for="followupMessageDraft">
+        <span>Draft message</span>
+        <textarea id="followupMessageDraft" rows="8" spellcheck="true"></textarea>
+      </label>
+      <div class="followupHelperActions">
+        <button id="followupMessageCopyBtn" class="secondaryAction" type="button">Copy message</button>
+        <div id="followupMessageStatusLine" class="statusNotice muted" role="status" aria-live="polite">Copy-only helper. Review the draft before using it.</div>
+      </div>
+      <div class="small muted followupHelperNote">This helper is for draft copy only. It does not send messages, save drafts, or update follow-up status.</div>
+    </div>
+
     <div id="adminJobsSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
       <div class="sectionHeader compact">
         <div>
