@@ -885,6 +885,11 @@ function friendlyMissingSchedulingField(field) {
   return labels[field] || String(field || "").replace(/_/g, " ");
 }
 
+function shouldOpenAcceptedNotBookedItemInRescheduleMode(item) {
+  const normalizedStatus = String(item?.status || "").trim().toLowerCase();
+  return normalizedStatus === "scheduled";
+}
+
 function renderAcceptedNotBookedQueue(payload) {
   const box = document.getElementById("acceptedNotBookedQueueBox");
   if (!box) return;
@@ -990,11 +995,12 @@ function renderAcceptedNotBookedQueue(payload) {
     const actionRow = document.createElement("div");
     actionRow.className = "acceptedNotBookedActions";
     if (item.job_id) {
+      const openInRescheduleMode = shouldOpenAcceptedNotBookedItemInRescheduleMode(item);
       const scheduleBtn = document.createElement("button");
       scheduleBtn.type = "button";
       scheduleBtn.className = "actionBtn acceptedNotBookedScheduleBtn";
-      scheduleBtn.textContent = "Open Schedule";
-      scheduleBtn.addEventListener("click", () => showScheduleModal(item.job_id, false));
+      scheduleBtn.textContent = openInRescheduleMode ? "Open Reschedule" : "Open Schedule";
+      scheduleBtn.addEventListener("click", () => showScheduleModal(item.job_id, openInRescheduleMode));
       actionRow.appendChild(scheduleBtn);
     } else {
       const actionHint = document.createElement("div");
