@@ -670,7 +670,7 @@ function createInternalRiskSummarySignals({ advisory, assessment, request }) {
   if (suggestedActions.length) {
     addSummarySignal(signals, "Follow-up recommended");
   }
-  if (Boolean(advisory?.manual_review_recommended)) {
+  if (normalizeBooleanLike(advisory?.manual_review_recommended)) {
     addSummarySignal(signals, "Owner review recommended");
   }
 
