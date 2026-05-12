@@ -241,7 +241,7 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
+  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "profitReportBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
@@ -514,6 +514,186 @@ async function refreshOpsQueueBestEffort() {
     renderOpsQueue(opsQueue);
   } catch {
     renderOpsQueueError();
+  }
+}
+
+function renderProfitReport(report) {
+  const box = document.getElementById("profitReportBox");
+  if (!box) return;
+  clearNode(box);
+
+  if (!report || (!Array.isArray(report.jobs) && !Array.isArray(report.summary_cards))) {
+    return addEmptyState(box, "No profit report data available.");
+  }
+
+  // Summary cards
+  const cards = Array.isArray(report.summary_cards) ? report.summary_cards : [];
+  if (cards.length) {
+    const grid = document.createElement("div");
+    grid.className = "profitReportSummaryGrid";
+    cards.forEach((card) => {
+      const section = document.createElement("section");
+      section.className = "profitReportCard";
+
+      const header = document.createElement("div");
+      header.className = "profitReportCardHeader";
+
+      const label = document.createElement("div");
+      label.className = "profitReportCardLabel";
+      label.textContent = card.label || card.key || "";
+
+      const val = document.createElement("span");
+      val.className = "profitReportCardValue";
+      if (card.value === null || card.value === undefined) {
+        val.textContent = "—";
+      } else if (card.key === "known_profit_total_cad") {
+        val.textContent = "$" + Number(card.value).toFixed(2);
+      } else if (card.key === "avg_known_margin_pct") {
+        val.textContent = Number(card.value).toFixed(1) + "%";
+      } else {
+        val.textContent = String(card.value);
+      }
+
+      header.append(label, val);
+      section.appendChild(header);
+
+      if (card.description) {
+        const desc = document.createElement("div");
+        desc.className = "small muted profitReportCardDescription";
+        desc.textContent = card.description;
+        section.appendChild(desc);
+      }
+
+      grid.appendChild(section);
+    });
+    box.appendChild(grid);
+  }
+
+  // Category breakdown
+  const breakdown = Array.isArray(report.category_breakdown) ? report.category_breakdown : [];
+  if (breakdown.length) {
+    const h4 = document.createElement("h4");
+    h4.className = "profitReportSubheading";
+    h4.textContent = "Category Breakdown";
+    box.appendChild(h4);
+
+    const table = document.createElement("table");
+    table.className = "profitReportTable";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["Service Type", "Jobs", "Complete", "Incomplete", "Owner Review", "Underquoted/Painful", "Profit Total", "Avg Margin", "Avg Collected"].forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    breakdown.forEach((row) => {
+      const tr = document.createElement("tr");
+      const cells = [
+        row.service_type || "unknown",
+        String(row.total_jobs || 0),
+        String(row.complete_rows || 0),
+        String(row.incomplete_rows || 0),
+        String(row.owner_review_count || 0),
+        String(row.underquoted_painful_count || 0),
+        row.known_profit_total_cad !== null && row.known_profit_total_cad !== undefined ? "$" + Number(row.known_profit_total_cad).toFixed(2) : "—",
+        row.avg_known_margin_pct !== null && row.avg_known_margin_pct !== undefined ? Number(row.avg_known_margin_pct).toFixed(1) + "%" : "—",
+        row.avg_collected_cad !== null && row.avg_collected_cad !== undefined ? "$" + Number(row.avg_collected_cad).toFixed(2) : "—",
+      ];
+      cells.forEach((cellText) => {
+        const td = document.createElement("td");
+        td.textContent = cellText;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+  }
+
+  // Recent completed jobs table
+  const jobs = Array.isArray(report.jobs) ? report.jobs : [];
+  if (jobs.length) {
+    const h4 = document.createElement("h4");
+    h4.className = "profitReportSubheading";
+    h4.textContent = "Recent Completed Jobs";
+    box.appendChild(h4);
+
+    const table = document.createElement("table");
+    table.className = "profitReportTable";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["Job ID", "Service", "Collected", "Known Cost", "Known Profit", "Margin", "Status", "Flags"].forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    jobs.forEach((job) => {
+      const tr = document.createElement("tr");
+      if (job.owner_review) tr.classList.add("profitReportRowReview");
+      else if (!job.is_complete) tr.classList.add("profitReportRowIncomplete");
+
+      const flags = [];
+      if (!job.is_complete) flags.push("Missing cost data");
+      if (job.owner_review) flags.push("Needs owner review");
+      if (job.job_profit_status === "underquoted") flags.push("Underquoted");
+      if (job.job_profit_status === "painful") flags.push("Painful job");
+      if (job.trusted_margin && job.known_margin_pct !== null && job.known_margin_pct < 20) flags.push("Below 20% known margin");
+
+      const cells = [
+        String(job.job_id || "").slice(0, 8) + "…",
+        job.service_type || "unknown",
+        job.final_amount_collected_cad !== null && job.final_amount_collected_cad !== undefined ? "$" + Number(job.final_amount_collected_cad).toFixed(2) : "—",
+        job.known_cost_cad !== null && job.known_cost_cad !== undefined ? "$" + Number(job.known_cost_cad).toFixed(2) : "—",
+        job.known_profit_cad !== null && job.known_profit_cad !== undefined ? "$" + Number(job.known_profit_cad).toFixed(2) : "—",
+        job.known_margin_pct !== null && job.known_margin_pct !== undefined ? Number(job.known_margin_pct).toFixed(1) + "%" : (job.is_complete ? "—" : "Incomplete closeout"),
+        job.job_profit_status || "—",
+        flags.join(", ") || "Profitable",
+      ];
+      cells.forEach((cellText) => {
+        const td = document.createElement("td");
+        td.textContent = cellText;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+  }
+
+  if (!cards.length && !breakdown.length && !jobs.length) {
+    addEmptyState(box, "No completed jobs found.");
+  }
+}
+
+function renderProfitReportError() {
+  const box = document.getElementById("profitReportBox");
+  if (!box) return;
+  clearNode(box);
+  const div = document.createElement("div");
+  div.className = "emptyState";
+  const msg = document.createElement("span");
+  msg.className = "bad";
+  msg.textContent = "Profit review report could not load. Core admin data is still available.";
+  div.appendChild(msg);
+  box.appendChild(div);
+}
+
+async function refreshProfitReportBestEffort() {
+  try {
+    const report = await fetchJSON("/admin/api/completed-job-profit-report");
+    renderProfitReport(report);
+  } catch {
+    renderProfitReportError();
   }
 }
 
@@ -2169,6 +2349,7 @@ async function refreshAll() {
 
     setProtectedDashboardVisible(true);
     void refreshOpsQueueBestEffort();
+    void refreshProfitReportBestEffort();
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
     adminSessionReady = false;

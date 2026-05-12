@@ -1158,6 +1158,45 @@ def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_star
     return {"counts": counts}
 
 
+# =========================
+# Completed Job Profit Report
+# =========================
+
+_PROFIT_REPORT_FIELDS = (
+    "job_id",
+    "service_type",
+    "status",
+    "actual_labor_cost_cad",
+    "actual_disposal_cost_cad",
+    "actual_fuel_cost_cad",
+    "actual_other_costs_cad",
+    "final_amount_collected_cad",
+    "payment_method",
+    "payment_status",
+    "job_profit_status",
+    "scheduled_start",
+    "customer_name",
+)
+
+
+def load_completed_job_profit_report_sources(*, limit: int = 200) -> List[Dict[str, Any]]:
+    """Return completed job rows with all profit-report fields for read-only analysis.
+
+    Only returns jobs with status='completed'. No mutations.
+    """
+    safe_limit = max(1, min(int(limit), 500))
+    cols = ", ".join(_PROFIT_REPORT_FIELDS)
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            f"SELECT {cols} FROM jobs WHERE status = 'completed' ORDER BY scheduled_start DESC NULLS LAST LIMIT ?",
+            (safe_limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:
     normalized_status = _validate_quote_admin_status(admin_status)
     conn = _connect()
