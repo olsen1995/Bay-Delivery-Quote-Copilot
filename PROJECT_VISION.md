@@ -2,123 +2,469 @@
 
 ## What this repo is
 
-**Bay Delivery Quote Copilot** is a small web app + API for Bay Delivery (North Bay, Ontario) that:
+**Bay Delivery Quote Copilot** is a small production web app + API for Bay Delivery in North Bay, Ontario.
 
-- Gives customers quick, consistent **estimates** for common services
-- Lets customers **request a booking window** (accept/decline quote → request becomes a booking request)
-- Gives the operator (admin) a clean dashboard to **review, approve/reject, and track jobs**
-- Protects business rules so we don’t undercharge, and supports “Render free tier” reality (ephemeral disk)
+It helps Bay Delivery:
 
-This project is intentionally practical: **quotes + booking requests + job tracking + backups** — not a giant CRM.
+- give customers quick, consistent estimates for common services
+- collect simple job details and photos
+- let customers accept, decline, or request a booking window
+- give Austin and Dan a clean admin workflow for leads, jobs, follow-ups, risk review, scheduling, costing, and reporting
+- protect business rules so Bay Delivery does not undercharge
+- learn from completed-job costs before changing pricing
+- support Render free-tier reality, including ephemeral disk and backup/restore workflows
+
+This project is intentionally practical.
+
+It is not a giant CRM.
+
+It is not a sandbox.
+
+It is not a pricing experiment.
+
+The goal is a small business operating system that protects margin, reduces missed follow-ups, and makes daily decisions easier.
 
 ---
 
-## Current state (March 2026)
+## Current state (May 2026)
 
-- The project is in **stable cleanup / refinement mode** (no longer rescue mode).
-- Core customer quote flow and admin review/approval flow are stable and in regular use.
-- Security hardening baselines are in place, including CSP fixes for quote/admin/admin-uploads, request protections, and abuse-control cleanup.
-- Admin UX and frontend polish passes are complete.
-- Smoke test contract alignment, version/docs/release alignment, and dependency cleanup are complete.
+The project is in **stable operations / roadmap refinement mode**.
+
+The app has moved beyond a basic quote calculator. It now supports a stronger operating workflow:
+
+- customer quote flow
+- quote decisions and booking requests
+- admin request/job management
+- daily ops visibility
+- follow-up shortcuts
+- internal risk summaries
+- completed-job profit review
+- backup/recovery support
+- protected pricing authority
+
+Recent roadmap work completed:
+
+1. **Admin Daily Ops Board**
+   - Read-only desktop admin cards for operational queues.
+   - Helps identify new requests, follow-ups, accepted-not-booked work, upcoming jobs, missing costs, owner review items, and stale quotes.
+
+2. **Admin Ops Board Action Shortcuts**
+   - Practical desktop admin shortcuts for follow-up/status workflows.
+   - Keeps admin actions narrow and intentional.
+
+3. **Customer Quote Flow Simplification**
+   - Public quote flow is calmer, clearer, and lower-friction.
+   - Customer copy avoids internal risk and pricing jargon.
+   - Existing payload compatibility is preserved.
+
+4. **Internal Quote Risk Summary**
+   - Desktop admin shows a compact internal risk summary using existing advisory and risk-assessment data.
+   - This helps Austin/Dan see access concerns, heavy-material concerns, disposal uncertainty, photos/details needs, and owner-review signals.
+   - This does not change prices.
+
+5. **Completed Job Profit Review Report**
+   - Desktop admin includes an internal completed-job profit review report.
+   - The report uses existing completed-job costing fields to show collected revenue, known costs, profit, margin, missing cost data, owner-review flags, and category breakdowns.
+   - This is read-only and exists to support owner review and future pricing calibration.
+
+Current repo version:
+
+- `0.11.0`
 
 ---
 
 ## Current Stack
 
-- **Backend:** FastAPI (Python)
-- **Frontend:** Static HTML/CSS/JS served from `/static`
-- **Storage:** SQLite (local file)
-- **Hosting:** Render (free tier = **ephemeral disk**, DB resets on redeploy)
-- **Backups:** Local JSON export/import + optional Google Drive Vault snapshot (when configured)
+- **Backend:** FastAPI / Python
+- **Frontend:** Static HTML/CSS/JavaScript served from `/static`
+- **Storage:** SQLite local file
+- **Hosting:** Render
+- **Backups:** Local JSON export/import plus optional Google Drive Vault snapshot/restore when configured
+- **Admin auth:** Basic Auth for admin surfaces and admin APIs
+- **Customer security:** customer decision and booking flows use secure tokens where applicable
+
+Render free tier has an ephemeral disk, so backup/export/restore workflows remain important.
+
+SQLite remains the operational source of truth.
+
+Google Calendar and Google Drive are support tools only.
 
 ---
 
-## What the app does today (core workflow)
+## Executive principle
+
+Customer side stays simple.
+
+Admin side tells Austin and Dan what needs attention.
+
+Pricing authority stays protected in:
+
+- `app/quote_engine.py`
+
+Completed-job reporting learns from real jobs before any pricing changes are made.
+
+---
+
+## What the app does today
 
 ### Customer side
 
-1. Customer opens `/quote`
-2. Fills job details (service type, hours, crew size, add-ons)
-3. App calls `POST /quote/calculate`
-4. Customer sees totals:
-   - `cash_total_cad` (cash = tax-free)
-   - `emt_total_cad` (EMT adds 13% HST)
-5. Optional: customer uploads up to 5 photos (Drive required)
-6. Customer chooses **accept** or **decline** via `POST /quote/{quote_id}/decision`
-   - Accept creates/updates a `quote_request` record
+1. Customer opens `/quote`.
+2. Customer describes the job in simple language.
+3. Customer provides helpful structured details such as:
+   - service type
+   - access difficulty
+   - estimated hours
+   - crew size where applicable
+   - trailer/load indicators where applicable
+   - mattress/box spring counts
+   - scrap pickup details
+   - photos when available
+4. App calls `POST /quote/calculate`.
+5. Customer sees:
+   - `cash_total_cad`
+   - `emt_total_cad`
+   - clear customer-facing quote guidance
+6. Customer can accept or decline.
+7. Accepted quote/request information moves into the admin workflow for review, follow-up, approval, and eventual job handling.
+
+Customer-facing language should stay plain, calm, and helpful.
+
+Customer-facing pages must not expose internal risk, margin, owner-review, completed-job costing, dispatch, or pricing-advisory language.
+
+---
 
 ### Admin side
 
-1. Admin opens `/admin`
-2. Admin authenticates using Basic Auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`)
+1. Admin opens `/admin`.
+2. Admin authenticates using Basic Auth.
 3. Admin reviews:
-   - Recent quotes
-   - Booking requests
-   - Jobs
-   - Uploads (if Drive configured)
-4. Admin approves/rejects booking requests
-   - Approve creates a job record automatically
+   - Daily Ops Board
+   - quote requests
+   - quotes
+   - jobs
+   - completed-job costing
+   - internal risk summaries
+   - completed-job profit review report
+   - backup/restore tools
+4. Admin can:
+   - review leads
+   - approve/reject requests
+   - track follow-up status
+   - see accepted-not-booked work
+   - create/track jobs through existing workflows
+   - enter completed-job costing
+   - review profit/margin evidence after jobs are complete
+5. Admin reports help identify what needs attention, but they do not automatically change pricing.
+
+Admin is allowed to show operational complexity.
+
+Admin can show risk, missing info, owner-review flags, costing, and profit/margin evidence.
 
 ---
 
-## Business Rules (must stay true)
+## Business Rules that must stay true
 
-- **Cash:** no tax
-- **EMT:** adds 13% HST
-- **Minimums:** always include at least **$20 gas + $20 wear & tear**
-- **Big items:** require **2 workers**
-- **Labour floors:** for 2 workers, minimum labour cost floor is **$40 cost** (business rule; profit margin is added in pricing)
-- **Scrap pickup:** curbside = $0 (picked up next time in area), inside = $30 flat
-- Quotes should include **margin**, not “at cost”
+- **Cash:** no HST
+- **EMT/e-transfer:** add 13% HST
+- **Travel minimum:** at least $20 gas + $20 wear, for a $40 travel minimum
+- **Big items:** require 2 workers
+- **Labour cost anchors:** Austin/operator around $20/hr; helper around $16/hr
+- **Mattress disposal:** $50 per mattress
+- **Box spring disposal:** $50 per box spring
+- **Scrap pickup:** curbside can be free; inside removal has a $30 charge
+- Quotes must include margin and should not be at-cost
+- Pricing authority must remain in `app/quote_engine.py`
+
+The system should protect Bay Delivery from undercharging while still keeping customer-facing quotes believable.
 
 ---
 
-## What is already done (stable baseline)
+## What is already done
 
-- Quote contract behavior is stable across UI, API, smoke test, and regression tests.
-- Booking lifecycle status transitions are enforced and tested (`customer_pending` → `customer_accepted/customer_declined` → `admin_approved/rejected`).
-- Admin dashboard and backend route behavior are aligned with Basic Auth protection for admin APIs.
-- Backup/recovery workflow is practical for Render reality (DB JSON export/import plus optional Drive snapshot/restore when configured).
-- Undercharge protection invariants are covered by tests for core pricing rules.
-- Reliability baseline is in place: health/version reporting, clean JSON errors, and practical operational logging.
+The current stable baseline includes:
+
+- Customer quote flow and `/quote/calculate`
+- Customer accept/decline/request workflow
+- Admin authentication and protected admin APIs
+- Admin dashboard for quotes, requests, and jobs
+- Admin Daily Ops Board
+- Admin follow-up/action shortcuts
+- Customer quote flow simplification
+- Internal Quote Risk Summary
+- Completed Job Profit Review Report
+- Completed-job costing fields and admin handling
+- Backup/export/import workflow
+- Google Drive snapshot/restore support when configured
+- Version parity checks
+- GPT grounding pack parity checks
+- CI and Unicode guard workflows
+- Security hardening baselines
+- Dependency audit hardening
+- Static asset tests and regression coverage
+- Pricing/business-rule regression tests
+
+---
+
+## Roadmap direction
+
+The project roadmap is intentionally conservative.
+
+The sequence is:
+
+1. Admin Daily Ops Board
+2. Admin Ops Board Action Shortcuts
+3. Customer Quote Flow Simplification
+4. Internal Quote Risk Summary
+5. Completed Job Profit Review Report
+6. Follow-Up Message Helper
+7. Scheduling Fields + Accepted Not Booked Queue
+8. Pricing PRs by service category
+9. Internal GPT Upgrade
+10. Photo Evidence / Photo Assistant
+
+Completed so far:
+
+- Admin Daily Ops Board
+- Admin Ops Board Action Shortcuts
+- Customer Quote Flow Simplification
+- Internal Quote Risk Summary
+- Completed Job Profit Review Report
+
+Next likely roadmap item:
+
+- Follow-Up Message Helper
+
+The Follow-Up Message Helper should generate copy-ready internal/admin messages for common situations such as:
+
+- no reply
+- need photos
+- accepted but not booked
+- customer asking for cheaper price
+- completed job follow-up
+- review request
+
+It should not send messages automatically unless a future PR explicitly scopes that behavior.
+
+---
+
+## Pricing calibration direction
+
+Pricing changes should not happen just because a report exists.
+
+Completed-job reporting creates evidence.
+
+Owner review turns evidence into judgment.
+
+Pricing PRs happen later, one service category at a time.
+
+Later pricing order:
+
+1. Demolition / rip-out
+2. Moving labour
+3. Heavy/dense dump runs
+4. Scrap pickups
+5. Delivery
+
+Each pricing PR should include:
+
+- focused tests
+- before/after examples
+- service-specific reasoning
+- protected no-go checks
+- no unrelated cleanup
+- no broad global repricing
+
+Completed-job data should help answer:
+
+- Which services are underpriced?
+- Which jobs are painful even when profitable?
+- Which jobs are missing cost data?
+- Which categories create margin problems?
+- Which assumptions need adjustment?
+
+Completed-job reports are evidence, not automatic pricing authority.
+
+---
+
+## AI and GPT direction
+
+GPT is internal-only and recommendation-only.
+
+GPT can help Austin/Dan:
+
+- summarize quote requests
+- explain internal risk
+- draft follow-up messages
+- explain completed-job findings
+- suggest questions to ask the customer
+- support owner review
+
+GPT must never:
+
+- override the pricing engine
+- create a second pricing system
+- expose internal risk or profit details to customers
+- mutate jobs/quotes automatically
+- become the source of truth
+
+Any GPT grounding update should be deliberate and paired with grounding pack parity checks.
+
+---
+
+## SEO and growth direction
+
+SEO and growth work is valuable, especially for searches like:
+
+- junk removal North Bay
+- dump runs North Bay
+- scrap pickup North Bay
+- furniture removal North Bay
+- appliance removal North Bay
+- mattress removal North Bay
+
+However, SEO/growth pages are backlog items unless Austin explicitly moves them ahead of the operational roadmap.
+
+A future growth PR may add pages such as:
+
+- `/junk-removal-north-bay`
+- `/dump-runs-north-bay`
+- `/scrap-pickup-north-bay`
+- `/small-moves-north-bay`
+- `/appliance-removal-north-bay`
+- `/mattress-removal-north-bay`
+
+Those pages should be simple, local, crawlable, customer-facing, and linked clearly to `/quote`.
+
+They must not interfere with pricing, admin workflows, customer payloads, GPT grounding, or roadmap safety work.
+
+---
 
 ## Done enough for now
 
-The product is "done enough" when it reliably protects margin, supports real booking operations, and remains understandable to operate and maintain without overengineering.
+The product is done enough when it reliably:
 
-Today that means:
+- gives customers clear estimates
+- collects the right job details
+- protects pricing rules
+- avoids customer-facing complexity
+- helps admin see what needs attention
+- prevents missed follow-ups
+- supports booking/job workflows
+- allows completed-job closeout
+- reports profit/margin evidence
+- keeps backup/recovery practical
+- remains understandable to operate and maintain
 
-- Customer quotes and decisions work end-to-end.
-- Admin review/approval workflow works end-to-end.
-- Core security/hardening controls are active.
-- Recovery paths exist for ephemeral hosting.
-- Key pricing and workflow regressions are covered by tests.
+Today, that means:
 
----
-
-## Remaining non-urgent improvements
-
-1. Expand runbook depth for operations (restore drills, failure playbooks, release cadence notes).
-2. Keep tightening edge-case validation and abuse controls as real usage data accumulates.
-3. Continue small UX refinements in quote/admin surfaces without changing API contracts.
-4. Add focused regression tests only where new bugs are discovered.
-5. Keep docs/version/release artifacts aligned as part of normal maintenance.
-
----
-
-## Repo Conventions
-
-- Prefer clear, boring API contracts over cleverness
-- When changing behavior, add/extend a regression test
-- Avoid duplicate business rules across frontend/backend (backend is the source of truth)
+- customer quote flow works end-to-end
+- admin review/approval workflow works end-to-end
+- daily ops visibility exists
+- internal risk visibility exists
+- completed-job profit reporting exists
+- core security controls are active
+- recovery paths exist for ephemeral hosting
+- key pricing and workflow regressions are covered by tests
 
 ---
 
-## How to run locally (typical)
+## Remaining improvements
 
-- Start API:
-  - `python -m uvicorn app.main:app --reload`
-- Visit:
-  - Customer: `http://127.0.0.1:8000/`
-  - Quote: `http://127.0.0.1:8000/quote`
-  - Admin: `http://127.0.0.1:8000/admin`
+### Near-term roadmap
+
+1. Follow-Up Message Helper
+2. Scheduling Fields + Accepted Not Booked Queue
+3. Internal GPT upgrade for admin summaries and message drafting
+4. Photo evidence / photo assistant, advisory-only
+
+### Later pricing work
+
+1. Demolition / rip-out pricing review
+2. Moving labour pricing review
+3. Heavy/dense dump run pricing review
+4. Scrap pickup access-risk pricing review
+5. Delivery distance/weather/enclosed-trailer pricing review
+
+### Backlog / growth
+
+1. Junk removal North Bay landing page
+2. Dump runs North Bay landing page
+3. Scrap pickup North Bay landing page
+4. Google Business Profile / reviews / SEO support content
+5. Service-area content and local proof pages
+
+### Ongoing maintenance
+
+1. Keep docs, version markers, and release notes aligned.
+2. Keep dependency audit green.
+3. Keep GPT grounding pack parity green.
+4. Keep tests focused and meaningful.
+5. Keep admin/customer/mobile boundaries protected.
+6. Keep PRs narrow, auditable, and reversible.
+
+---
+
+## Repo conventions
+
+- Prefer clear, boring API contracts over cleverness.
+- Backend is the source of truth for business rules.
+- Pricing authority stays in `app/quote_engine.py`.
+- Avoid duplicate business rules across frontend/backend.
+- When changing behavior, add or extend regression tests.
+- Keep customer pages simple.
+- Keep admin reports internal.
+- Do not mix unrelated work in one PR.
+- Open/update PRs and stop.
+- Merge only after Austin explicitly approves.
+- Post-merge verify `main` before starting the next feature.
+
+---
+
+## How to run locally
+
+Start API:
+
+- `python -m uvicorn app.main:app --reload`
+
+Visit:
+
+- Customer/home: `http://127.0.0.1:8000/`
+- Quote: `http://127.0.0.1:8000/quote`
+- Admin: `http://127.0.0.1:8000/admin`
+
+Common validation from repo root:
+
+- `python tools/check_version_parity.py`
+- `python tools/check_gpt_grounding_pack_parity.py`
+- `python -m compileall app tools scripts tests`
+- `python -m pytest -q`
+
+On the local Windows repo venv, use:
+
+- `.\.venv\Scripts\python.exe tools\check_version_parity.py`
+- `.\.venv\Scripts\python.exe tools\check_gpt_grounding_pack_parity.py`
+- `.\.venv\Scripts\python.exe -m compileall app tools scripts tests`
+- `.\.venv\Scripts\python.exe -m pytest -q`
+
+---
+
+## Final operating loop
+
+Customer submits a simple quote.
+
+The system captures useful structured facts.
+
+Admin sees risk, missing info, and follow-up needs.
+
+Austin/Dan approve, follow up, or book.
+
+The job gets completed.
+
+Actual costs are entered.
+
+The system shows profit and underpricing patterns.
+
+Pricing is improved carefully by category in later dedicated PRs.
+
+That is the product vision.
