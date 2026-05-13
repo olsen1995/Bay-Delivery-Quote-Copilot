@@ -18,8 +18,8 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Accepted-not-booked detail rows are capped at 50 while `counts.accepted_not_booked` remains the uncapped true total.
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
-- The roadmap phases below are complete in sequence:
-	- Admin Daily Ops Board
+- Completed roadmap work reflected in the repo today:
+	- Admin Daily Ops Board read model
 	- Completed Job Profit Review Report
 	- Follow-Up Message Helper
 	- Accepted, Not Booked scheduling queue
