@@ -110,6 +110,7 @@ def _normalize_accepted_not_booked_item(source: dict[str, Any]) -> dict[str, Any
     requested_time_window = source.get("requested_time_window")
     scheduled_start = source.get("scheduled_start")
     scheduled_end = source.get("scheduled_end")
+    google_calendar_event_id = source.get("google_calendar_event_id")
 
     missing_scheduling_fields: list[str] = []
     if _is_missing(job_id):
@@ -157,6 +158,7 @@ def _normalize_accepted_not_booked_item(source: dict[str, Any]) -> dict[str, Any
         "requested_time_window": requested_time_window,
         "scheduled_start": scheduled_start,
         "scheduled_end": scheduled_end,
+        "google_calendar_event_id": google_calendar_event_id,
         "scheduling_ready": scheduling_ready,
         "missing_scheduling_fields": missing_scheduling_fields,
         "scheduling_summary": scheduling_summary,

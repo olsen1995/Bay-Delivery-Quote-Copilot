@@ -275,6 +275,8 @@ def test_admin_desktop_contains_accepted_not_booked_queue_ui() -> None:
     assert "acceptedNotBookedReadinessBadge" in admin_js
     assert "shouldOpenAcceptedNotBookedItemInRescheduleMode" in admin_js
     assert "normalizedStatus === \"scheduled\"" in admin_js
+    assert "item?.google_calendar_event_id" in admin_js
+    assert "normalizedStatus === \"scheduled\" && hasCalendarEvent" in admin_js
     assert "showScheduleModal(item.job_id, openInRescheduleMode)" in admin_js
     assert "scheduleBtn.textContent = openInRescheduleMode ? \"Open Reschedule\" : \"Open Schedule\";" in admin_js
     assert ".acceptedNotBookedItem" in admin_css

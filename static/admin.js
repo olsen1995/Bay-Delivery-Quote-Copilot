@@ -887,7 +887,8 @@ function friendlyMissingSchedulingField(field) {
 
 function shouldOpenAcceptedNotBookedItemInRescheduleMode(item) {
   const normalizedStatus = String(item?.status || "").trim().toLowerCase();
-  return normalizedStatus === "scheduled";
+  const hasCalendarEvent = Boolean(String(item?.google_calendar_event_id || "").trim());
+  return normalizedStatus === "scheduled" && hasCalendarEvent;
 }
 
 function renderAcceptedNotBookedQueue(payload) {

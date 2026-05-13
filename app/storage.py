@@ -1018,6 +1018,7 @@ def load_accepted_not_booked_detail_sources() -> List[Dict[str, Any]]:
                     qr.requested_time_window AS requested_time_window,
                     NULL AS scheduled_start,
                     NULL AS scheduled_end,
+                    NULL AS google_calendar_event_id,
                     qr.notes AS notes
                 FROM quote_requests AS qr
                 WHERE {accepted_not_booked_request_where}
@@ -1041,6 +1042,7 @@ def load_accepted_not_booked_detail_sources() -> List[Dict[str, Any]]:
                     qr.requested_time_window AS requested_time_window,
                     j.scheduled_start AS scheduled_start,
                     j.scheduled_end AS scheduled_end,
+                    j.google_calendar_event_id AS google_calendar_event_id,
                     COALESCE(qr.notes, j.notes) AS notes
                 FROM jobs AS j
                 LEFT JOIN quote_requests AS qr ON qr.request_id = j.request_id
