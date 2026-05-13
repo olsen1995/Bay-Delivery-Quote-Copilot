@@ -75,7 +75,9 @@ def _seed_request(
     requested_job_date: str | None = "2026-05-10",
     requested_time_window: str | None = "morning",
     created_at: str = "2026-04-28T10:00:00",
+    submitted_at: str | None = None,
 ) -> None:
+    accepted_or_approved_at = submitted_at or created_at
     storage.save_quote_request(
         {
             "request_id": request_id,
@@ -94,8 +96,8 @@ def _seed_request(
             "notes": None,
             "requested_job_date": requested_job_date,
             "requested_time_window": requested_time_window,
-            "customer_accepted_at": created_at if status == "customer_accepted" else None,
-            "admin_approved_at": None,
+            "customer_accepted_at": accepted_or_approved_at if status == "customer_accepted" else None,
+            "admin_approved_at": accepted_or_approved_at if status == "admin_approved" else None,
             "accept_token": f"accept-{quote_id}",
             "booking_token": f"booking-{quote_id}",
             "booking_token_created_at": created_at,
@@ -308,11 +310,21 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     expected_detail_cap = 50
     for index in range(total_records):
         quote_id = f"q-cap-{index:02d}"
-        _seed_quote(quote_id, created_at=f"2099-04-01T09:{index:02d}:00")
+        if index == 0:
+            created_at = "2099-01-01T08:00:00"
+            submitted_at = "2099-05-01T12:00:00"
+        elif index in (1, 2):
+            created_at = f"2099-01-0{index + 1}T08:00:00"
+            submitted_at = "2099-05-01T11:00:00"
+        else:
+            created_at = f"2099-04-01T10:{index:02d}:00"
+            submitted_at = f"2099-04-01T09:{59 - index:02d}:00"
+        _seed_quote(quote_id, created_at=created_at)
         _seed_request(
             f"req-cap-{index:02d}",
             quote_id=quote_id,
-            created_at=f"2099-04-01T10:{index:02d}:00",
+            created_at=created_at,
+            submitted_at=submitted_at,
         )
 
     _seed_quote("q-excluded-scheduled")
@@ -345,12 +357,13 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     assert _cards(first_payload)["accepted_not_booked"]["count"] == total_records
     assert len(first_payload["accepted_not_booked_items"]) == expected_detail_cap
     assert [item["item_id"] for item in first_payload["accepted_not_booked_items"][:3]] == [
-        "req-cap-54",
-        "req-cap-53",
-        "req-cap-52",
+        "req-cap-00",
+        "req-cap-01",
+        "req-cap-02",
     ]
     returned_ids = {item["item_id"] for item in first_payload["accepted_not_booked_items"]}
-    assert "req-cap-04" not in returned_ids
+    assert "req-cap-00" in returned_ids
+    assert "req-cap-54" not in returned_ids
     assert "job-excluded-scheduled" not in returned_ids
     assert "job-excluded-completed" not in returned_ids
     assert "job-excluded-cancelled" not in returned_ids

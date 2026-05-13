@@ -1050,7 +1050,7 @@ def load_accepted_not_booked_detail_sources() -> List[Dict[str, Any]]:
                 LEFT JOIN quote_requests AS qr ON qr.request_id = j.request_id
                 WHERE {accepted_not_booked_job_where}
             )
-            ORDER BY datetime(created_at) DESC, item_type ASC, item_id ASC
+            ORDER BY datetime(submitted_at) DESC, item_type ASC, item_id ASC
             LIMIT ?
             """,
             (ACCEPTED_NOT_BOOKED_DETAIL_ROW_LIMIT,),
