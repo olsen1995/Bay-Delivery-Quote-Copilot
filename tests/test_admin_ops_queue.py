@@ -304,31 +304,59 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     admin_headers: dict[str, str],
     isolated_db: Path,
 ) -> None:
-    total_records = 12
+    total_records = 55
+    expected_detail_cap = 50
     for index in range(total_records):
         quote_id = f"q-cap-{index:02d}"
-        _seed_quote(quote_id, created_at=f"2099-04-{(index % 28) + 1:02d}T09:00:00")
+        _seed_quote(quote_id, created_at=f"2099-04-01T09:{index:02d}:00")
         _seed_request(
             f"req-cap-{index:02d}",
             quote_id=quote_id,
-            created_at=f"2099-04-{(index % 28) + 1:02d}T10:00:00",
+            created_at=f"2099-04-01T10:{index:02d}:00",
         )
 
-    before_requests = storage.list_quote_requests(limit=50, include_followup_status=True)
-    before_jobs = storage.list_jobs(limit=50)
-    before_quotes = storage.list_quotes(limit=50)
+    _seed_quote("q-excluded-scheduled")
+    _seed_request("req-excluded-scheduled", quote_id="q-excluded-scheduled", status="admin_approved")
+    _seed_job(
+        "job-excluded-scheduled",
+        quote_id="q-excluded-scheduled",
+        request_id="req-excluded-scheduled",
+        status="scheduled",
+        scheduled_start="2099-04-02T12:00:00+00:00",
+        scheduled_end="2099-04-02T14:00:00+00:00",
+    )
+    _seed_job("job-excluded-completed", quote_id="q-excluded-completed", request_id="req-excluded-completed", status="completed")
+    _seed_job("job-excluded-cancelled", quote_id="q-excluded-cancelled", request_id="req-excluded-cancelled", status="cancelled")
+
+    before_requests = storage.list_quote_requests(limit=100, include_followup_status=True)
+    before_jobs = storage.list_jobs(limit=100)
+    before_quotes = storage.list_quotes(limit=100)
 
     first = client.get("/admin/api/ops-queue", headers=admin_headers)
     second = client.get("/admin/api/ops-queue", headers=admin_headers)
 
     assert first.status_code == 200
     assert second.status_code == 200
-    assert _cards(first.json()) == _cards(second.json())
-    assert first.json()["accepted_not_booked_items"] == second.json()["accepted_not_booked_items"]
-    assert first.json()["counts"]["accepted_not_booked"] == total_records
-    assert storage.list_quote_requests(limit=50, include_followup_status=True) == before_requests
-    assert storage.list_jobs(limit=50) == before_jobs
-    assert storage.list_quotes(limit=50) == before_quotes
+    first_payload = first.json()
+    second_payload = second.json()
+    assert _cards(first_payload) == _cards(second_payload)
+    assert first_payload["accepted_not_booked_items"] == second_payload["accepted_not_booked_items"]
+    assert first_payload["counts"]["accepted_not_booked"] == total_records
+    assert _cards(first_payload)["accepted_not_booked"]["count"] == total_records
+    assert len(first_payload["accepted_not_booked_items"]) == expected_detail_cap
+    assert [item["item_id"] for item in first_payload["accepted_not_booked_items"][:3]] == [
+        "req-cap-54",
+        "req-cap-53",
+        "req-cap-52",
+    ]
+    returned_ids = {item["item_id"] for item in first_payload["accepted_not_booked_items"]}
+    assert "req-cap-04" not in returned_ids
+    assert "job-excluded-scheduled" not in returned_ids
+    assert "job-excluded-completed" not in returned_ids
+    assert "job-excluded-cancelled" not in returned_ids
+    assert storage.list_quote_requests(limit=100, include_followup_status=True) == before_requests
+    assert storage.list_jobs(limit=100) == before_jobs
+    assert storage.list_quotes(limit=100) == before_quotes
 
 
 def test_admin_ops_queue_includes_accepted_not_booked_detail_items(

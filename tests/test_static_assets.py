@@ -273,6 +273,7 @@ def test_admin_desktop_contains_accepted_not_booked_queue_ui() -> None:
     assert "renderAcceptedNotBookedQueue" in admin_js
     assert "accepted_not_booked_items" in admin_js
     assert "acceptedNotBookedReadinessBadge" in admin_js
+    assert "Showing latest ${items.length} of ${totalCount} accepted or approved items waiting on scheduling." in admin_js
     assert "shouldOpenAcceptedNotBookedItemInRescheduleMode" in admin_js
     assert "normalizedStatus === \"scheduled\"" in admin_js
     assert "item?.google_calendar_event_id" in admin_js

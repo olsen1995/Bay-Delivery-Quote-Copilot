@@ -977,6 +977,8 @@ ADMIN_OPS_BOARD_COUNT_KEYS = (
     "stale_quotes",
 )
 
+ACCEPTED_NOT_BOOKED_DETAIL_ROW_LIMIT = 50
+
 
 def _count_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...] = ()) -> int:
     row = conn.execute(sql, params).fetchone()
@@ -1049,7 +1051,9 @@ def load_accepted_not_booked_detail_sources() -> List[Dict[str, Any]]:
                 WHERE {accepted_not_booked_job_where}
             )
             ORDER BY datetime(created_at) DESC, item_type ASC, item_id ASC
-            """
+            LIMIT ?
+            """,
+            (ACCEPTED_NOT_BOOKED_DETAIL_ROW_LIMIT,),
         ).fetchall()
     finally:
         conn.close()
