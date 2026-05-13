@@ -905,7 +905,9 @@ function renderAcceptedNotBookedQueue(payload) {
 
   const summary = document.createElement("div");
   summary.className = "acceptedNotBookedQueueSummary";
-  summary.textContent = `${totalCount} accepted or approved item${totalCount === 1 ? "" : "s"} waiting on scheduling.`;
+  summary.textContent = items.length < totalCount
+    ? `Showing latest ${items.length} of ${totalCount} accepted or approved items waiting on scheduling.`
+    : `${totalCount} accepted or approved item${totalCount === 1 ? "" : "s"} waiting on scheduling.`;
   box.appendChild(summary);
 
   const list = document.createElement("div");
