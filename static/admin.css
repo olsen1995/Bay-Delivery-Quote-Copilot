@@ -102,6 +102,7 @@ label {
 #requestsBox,
 #jobsBox,
 #opsQueueBox,
+#acceptedNotBookedQueueBox,
 #auditLogBox,
 #assistantHistoryBox,
 #followupMessageContextSummary {
@@ -210,6 +211,106 @@ label {
 
 .opsQueueShortcut:hover {
 	background: rgba(255, 255, 255, 0.14);
+}
+
+.acceptedNotBookedQueueSummary {
+	margin-bottom: 12px;
+	font-size: 0.92rem;
+	color: var(--muted);
+}
+
+.acceptedNotBookedList {
+	display: grid;
+	gap: 12px;
+}
+
+.acceptedNotBookedItem {
+	border: 1px solid var(--line-soft);
+	border-radius: 10px;
+	padding: 14px;
+	background: var(--surface-alt);
+}
+
+.acceptedNotBookedHeader {
+	display: flex;
+	justify-content: space-between;
+	gap: 14px;
+	align-items: flex-start;
+}
+
+.acceptedNotBookedTitleWrap {
+	min-width: 0;
+}
+
+.acceptedNotBookedTitle {
+	display: block;
+	font-size: 0.98rem;
+	margin-bottom: 4px;
+}
+
+.acceptedNotBookedBadgeWrap {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.acceptedNotBookedReadinessBadge {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 999px;
+	padding: 4px 10px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.acceptedNotBookedReadinessBadge.is-ready {
+	background: rgba(86, 196, 159, 0.16);
+	color: #d6fff2;
+}
+
+.acceptedNotBookedReadinessBadge.is-blocked {
+	background: rgba(255, 179, 71, 0.16);
+	color: #ffe4b3;
+}
+
+.acceptedNotBookedDetailGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 14px;
+	margin-top: 12px;
+}
+
+.acceptedNotBookedDetailRow {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 0.86rem;
+}
+
+.acceptedNotBookedDetailLabel {
+	color: var(--muted);
+	font-weight: 700;
+}
+
+.acceptedNotBookedSummary,
+.acceptedNotBookedMissingFields,
+.acceptedNotBookedActions,
+.acceptedNotBookedNotes {
+	margin-top: 12px;
+}
+
+.acceptedNotBookedMissingFields {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	font-size: 0.86rem;
+}
+
+.acceptedNotBookedScheduleBtn {
+	min-width: 0;
 }
 
 .adminSectionFocus {
@@ -900,6 +1001,7 @@ textarea:focus {
 	.followupHelperActions,
 	.dashboardGrid,
 	.opsQueueGrid,
+	.acceptedNotBookedDetailGrid,
 	.profitReportSummaryGrid {
 		grid-template-columns: 1fr;
 	}
@@ -920,6 +1022,16 @@ textarea:focus {
 	.adminHero,
 	.sectionHeader {
 		flex-direction: column;
+	}
+
+	.acceptedNotBookedHeader,
+	.acceptedNotBookedDetailRow {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.acceptedNotBookedBadgeWrap {
+		justify-content: flex-start;
 	}
 
 	.heroBadgeGroup {

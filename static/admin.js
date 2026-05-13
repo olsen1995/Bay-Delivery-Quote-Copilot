@@ -874,12 +874,166 @@ function renderOpsQueueError() {
   box.appendChild(div);
 }
 
+function friendlyMissingSchedulingField(field) {
+  const labels = {
+    job_id: "job record",
+    requested_job_date: "requested date",
+    requested_time_window: "requested time window",
+    scheduled_start: "scheduled start",
+    scheduled_end: "scheduled end"
+  };
+  return labels[field] || String(field || "").replace(/_/g, " ");
+}
+
+function shouldOpenAcceptedNotBookedItemInRescheduleMode(item) {
+  const normalizedStatus = String(item?.status || "").trim().toLowerCase();
+  const hasCalendarEvent = Boolean(String(item?.google_calendar_event_id || "").trim());
+  return normalizedStatus === "scheduled" && hasCalendarEvent;
+}
+
+function renderAcceptedNotBookedQueue(payload) {
+  const box = document.getElementById("acceptedNotBookedQueueBox");
+  if (!box) return;
+  clearNode(box);
+
+  const items = Array.isArray(payload?.accepted_not_booked_items) ? payload.accepted_not_booked_items : [];
+  const totalCount = Number(payload?.counts?.accepted_not_booked || items.length || 0);
+
+  if (!items.length) {
+    return addEmptyState(box, totalCount ? "Accepted-not-booked detail is temporarily unavailable." : "No accepted or approved work is waiting on scheduling.");
+  }
+
+  const summary = document.createElement("div");
+  summary.className = "acceptedNotBookedQueueSummary";
+  summary.textContent = `${totalCount} accepted or approved item${totalCount === 1 ? "" : "s"} waiting on scheduling.`;
+  box.appendChild(summary);
+
+  const list = document.createElement("div");
+  list.className = "acceptedNotBookedList";
+
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "acceptedNotBookedItem";
+
+    const header = document.createElement("div");
+    header.className = "acceptedNotBookedHeader";
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "acceptedNotBookedTitleWrap";
+    const title = document.createElement("strong");
+    title.className = "acceptedNotBookedTitle";
+    const titleBits = [item.customer_name || item.item_id || "Unassigned item"];
+    if (item.service_type) titleBits.push(String(item.service_type).replace(/_/g, " "));
+    title.textContent = titleBits.join(" • ");
+    titleWrap.appendChild(title);
+
+    const sub = document.createElement("div");
+    sub.className = "small muted";
+    const subBits = [];
+    if (item.job_address) subBits.push(item.job_address);
+    if (item.submitted_at) subBits.push(`Submitted ${item.submitted_at}`);
+    else if (item.created_at) subBits.push(`Created ${item.created_at}`);
+    sub.textContent = subBits.join(" • ");
+    titleWrap.appendChild(sub);
+
+    const badgeWrap = document.createElement("div");
+    badgeWrap.className = "acceptedNotBookedBadgeWrap";
+    badgeWrap.appendChild(makeStatusBadge(item.status || item.item_type || "pending"));
+
+    const readiness = document.createElement("span");
+    readiness.className = `acceptedNotBookedReadinessBadge ${item.scheduling_ready ? "is-ready" : "is-blocked"}`;
+    readiness.textContent = item.scheduling_ready ? "Ready to schedule" : "Needs workflow step";
+    badgeWrap.appendChild(readiness);
+
+    header.append(titleWrap, badgeWrap);
+    card.appendChild(header);
+
+    const detailGrid = document.createElement("div");
+    detailGrid.className = "acceptedNotBookedDetailGrid";
+    [
+      ["Type", item.item_type === "job" ? "Job" : "Request"],
+      ["Quote", item.quote_id || "-"],
+      ["Request", item.request_id || "-"],
+      ["Job", item.job_id || "-"],
+      ["Preferred date", item.requested_job_date ? formatIsoDate(item.requested_job_date) : "Not provided"],
+      ["Preferred window", item.preferred_window_label || "Not provided"],
+      ["Phone", item.customer_phone || "-"]
+    ].forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.className = "acceptedNotBookedDetailRow";
+      const name = document.createElement("span");
+      name.className = "acceptedNotBookedDetailLabel";
+      name.textContent = label;
+      const val = document.createElement("span");
+      val.textContent = value;
+      row.append(name, val);
+      detailGrid.appendChild(row);
+    });
+    card.appendChild(detailGrid);
+
+    const summaryText = document.createElement("div");
+    summaryText.className = "acceptedNotBookedSummary";
+    summaryText.textContent = item.scheduling_summary || "Scheduling review pending.";
+    card.appendChild(summaryText);
+
+    const missingFields = Array.isArray(item.missing_scheduling_fields) ? item.missing_scheduling_fields : [];
+    const missing = document.createElement("div");
+    missing.className = "acceptedNotBookedMissingFields";
+    const missingLabel = document.createElement("strong");
+    missingLabel.textContent = "Missing scheduling fields:";
+    const missingValue = document.createElement("span");
+    missingValue.textContent = missingFields.length ? missingFields.map(friendlyMissingSchedulingField).join(", ") : "None";
+    missing.append(missingLabel, missingValue);
+    card.appendChild(missing);
+
+    if (item.notes) {
+      const notes = document.createElement("div");
+      notes.className = "small muted acceptedNotBookedNotes";
+      notes.textContent = `Notes: ${item.notes}`;
+      card.appendChild(notes);
+    }
+
+    const actionRow = document.createElement("div");
+    actionRow.className = "acceptedNotBookedActions";
+    if (item.job_id) {
+      const openInRescheduleMode = shouldOpenAcceptedNotBookedItemInRescheduleMode(item);
+      const scheduleBtn = document.createElement("button");
+      scheduleBtn.type = "button";
+      scheduleBtn.className = "actionBtn acceptedNotBookedScheduleBtn";
+      scheduleBtn.textContent = openInRescheduleMode ? "Open Reschedule" : "Open Schedule";
+      scheduleBtn.addEventListener("click", () => showScheduleModal(item.job_id, openInRescheduleMode));
+      actionRow.appendChild(scheduleBtn);
+    } else {
+      const actionHint = document.createElement("div");
+      actionHint.className = "small muted";
+      actionHint.textContent = item.recommended_action === "approve_request"
+        ? "Approve this request from the Booking Requests section before scheduling."
+        : "Create or restore a job record before opening the schedule workflow.";
+      actionRow.appendChild(actionHint);
+    }
+    card.appendChild(actionRow);
+
+    list.appendChild(card);
+  });
+
+  box.appendChild(list);
+}
+
+function renderAcceptedNotBookedQueueError() {
+  const box = document.getElementById("acceptedNotBookedQueueBox");
+  if (!box) return;
+  clearNode(box);
+  addEmptyState(box, "Accepted, Not Booked could not load. Core admin data is still available.");
+}
+
 async function refreshOpsQueueBestEffort() {
   try {
     const opsQueue = await fetchJSON("/admin/api/ops-queue");
     renderOpsQueue(opsQueue);
+    renderAcceptedNotBookedQueue(opsQueue);
   } catch {
     renderOpsQueueError();
+    renderAcceptedNotBookedQueueError();
   }
 }
 

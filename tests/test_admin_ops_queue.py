@@ -113,6 +113,7 @@ def _seed_job(
     created_at: str = "2026-04-28T11:00:00",
     scheduled_start: str | None = None,
     scheduled_end: str | None = None,
+    google_calendar_event_id: str | None = None,
     costing: dict[str, Any] | None = None,
     request_json: dict[str, Any] | None = None,
 ) -> None:
@@ -134,6 +135,7 @@ def _seed_job(
         "notes": None,
         "scheduled_start": scheduled_start,
         "scheduled_end": scheduled_end if scheduled_end is not None else ("2026-05-10T14:00:00+00:00" if scheduled_start else None),
+        "google_calendar_event_id": google_calendar_event_id,
         "completed_at": "2026-04-28T12:30:00" if status == "completed" else None,
     }
     if costing:
@@ -183,7 +185,7 @@ def test_admin_ops_queue_returns_stable_zero_count_daily_ops_board(
 
     assert resp.status_code == 200
     payload = resp.json()
-    assert set(payload) == {"generated_at", "counts", "cards"}
+    assert set(payload) == {"generated_at", "counts", "cards", "accepted_not_booked_items"}
     assert "sections" not in payload
     assert [card["key"] for card in payload["cards"]] == [
         "new_requests",
@@ -199,6 +201,7 @@ def test_admin_ops_queue_returns_stable_zero_count_daily_ops_board(
         assert card["label"]
         assert card["description"]
         assert payload["counts"][card["key"]] == card["count"]
+    assert payload["accepted_not_booked_items"] == []
 
 
 def test_admin_ops_queue_daily_ops_board_counts_existing_attention_queues(
@@ -321,10 +324,121 @@ def test_admin_ops_queue_response_is_capped_stable_and_read_only(
     assert first.status_code == 200
     assert second.status_code == 200
     assert _cards(first.json()) == _cards(second.json())
+    assert first.json()["accepted_not_booked_items"] == second.json()["accepted_not_booked_items"]
     assert first.json()["counts"]["accepted_not_booked"] == total_records
     assert storage.list_quote_requests(limit=50, include_followup_status=True) == before_requests
     assert storage.list_jobs(limit=50) == before_jobs
     assert storage.list_quotes(limit=50) == before_quotes
+
+
+def test_admin_ops_queue_includes_accepted_not_booked_detail_items(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_quote("q-request")
+    _seed_request("req-request", quote_id="q-request", status="customer_accepted")
+
+    _seed_quote("q-admin-approved")
+    _seed_request("req-admin-approved", quote_id="q-admin-approved", status="admin_approved")
+
+    _seed_quote("q-job")
+    _seed_request("req-job", quote_id="q-job", status="admin_approved")
+    _seed_job("job-unscheduled", quote_id="q-job", request_id="req-job", status="approved")
+
+    _seed_quote("q-scheduled-linked")
+    _seed_request("req-scheduled-linked", quote_id="q-scheduled-linked", status="admin_approved")
+    _seed_job(
+        "job-scheduled-linked",
+        quote_id="q-scheduled-linked",
+        request_id="req-scheduled-linked",
+        status="scheduled",
+        google_calendar_event_id="calendar-linked-event",
+    )
+
+    _seed_quote("q-scheduled")
+    _seed_request("req-scheduled", quote_id="q-scheduled", status="admin_approved")
+    _seed_job(
+        "job-scheduled",
+        quote_id="q-scheduled",
+        request_id="req-scheduled",
+        status="scheduled",
+        scheduled_start="2099-05-10T12:00:00+00:00",
+        scheduled_end="2099-05-10T14:00:00+00:00",
+    )
+
+    _seed_job("job-completed", quote_id="q-completed", request_id="req-completed", status="completed")
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["counts"]["accepted_not_booked"] == 4
+
+    items = {item["item_id"]: item for item in payload["accepted_not_booked_items"]}
+    assert set(items) == {"req-request", "req-admin-approved", "job-unscheduled", "job-scheduled-linked"}
+
+    accepted_request = items["req-request"]
+    assert accepted_request["item_type"] == "request"
+    assert accepted_request["job_id"] is None
+    assert accepted_request["scheduling_ready"] is False
+    assert accepted_request["recommended_action"] == "approve_request"
+    assert "job_id" in accepted_request["missing_scheduling_fields"]
+    assert "scheduled_start" in accepted_request["missing_scheduling_fields"]
+
+    approved_request = items["req-admin-approved"]
+    assert approved_request["recommended_action"] == "needs_job"
+    assert approved_request["scheduling_ready"] is False
+
+    unscheduled_job = items["job-unscheduled"]
+    assert unscheduled_job["item_type"] == "job"
+    assert unscheduled_job["job_id"] == "job-unscheduled"
+    assert unscheduled_job["scheduling_ready"] is True
+    assert unscheduled_job["recommended_action"] == "schedule_job"
+    assert unscheduled_job["requested_job_date"] == "2026-05-10"
+    assert unscheduled_job["requested_time_window"] == "morning"
+    assert "scheduled_start" in unscheduled_job["missing_scheduling_fields"]
+    assert "scheduled_end" in unscheduled_job["missing_scheduling_fields"]
+    assert unscheduled_job["google_calendar_event_id"] is None
+
+    scheduled_linked_job = items["job-scheduled-linked"]
+    assert scheduled_linked_job["status"] == "scheduled"
+    assert scheduled_linked_job["job_id"] == "job-scheduled-linked"
+    assert scheduled_linked_job["google_calendar_event_id"] == "calendar-linked-event"
+    assert scheduled_linked_job["scheduling_ready"] is True
+    assert scheduled_linked_job["recommended_action"] == "schedule_job"
+    assert "scheduled_start" in scheduled_linked_job["missing_scheduling_fields"]
+
+
+def test_admin_ops_queue_accepted_not_booked_detail_reports_missing_customer_preferences(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_quote("q-job-missing-preferences")
+    _seed_request(
+        "req-job-missing-preferences",
+        quote_id="q-job-missing-preferences",
+        status="admin_approved",
+        requested_job_date=None,
+        requested_time_window=None,
+    )
+    _seed_job(
+        "job-missing-preferences",
+        quote_id="q-job-missing-preferences",
+        request_id="req-job-missing-preferences",
+        status="approved",
+    )
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    item = next(item for item in resp.json()["accepted_not_booked_items"] if item["item_id"] == "job-missing-preferences")
+    assert item["scheduling_ready"] is True
+    assert item["preferred_window_label"] == "Not provided"
+    assert "requested_job_date" in item["missing_scheduling_fields"]
+    assert "requested_time_window" in item["missing_scheduling_fields"]
+    assert "confirm timing manually" in item["scheduling_summary"].lower()
 
 
 def test_admin_ops_queue_does_not_require_full_item_hydration(

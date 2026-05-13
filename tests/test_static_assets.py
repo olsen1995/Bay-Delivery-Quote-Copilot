@@ -262,6 +262,39 @@ def test_admin_uploads_page_uses_external_script_for_csp():
     assert "onload=" not in uploads_html
 
 
+def test_admin_desktop_contains_accepted_not_booked_queue_ui() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+
+    assert 'id="acceptedNotBookedQueueSection"' in admin_html
+    assert 'id="acceptedNotBookedQueueBox"' in admin_html
+    assert "Accepted, Not Booked" in admin_html
+    assert "renderAcceptedNotBookedQueue" in admin_js
+    assert "accepted_not_booked_items" in admin_js
+    assert "acceptedNotBookedReadinessBadge" in admin_js
+    assert "shouldOpenAcceptedNotBookedItemInRescheduleMode" in admin_js
+    assert "normalizedStatus === \"scheduled\"" in admin_js
+    assert "item?.google_calendar_event_id" in admin_js
+    assert "normalizedStatus === \"scheduled\" && hasCalendarEvent" in admin_js
+    assert "showScheduleModal(item.job_id, openInRescheduleMode)" in admin_js
+    assert "scheduleBtn.textContent = openInRescheduleMode ? \"Open Reschedule\" : \"Open Schedule\";" in admin_js
+    assert ".acceptedNotBookedItem" in admin_css
+    assert ".acceptedNotBookedReadinessBadge" in admin_css
+
+
+def test_customer_and_mobile_assets_do_not_include_desktop_accepted_not_booked_queue() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    for content in [quote_html, quote_js, mobile_html, mobile_js]:
+        assert "acceptedNotBookedQueueSection" not in content
+        assert "acceptedNotBookedQueueBox" not in content
+        assert "renderAcceptedNotBookedQueue" not in content
+
+
 def test_admin_page_gates_protected_dashboard_until_auth_load():
     """Ensure protected admin dashboard shells are hidden by default until JS reveals them."""
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
