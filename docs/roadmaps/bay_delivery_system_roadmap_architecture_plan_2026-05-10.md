@@ -66,6 +66,26 @@ The recommended build path is intentionally conservative:
 | 9     | Internal GPT Upgrade                          | Let GPT summarize ops board, risk, follow-ups, and calibration findings. Still internal-only and advisory.                                      |
 | 10    | Photo Evidence / Photo Assistant              | Attach photos and use advisory image notes later. Do not let image AI auto-price or override quote_engine.py.                                   |
 
+## Current Delivery Status (May 13, 2026)
+
+Completed roadmap work reflected in the repo today:
+
+- Admin Daily Ops Board read model.
+- Completed Job Profit Review Report.
+- Follow-Up Message Helper.
+- Accepted, Not Booked scheduling queue.
+- Accepted-not-booked detail row cap.
+
+Partial or still future roadmap work:
+
+- Admin action shortcuts are only partial, not complete.
+- Internal Quote Risk Summary is not fully complete.
+- Customer Quote Flow Simplification is not complete.
+- Lead source tracking, repeat customer marker, internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
+- Pricing PRs by service category have not started.
+- Internal GPT upgrade has not started beyond current grounding/state docs.
+- Photo Evidence / Photo Assistant remains future advisory-only work.
+
 ## Customer Flow Design
 
 The customer experience should feel like: Tell us what you need, add a few helpful details, send photos if possible, and Bay Delivery will confirm.
@@ -173,45 +193,29 @@ Rules:
 
 ## Exact PR Sequence
 
-| Order | PR Title                                                   | Scope                                                                                                  |
-|-------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| 1     | create admin daily ops board read model                    | Desktop admin read-only summary cards. No pricing, customer, schema, Render, workflow, or GPT changes. |
-| 2     | create admin ops board action shortcuts                    | Add follow-up/status shortcuts after the board is confirmed useful.                                    |
-| 3     | create customer quote flow simplification                  | Improve public wording and layout using progressive disclosure. Keep quote behavior compatible.        |
-| 4     | create internal quote risk summary                         | Admin-only risk card from structured intake fields. No quote total changes.                            |
-| 5     | create completed job profit review report                  | Admin report using completed-job costing data and analyzer concepts. Internal-only.                    |
-| 6     | create follow up message helper                            | Copy-ready message drafts for common customer situations. No automated sending yet.                    |
-| 7     | create job scheduling fields and accepted not booked queue | Booking/date/window fields and queue visibility. SQLite remains source of truth.                       |
+| Order | PR Title                                                   | Status    | Scope                                                                                                  |
+|-------|------------------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------|
+| 1     | create admin daily ops board read model                    | Complete  | Desktop admin read-only summary cards. No pricing, customer, schema, Render, workflow, or GPT changes. |
+| 2     | create admin ops board action shortcuts                    | Partial   | Add follow-up/status shortcuts after the board is confirmed useful.                                    |
+| 3     | create customer quote flow simplification                  | Future    | Improve public wording and layout using progressive disclosure. Keep quote behavior compatible.        |
+| 4     | create internal quote risk summary                         | Future    | Admin-only risk card from structured intake fields. No quote total changes.                            |
+| 5     | create completed job profit review report                  | Complete  | Admin report using completed-job costing data and analyzer concepts. Internal-only.                    |
+| 6     | create follow up message helper                            | Complete  | Copy-ready message drafts for common customer situations. No automated sending yet.                    |
+| 7     | create job scheduling fields and accepted not booked queue | Complete  | Accepted-not-booked queue visibility and scheduling-readiness guidance using existing admin flows.      |
 
-## Best Immediate Next PR
+## Best Immediate Next Task
 
-```text
-create follow up message helper
-```
+Run live health/version parity smoke coverage first to confirm the current docs, GPT grounding, and deployed baseline remain aligned after the completed admin workflow PRs.
 
-Scope: internal/admin drafting helper only, copy-ready message suggestions for common follow-up situations, no automatic sending, no pricing changes, no schema changes, and no customer/mobile behavior changes unless explicitly scoped.
+## Plan-Only Decision After Smoke Coverage
 
-This comes after the completed-job profit review report and before scheduling refinements. Pricing changes remain later and category-specific after reporting evidence.
+Choose one narrow planning path next:
 
-## Codex Prompt Seed
+1. Internal Quote Risk Summary.
+2. Customer Quote Flow Simplification.
+3. Lead source + repeat customer tracking.
 
-```text
-Create a Follow-Up Message Helper for Bay Delivery Quote Copilot. Plan first, then implement only if the plan stays narrow. Scope is internal/admin helper only. Generate copy-ready message drafts for common situations: no reply, need photos, accepted-not-booked, customer asking for cheaper pricing, completed-job follow-up, and review request. Do not auto-send messages. Do not change app/quote_engine.py, pricing logic, public quote behavior, Render config, workflows, requirements, or schema unless explicitly required. Validate with version parity, GPT grounding parity, compileall, focused tests, and full pytest if practical.
-```
-
-## Commit Text
-
-Commit headline:
-
-```text
-create follow up message helper
-```
-
-Commit description:
-
-```text
-Add an internal/admin Follow-Up Message Helper that drafts copy-ready follow-up messages for common customer scenarios. Keep the change advisory-only with no pricing, schema, customer-flow behavior, or auto-send behavior changes.
-```
+Keep pricing work later and category-specific after more operational evidence review.
 
 ## Final Operating Loop
 
