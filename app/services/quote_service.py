@@ -15,7 +15,11 @@ from app.quote_engine import (
     calculate_quote,
     load_config,
 )
-from app.services.quote_risk_scoring import build_quote_risk_advisory, build_quote_risk_assessment
+from app.services.quote_risk_scoring import (
+    build_quote_risk_advisory,
+    build_quote_risk_assessment,
+    build_quote_risk_summary,
+)
 from app.storage import get_quote_record, save_quote
 
 logger = logging.getLogger(__name__)
@@ -361,6 +365,7 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
 
     internal_risk_assessment: dict[str, Any] | None = None
     quote_risk_advisory: dict[str, Any] | None = None
+    quote_risk_summary: dict[str, Any] | None = None
     try:
         request_payload = quote.get("request")
         if not isinstance(request_payload, dict):
@@ -372,6 +377,11 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
         advisory = artifacts.get("quote_risk_advisory")
         if isinstance(advisory, dict):
             quote_risk_advisory = advisory
+        quote_risk_summary = build_quote_risk_summary(
+            dict(request_payload),
+            quote_risk_advisory,
+            internal_risk_assessment,
+        )
     except Exception:
         logger.warning(
             "Failed to re-derive internal risk assessment for admin quote detail %s",
@@ -383,4 +393,5 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
         **quote,
         "internal_risk_assessment": internal_risk_assessment,
         "quote_risk_advisory": quote_risk_advisory,
+        "quote_risk_summary": quote_risk_summary,
     }

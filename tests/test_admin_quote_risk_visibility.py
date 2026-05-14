@@ -73,6 +73,12 @@ def test_admin_quote_detail_includes_internal_risk_assessment(temp_quote_db: Non
     assert "DENSE_MATERIAL_RISK" in {
         flag["code"] for flag in body["quote_risk_advisory"]["risk_flags"]
     }
+    assert body["quote_risk_summary"]["customer_visible"] is False
+    assert body["quote_risk_summary"]["pricing_effect"] == "none"
+    assert body["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert body["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"
+    assert "heavy_material_risk" in body["quote_risk_summary"]["reasons"]
+    assert "photos" in body["quote_risk_summary"]["missing_info"]
 
 
 def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails(temp_quote_db: None) -> None:
@@ -97,6 +103,7 @@ def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails
     assert body["quote_id"] == "legacy-riskless-quote"
     assert body["internal_risk_assessment"] is None
     assert body["quote_risk_advisory"] is None
+    assert body["quote_risk_summary"] is None
 
 
 def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quote_db: None) -> None:
@@ -120,6 +127,7 @@ def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quot
     assert body["response"] is None
     assert body["internal_risk_assessment"] is None
     assert body["quote_risk_advisory"] is None
+    assert body["quote_risk_summary"] is None
 
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
     assert "const request = detail?.request ?? {};" in admin_js
@@ -138,6 +146,8 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
         assert "internal_risk_assessment" not in quote_body["response"]
         assert "quote_risk_advisory" not in quote_body
         assert "quote_risk_advisory" not in quote_body["response"]
+        assert "quote_risk_summary" not in quote_body
+        assert "quote_risk_summary" not in quote_body["response"]
 
         review_resp = client.get(
             f"/quote/{quote_body['quote_id']}/view",
@@ -150,3 +160,5 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
     assert "internal_risk_assessment" not in review_body["response"]
     assert "quote_risk_advisory" not in review_body
     assert "quote_risk_advisory" not in review_body["response"]
+    assert "quote_risk_summary" not in review_body
+    assert "quote_risk_summary" not in review_body["response"]

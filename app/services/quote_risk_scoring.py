@@ -36,6 +36,7 @@ _HIGH_CONSTRUCTION_DEBRIS_TYPES = {"concrete"}
 _MEDIUM_CONSTRUCTION_DEBRIS_TYPES = {"tile", "shingles", "mixed"}
 _REFRIGERANT_APPLIANCE_TYPES = {"fridge", "freezer", "air_conditioner", "dehumidifier"}
 _MOVE_DELIVERY_SERVICE_TYPES = {"small_move", "item_delivery", "moving", "delivery"}
+_VAGUE_SCOPE_WORDS = {"stuff", "junk", "items", "things", "load", "misc", "miscellaneous"}
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
@@ -359,3 +360,167 @@ def build_quote_risk_advisory(normalized_request: dict[str, Any]) -> dict[str, A
     if recommended_trailer:
         advisory["recommended_trailer"] = recommended_trailer
     return advisory
+
+
+def build_quote_risk_summary(
+    normalized_request: dict[str, Any],
+    advisory: dict[str, Any] | None,
+    assessment: dict[str, Any] | None,
+) -> dict[str, Any]:
+    request = normalized_request or {}
+    advisory_data = advisory if isinstance(advisory, dict) else {}
+    assessment_data = assessment if isinstance(assessment, dict) else {}
+    advisory_flags = [
+        flag for flag in advisory_data.get("risk_flags", [])
+        if isinstance(flag, dict) and _has_text(flag.get("code"))
+    ]
+    advisory_codes = {str(flag.get("code", "")).strip() for flag in advisory_flags}
+    assessment_flags = {
+        str(flag).strip()
+        for flag in assessment_data.get("risk_flags", [])
+        if str(flag or "").strip()
+    } if isinstance(assessment_data.get("risk_flags"), list) else set()
+
+    reasons: list[str] = []
+    missing_info: list[str] = []
+
+    def add_reason(reason: str) -> None:
+        if reason not in reasons:
+            reasons.append(reason)
+
+    def add_missing(field: str) -> None:
+        if field not in missing_info:
+            missing_info.append(field)
+
+    if advisory_codes & {"DENSE_MATERIAL_RISK", "DEMOLITION_SCOPE_RISK"} or "dense_material_risk" in assessment_flags:
+        add_reason("heavy_material_risk")
+    if advisory_codes & {"MIXED_LOAD_SORTING_RISK", "REFRIGERANT_APPLIANCE_RISK"} or {
+        "mixed_bulky_load_risk",
+        "likely_underestimated_volume",
+    } & assessment_flags:
+        add_reason("disposal_or_sorting_risk")
+    if advisory_codes & {"ACCESS_LABOUR_RISK"} or "access_volume_risk" in assessment_flags:
+        add_reason("access_or_stairs_risk")
+    if "REFRIGERANT_APPLIANCE_RISK" in advisory_codes:
+        add_reason("refrigerant_appliance_check")
+    if "DEMOLITION_SCOPE_RISK" in advisory_codes:
+        add_reason("demolition_or_ripout_scope")
+    if assessment_data.get("confidence_level") == "low" or {
+        "missing_structured_scope",
+        "low_input_signal",
+    } & assessment_flags:
+        add_reason("low_confidence_or_missing_scope")
+    if _as_bool(advisory_data.get("manual_review_recommended")):
+        add_reason("owner_review_recommended")
+
+    has_photos = any(
+        (
+            _as_bool(request.get("photos_uploaded")),
+            _as_bool(request.get("has_photos")),
+            _as_int(request.get("photo_count")) > 0,
+            _as_int(request.get("attachment_count")) > 0,
+        )
+    )
+    if not has_photos:
+        add_missing("photos")
+
+    description_words = set(_normalized_text(request.get("description") or request.get("job_description_customer")).split())
+    vague_description = bool(description_words & _VAGUE_SCOPE_WORDS) or len(description_words) <= 2
+    has_item_scope = any(
+        (
+            _as_int(request.get("garbage_bag_count")) > 0,
+            _as_int(request.get("mattresses_count")) > 0,
+            _as_int(request.get("box_springs_count")) > 0,
+            _has_text(request.get("trailer_fill_estimate")),
+            _has_text(request.get("trailer_class")),
+        )
+    )
+    if "missing_structured_scope" in assessment_flags or (not has_item_scope and vague_description):
+        add_missing("item_count")
+
+    access_known = any(
+        (
+            _has_text(request.get("access_difficulty")),
+            request.get("stairs_count") is not None,
+            request.get("floor_count") is not None,
+            request.get("basement_or_inside_removal") is not None,
+        )
+    )
+    if not access_known or "access_or_stairs_risk" in reasons:
+        add_missing("access_details")
+
+    disposal_review_needed = bool(
+        advisory_codes & {
+            "DENSE_MATERIAL_RISK",
+            "MIXED_LOAD_SORTING_RISK",
+            "REFRIGERANT_APPLIANCE_RISK",
+            "DEMOLITION_SCOPE_RISK",
+        }
+    )
+    if disposal_review_needed:
+        add_missing("disposal_type")
+
+    if not _has_text(request.get("requested_job_date")):
+        add_missing("preferred_date")
+    if not _has_text(request.get("requested_time_window")):
+        add_missing("preferred_time_window")
+
+    advisory_level = str(advisory_data.get("risk_level") or "").strip().lower()
+    if _as_bool(advisory_data.get("manual_review_recommended")):
+        risk_level = "owner_review"
+    elif advisory_level in {"high", "medium", "low"}:
+        risk_level = advisory_level
+        if advisory_level == "medium" and assessment_data.get("confidence_level") == "low" and len(reasons) >= 2:
+            risk_level = "high"
+    elif reasons:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    if risk_level == "owner_review":
+        suggested_action = "owner_review_before_approving"
+    elif any("photo" in str(action).lower() for action in advisory_data.get("suggested_actions", [])):
+        suggested_action = "request_photos"
+    elif missing_info or reasons:
+        suggested_action = "ask_followup"
+    else:
+        suggested_action = "approve"
+
+    stairs_count = max(_as_int(request.get("stairs_count")), 0)
+    floor_count = max(_as_int(request.get("floor_count")), 0)
+    crew_size = max(_as_int(request.get("crew_size"), 1), 1)
+    if risk_level == "owner_review":
+        crew_suggestion = "owner_review"
+    elif crew_size >= 2 or stairs_count >= 2 or floor_count >= 2 or _as_bool(request.get("basement_or_inside_removal")):
+        crew_suggestion = "two_workers_likely"
+    else:
+        crew_suggestion = "one_worker_likely"
+
+    trailer_value = str(advisory_data.get("recommended_trailer") or request.get("trailer_class") or "").strip()
+    if trailer_value == "double_axle_open_aluminum":
+        trailer_suggestion = "double_axle"
+    elif trailer_value in {"older_enclosed", "newer_enclosed"}:
+        trailer_suggestion = "enclosed"
+    elif trailer_value == "single_axle_open_aluminum":
+        trailer_suggestion = "single_axle"
+    elif str(request.get("service_type") or "").strip().lower() == "haul_away" and has_item_scope:
+        trailer_suggestion = "single_axle"
+    elif str(request.get("service_type") or "").strip().lower() in {"scrap_pickup", "item_delivery"}:
+        trailer_suggestion = "truck_only"
+    else:
+        trailer_suggestion = "unknown"
+
+    if not reasons:
+        add_reason("no_major_internal_risk_signals")
+
+    return {
+        "risk_level": risk_level,
+        "reasons": reasons,
+        "missing_info": missing_info,
+        "suggested_action": suggested_action,
+        "crew_suggestion": crew_suggestion,
+        "trailer_suggestion": trailer_suggestion,
+        "pricing_caution": "internal_advisory_only_no_price_change",
+        "customer_visible": False,
+        "pricing_effect": "none",
+    }
