@@ -202,12 +202,89 @@ def test_live_safe_health_version_check_uses_existing_health_validation(
         smoke_test._run_live_safe_smoke(check_health_version=True)
 
 
+def test_live_safe_health_commit_check_passes_when_health_matches_checked_out_head(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BASE_URL", "https://example.test/")
+    monkeypatch.setattr(smoke_test, "_checked_out_head_commit", lambda: "abcdef1234567890")
+
+    smoke_test._check_health_commit({"commit": "abcdef123456"})
+
+
+def test_live_safe_health_commit_check_reports_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BASE_URL", "https://example.test/")
+    monkeypatch.setattr(smoke_test, "_checked_out_head_commit", lambda: "abcdef1234567890")
+
+    with pytest.raises(AssertionError) as exc_info:
+        smoke_test._check_health_commit({"commit": "feedface0000"})
+
+    message = str(exc_info.value)
+    assert "expected checked-out HEAD abcdef123456" in message
+    assert "actual live /health commit feedface0000" in message
+    assert "https://example.test/health" in message
+
+
+def test_live_safe_health_commit_check_skips_when_live_commit_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("BASE_URL", "https://example.test/")
+    monkeypatch.setattr(smoke_test, "_checked_out_head_commit", lambda: "abcdef1234567890")
+
+    smoke_test._check_health_commit({})
+
+    captured = capsys.readouterr()
+    assert "Deployed commit fingerprint unavailable; skipped exact commit match." in captured.out
+
+
+def test_live_safe_without_commit_flag_does_not_read_checked_out_head(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_api(method: str, path: str, payload: dict | None = None, headers: dict | None = None):
+        del payload, headers
+        calls.append((method, path))
+        if path == "/health":
+            return 200, {"ok": True, "version": "0.11.0", "commit": "abcdef123456"}
+        if path == "/":
+            return 200, '<html><a href="/quote">Get a Quote</a></html>'
+        if path == "/quote":
+            return 200, '<html><form id="quoteForm"></form></html>'
+        if path == "/admin":
+            return 200, '<html><h2>Admin Access</h2><button id="refreshBtn"></button></html>'
+        if path == "/admin/uploads":
+            return 200, '<html><h2>Customer Uploads</h2><button id="btnSearch"></button></html>'
+        if path == "/admin/api/uploads?limit=1":
+            return 503, {"detail": "not configured"}
+        raise AssertionError(f"Unexpected smoke API call: {method} {path}")
+
+    def fail_if_called() -> str:
+        raise AssertionError("checked-out HEAD should not be read without --check-health-commit")
+
+    monkeypatch.setattr(smoke_test, "api", fake_api)
+    monkeypatch.setattr(smoke_test, "_checked_out_head_commit", fail_if_called)
+    monkeypatch.delenv("ADMIN_USERNAME", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+
+    assert smoke_test._run_live_safe_smoke() == 0
+    assert ("GET", "/health") in calls
+
+
 def test_live_safe_mode_dispatches_health_version_check_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     received: dict[str, bool] = {}
 
-    def fake_live_safe(*, check_gpt_observability: bool = False, check_health_version: bool = False) -> int:
+    def fake_live_safe(
+        *,
+        check_gpt_observability: bool = False,
+        check_health_version: bool = False,
+        check_health_commit: bool = False,
+    ) -> int:
         received["check_gpt_observability"] = check_gpt_observability
         received["check_health_version"] = check_health_version
+        received["check_health_commit"] = check_health_commit
         return 0
 
     monkeypatch.setattr(smoke_test, "_run_live_safe_smoke", fake_live_safe)
@@ -218,4 +295,37 @@ def test_live_safe_mode_dispatches_health_version_check_flag(monkeypatch: pytest
     )
 
     assert smoke_test.main() == 0
-    assert received == {"check_gpt_observability": False, "check_health_version": True}
+    assert received == {
+        "check_gpt_observability": False,
+        "check_health_version": True,
+        "check_health_commit": False,
+    }
+
+
+def test_live_safe_mode_dispatches_health_commit_check_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: dict[str, bool] = {}
+
+    def fake_live_safe(
+        *,
+        check_gpt_observability: bool = False,
+        check_health_version: bool = False,
+        check_health_commit: bool = False,
+    ) -> int:
+        received["check_gpt_observability"] = check_gpt_observability
+        received["check_health_version"] = check_health_version
+        received["check_health_commit"] = check_health_commit
+        return 0
+
+    monkeypatch.setattr(smoke_test, "_run_live_safe_smoke", fake_live_safe)
+    monkeypatch.setattr(
+        smoke_test.sys,
+        "argv",
+        ["smoke_test.py", "--mode", "live-safe", "--check-health-commit"],
+    )
+
+    assert smoke_test.main() == 0
+    assert received == {
+        "check_gpt_observability": False,
+        "check_health_version": False,
+        "check_health_commit": True,
+    }

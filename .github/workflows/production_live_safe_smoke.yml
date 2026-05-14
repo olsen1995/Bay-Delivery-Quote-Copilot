@@ -40,4 +40,4 @@ jobs:
           test -n "$ADMIN_PASSWORD" || (echo "Missing required secret: ADMIN_PASSWORD" && exit 1)
 
       - name: Run production live-safe smoke
-        run: python scripts/smoke_test.py --mode live-safe --check-gpt-observability --check-health-version
+        run: python scripts/smoke_test.py --mode live-safe --check-gpt-observability --check-health-version --check-health-commit
