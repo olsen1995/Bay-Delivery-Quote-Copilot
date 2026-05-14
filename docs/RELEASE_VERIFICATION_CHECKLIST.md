@@ -79,19 +79,18 @@ Run live-safe smoke when:
 Preferred path:
 
 - Trigger GitHub Actions workflow: `.github/workflows/production_live_safe_smoke.yml`
-  - This path runs the existing GPT observability live-safe assertion, verifies deployed `/health.version` matches the checked-out repo `VERSION`, and compares `/health.commit` against the first 12 characters of the full checked-out `HEAD` SHA only when the deployed commit fingerprint is available.
+  - This path runs the existing GPT observability live-safe assertion, uses `scripts/smoke_test.py --check-health-version` to verify deployed `/health.version` matches the checked-out repo `VERSION`, and uses `--check-health-commit` to compare `/health.commit` against the first 12 characters of the checked-out `HEAD` SHA when the deployed commit fingerprint is available.
   - Treat exact deploy proof as confirmed only when `/health.commit` is present and matched. If the field is absent/null, the workflow remains a deployed `VERSION` alignment check only.
-  - Render should normally provide this via `RENDER_GIT_COMMIT`; `BAYDELIVERY_COMMIT_SHA` remains an optional explicit override.
 
 Manual path:
 
 ```bash
-python scripts/smoke_test.py --mode live-safe
+python scripts/smoke_test.py --mode live-safe --check-health-version --check-health-commit
 ```
 
 Practical pass/fail interpretation:
 
-- **Pass**: `/health`, admin markers, auth-protected checks, configured Drive-backed checks, and deployed `VERSION` alignment all succeed. Exact commit proof is an extra confirmation only when `/health.commit` is present and matched.
+- **Pass**: `/health`, admin markers, auth-protected checks, configured Drive-backed checks, deployed `VERSION` alignment, and deployed commit alignment when `/health.commit` is present all succeed.
 - **Fail**: treat as a verification failure; log failure area and open follow-up before marking release verified.
 
 Reference: `.github/workflows/production_live_safe_smoke.yml`, `README.md` (Smoke test usage), `DEPLOYMENT_NOTES.md`.
