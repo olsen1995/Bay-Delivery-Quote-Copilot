@@ -64,10 +64,19 @@ const assistantStatusLine = document.getElementById("assistantStatusLine");
 const assistantDraftMeta = document.getElementById("assistantDraftMeta");
 const assistantAttachmentIdsInput = document.getElementById("assistantAttachmentIds");
 const assistantScreenshotFilesInput = document.getElementById("assistantScreenshotFiles");
+const followupMessageScenarioSelect = document.getElementById("followupMessageScenario");
+const followupMessageFormatSelect = document.getElementById("followupMessageFormat");
+const followupMessageContextSelect = document.getElementById("followupMessageContext");
+const followupMessageContextSummary = document.getElementById("followupMessageContextSummary");
+const followupMessageDraftInput = document.getElementById("followupMessageDraft");
+const followupMessageCopyBtn = document.getElementById("followupMessageCopyBtn");
+const followupMessageStatusLine = document.getElementById("followupMessageStatusLine");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
 let currentAssistantHandoff = null;
+let currentRequestItems = [];
+let currentJobItems = [];
 let currentJobsById = {};
 let currentQuoteItems = [];
 let currentQuoteDetailId = "";
@@ -90,6 +99,21 @@ const quoteRequestFollowupOptions = [
   ["waiting_on_customer", "Waiting on customer"],
   ["not_ready", "Not ready"],
   ["closed_no_followup", "Closed - no follow-up"]
+];
+const followupMessageFormatOptions = [
+  ["text", "Text message"],
+  ["email", "Email"]
+];
+const followupMessageScenarioCatalog = [
+  { key: "need_photos", label: "Need photos", audience: "customer" },
+  { key: "no_reply", label: "No reply / gentle follow-up", audience: "customer" },
+  { key: "accepted_not_booked", label: "Accepted but not booked", audience: "customer" },
+  { key: "need_access_details", label: "Need access details", audience: "customer" },
+  { key: "price_concern", label: "Price concern / customer asking cheaper", audience: "customer" },
+  { key: "completed_followup", label: "Completed job follow-up", audience: "customer" },
+  { key: "review_request", label: "Review request", audience: "customer" },
+  { key: "manual_review", label: "Manual review / unclear job", audience: "customer" },
+  { key: "missing_completed_job_cost_info", label: "Missing completed-job cost info", audience: "admin" }
 ];
 const dailyOpsBoardCardKeys = [
   "new_requests",
@@ -137,6 +161,345 @@ const structuredIntakeLabels = {
   double_axle_open_aluminum: "Double axle open aluminum",
   newer_enclosed: "Newer enclosed"
 };
+
+const friendlyServiceLabels = {
+  haul_away: "junk removal job",
+  scrap_pickup: "scrap pickup",
+  small_move: "move",
+  item_delivery: "delivery",
+  demolition: "demolition job",
+  dump_run: "junk removal job",
+  delivery: "delivery"
+};
+
+function populateSelectOptions(select, options, selectedValue) {
+  if (!select) return;
+  clearNode(select);
+  options.forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+  if (selectedValue && options.some(([value]) => value === selectedValue)) {
+    select.value = selectedValue;
+  } else if (options[0]) {
+    select.value = options[0][0];
+  }
+}
+
+function sentenceCase(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function firstName(value) {
+  return String(value || "").trim().split(/\s+/)[0] || "";
+}
+
+function friendlyServiceLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return friendlyServiceLabels[normalized] || (normalized ? normalized.replace(/_/g, " ") : "job");
+}
+
+function friendlyWindowLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  const map = {
+    morning: "morning",
+    afternoon: "afternoon",
+    evening: "evening",
+    flexible: "a flexible time"
+  };
+  return map[normalized] || normalized.replace(/_/g, " ");
+}
+
+function formatIsoDate(dateValue) {
+  const normalized = String(dateValue || "").trim();
+  if (!normalized) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    const date = new Date(`${normalized}T12:00:00`);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+  }
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return normalized;
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function safeTrimmed(value) {
+  return String(value || "").trim();
+}
+
+function compactContextCustomerName(context) {
+  return safeTrimmed(context.customer_name) || "";
+}
+
+function buildFollowupGreeting(context) {
+  const name = firstName(compactContextCustomerName(context));
+  return name ? `Hi ${name},` : "Hi,";
+}
+
+function buildFollowupClosing(format) {
+  return format === "email" ? "Thanks,\nBay Delivery" : "Thanks, Bay Delivery";
+}
+
+function describeDraftContext(context) {
+  const parts = [];
+  if (context.kind === "request") parts.push("Booking request context");
+  if (context.kind === "job") parts.push("Job context");
+  if (context.kind === "general") parts.push("General draft");
+  if (context.customer_name) parts.push(context.customer_name);
+  if (context.service_type) parts.push(sentenceCase(friendlyServiceLabel(context.service_type)));
+  if (context.job_address) parts.push(context.job_address);
+  if (context.requested_job_date) {
+    const dateLabel = formatIsoDate(context.requested_job_date);
+    const windowLabel = friendlyWindowLabel(context.requested_time_window);
+    if (dateLabel && windowLabel) parts.push(`${dateLabel} (${windowLabel})`);
+    else if (dateLabel) parts.push(dateLabel);
+  } else if (context.scheduled_start) {
+    parts.push(`Scheduled ${formatIsoDate(context.scheduled_start)}`);
+  } else if (context.completed_at) {
+    parts.push(`Completed ${formatIsoDate(context.completed_at)}`);
+  }
+  return parts.join(" • ") || "Using a general draft. Load requests or jobs to reuse existing admin context.";
+}
+
+function buildPhotosPrompt(requestJson) {
+  const request = requestJson && typeof requestJson === "object" ? requestJson : {};
+  const prompts = [];
+  const stairsCount = Number(request.stairs_count || 0);
+  const floorCount = Number(request.floor_count || 0);
+  const hasInsideRemoval = normalizeBooleanLike(request.basement_or_inside_removal);
+  if (stairsCount > 0 || floorCount > 0 || hasInsideRemoval) {
+    prompts.push("stairs, basement or inside access");
+  }
+  if (safeTrimmed(request.access_difficulty) === "difficult" || safeTrimmed(request.access_difficulty) === "extreme") {
+    prompts.push("apartment, elevator, or long-carry details");
+  }
+  return prompts;
+}
+
+function buildAccessPrompt(requestJson) {
+  const request = requestJson && typeof requestJson === "object" ? requestJson : {};
+  const prompts = [];
+  const stairsCount = Number(request.stairs_count || 0);
+  const floorCount = Number(request.floor_count || 0);
+  const hasInsideRemoval = normalizeBooleanLike(request.basement_or_inside_removal);
+  if (stairsCount > 0) prompts.push(`${stairsCount} stair set${stairsCount === 1 ? "" : "s"}`);
+  if (floorCount > 0) prompts.push(`${floorCount} floor${floorCount === 1 ? "" : "s"} from entry`);
+  if (hasInsideRemoval) prompts.push("inside or basement removal");
+  if (!prompts.length) {
+    prompts.push("stairs, apartment or elevator access, basement access, long carry, and parking/loading details");
+  }
+  return prompts;
+}
+
+function getMissingCompletedCostFields(context) {
+  const fields = [];
+  if (context.kind !== "job") return fields;
+  if (nullableNumber(context.actual_labor_cost_cad) === null) fields.push("actual labour cost");
+  if (nullableNumber(context.actual_disposal_cost_cad) === null) fields.push("actual disposal cost");
+  if (nullableNumber(context.actual_fuel_cost_cad) === null) fields.push("actual fuel cost");
+  if (nullableNumber(context.actual_other_costs_cad) === null) fields.push("actual other costs");
+  if (nullableNumber(context.final_amount_collected_cad) === null) fields.push("final amount collected");
+  if (!safeTrimmed(context.payment_status)) fields.push("payment status");
+  return fields;
+}
+
+function joinList(values) {
+  const items = values.filter((value) => safeTrimmed(value));
+  if (!items.length) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function createFollowupContextOptions() {
+  const options = [{ value: "general", label: "General / no selected context" }];
+  currentRequestItems.forEach((item) => {
+    const labelParts = [compactContextCustomerName(item) || item.request_id || "Request", sentenceCase(friendlyServiceLabel(item.service_type))];
+    if (item.requested_job_date) labelParts.push(formatIsoDate(item.requested_job_date));
+    options.push({ value: `request:${item.request_id || ""}`, label: `Request: ${labelParts.filter(Boolean).join(" • ")}` });
+  });
+  currentJobItems.forEach((item) => {
+    const labelParts = [compactContextCustomerName(item) || item.job_id || "Job", sentenceCase(friendlyServiceLabel(item.service_type))];
+    if (item.completed_at) labelParts.push(`Completed ${formatIsoDate(item.completed_at)}`);
+    else if (item.scheduled_start) labelParts.push(`Scheduled ${formatIsoDate(item.scheduled_start)}`);
+    else labelParts.push(statusLabel(item.status));
+    options.push({ value: `job:${item.job_id || ""}`, label: `Job: ${labelParts.filter(Boolean).join(" • ")}` });
+  });
+  return options;
+}
+
+function getFollowupContextByValue(value) {
+  const normalized = safeTrimmed(value);
+  if (!normalized || normalized === "general") {
+    return { kind: "general" };
+  }
+  const [kind, id] = normalized.split(":", 2);
+  if (kind === "request") {
+    const item = currentRequestItems.find((entry) => entry.request_id === id);
+    return item ? { kind: "request", ...item } : { kind: "general" };
+  }
+  if (kind === "job") {
+    const item = currentJobItems.find((entry) => entry.job_id === id);
+    return item ? { kind: "job", ...item } : { kind: "general" };
+  }
+  return { kind: "general" };
+}
+
+function buildCustomerDraft(scenarioKey, format, context) {
+  const greeting = buildFollowupGreeting(context);
+  const closing = buildFollowupClosing(format);
+  const serviceLabel = friendlyServiceLabel(context.service_type);
+  const dateLabel = formatIsoDate(context.requested_job_date);
+  const windowLabel = friendlyWindowLabel(context.requested_time_window);
+  const photoPrompts = buildPhotosPrompt(context.request_json);
+  const accessPrompts = buildAccessPrompt(context.request_json);
+
+  if (scenarioKey === "need_photos") {
+    const extraPrompt = photoPrompts.length ? ` If you can, please also mention ${joinList(photoPrompts)}.` : " If you can, please also mention whether the items are inside or outside and any stairs or access details.";
+    if (format === "email") {
+      return `${greeting}\n\nThanks for reaching out to Bay Delivery about your ${serviceLabel}. To give you a solid quote, could you send 2-4 clear photos of the items or area when you have a minute?${extraPrompt}\n\n${closing}`;
+    }
+    return `${greeting} Thanks for reaching out to Bay Delivery about your ${serviceLabel}. Could you send 2-4 clear photos of the items or area?${extraPrompt} ${closing}`;
+  }
+
+  if (scenarioKey === "no_reply") {
+    if (format === "email") {
+      return `${greeting}\n\nJust checking in on your Bay Delivery estimate for the ${serviceLabel}. If you still want to move ahead, send a quick reply and we will take the next step from there. No rush.\n\n${closing}`;
+    }
+    return `${greeting} Just checking in on your Bay Delivery estimate for the ${serviceLabel}. If you still want to move ahead, send a quick reply and we will take the next step from there. No rush. ${closing}`;
+  }
+
+  if (scenarioKey === "accepted_not_booked") {
+    const timePrompt = dateLabel && windowLabel ? `You mentioned ${dateLabel} in the ${windowLabel}.` : "If you still want to book it, send a couple of days and times that work best for you.";
+    if (format === "email") {
+      return `${greeting}\n\nThanks for accepting the estimate for your ${serviceLabel}. ${timePrompt} We can confirm the booking once we have the timing details from you.\n\n${closing}`;
+    }
+    return `${greeting} Thanks for accepting the estimate for your ${serviceLabel}. ${timePrompt} We can confirm the booking once we have the timing details from you. ${closing}`;
+  }
+
+  if (scenarioKey === "need_access_details") {
+    const accessSummary = joinList(accessPrompts);
+    if (format === "email") {
+      return `${greeting}\n\nBefore we lock this in, could you confirm a couple of access details for the ${serviceLabel}? Please let us know about ${accessSummary}. That helps Bay Delivery plan the right crew and timing.\n\n${closing}`;
+    }
+    return `${greeting} Before we lock this in, could you confirm a couple of access details for the ${serviceLabel}? Please let us know about ${accessSummary}. That helps Bay Delivery plan the right crew and timing. ${closing}`;
+  }
+
+  if (scenarioKey === "price_concern") {
+    if (format === "email") {
+      return `${greeting}\n\nThanks for the note. If you would like to bring the price down, the best option is usually to reduce the scope, set a few items aside, or have more of the load ready ahead of time. If you want, send over the changes you have in mind and Bay Delivery can take another look.\n\n${closing}`;
+    }
+    return `${greeting} Thanks for the note. If you would like to bring the price down, the best option is usually to reduce the scope, set a few items aside, or have more of the load ready ahead of time. If you want, send over the changes you have in mind and Bay Delivery can take another look. ${closing}`;
+  }
+
+  if (scenarioKey === "completed_followup") {
+    if (format === "email") {
+      return `${greeting}\n\nThanks again for choosing Bay Delivery. We are following up to make sure the ${serviceLabel} was completed the way you expected. If anything was missed, reply here and we will take care of it.\n\n${closing}`;
+    }
+    return `${greeting} Thanks again for choosing Bay Delivery. Just checking that the ${serviceLabel} was completed the way you expected. If anything was missed, reply here and we will take care of it. ${closing}`;
+  }
+
+  if (scenarioKey === "review_request") {
+    if (format === "email") {
+      return `${greeting}\n\nThanks again for choosing Bay Delivery. If you were happy with the job, we would really appreciate a short Google or Facebook review when you have a minute. It helps local customers find us.\n\n${closing}`;
+    }
+    return `${greeting} Thanks again for choosing Bay Delivery. If you were happy with the job, we would really appreciate a short Google or Facebook review when you have a minute. ${closing}`;
+  }
+
+  if (scenarioKey === "manual_review") {
+    const extraPrompt = photoPrompts.length ? `A few photos and any extra access details will help us confirm it.` : "A few photos and any extra access details will help us confirm it.";
+    if (format === "email") {
+      return `${greeting}\n\nThanks for sending this over. Before we confirm the final price for the ${serviceLabel}, we need to double-check a few details so there are no surprises on the day of the job. ${extraPrompt}\n\n${closing}`;
+    }
+    return `${greeting} Thanks for sending this over. Before we confirm the final price for the ${serviceLabel}, we need to double-check a few details so there are no surprises on the day of the job. ${extraPrompt} ${closing}`;
+  }
+
+  return `${greeting} Thanks for reaching out to Bay Delivery. Reply here when you are ready and we will take the next step from there. ${closing}`;
+}
+
+function buildAdminDraft(context) {
+  const missingFields = getMissingCompletedCostFields(context);
+  const missingSummary = missingFields.length ? joinList(missingFields) : "actual labour cost, actual disposal cost, actual fuel cost, actual other costs, final amount collected, and payment status";
+  const label = context.kind === "job"
+    ? `${context.customer_name || "job"} (${context.job_id || ""})`
+    : "this completed job";
+  return `Internal follow-up: please enter missing completed-job closeout details for ${label}. Still needed: ${missingSummary}. This helper is copy-only and does not update job status.`;
+}
+
+function buildFollowupMessageDraft(scenarioKey, format, context) {
+  if (scenarioKey === "missing_completed_job_cost_info") {
+    return buildAdminDraft(context);
+  }
+  return buildCustomerDraft(scenarioKey, format, context);
+}
+
+function updateFollowupMessageDraft() {
+  if (!followupMessageScenarioSelect || !followupMessageFormatSelect || !followupMessageContextSelect || !followupMessageDraftInput || !followupMessageCopyBtn) return;
+  const scenarioKey = followupMessageScenarioSelect.value || followupMessageScenarioCatalog[0].key;
+  const format = followupMessageFormatSelect.value || "text";
+  const context = getFollowupContextByValue(followupMessageContextSelect.value || "general");
+  const draft = buildFollowupMessageDraft(scenarioKey, format, context);
+  followupMessageDraftInput.value = draft;
+  followupMessageCopyBtn.disabled = !safeTrimmed(draft);
+  if (followupMessageContextSummary) {
+    followupMessageContextSummary.textContent = describeDraftContext(context);
+  }
+  if (followupMessageStatusLine) {
+    followupMessageStatusLine.textContent = "Copy-only helper. Review the draft before using it.";
+    followupMessageStatusLine.className = "statusNotice muted";
+  }
+}
+
+function renderFollowupMessageHelper() {
+  if (!followupMessageScenarioSelect || !followupMessageFormatSelect || !followupMessageContextSelect) return;
+  const selectedScenario = followupMessageScenarioSelect.value;
+  const selectedFormat = followupMessageFormatSelect.value;
+  const selectedContext = followupMessageContextSelect.value;
+  populateSelectOptions(
+    followupMessageScenarioSelect,
+    followupMessageScenarioCatalog.map((item) => [item.key, item.label]),
+    selectedScenario || followupMessageScenarioCatalog[0].key,
+  );
+  populateSelectOptions(
+    followupMessageFormatSelect,
+    followupMessageFormatOptions,
+    selectedFormat || followupMessageFormatOptions[0][0],
+  );
+  populateSelectOptions(
+    followupMessageContextSelect,
+    createFollowupContextOptions().map((item) => [item.value, item.label]),
+    selectedContext || "general",
+  );
+  updateFollowupMessageDraft();
+}
+
+async function copyFollowupMessageDraft() {
+  if (!followupMessageDraftInput || !followupMessageStatusLine) return;
+  const draft = safeTrimmed(followupMessageDraftInput.value);
+  if (!draft) {
+    setLine(followupMessageStatusLine, "bad", "No draft to copy yet. Choose a scenario first.");
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(draft);
+      setLine(followupMessageStatusLine, "ok", "Message copied to clipboard.");
+      return;
+    }
+  } catch {
+    // Fall back to manual copy guidance below.
+  }
+
+  followupMessageDraftInput.focus();
+  followupMessageDraftInput.select();
+  setLine(followupMessageStatusLine, "bad", "Clipboard access was blocked. The draft is selected so you can copy it manually.");
+}
 
 function setAssistantDraftLocked(isLocked) {
   // Desktop assistant is read-only; no draft controls to lock/unlock.
@@ -241,13 +604,15 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
+  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "profitReportBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
   });
   currentAssistantAnalysisId = "";
   currentAssistantHandoff = null;
+  currentRequestItems = [];
+  currentJobItems = [];
   currentJobsById = {};
   currentQuoteItems = [];
   currentQuoteDetailId = "";
@@ -256,6 +621,7 @@ function resetProtectedDashboard() {
   currentQuoteDetailsById = {};
   setAssistantDraftLocked(false);
   if (assistantDraftMeta) assistantDraftMeta.textContent = "No screenshot intake guidance records yet.";
+  renderFollowupMessageHelper();
 }
 
 function createTable(headers) {
@@ -508,12 +874,348 @@ function renderOpsQueueError() {
   box.appendChild(div);
 }
 
+function friendlyMissingSchedulingField(field) {
+  const labels = {
+    job_id: "job record",
+    requested_job_date: "requested date",
+    requested_time_window: "requested time window",
+    scheduled_start: "scheduled start",
+    scheduled_end: "scheduled end"
+  };
+  return labels[field] || String(field || "").replace(/_/g, " ");
+}
+
+function shouldOpenAcceptedNotBookedItemInRescheduleMode(item) {
+  const normalizedStatus = String(item?.status || "").trim().toLowerCase();
+  const hasCalendarEvent = Boolean(String(item?.google_calendar_event_id || "").trim());
+  return normalizedStatus === "scheduled" && hasCalendarEvent;
+}
+
+function renderAcceptedNotBookedQueue(payload) {
+  const box = document.getElementById("acceptedNotBookedQueueBox");
+  if (!box) return;
+  clearNode(box);
+
+  const items = Array.isArray(payload?.accepted_not_booked_items) ? payload.accepted_not_booked_items : [];
+  const totalCount = Number(payload?.counts?.accepted_not_booked || items.length || 0);
+
+  if (!items.length) {
+    return addEmptyState(box, totalCount ? "Accepted-not-booked detail is temporarily unavailable." : "No accepted or approved work is waiting on scheduling.");
+  }
+
+  const summary = document.createElement("div");
+  summary.className = "acceptedNotBookedQueueSummary";
+  summary.textContent = items.length < totalCount
+    ? `Showing latest ${items.length} of ${totalCount} accepted or approved items waiting on scheduling.`
+    : `${totalCount} accepted or approved item${totalCount === 1 ? "" : "s"} waiting on scheduling.`;
+  box.appendChild(summary);
+
+  const list = document.createElement("div");
+  list.className = "acceptedNotBookedList";
+
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "acceptedNotBookedItem";
+
+    const header = document.createElement("div");
+    header.className = "acceptedNotBookedHeader";
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "acceptedNotBookedTitleWrap";
+    const title = document.createElement("strong");
+    title.className = "acceptedNotBookedTitle";
+    const titleBits = [item.customer_name || item.item_id || "Unassigned item"];
+    if (item.service_type) titleBits.push(String(item.service_type).replace(/_/g, " "));
+    title.textContent = titleBits.join(" • ");
+    titleWrap.appendChild(title);
+
+    const sub = document.createElement("div");
+    sub.className = "small muted";
+    const subBits = [];
+    if (item.job_address) subBits.push(item.job_address);
+    if (item.submitted_at) subBits.push(`Submitted ${item.submitted_at}`);
+    else if (item.created_at) subBits.push(`Created ${item.created_at}`);
+    sub.textContent = subBits.join(" • ");
+    titleWrap.appendChild(sub);
+
+    const badgeWrap = document.createElement("div");
+    badgeWrap.className = "acceptedNotBookedBadgeWrap";
+    badgeWrap.appendChild(makeStatusBadge(item.status || item.item_type || "pending"));
+
+    const readiness = document.createElement("span");
+    readiness.className = `acceptedNotBookedReadinessBadge ${item.scheduling_ready ? "is-ready" : "is-blocked"}`;
+    readiness.textContent = item.scheduling_ready ? "Ready to schedule" : "Needs workflow step";
+    badgeWrap.appendChild(readiness);
+
+    header.append(titleWrap, badgeWrap);
+    card.appendChild(header);
+
+    const detailGrid = document.createElement("div");
+    detailGrid.className = "acceptedNotBookedDetailGrid";
+    [
+      ["Type", item.item_type === "job" ? "Job" : "Request"],
+      ["Quote", item.quote_id || "-"],
+      ["Request", item.request_id || "-"],
+      ["Job", item.job_id || "-"],
+      ["Preferred date", item.requested_job_date ? formatIsoDate(item.requested_job_date) : "Not provided"],
+      ["Preferred window", item.preferred_window_label || "Not provided"],
+      ["Phone", item.customer_phone || "-"]
+    ].forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.className = "acceptedNotBookedDetailRow";
+      const name = document.createElement("span");
+      name.className = "acceptedNotBookedDetailLabel";
+      name.textContent = label;
+      const val = document.createElement("span");
+      val.textContent = value;
+      row.append(name, val);
+      detailGrid.appendChild(row);
+    });
+    card.appendChild(detailGrid);
+
+    const summaryText = document.createElement("div");
+    summaryText.className = "acceptedNotBookedSummary";
+    summaryText.textContent = item.scheduling_summary || "Scheduling review pending.";
+    card.appendChild(summaryText);
+
+    const missingFields = Array.isArray(item.missing_scheduling_fields) ? item.missing_scheduling_fields : [];
+    const missing = document.createElement("div");
+    missing.className = "acceptedNotBookedMissingFields";
+    const missingLabel = document.createElement("strong");
+    missingLabel.textContent = "Missing scheduling fields:";
+    const missingValue = document.createElement("span");
+    missingValue.textContent = missingFields.length ? missingFields.map(friendlyMissingSchedulingField).join(", ") : "None";
+    missing.append(missingLabel, missingValue);
+    card.appendChild(missing);
+
+    if (item.notes) {
+      const notes = document.createElement("div");
+      notes.className = "small muted acceptedNotBookedNotes";
+      notes.textContent = `Notes: ${item.notes}`;
+      card.appendChild(notes);
+    }
+
+    const actionRow = document.createElement("div");
+    actionRow.className = "acceptedNotBookedActions";
+    if (item.job_id) {
+      const openInRescheduleMode = shouldOpenAcceptedNotBookedItemInRescheduleMode(item);
+      const scheduleBtn = document.createElement("button");
+      scheduleBtn.type = "button";
+      scheduleBtn.className = "actionBtn acceptedNotBookedScheduleBtn";
+      scheduleBtn.textContent = openInRescheduleMode ? "Open Reschedule" : "Open Schedule";
+      scheduleBtn.addEventListener("click", () => showScheduleModal(item.job_id, openInRescheduleMode));
+      actionRow.appendChild(scheduleBtn);
+    } else {
+      const actionHint = document.createElement("div");
+      actionHint.className = "small muted";
+      actionHint.textContent = item.recommended_action === "approve_request"
+        ? "Approve this request from the Booking Requests section before scheduling."
+        : "Create or restore a job record before opening the schedule workflow.";
+      actionRow.appendChild(actionHint);
+    }
+    card.appendChild(actionRow);
+
+    list.appendChild(card);
+  });
+
+  box.appendChild(list);
+}
+
+function renderAcceptedNotBookedQueueError() {
+  const box = document.getElementById("acceptedNotBookedQueueBox");
+  if (!box) return;
+  clearNode(box);
+  addEmptyState(box, "Accepted, Not Booked could not load. Core admin data is still available.");
+}
+
 async function refreshOpsQueueBestEffort() {
   try {
     const opsQueue = await fetchJSON("/admin/api/ops-queue");
     renderOpsQueue(opsQueue);
+    renderAcceptedNotBookedQueue(opsQueue);
   } catch {
     renderOpsQueueError();
+    renderAcceptedNotBookedQueueError();
+  }
+}
+
+function renderProfitReport(report) {
+  const box = document.getElementById("profitReportBox");
+  if (!box) return;
+  clearNode(box);
+
+  if (!report || (!Array.isArray(report.jobs) && !Array.isArray(report.summary_cards))) {
+    return addEmptyState(box, "No profit report data available.");
+  }
+
+  // Summary cards
+  const cards = Array.isArray(report.summary_cards) ? report.summary_cards : [];
+  if (cards.length) {
+    const grid = document.createElement("div");
+    grid.className = "profitReportSummaryGrid";
+    cards.forEach((card) => {
+      const section = document.createElement("section");
+      section.className = "profitReportCard";
+
+      const header = document.createElement("div");
+      header.className = "profitReportCardHeader";
+
+      const label = document.createElement("div");
+      label.className = "profitReportCardLabel";
+      label.textContent = card.label || card.key || "";
+
+      const val = document.createElement("span");
+      val.className = "profitReportCardValue";
+      if (card.value === null || card.value === undefined) {
+        val.textContent = "—";
+      } else if (card.key === "known_profit_total_cad") {
+        val.textContent = "$" + Number(card.value).toFixed(2);
+      } else if (card.key === "avg_known_margin_pct") {
+        val.textContent = Number(card.value).toFixed(1) + "%";
+      } else {
+        val.textContent = String(card.value);
+      }
+
+      header.append(label, val);
+      section.appendChild(header);
+
+      if (card.description) {
+        const desc = document.createElement("div");
+        desc.className = "small muted profitReportCardDescription";
+        desc.textContent = card.description;
+        section.appendChild(desc);
+      }
+
+      grid.appendChild(section);
+    });
+    box.appendChild(grid);
+  }
+
+  // Category breakdown
+  const breakdown = Array.isArray(report.category_breakdown) ? report.category_breakdown : [];
+  if (breakdown.length) {
+    const h4 = document.createElement("h4");
+    h4.className = "profitReportSubheading";
+    h4.textContent = "Category Breakdown";
+    box.appendChild(h4);
+
+    const table = document.createElement("table");
+    table.className = "profitReportTable";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["Service Type", "Jobs", "Complete", "Incomplete", "Owner Review", "Underquoted/Painful", "Profit Total", "Avg Margin", "Avg Collected"].forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    breakdown.forEach((row) => {
+      const tr = document.createElement("tr");
+      const cells = [
+        row.service_type || "unknown",
+        String(row.total_jobs || 0),
+        String(row.complete_rows || 0),
+        String(row.incomplete_rows || 0),
+        String(row.owner_review_count || 0),
+        String(row.underquoted_painful_count || 0),
+        row.known_profit_total_cad !== null && row.known_profit_total_cad !== undefined ? "$" + Number(row.known_profit_total_cad).toFixed(2) : "—",
+        row.avg_known_margin_pct !== null && row.avg_known_margin_pct !== undefined ? Number(row.avg_known_margin_pct).toFixed(1) + "%" : "—",
+        row.avg_collected_cad !== null && row.avg_collected_cad !== undefined ? "$" + Number(row.avg_collected_cad).toFixed(2) : "—",
+      ];
+      cells.forEach((cellText) => {
+        const td = document.createElement("td");
+        td.textContent = cellText;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+  }
+
+  // Recent completed jobs table
+  const jobs = Array.isArray(report.jobs) ? report.jobs : [];
+  if (jobs.length) {
+    const h4 = document.createElement("h4");
+    h4.className = "profitReportSubheading";
+    h4.textContent = "Recent Completed Jobs";
+    box.appendChild(h4);
+
+    const table = document.createElement("table");
+    table.className = "profitReportTable";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["Job ID", "Service", "Collected", "Known Cost", "Known Profit", "Margin", "Status", "Flags"].forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    jobs.forEach((job) => {
+      const tr = document.createElement("tr");
+      if (job.owner_review) tr.classList.add("profitReportRowReview");
+      else if (!job.is_complete) tr.classList.add("profitReportRowIncomplete");
+
+      const flags = [];
+      if (!job.is_complete) flags.push("Missing cost data");
+      if (job.owner_review) flags.push("Needs owner review");
+      if (job.job_profit_status === "underquoted") flags.push("Underquoted");
+      if (job.job_profit_status === "painful") flags.push("Painful job");
+      if (job.trusted_margin && job.known_margin_pct !== null && job.known_margin_pct < 20) flags.push("Below 20% known margin");
+
+      const cells = [
+        String(job.job_id || "").slice(0, 8) + "…",
+        job.service_type || "unknown",
+        job.final_amount_collected_cad !== null && job.final_amount_collected_cad !== undefined ? "$" + Number(job.final_amount_collected_cad).toFixed(2) : "—",
+        job.known_cost_cad !== null && job.known_cost_cad !== undefined ? "$" + Number(job.known_cost_cad).toFixed(2) : "—",
+        job.known_profit_cad !== null && job.known_profit_cad !== undefined ? "$" + Number(job.known_profit_cad).toFixed(2) : "—",
+        job.known_margin_pct !== null && job.known_margin_pct !== undefined ? Number(job.known_margin_pct).toFixed(1) + "%" : (job.is_complete ? "—" : "Incomplete closeout"),
+        job.job_profit_status || "—",
+        flags.join(", ") || "Profitable",
+      ];
+      cells.forEach((cellText) => {
+        const td = document.createElement("td");
+        td.textContent = cellText;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+  }
+
+  if (!cards.length && !breakdown.length && !jobs.length) {
+    addEmptyState(box, "No completed jobs found.");
+  }
+}
+
+function renderProfitReportError() {
+  const box = document.getElementById("profitReportBox");
+  if (!box) return;
+  clearNode(box);
+  const div = document.createElement("div");
+  div.className = "emptyState";
+  const msg = document.createElement("span");
+  msg.className = "bad";
+  msg.textContent = "Profit review report could not load. Core admin data is still available.";
+  div.appendChild(msg);
+  box.appendChild(div);
+}
+
+async function refreshProfitReportBestEffort() {
+  try {
+    const report = await fetchJSON("/admin/api/completed-job-profit-report");
+    renderProfitReport(report);
+  } catch {
+    renderProfitReportError();
   }
 }
 
@@ -1153,6 +1855,7 @@ function actionCell(item) {
 
 function renderRequests(items) {
   const box = document.getElementById("requestsBox");
+  currentRequestItems = items || [];
   if (!items || items.length === 0) return addEmptyState(box, "No booking requests yet.");
   clearNode(box);
 
@@ -1219,6 +1922,7 @@ function renderRequests(items) {
   });
 
   box.appendChild(table);
+  renderFollowupMessageHelper();
 }
 
 function createCostingField(label, field, type, value, options, config = {}) {
@@ -1431,6 +2135,7 @@ function createJobCostingPanel(job) {
 
 function renderJobs(items) {
   const box = document.getElementById("jobsBox");
+  currentJobItems = items || [];
   if (!items || items.length === 0) return addEmptyState(box, "No jobs yet.");
   clearNode(box);
   currentJobsById = Object.fromEntries((items || []).filter((item) => item && item.job_id).map((item) => [item.job_id, item]));
@@ -1576,6 +2281,7 @@ function renderJobs(items) {
   });
 
   box.appendChild(table);
+  renderFollowupMessageHelper();
 }
 
 function renderScheduleContext(job) {
@@ -2128,6 +2834,7 @@ async function refreshAll() {
 
     setProtectedDashboardVisible(true);
     void refreshOpsQueueBestEffort();
+    void refreshProfitReportBestEffort();
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
     adminSessionReady = false;
@@ -2163,6 +2870,10 @@ adminUsernameInput.addEventListener("keydown", handleCredsKeydown);
 adminPasswordInput.addEventListener("keydown", handleCredsKeydown);
 if (scheduleCloseBtn) scheduleCloseBtn.addEventListener("click", closeScheduleModal);
 if (scheduleCancelBtn) scheduleCancelBtn.addEventListener("click", closeScheduleModal);
+if (followupMessageScenarioSelect) followupMessageScenarioSelect.addEventListener("change", updateFollowupMessageDraft);
+if (followupMessageFormatSelect) followupMessageFormatSelect.addEventListener("change", updateFollowupMessageDraft);
+if (followupMessageContextSelect) followupMessageContextSelect.addEventListener("change", updateFollowupMessageDraft);
+if (followupMessageCopyBtn) followupMessageCopyBtn.addEventListener("click", copyFollowupMessageDraft);
 
 resetProtectedDashboard();
 closeScheduleModal();

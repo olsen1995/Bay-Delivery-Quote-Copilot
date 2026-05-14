@@ -208,6 +208,14 @@ def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:
         "internal_risk_assessment",
         "quote_risk_advisory",
         "quote_risk_summary",
+        "follow-up message helper",
+        "completed-job cost info",
+        "known margin",
+        "known profit",
+        "underquoted",
+        "painful",
+        "pricing engine",
+        "risk score",
     ]
 
     banned_phrases_css = [
@@ -254,6 +262,40 @@ def test_admin_uploads_page_uses_external_script_for_csp():
     assert "<script>" not in uploads_html
     assert "onclick=" not in uploads_html
     assert "onload=" not in uploads_html
+
+
+def test_admin_desktop_contains_accepted_not_booked_queue_ui() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+
+    assert 'id="acceptedNotBookedQueueSection"' in admin_html
+    assert 'id="acceptedNotBookedQueueBox"' in admin_html
+    assert "Accepted, Not Booked" in admin_html
+    assert "renderAcceptedNotBookedQueue" in admin_js
+    assert "accepted_not_booked_items" in admin_js
+    assert "acceptedNotBookedReadinessBadge" in admin_js
+    assert "Showing latest ${items.length} of ${totalCount} accepted or approved items waiting on scheduling." in admin_js
+    assert "shouldOpenAcceptedNotBookedItemInRescheduleMode" in admin_js
+    assert "normalizedStatus === \"scheduled\"" in admin_js
+    assert "item?.google_calendar_event_id" in admin_js
+    assert "normalizedStatus === \"scheduled\" && hasCalendarEvent" in admin_js
+    assert "showScheduleModal(item.job_id, openInRescheduleMode)" in admin_js
+    assert "scheduleBtn.textContent = openInRescheduleMode ? \"Open Reschedule\" : \"Open Schedule\";" in admin_js
+    assert ".acceptedNotBookedItem" in admin_css
+    assert ".acceptedNotBookedReadinessBadge" in admin_css
+
+
+def test_customer_and_mobile_assets_do_not_include_desktop_accepted_not_booked_queue() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    for content in [quote_html, quote_js, mobile_html, mobile_js]:
+        assert "acceptedNotBookedQueueSection" not in content
+        assert "acceptedNotBookedQueueBox" not in content
+        assert "renderAcceptedNotBookedQueue" not in content
 
 
 def test_admin_page_gates_protected_dashboard_until_auth_load():
@@ -438,6 +480,60 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'Missing fields:' in admin_js
     assert 'Warnings:' in admin_js
     assert 'No message/OCR-based intake suggestions detected.' in admin_js
+
+
+def test_completed_job_profit_report_desktop_only_assets() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    assert 'id="adminProfitReportSection"' in admin_html
+    assert "Completed Job Profit Review" in admin_html
+    assert "Internal report only." in admin_html
+    assert 'id="profitReportBox"' in admin_html
+    assert 'data-admin-protected="true"' in admin_html
+
+    assert "/admin/api/completed-job-profit-report" in admin_js
+    assert "function renderProfitReport(" in admin_js
+    assert "function refreshProfitReportBestEffort(" in admin_js
+    assert "Category Breakdown" in admin_js
+    assert "Recent Completed Jobs" in admin_js
+    assert "Missing cost data" in admin_js
+    assert "Incomplete closeout" in admin_js
+    assert "Underquoted" in admin_js
+    assert "Painful job" in admin_js
+    assert "Below 20% known margin" in admin_js
+
+    assert ".profitReportSummaryGrid" in admin_css
+    assert ".profitReportTable" in admin_css
+
+    banned_mobile = [
+        "Completed Job Profit Review",
+        "profitReportBox",
+        "/admin/api/completed-job-profit-report",
+        "known_margin_pct",
+        "known_profit_cad",
+    ]
+    for phrase in banned_mobile:
+        assert phrase not in mobile_html
+        assert phrase not in mobile_js
+
+    banned_quote = [
+        "completed job profit review",
+        "/admin/api/completed-job-profit-report",
+        "known_margin_pct",
+        "known_profit_cad",
+        "owner review",
+    ]
+    for phrase in banned_quote:
+        assert phrase not in quote_html.lower()
+        assert phrase not in quote_js.lower()
+        assert phrase not in quote_css.lower()
     assert '["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]' in admin_js
     assert 'ocr_json' in admin_js
     assert 'Click Analyze Intake to save reviewed fields.' not in admin_js
@@ -588,6 +684,92 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     assert "/followup-status" not in mobile_js
     assert "followupQuickActions" not in mobile_html
     assert "followupQuickActions" not in mobile_js
+
+
+def test_desktop_admin_includes_followup_message_helper_only() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8").lower()
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8").lower()
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8").lower()
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8").lower()
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8").lower()
+
+    assert "Follow-Up Message Helper" in admin_html
+    assert 'id="adminFollowupHelperSection"' in admin_html
+    assert 'id="followupMessageScenario"' in admin_html
+    assert 'id="followupMessageFormat"' in admin_html
+    assert 'id="followupMessageContext"' in admin_html
+    assert 'id="followupMessageContextSummary"' in admin_html
+    assert 'id="followupMessageDraft"' in admin_html
+    assert 'id="followupMessageCopyBtn"' in admin_html
+    assert "Copy-only helper" in admin_html
+    assert "does not send messages or update follow-up status" in admin_html
+
+    for label in [
+        "Need photos",
+        "No reply / gentle follow-up",
+        "Accepted but not booked",
+        "Need access details",
+        "Price concern / customer asking cheaper",
+        "Completed job follow-up",
+        "Review request",
+        "Manual review / unclear job",
+        "Missing completed-job cost info",
+        "Text message",
+        "Email",
+    ]:
+        assert label in admin_js
+
+    assert "const followupMessageScenarioCatalog = [" in admin_js
+    assert "function renderFollowupMessageHelper()" in admin_js
+    assert "function buildFollowupMessageDraft(scenarioKey, format, context)" in admin_js
+    assert "function copyFollowupMessageDraft()" in admin_js
+    assert "navigator.clipboard.writeText" in admin_js
+    assert ".followupHelperGrid" in admin_css
+    assert ".followupHelperSummary" in admin_css
+    assert ".followupHelperActions" in admin_css
+    assert ".followupHelperNote" in admin_css
+
+    copy_function = re.search(r"async function copyFollowupMessageDraft\(\) \{(?P<body>.*?)\n\}\n\nfunction setAssistantDraftLocked", admin_js, re.S)
+    assert copy_function is not None
+    copy_body = copy_function.group("body")
+    assert "fetch(" not in copy_body
+    for forbidden in [
+        "/followup-status",
+        "/decision",
+        "/schedule",
+        "/reschedule",
+        "/costing",
+        "/start",
+        "/complete",
+        "/cancel",
+        "/sms",
+        "/email",
+        "/messages",
+    ]:
+        assert forbidden not in copy_body
+
+    for forbidden in [
+        "follow-up message helper",
+        "completed-job cost info",
+        "known margin",
+        "known profit",
+        "underquoted",
+        "painful",
+        "owner review",
+        "internal risk",
+        "quote_risk_advisory",
+        "internal_risk_assessment",
+        "pricing engine",
+        "risk score",
+    ]:
+        assert forbidden not in quote_html
+        assert forbidden not in quote_js
+        assert forbidden not in quote_css
+        assert forbidden not in mobile_html
+        assert forbidden not in mobile_js
 
 
 def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:

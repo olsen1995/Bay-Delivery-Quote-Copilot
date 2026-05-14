@@ -102,8 +102,10 @@ label {
 #requestsBox,
 #jobsBox,
 #opsQueueBox,
+#acceptedNotBookedQueueBox,
 #auditLogBox,
-#assistantHistoryBox {
+#assistantHistoryBox,
+#followupMessageContextSummary {
 	overflow-x: auto;
 }
 
@@ -209,6 +211,106 @@ label {
 
 .opsQueueShortcut:hover {
 	background: rgba(255, 255, 255, 0.14);
+}
+
+.acceptedNotBookedQueueSummary {
+	margin-bottom: 12px;
+	font-size: 0.92rem;
+	color: var(--muted);
+}
+
+.acceptedNotBookedList {
+	display: grid;
+	gap: 12px;
+}
+
+.acceptedNotBookedItem {
+	border: 1px solid var(--line-soft);
+	border-radius: 10px;
+	padding: 14px;
+	background: var(--surface-alt);
+}
+
+.acceptedNotBookedHeader {
+	display: flex;
+	justify-content: space-between;
+	gap: 14px;
+	align-items: flex-start;
+}
+
+.acceptedNotBookedTitleWrap {
+	min-width: 0;
+}
+
+.acceptedNotBookedTitle {
+	display: block;
+	font-size: 0.98rem;
+	margin-bottom: 4px;
+}
+
+.acceptedNotBookedBadgeWrap {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.acceptedNotBookedReadinessBadge {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 999px;
+	padding: 4px 10px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.acceptedNotBookedReadinessBadge.is-ready {
+	background: rgba(86, 196, 159, 0.16);
+	color: #d6fff2;
+}
+
+.acceptedNotBookedReadinessBadge.is-blocked {
+	background: rgba(255, 179, 71, 0.16);
+	color: #ffe4b3;
+}
+
+.acceptedNotBookedDetailGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 14px;
+	margin-top: 12px;
+}
+
+.acceptedNotBookedDetailRow {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 0.86rem;
+}
+
+.acceptedNotBookedDetailLabel {
+	color: var(--muted);
+	font-weight: 700;
+}
+
+.acceptedNotBookedSummary,
+.acceptedNotBookedMissingFields,
+.acceptedNotBookedActions,
+.acceptedNotBookedNotes {
+	margin-top: 12px;
+}
+
+.acceptedNotBookedMissingFields {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	font-size: 0.86rem;
+}
+
+.acceptedNotBookedScheduleBtn {
+	min-width: 0;
 }
 
 .adminSectionFocus {
@@ -440,6 +542,53 @@ label {
 .followupQuickAction.isActive {
 	background: rgba(52, 211, 153, 0.16);
 	border-color: rgba(52, 211, 153, 0.36);
+}
+
+.followupHelperGrid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+	margin-top: 12px;
+}
+
+.followupHelperField {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+}
+
+.followupHelperField span {
+	font-size: 0.84rem;
+}
+
+.followupHelperSummary {
+	margin-top: 14px;
+	padding: 12px 14px;
+	border: 1px dashed rgba(255, 255, 255, 0.16);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.followupHelperDraftField {
+	margin-top: 14px;
+}
+
+.followupHelperDraftField textarea {
+	min-height: 190px;
+	resize: vertical;
+	line-height: 1.5;
+}
+
+.followupHelperActions {
+	display: grid;
+	grid-template-columns: 180px minmax(0, 1fr);
+	gap: 12px;
+	align-items: center;
+	margin-top: 14px;
+}
+
+.followupHelperNote {
+	margin-top: 10px;
 }
 
 .dashboardGrid {
@@ -803,10 +952,86 @@ textarea:focus {
 	background: transparent;
 }
 
+.profitReportSummaryGrid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.profitReportCard {
+	border: 1px solid var(--line-soft);
+	border-radius: 8px;
+	padding: 12px;
+	background: var(--surface-alt);
+	min-width: 0;
+}
+
+.profitReportCardHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+
+.profitReportCardLabel {
+	font-weight: 800;
+	font-size: 0.95rem;
+}
+
+.profitReportCardValue {
+	font-weight: 800;
+	color: var(--ink-strong);
+}
+
+.profitReportCardDescription {
+	line-height: 1.35;
+}
+
+.profitReportSubheading {
+	margin: 16px 0 8px;
+	font-size: 1rem;
+	font-weight: 800;
+}
+
+.profitReportTable {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.92rem;
+	margin-bottom: 12px;
+}
+
+.profitReportTable th,
+.profitReportTable td {
+	border-bottom: 1px solid var(--line-soft);
+	padding: 8px;
+	text-align: left;
+	vertical-align: top;
+}
+
+.profitReportTable th {
+	font-weight: 800;
+	color: var(--ink-strong);
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.profitReportRowReview {
+	background: rgba(193, 44, 39, 0.1);
+}
+
+.profitReportRowIncomplete {
+	background: rgba(252, 200, 29, 0.08);
+}
+
 @media (max-width: 980px) {
 	.row,
+	.followupHelperGrid,
+	.followupHelperActions,
 	.dashboardGrid,
-	.opsQueueGrid {
+	.opsQueueGrid,
+	.acceptedNotBookedDetailGrid,
+	.profitReportSummaryGrid {
 		grid-template-columns: 1fr;
 	}
 }
@@ -826,6 +1051,16 @@ textarea:focus {
 	.adminHero,
 	.sectionHeader {
 		flex-direction: column;
+	}
+
+	.acceptedNotBookedHeader,
+	.acceptedNotBookedDetailRow {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.acceptedNotBookedBadgeWrap {
+		justify-content: flex-start;
 	}
 
 	.heroBadgeGroup {

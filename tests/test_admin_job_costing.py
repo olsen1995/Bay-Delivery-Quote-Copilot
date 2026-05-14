@@ -37,7 +37,11 @@ def admin_headers() -> dict[str, str]:
     return {"Authorization": f"Basic {token}"}
 
 
-def _seed_job(job_id: str = "job-costing", status: str = "completed") -> dict[str, Any]:
+def _seed_job(
+    job_id: str = "job-costing",
+    status: str = "completed",
+    service_type: str = "dump_run",
+) -> dict[str, Any]:
     job = {
         "job_id": job_id,
         "created_at": "2026-04-26T10:00:00",
@@ -49,10 +53,10 @@ def _seed_job(job_id: str = "job-costing", status: str = "completed") -> dict[st
         "job_address": "123 Costing St",
         "job_description_customer": "Completed junk removal",
         "job_description_internal": "Internal details",
-        "service_type": "dump_run",
+        "service_type": service_type,
         "cash_total_cad": 240.0,
         "emt_total_cad": 271.2,
-        "request_json": {"service_type": "dump_run"},
+        "request_json": {"service_type": service_type},
         "notes": "Original job notes",
         "completed_at": "2026-04-26T12:30:00" if status == "completed" else None,
     }
@@ -485,3 +489,196 @@ def test_legacy_backup_payment_method_status_values_import_as_payment_status(
     restored = storage.require_job("legacy-backup-partial")
     assert restored["payment_method"] is None
     assert restored["payment_status"] == "partial_payment"
+
+
+def test_completed_job_profit_report_requires_auth(client: TestClient, isolated_db: Path) -> None:
+    _seed_job(job_id="report-auth", status="completed")
+
+    resp = client.get("/admin/api/completed-job-profit-report")
+
+    assert resp.status_code == 401
+
+
+def test_completed_job_profit_report_includes_completed_jobs_only(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_job(job_id="report-completed-a", status="completed")
+    _seed_job(job_id="report-completed-b", status="completed")
+    _seed_job(job_id="report-scheduled", status="scheduled")
+
+    resp = client.get("/admin/api/completed-job-profit-report", headers=admin_headers)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert "summary_cards" in payload
+    assert "category_breakdown" in payload
+    job_ids = {item["job_id"] for item in payload["jobs"]}
+    assert "report-completed-a" in job_ids
+    assert "report-completed-b" in job_ids
+    assert "report-scheduled" not in job_ids
+
+
+def test_completed_job_profit_report_flags_incomplete_rows_and_untrusted_margin(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_job(job_id="report-incomplete", status="completed")
+
+    resp = client.get("/admin/api/completed-job-profit-report", headers=admin_headers)
+
+    assert resp.status_code == 200
+    row = next(item for item in resp.json()["jobs"] if item["job_id"] == "report-incomplete")
+    assert row["is_complete"] is False
+    assert row["trusted_margin"] is False
+    assert "actual_labor_cost_cad" in row["missing_fields"]
+    assert row["known_margin_pct"] is None
+
+
+@pytest.mark.parametrize("zero_value", [0, "0", "0.00"])
+def test_completed_job_profit_report_treats_zero_collected_amount_as_incomplete_closeout(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    zero_value: Any,
+) -> None:
+    _seed_job(job_id=f"report-zero-{str(zero_value).replace('.', '-')}", status="completed")
+
+    storage.update_job_costing(
+        f"report-zero-{str(zero_value).replace('.', '-')}",
+        actual_labor_cost_cad=80.0,
+        actual_disposal_cost_cad=15.0,
+        actual_fuel_cost_cad=10.0,
+        actual_other_costs_cad=5.0,
+        final_amount_collected_cad=zero_value,
+        payment_status="paid_in_full",
+        job_profit_status="fair",
+    )
+
+    resp = client.get("/admin/api/completed-job-profit-report", headers=admin_headers)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    row = next(item for item in payload["jobs"] if item["job_id"] == f"report-zero-{str(zero_value).replace('.', '-')}")
+
+    assert row["is_complete"] is False
+    assert row["trusted_margin"] is False
+    assert row["known_profit_cad"] is None
+    assert row["known_margin_pct"] is None
+    assert "final_amount_collected_cad" in row["missing_fields"]
+
+    cards = {card["key"]: card for card in payload["summary_cards"]}
+    assert cards["missing_cost_data"]["value"] >= 1
+
+
+def test_completed_job_profit_report_owner_review_margin_and_profit_status_rules(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_job(job_id="report-margin-low", status="completed")
+    _seed_job(job_id="report-underquoted", status="completed")
+    _seed_job(job_id="report-profitable", status="completed")
+
+    storage.update_job_costing(
+        "report-margin-low",
+        actual_labor_cost_cad=120.0,
+        actual_disposal_cost_cad=25.0,
+        actual_fuel_cost_cad=10.0,
+        actual_other_costs_cad=10.0,
+        final_amount_collected_cad=180.0,
+        payment_status="paid_in_full",
+        job_profit_status="fair",
+    )
+    storage.update_job_costing(
+        "report-underquoted",
+        actual_labor_cost_cad=80.0,
+        actual_disposal_cost_cad=10.0,
+        actual_fuel_cost_cad=8.0,
+        actual_other_costs_cad=5.0,
+        final_amount_collected_cad=190.0,
+        payment_status="paid_in_full",
+        job_profit_status="underquoted",
+    )
+    storage.update_job_costing(
+        "report-profitable",
+        actual_labor_cost_cad=60.0,
+        actual_disposal_cost_cad=10.0,
+        actual_fuel_cost_cad=8.0,
+        actual_other_costs_cad=5.0,
+        final_amount_collected_cad=220.0,
+        payment_status="paid_in_full",
+        job_profit_status="profitable",
+    )
+
+    resp = client.get("/admin/api/completed-job-profit-report", headers=admin_headers)
+    assert resp.status_code == 200
+    rows = {item["job_id"]: item for item in resp.json()["jobs"]}
+
+    assert rows["report-margin-low"]["trusted_margin"] is True
+    assert rows["report-margin-low"]["known_margin_pct"] < 20.0
+    assert rows["report-margin-low"]["owner_review"] is True
+
+    assert rows["report-underquoted"]["owner_review"] is True
+    assert rows["report-underquoted"]["job_profit_status"] == "underquoted"
+
+    assert rows["report-profitable"]["trusted_margin"] is True
+    assert rows["report-profitable"]["known_margin_pct"] > 20.0
+    assert rows["report-profitable"]["owner_review"] is False
+
+
+def test_completed_job_profit_report_category_breakdown_and_summary_cards(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_job(job_id="report-dump-1", status="completed")
+    _seed_job(job_id="report-dump-2", status="completed")
+    _seed_job(job_id="report-moving-1", status="completed", service_type="moving")
+
+    storage.update_job_costing(
+        "report-dump-1",
+        actual_labor_cost_cad=90.0,
+        actual_disposal_cost_cad=20.0,
+        actual_fuel_cost_cad=10.0,
+        actual_other_costs_cad=10.0,
+        final_amount_collected_cad=220.0,
+        payment_status="paid_in_full",
+        job_profit_status="profitable",
+    )
+    storage.update_job_costing(
+        "report-moving-1",
+        actual_labor_cost_cad=120.0,
+        actual_disposal_cost_cad=15.0,
+        actual_fuel_cost_cad=14.0,
+        actual_other_costs_cad=12.0,
+        final_amount_collected_cad=230.0,
+        payment_status="paid_in_full",
+        job_profit_status="fair",
+    )
+
+    resp = client.get("/admin/api/completed-job-profit-report", headers=admin_headers)
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    category_map = {row["service_type"]: row for row in payload["category_breakdown"]}
+    assert "dump_run" in category_map
+    assert "moving" in category_map
+    assert category_map["dump_run"]["total_jobs"] >= 2
+    assert category_map["moving"]["total_jobs"] >= 1
+
+    cards = {card["key"]: card for card in payload["summary_cards"]}
+    assert cards["completed_jobs_reviewed"]["value"] >= 3
+    assert "missing_cost_data" in cards
+    assert "owner_review" in cards
+
+
+def test_completed_job_profit_report_service_does_not_import_quote_engine() -> None:
+    service_path = Path("app/services/completed_job_profit_report.py")
+    source = service_path.read_text(encoding="utf-8")
+
+    assert "from app.quote_engine import" not in source
+    assert "import app.quote_engine" not in source
+    assert "calculate_quote(" not in source

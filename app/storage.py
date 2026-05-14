@@ -223,6 +223,7 @@ class GptQuoteObservabilityRecord(TypedDict):
 
 class AdminOpsQueueSources(TypedDict):
     counts: Dict[str, int]
+    accepted_not_booked_detail_sources: List[Dict[str, Any]]
 
 
 def _validate_deposit_status(value: Any) -> None:
@@ -976,10 +977,88 @@ ADMIN_OPS_BOARD_COUNT_KEYS = (
     "stale_quotes",
 )
 
+ACCEPTED_NOT_BOOKED_DETAIL_ROW_LIMIT = 50
+
 
 def _count_query(conn: sqlite3.Connection, sql: str, params: Tuple[Any, ...] = ()) -> int:
     row = conn.execute(sql, params).fetchone()
     return int(row[0]) if row else 0
+
+
+def load_accepted_not_booked_detail_sources() -> List[Dict[str, Any]]:
+    """Return targeted source rows for accepted or approved work waiting on scheduling."""
+    accepted_not_booked_request_where = (
+        "qr.status IN ('customer_accepted', 'admin_approved') AND NOT EXISTS ("
+        "SELECT 1 FROM jobs AS j WHERE j.request_id = qr.request_id OR j.quote_id = qr.quote_id"
+        ")"
+    )
+    accepted_not_booked_job_where = (
+        "j.status IN ('approved', 'scheduled') AND "
+        "(j.scheduled_start IS NULL OR TRIM(j.scheduled_start) = '')"
+    )
+
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM (
+                SELECT
+                    'request' AS item_type,
+                    qr.request_id AS item_id,
+                    qr.created_at AS created_at,
+                    COALESCE(qr.customer_accepted_at, qr.admin_approved_at, qr.created_at) AS submitted_at,
+                    qr.status AS status,
+                    qr.request_id AS request_id,
+                    NULL AS job_id,
+                    qr.quote_id AS quote_id,
+                    qr.customer_name AS customer_name,
+                    qr.customer_phone AS customer_phone,
+                    qr.service_type AS service_type,
+                    qr.job_address AS job_address,
+                    qr.requested_job_date AS requested_job_date,
+                    qr.requested_time_window AS requested_time_window,
+                    NULL AS scheduled_start,
+                    NULL AS scheduled_end,
+                    NULL AS google_calendar_event_id,
+                    qr.notes AS notes
+                FROM quote_requests AS qr
+                WHERE {accepted_not_booked_request_where}
+
+                UNION ALL
+
+                SELECT
+                    'job' AS item_type,
+                    j.job_id AS item_id,
+                    j.created_at AS created_at,
+                    COALESCE(qr.admin_approved_at, qr.customer_accepted_at, j.created_at) AS submitted_at,
+                    j.status AS status,
+                    j.request_id AS request_id,
+                    j.job_id AS job_id,
+                    j.quote_id AS quote_id,
+                    j.customer_name AS customer_name,
+                    j.customer_phone AS customer_phone,
+                    j.service_type AS service_type,
+                    j.job_address AS job_address,
+                    qr.requested_job_date AS requested_job_date,
+                    qr.requested_time_window AS requested_time_window,
+                    j.scheduled_start AS scheduled_start,
+                    j.scheduled_end AS scheduled_end,
+                    j.google_calendar_event_id AS google_calendar_event_id,
+                    COALESCE(qr.notes, j.notes) AS notes
+                FROM jobs AS j
+                LEFT JOIN quote_requests AS qr ON qr.request_id = j.request_id
+                WHERE {accepted_not_booked_job_where}
+            )
+            ORDER BY datetime(submitted_at) DESC, item_type ASC, item_id ASC
+            LIMIT ?
+            """,
+            (ACCEPTED_NOT_BOOKED_DETAIL_ROW_LIMIT,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [dict(row) for row in rows]
 
 
 def _json_truthy(column: str, field_name: str) -> str:
@@ -1029,6 +1108,7 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
 def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_start_iso: str) -> AdminOpsQueueSources:
     """Return targeted read-only counts and risk-advisory candidates for the admin ops board."""
     counts: Dict[str, int] = {key: 0 for key in ADMIN_OPS_BOARD_COUNT_KEYS}
+    accepted_not_booked_detail_sources: List[Dict[str, Any]] = []
 
     new_requests_where = "status = 'customer_pending'"
     followup_where = (
@@ -1155,7 +1235,51 @@ def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_star
     finally:
         conn.close()
 
-    return {"counts": counts}
+    accepted_not_booked_detail_sources = load_accepted_not_booked_detail_sources()
+
+    return {
+        "counts": counts,
+        "accepted_not_booked_detail_sources": accepted_not_booked_detail_sources,
+    }
+
+
+# =========================
+# Completed Job Profit Report
+# =========================
+
+_PROFIT_REPORT_FIELDS = (
+    "job_id",
+    "service_type",
+    "status",
+    "actual_labor_cost_cad",
+    "actual_disposal_cost_cad",
+    "actual_fuel_cost_cad",
+    "actual_other_costs_cad",
+    "final_amount_collected_cad",
+    "payment_method",
+    "payment_status",
+    "job_profit_status",
+    "scheduled_start",
+    "customer_name",
+)
+
+
+def load_completed_job_profit_report_sources(*, limit: int = 200) -> List[Dict[str, Any]]:
+    """Return completed job rows with all profit-report fields for read-only analysis.
+
+    Only returns jobs with status='completed'. No mutations.
+    """
+    safe_limit = max(1, min(int(limit), 500))
+    cols = ", ".join(_PROFIT_REPORT_FIELDS)
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            f"SELECT {cols} FROM jobs WHERE status = 'completed' ORDER BY scheduled_start DESC NULLS LAST LIMIT ?",
+            (safe_limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 
 def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:
