@@ -327,7 +327,25 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "function createInternalRiskSummarySignals(" not in admin_js
     assert "normalizeBooleanLike(request?.basement_or_inside_removal)" not in admin_js
     assert 'detail.quote_risk_summary || null' in admin_js
+    risk_summary_match = re.search(
+        r"function createInternalRiskSummarySection\(summary\) \{(?P<body>.*?)\n\}\n\nfunction createQuoteRiskAdvisorySection",
+        admin_js,
+        re.DOTALL,
+    )
+    assert risk_summary_match is not None
+    risk_summary_body = risk_summary_match.group("body")
+    assert "makeRiskConfidenceBadge" not in risk_summary_body
+    assert "makeQuoteRiskLevelBadge(riskLevel)" in risk_summary_body
     assert "formatRiskSummaryValue" in admin_js
+    assert "function makeQuoteRiskLevelBadge(" in admin_js
+    assert "quote-risk-level-low" in admin_js
+    assert "quote-risk-level-medium" in admin_js
+    assert "quote-risk-level-high" in admin_js
+    assert "quote-risk-level-owner-review" in admin_js
+    assert "Low risk" in admin_js
+    assert "Medium risk" in admin_js
+    assert "High risk" in admin_js
+    assert "Owner review" in admin_js
     assert "Risk level" in admin_js
     assert "Reasons:" in admin_js
     assert "Missing info:" in admin_js
@@ -351,6 +369,11 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert ".quoteRiskSection" in admin_css
     assert ".quoteRiskFlags" in admin_css
     assert ".quoteRiskSummaryList" in admin_css
+    assert ".quoteRiskLevel" in admin_css
+    assert ".quote-risk-level-low" in admin_css
+    assert ".quote-risk-level-medium" in admin_css
+    assert ".quote-risk-level-high" in admin_css
+    assert ".quote-risk-level-owner-review" in admin_css
     assert ".risk-confidence-medium" in admin_css
 
 

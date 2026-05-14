@@ -590,6 +590,10 @@ button:disabled {
 	margin-left: 6px;
 }
 
+.quoteRiskLevel {
+	margin-left: 6px;
+}
+
 .risk-confidence-high {
 	background: rgba(52, 211, 153, 0.14);
 	border-color: rgba(52, 211, 153, 0.38);
@@ -607,6 +611,31 @@ button:disabled {
 	background: rgba(248, 113, 113, 0.14);
 	border-color: rgba(248, 113, 113, 0.4);
 	color: #fecaca;
+}
+
+.quote-risk-level-low {
+	background: rgba(148, 163, 184, 0.14);
+	border-color: rgba(148, 163, 184, 0.36);
+	color: #dbe4ef;
+}
+
+.quote-risk-level-medium {
+	background: rgba(250, 204, 21, 0.16);
+	border-color: rgba(250, 204, 21, 0.42);
+	color: #fde68a;
+}
+
+.quote-risk-level-high {
+	background: rgba(248, 113, 113, 0.16);
+	border-color: rgba(248, 113, 113, 0.44);
+	color: #fecaca;
+}
+
+.quote-risk-level-owner-review,
+.quote-risk-level-unknown {
+	background: rgba(216, 180, 254, 0.16);
+	border-color: rgba(216, 180, 254, 0.42);
+	color: #e9d5ff;
 }
 
 .ok {

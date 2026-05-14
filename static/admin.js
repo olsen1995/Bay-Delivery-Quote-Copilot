@@ -531,6 +531,27 @@ function makeRiskConfidenceBadge(level) {
   return badge;
 }
 
+function makeQuoteRiskLevelBadge(riskLevel) {
+  const normalized = String(riskLevel || "").trim().toLowerCase();
+  const labels = {
+    low: "Low risk",
+    medium: "Medium risk",
+    high: "High risk",
+    owner_review: "Owner review",
+  };
+  const classes = {
+    low: "quote-risk-level-low",
+    medium: "quote-risk-level-medium",
+    high: "quote-risk-level-high",
+    owner_review: "quote-risk-level-owner-review",
+  };
+  const className = classes[normalized] || "quote-risk-level-unknown";
+  const badge = document.createElement("span");
+  badge.className = "statusBadge quoteRiskLevel " + className;
+  badge.textContent = labels[normalized] || "Unknown risk";
+  return badge;
+}
+
 function createQuoteMetaRow(label, value, extraNode) {
   const row = document.createElement("div");
   row.className = "quoteDetailMetaRow";
@@ -659,7 +680,7 @@ function createInternalRiskSummarySection(summary) {
 
   const riskLevel = String(summary.risk_level || "").trim();
   if (riskLevel) {
-    section.appendChild(createQuoteMetaRow("Risk level", null, makeRiskConfidenceBadge(riskLevel)));
+    section.appendChild(createQuoteMetaRow("Risk level", null, makeQuoteRiskLevelBadge(riskLevel)));
   }
 
   appendRiskSummaryList(section, "Reasons:", summary.reasons);
