@@ -232,6 +232,19 @@ function safeTrimmed(value) {
   return String(value || "").trim();
 }
 
+function normalizeBooleanLike(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1", "on"].includes(normalized)) return true;
+    if (["false", "no", "n", "0", "off", ""].includes(normalized)) return false;
+    return false;
+  }
+  return false;
+}
+
 function compactContextCustomerName(context) {
   return safeTrimmed(context.customer_name) || "";
 }

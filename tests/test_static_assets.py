@@ -367,7 +367,6 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "Internal Risk Summary" in admin_js
     assert "function createInternalRiskSummarySection(" in admin_js
     assert "function createInternalRiskSummarySignals(" not in admin_js
-    assert "normalizeBooleanLike(request?.basement_or_inside_removal)" not in admin_js
     assert 'detail.quote_risk_summary || null' in admin_js
     risk_summary_match = re.search(
         r"function createInternalRiskSummarySection\(summary\) \{(?P<body>.*?)\n\}\n\nfunction createQuoteRiskAdvisorySection",
@@ -727,6 +726,12 @@ def test_desktop_admin_includes_followup_message_helper_only() -> None:
     assert "function buildFollowupMessageDraft(scenarioKey, format, context)" in admin_js
     assert "function copyFollowupMessageDraft()" in admin_js
     assert "navigator.clipboard.writeText" in admin_js
+    assert "function normalizeBooleanLike(" in admin_js
+    assert '["true", "yes", "y", "1", "on"].includes(normalized)' in admin_js
+    assert '["false", "no", "n", "0", "off", ""].includes(normalized)' in admin_js
+    assert "normalizeBooleanLike(request.basement_or_inside_removal)" in admin_js
+    assert admin_js.index("function normalizeBooleanLike(") < admin_js.index("function buildPhotosPrompt(")
+    assert admin_js.index("function normalizeBooleanLike(") < admin_js.index("function buildAccessPrompt(")
     assert ".followupHelperGrid" in admin_css
     assert ".followupHelperSummary" in admin_css
     assert ".followupHelperActions" in admin_css
