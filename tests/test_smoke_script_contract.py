@@ -134,3 +134,88 @@ def test_post_deploy_mode_dispatches_to_post_deploy_smoke(monkeypatch: pytest.Mo
 
     assert smoke_test.main() == 0
     assert called is True
+
+
+def test_live_safe_health_version_check_passes_when_health_matches_repo_version(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("0.11.0\n", encoding="utf-8")
+
+    monkeypatch.setattr(smoke_test, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("BASE_URL", "https://example.test/")
+
+    smoke_test._check_health_version({"version": "0.11.0"})
+
+
+def test_live_safe_health_version_check_reports_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("0.11.0\n", encoding="utf-8")
+
+    monkeypatch.setattr(smoke_test, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("BASE_URL", "https://example.test/")
+
+    with pytest.raises(AssertionError) as exc_info:
+        smoke_test._check_health_version({"version": "0.10.9"})
+
+    message = str(exc_info.value)
+    assert "expected repo VERSION 0.11.0" in message
+    assert "actual live /health version 0.10.9" in message
+    assert "https://example.test/health" in message
+
+
+def test_live_safe_health_version_check_reports_missing_live_version(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("0.11.0\n", encoding="utf-8")
+
+    monkeypatch.setattr(smoke_test, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("BASE_URL", "https://example.test/")
+
+    with pytest.raises(AssertionError) as exc_info:
+        smoke_test._check_health_version({})
+
+    message = str(exc_info.value)
+    assert "expected repo VERSION 0.11.0" in message
+    assert "actual live /health version <missing>" in message
+    assert "https://example.test/health" in message
+
+
+def test_live_safe_health_version_check_uses_existing_health_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_api(method: str, path: str, payload: dict | None = None, headers: dict | None = None):
+        del method, payload, headers
+        if path == "/health":
+            return 200, {"ok": False, "version": "0.11.0"}
+        raise AssertionError(f"Unexpected smoke API call: {path}")
+
+    monkeypatch.setattr(smoke_test, "api", fake_api)
+
+    with pytest.raises(AssertionError, match=r"GET /health expected \{'ok': true\}"):
+        smoke_test._run_live_safe_smoke(check_health_version=True)
+
+
+def test_live_safe_mode_dispatches_health_version_check_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: dict[str, bool] = {}
+
+    def fake_live_safe(*, check_gpt_observability: bool = False, check_health_version: bool = False) -> int:
+        received["check_gpt_observability"] = check_gpt_observability
+        received["check_health_version"] = check_health_version
+        return 0
+
+    monkeypatch.setattr(smoke_test, "_run_live_safe_smoke", fake_live_safe)
+    monkeypatch.setattr(
+        smoke_test.sys,
+        "argv",
+        ["smoke_test.py", "--mode", "live-safe", "--check-health-version"],
+    )
+
+    assert smoke_test.main() == 0
+    assert received == {"check_gpt_observability": False, "check_health_version": True}

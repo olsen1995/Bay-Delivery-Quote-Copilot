@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -14,6 +15,9 @@ try:
     import requests  # type: ignore
 except Exception:  # pragma: no cover
     requests = None
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def base_url() -> str:
@@ -152,6 +156,26 @@ def _run_health_check() -> Dict[str, Any]:
     require(isinstance(health, dict) and health.get("ok") is True, "GET /health expected {'ok': true}")
     print("[ok] /health")
     return health
+
+
+def _expected_repo_version() -> str:
+    return (REPO_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+
+
+def _check_health_version(health: Dict[str, Any]) -> None:
+    expected_version = _expected_repo_version()
+    actual_version = str(health.get("version") or "").strip()
+    displayed_actual = actual_version or "<missing>"
+    health_url = f"{base_url()}/health"
+
+    require(
+        actual_version == expected_version,
+        "GET /health version mismatch: "
+        f"expected repo VERSION {expected_version}; "
+        f"actual live /health version {displayed_actual}; "
+        f"checked URL {health_url}",
+    )
+    print(f"[ok] /health version matches repo VERSION ({expected_version})")
 
 
 def _run_public_customer_page_checks() -> None:
@@ -316,9 +340,11 @@ def _run_admin_read_checks(health: Dict[str, Any], *, check_gpt_observability: b
         print("[skip] drive backup check (drive_configured=false or not reported)")
 
 
-def _run_live_safe_smoke(*, check_gpt_observability: bool = False) -> int:
+def _run_live_safe_smoke(*, check_gpt_observability: bool = False, check_health_version: bool = False) -> int:
     print(f"Smoke test target: {base_url()} (mode=live-safe)")
     health = _run_health_check()
+    if check_health_version:
+        _check_health_version(health)
     _run_public_customer_page_checks()
     _run_admin_read_checks(health, check_gpt_observability=check_gpt_observability)
     print("Live-safe smoke test passed.")
@@ -440,13 +466,21 @@ def main() -> int:
         action="store_true",
         help="Opt-in: include /admin/api/gpt-quote-observability assertion during live-safe mode.",
     )
+    parser.add_argument(
+        "--check-health-version",
+        action="store_true",
+        help="Opt-in: compare live /health version against repo VERSION during live-safe mode.",
+    )
     args = parser.parse_args()
 
     if args.mode == "stateful":
         return _run_stateful_workflow_smoke()
     if args.mode == "post-deploy":
         return _run_post_deploy_live_smoke()
-    return _run_live_safe_smoke(check_gpt_observability=args.check_gpt_observability)
+    return _run_live_safe_smoke(
+        check_gpt_observability=args.check_gpt_observability,
+        check_health_version=args.check_health_version,
+    )
 
 
 if __name__ == "__main__":
