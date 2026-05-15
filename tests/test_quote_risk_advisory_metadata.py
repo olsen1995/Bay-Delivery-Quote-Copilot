@@ -394,6 +394,95 @@ def test_quote_risk_summary_detects_missing_info_and_practical_reasons() -> None
     )
 
 
+def test_quote_risk_summary_does_not_request_photos_when_photo_context_exists() -> None:
+    advisory = build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "tile"})
+    assert advisory is not None
+    assert any("photo" in action.lower() for action in advisory["suggested_actions"])
+
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "tile",
+            "garbage_bag_count": 4,
+            "bag_type": "light",
+            "trailer_fill_estimate": "quarter",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+            "attachment_count": 2,
+        },
+        advisory,
+        {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+    )
+
+    assert "photos" not in summary["missing_info"]
+    assert summary["suggested_action"] == "ask_followup"
+
+
+def test_quote_risk_summary_still_requests_photos_when_photos_are_missing() -> None:
+    advisory = build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "tile"})
+
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "tile",
+            "garbage_bag_count": 4,
+            "bag_type": "light",
+            "trailer_fill_estimate": "quarter",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+        },
+        advisory,
+        {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+    )
+
+    assert "photos" in summary["missing_info"]
+    assert summary["suggested_action"] == "request_photos"
+
+
+def test_quote_risk_summary_owner_review_still_outranks_missing_photos() -> None:
+    advisory = build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "concrete"})
+
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "concrete",
+            "garbage_bag_count": 4,
+            "bag_type": "heavy_mixed",
+            "trailer_fill_estimate": "quarter",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+        },
+        advisory,
+        {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+    )
+
+    assert "photos" in summary["missing_info"]
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+
+
+def test_quote_risk_summary_other_missing_info_asks_followup_when_photos_present() -> None:
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "description": "stuff",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+            "photos_uploaded": True,
+        },
+        None,
+        {"confidence_level": "high", "risk_flags": []},
+    )
+
+    assert "photos" not in summary["missing_info"]
+    assert "item_count" in summary["missing_info"]
+    assert summary["suggested_action"] == "ask_followup"
+
+
 def test_quote_risk_summary_builder_does_not_mutate_inputs() -> None:
     request = {"service_type": "haul_away", "dense_material_type": "concrete"}
     advisory = build_quote_risk_advisory(request)

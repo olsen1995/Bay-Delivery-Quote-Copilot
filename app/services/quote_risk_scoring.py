@@ -479,7 +479,7 @@ def build_quote_risk_summary(
 
     if risk_level == "owner_review":
         suggested_action = "owner_review_before_approving"
-    elif any("photo" in str(action).lower() for action in advisory_data.get("suggested_actions", [])):
+    elif "photos" in missing_info and any("photo" in str(action).lower() for action in advisory_data.get("suggested_actions", [])):
         suggested_action = "request_photos"
     elif missing_info or reasons:
         suggested_action = "ask_followup"

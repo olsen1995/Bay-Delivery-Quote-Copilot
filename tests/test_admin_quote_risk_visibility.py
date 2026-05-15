@@ -175,6 +175,43 @@ def test_admin_quote_detail_risk_summary_uses_persisted_scheduling_and_photo_con
     assert summary["suggested_action"] == "approve"
 
 
+def test_admin_quote_detail_with_attachments_does_not_request_photos_from_advisory_text(temp_quote_db: None) -> None:
+    with TestClient(app) as client:
+        quote_resp = client.post(
+            "/quote/calculate",
+            json=_quote_payload(
+                job_description_customer="Four bags of tile from garage",
+                description="Four bags of tile from garage",
+                estimated_hours=1.0,
+                crew_size=1,
+                garbage_bag_count=4,
+                bag_type="heavy_mixed",
+                trailer_fill_estimate="quarter",
+                access_difficulty="normal",
+                dense_material_type="tile",
+            ),
+        )
+        assert quote_resp.status_code == 200
+        quote_body = quote_resp.json()
+        quote_id = quote_body["quote_id"]
+        _save_quote_request_for_quote(
+            quote_body,
+            requested_job_date="2026-05-20",
+            requested_time_window="morning",
+        )
+        _save_quote_attachment(quote_id)
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    summary = resp.json()["quote_risk_summary"]
+    advisory_actions = resp.json()["quote_risk_advisory"]["suggested_actions"]
+    assert any("photo" in action.lower() for action in advisory_actions)
+    assert "photos" not in summary["missing_info"]
+    assert summary["suggested_action"] != "request_photos"
+    assert summary["suggested_action"] == "ask_followup"
+
+
 def test_admin_quote_detail_risk_summary_keeps_missing_context_when_absent(temp_quote_db: None) -> None:
     with TestClient(app) as client:
         quote_resp = client.post(
