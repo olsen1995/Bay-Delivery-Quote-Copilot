@@ -76,12 +76,13 @@ Completed roadmap work reflected in the repo today:
 - Accepted, Not Booked scheduling queue.
 - Accepted-not-booked detail row cap.
 - Internal Quote Risk Summary.
+- Customer Quote Flow Simplification.
 
 Partial or still future roadmap work:
 
 - Admin action shortcuts are only partial, not complete.
-- Customer Quote Flow Simplification is not complete.
 - Lead source tracking, repeat customer marker, internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
+- Customer-facing GPT/chatbot, automatic SMS/email sending, and auto-calendar scheduling remain future work.
 - Pricing PRs by service category have not started.
 - Internal GPT upgrade has not started beyond current grounding/state docs.
 - Photo Evidence / Photo Assistant remains future advisory-only work.
@@ -207,7 +208,7 @@ Rules:
 |-------|------------------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------|
 | 1     | create admin daily ops board read model                    | Complete  | Desktop admin read-only summary cards. No pricing, customer, schema, Render, workflow, or GPT changes. |
 | 2     | create admin ops board action shortcuts                    | Partial   | Add follow-up/status shortcuts after the board is confirmed useful.                                    |
-| 3     | create customer quote flow simplification                  | Future    | Improve public wording and layout using progressive disclosure. Keep quote behavior compatible.        |
+| 3     | create customer quote flow simplification                  | Complete  | Public quote wording simplified with progressive disclosure while preserving field IDs, payload compatibility, structured intake data, and `/quote/calculate` behavior. |
 | 4     | create internal quote risk summary                         | Complete  | Admin-only risk card from structured intake fields. No quote total changes.                            |
 | 5     | create completed job profit review report                  | Complete  | Admin report using completed-job costing data and analyzer concepts. Internal-only.                    |
 | 6     | create follow up message helper                            | Complete  | Copy-ready message drafts for common customer situations. No automated sending yet.                    |
@@ -215,14 +216,14 @@ Rules:
 
 ## Best Immediate Next Task
 
-Customer Quote Flow Simplification.
+Lead source + repeat customer tracking.
 
-Admin-side risk visibility is now in place, so the public intake can be simplified without losing internal operational context.
+The customer quote flow is now cleaner and admin risk review is stronger. The next best business value is learning where leads come from and identifying repeat customers before pricing changes or heavier admin mutations.
 
 Why other options lose right now:
 
-- Lead source + repeat customer tracking likely touches schema/storage and persisted customer/job data, so it is higher risk.
-- Admin action shortcuts can drift into mutations and operational workflow changes, so it should wait until docs are aligned and customer intake clarity is handled.
+- Admin action shortcuts completion is useful, but it can drift into backend mutations and operational workflow changes.
+- Job closeout checklist improvements are valuable, but likely touch job/cost capture flows and should wait until lead/repeat customer signal is captured.
 
 Keep pricing work later and category-specific after more operational evidence review.
 
