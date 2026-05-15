@@ -24,12 +24,13 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 	- Follow-Up Message Helper
 	- Accepted, Not Booked scheduling queue
 	- Accepted-not-booked detail row cap
+	- Internal Quote Risk Summary
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
+- Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
 
 ## Partial Or Still Future
 
 - Admin action shortcuts are only partial, not complete.
-- Internal Quote Risk Summary is not fully complete.
 - Customer Quote Flow Simplification is not complete.
 - Lead source tracking, repeat customer marker, internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Pricing PRs by service category have not started.
@@ -46,8 +47,9 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Keep Daily Ops Queue items as admin attention flags only; use existing admin surfaces for any manual follow-up.
 - Keep the Follow-Up Message Helper advisory-only: copy-ready drafts, no automated sending, no saved message history, and no backend mutation.
 - Keep completed-job reporting advisory-only and separate from pricing authority.
+- Keep Internal Quote Risk Summary advisory-only and separate from pricing authority; `customer_visible` remains false and `pricing_effect` remains `none`.
 - Keep pricing changes deferred to later category-specific PRs after evidence review.
-- Next recommended task after this docs refresh: run live health/version parity smoke coverage, then choose a plan-only next feature between Internal Quote Risk Summary, Customer Quote Flow Simplification, and lead source + repeat customer tracking.
+- Next recommended task after this docs refresh: Customer Quote Flow Simplification, because admin-side risk visibility is now in place and public intake can be simplified without losing internal operational context.
 
 ## What Should Not Happen Next
 
@@ -109,6 +111,22 @@ The desktop admin Follow-Up Message Helper is internal-only and advisory-only.
 - Mutations: no backend mutation or schema change.
 
 GPT may describe the helper as a drafting aid, but it must not present it as an auto-send system or as customer-facing behavior.
+
+## Internal Quote Risk Summary Grounding
+
+The desktop admin Internal Quote Risk Summary is internal-only, advisory-only, and read-only.
+
+- Endpoint field: `quote_risk_summary` on `GET /admin/api/quotes/{quote_id}`.
+- Access: admin-auth quote detail only.
+- Surface: desktop `/admin` quote detail only; it is not part of customer quote pages, quote view, GPT quote response, or mobile admin.
+- Persistence: server-derived and recomputed from existing persisted context; it is not stored in request or job JSON.
+- Scope: risk level, practical reasons, missing info, suggested action, crew/trailer guidance, and pricing caution.
+- Photo/scheduling context: persisted scheduling and photo context are considered so preferred date/window/photos are not falsely reported missing.
+- Suggested action: `request_photos` is used only when photos are actually missing.
+- Visibility and pricing: `customer_visible` remains false and `pricing_effect` remains `none`.
+- Styling semantics: low, medium, high, and owner-review risk levels use risk-specific badge classes.
+
+The PR #285 refresh also restored `normalizeBooleanLike()` for Follow-Up Message Helper prompt builders. The summary does not change pricing authority, quote totals, schema, customer flow, mobile admin, GPT grounding schema, Render config, workflows, requirements, or `VERSION`.
 
 ## Completed-Job Profit Review Grounding
 
