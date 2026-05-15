@@ -97,28 +97,20 @@
         <div id="requestsBox"></div>
       </div>
 
-      <div class="card dataCard assistantCard">
-        <div class="sectionHeader compact">
-          <div>
-            <h3>Screenshot Intake Guidance (Read-Only)</h3>
-            <div class="muted">Read-only reference for request triage. Guidance is non-binding — pricing is always determined by the quote engine.</div>
-          </div>
-        </div>
+      <details class="adminReferenceDetails assistantCard">
+        <summary>Screenshot Intake Guidance (Read-Only)</summary>
+        <div class="muted">Read-only reference for request triage. Guidance is non-binding — pricing is always determined by the quote engine.</div>
         <div id="assistantDraftMeta" class="small assistantReferenceIntro">Reference context from recent screenshot intake analyses.</div>
         <div id="assistantStatusLine" class="statusNotice muted" role="status" aria-live="polite">Read-only desktop reference. Use request approvals and job actions for operational workflow changes.</div>
         <div id="assistantResultBox"></div>
         <div id="assistantUploadList"></div>
-      </div>
+      </details>
 
-      <div class="card dataCard">
-        <div class="sectionHeader compact">
-          <div>
-            <h3>Admin Audit Log</h3>
-            <div class="muted">Recent admin actions (read-only, last 50).</div>
-          </div>
-        </div>
+      <details class="adminReferenceDetails">
+        <summary>Admin Audit Log</summary>
+        <div class="muted">Recent admin actions (read-only, last 50).</div>
         <div id="auditLogBox"></div>
-      </div>
+      </details>
     </div>
 
     <div id="adminFollowupHelperSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
@@ -174,15 +166,11 @@
       <div id="profitReportBox"></div>
     </div>
 
-    <div class="card dataCard adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
-      <div class="sectionHeader compact">
-        <div>
-          <h3>Screenshot Intake History (Read-Only)</h3>
-          <div class="muted">Recent screenshot intake analyses for operator context. No quote drafting actions are available on desktop admin.</div>
-        </div>
-      </div>
+    <details class="adminReferenceDetails adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
+      <summary>Screenshot Intake History (Read-Only)</summary>
+      <div class="muted">Recent screenshot intake analyses for operator context. No quote drafting actions are available on desktop admin.</div>
       <div id="assistantHistoryBox"></div>
-    </div>
+    </details>
   </div>
 </div>
 
