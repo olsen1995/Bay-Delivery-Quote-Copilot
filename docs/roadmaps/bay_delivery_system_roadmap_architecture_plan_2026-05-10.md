@@ -66,7 +66,7 @@ The recommended build path is intentionally conservative:
 | 9     | Internal GPT Upgrade                          | Let GPT summarize ops board, risk, follow-ups, and calibration findings. Still internal-only and advisory.                                      |
 | 10    | Photo Evidence / Photo Assistant              | Attach photos and use advisory image notes later. Do not let image AI auto-price or override quote_engine.py.                                   |
 
-## Current Delivery Status (May 13, 2026)
+## Current Delivery Status (May 14, 2026)
 
 Completed roadmap work reflected in the repo today:
 
@@ -75,11 +75,11 @@ Completed roadmap work reflected in the repo today:
 - Follow-Up Message Helper.
 - Accepted, Not Booked scheduling queue.
 - Accepted-not-booked detail row cap.
+- Internal Quote Risk Summary.
 
 Partial or still future roadmap work:
 
 - Admin action shortcuts are only partial, not complete.
-- Internal Quote Risk Summary is not fully complete.
 - Customer Quote Flow Simplification is not complete.
 - Lead source tracking, repeat customer marker, internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Pricing PRs by service category have not started.
@@ -124,7 +124,17 @@ Daily Ops Board cards:
 
 ## Internal Quote Risk Summary
 
-Use structured intake fields to generate a compact internal card. This should be advisory only and should not change quote totals.
+Structured intake fields now generate a compact internal card on desktop admin quote detail. The summary is server-derived, read-only/recomputed, no-schema, advisory-only, and does not change quote totals.
+
+Current implemented behavior:
+
+- Exposed as admin-only `quote_risk_summary` on `GET /admin/api/quotes/{quote_id}`.
+- Rendered only in desktop admin quote detail.
+- Uses persisted scheduling/photo context so missing info does not falsely report preferred date/window/photos missing.
+- Uses `request_photos` only when photos are actually missing.
+- Uses risk-specific low, medium, high, and owner-review badge semantics.
+- Stays absent from customer quote flow, quote view, GPT quote response, mobile admin, and persisted request/job JSON.
+- Keeps `customer_visible` false and `pricing_effect` none.
 
 Example:
 
@@ -198,22 +208,21 @@ Rules:
 | 1     | create admin daily ops board read model                    | Complete  | Desktop admin read-only summary cards. No pricing, customer, schema, Render, workflow, or GPT changes. |
 | 2     | create admin ops board action shortcuts                    | Partial   | Add follow-up/status shortcuts after the board is confirmed useful.                                    |
 | 3     | create customer quote flow simplification                  | Future    | Improve public wording and layout using progressive disclosure. Keep quote behavior compatible.        |
-| 4     | create internal quote risk summary                         | Future    | Admin-only risk card from structured intake fields. No quote total changes.                            |
+| 4     | create internal quote risk summary                         | Complete  | Admin-only risk card from structured intake fields. No quote total changes.                            |
 | 5     | create completed job profit review report                  | Complete  | Admin report using completed-job costing data and analyzer concepts. Internal-only.                    |
 | 6     | create follow up message helper                            | Complete  | Copy-ready message drafts for common customer situations. No automated sending yet.                    |
 | 7     | create job scheduling fields and accepted not booked queue | Complete  | Accepted-not-booked queue visibility and scheduling-readiness guidance using existing admin flows.      |
 
 ## Best Immediate Next Task
 
-Run live health/version parity smoke coverage first to confirm the current docs, GPT grounding, and deployed baseline remain aligned after the completed admin workflow PRs.
+Customer Quote Flow Simplification.
 
-## Plan-Only Decision After Smoke Coverage
+Admin-side risk visibility is now in place, so the public intake can be simplified without losing internal operational context.
 
-Choose one narrow planning path next:
+Why other options lose right now:
 
-1. Internal Quote Risk Summary.
-2. Customer Quote Flow Simplification.
-3. Lead source + repeat customer tracking.
+- Lead source + repeat customer tracking likely touches schema/storage and persisted customer/job data, so it is higher risk.
+- Admin action shortcuts can drift into mutations and operational workflow changes, so it should wait until docs are aligned and customer intake clarity is handled.
 
 Keep pricing work later and category-specific after more operational evidence review.
 
