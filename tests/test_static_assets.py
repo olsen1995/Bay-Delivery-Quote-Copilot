@@ -168,7 +168,7 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Use full kitchen-size bags as a rough count." in quote_html
     assert "Most jobs are 5-10 bags. Adjust if needed." in quote_html
     assert "Heavy items help Bay Delivery bring the right setup." in quote_html
-    assert "Choose the closest option and add a quick note if you are not sure." in quote_html
+    assert "Choose the closest match. Add a note if you are not sure." in quote_html
     assert "Photos help us confirm scope faster." in quote_html
     assert "After you submit your booking request, add photos here if they help Bay Delivery confirm scope." in quote_html
     assert "After you see your estimate, you can accept and share your preferred day and time window." in quote_html
