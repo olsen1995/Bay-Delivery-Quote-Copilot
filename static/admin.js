@@ -34,7 +34,7 @@ function renderAuditLog(items) {
     tr.appendChild(tdEntity);
 
     const tdRec = document.createElement("td");
-    tdRec.textContent = entry.record_id || "";
+    tdRec.appendChild(createAdminIdCode(entry.record_id));
     tr.appendChild(tdRec);
 
     const tdSuccess = document.createElement("td");
@@ -50,6 +50,25 @@ function renderAuditLog(items) {
   });
 
   box.appendChild(table);
+}
+
+function formatAdminDisplayId(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  if (normalized.length <= 8) return normalized;
+  return `${normalized.slice(0, 8)}…`;
+}
+
+function createAdminIdCode(value) {
+  const code = document.createElement("code");
+  const normalized = String(value || "").trim();
+  code.className = "adminDisplayId";
+  code.textContent = formatAdminDisplayId(normalized);
+  if (normalized) {
+    code.title = normalized;
+    code.dataset.fullId = normalized;
+  }
+  return code;
 }
 const statusLine = document.getElementById("statusLine");
 const refreshBtn = document.getElementById("refreshBtn");
@@ -980,7 +999,11 @@ function renderAcceptedNotBookedQueue(payload) {
       name.className = "acceptedNotBookedDetailLabel";
       name.textContent = label;
       const val = document.createElement("span");
-      val.textContent = value;
+      if (["Quote", "Request", "Job"].includes(label) && value !== "-") {
+        val.appendChild(createAdminIdCode(value));
+      } else {
+        val.textContent = value;
+      }
       row.append(name, val);
       detailGrid.appendChild(row);
     });
@@ -1484,6 +1507,74 @@ function createQuoteRiskAdvisorySection(advisory) {
   return section;
 }
 
+function createQuoteRiskAssessmentSection(assessment) {
+  const riskFlags = Array.isArray(safeGet(assessment, "risk_flags", null))
+    ? assessment.risk_flags.filter((flag) => String(flag || "").trim())
+    : [];
+
+  if (!assessment || (!assessment.confidence_level && !riskFlags.length)) return null;
+
+  const riskSection = document.createElement("section");
+  riskSection.className = "quoteRiskSection quoteRawRiskSection";
+
+  const riskTitle = document.createElement("div");
+  riskTitle.className = "quoteDetailTitle";
+  riskTitle.textContent = "Quote Risk Assessment";
+  riskSection.appendChild(riskTitle);
+
+  riskSection.appendChild(
+    createQuoteMetaRow(
+      "Confidence",
+      null,
+      makeRiskConfidenceBadge(assessment.confidence_level)
+    )
+  );
+
+  const flagsRow = document.createElement("div");
+  flagsRow.className = "quoteDetailMetaRow";
+  const flagsLabel = document.createElement("strong");
+  flagsLabel.textContent = "Flags:";
+  flagsRow.appendChild(flagsLabel);
+
+  if (riskFlags.length) {
+    const list = document.createElement("ul");
+    list.className = "quoteRiskFlags";
+    riskFlags.forEach((flag) => {
+      const item = document.createElement("li");
+      item.textContent = flag;
+      list.appendChild(item);
+    });
+    flagsRow.appendChild(list);
+  } else {
+    flagsRow.appendChild(document.createTextNode(" none"));
+  }
+
+  riskSection.appendChild(flagsRow);
+  return riskSection;
+}
+
+function createRawRiskDataSection(...sections) {
+  const visibleSections = sections.filter(Boolean);
+  if (!visibleSections.length) return null;
+
+  const details = document.createElement("details");
+  details.className = "quoteRawRiskDetails";
+
+  const summary = document.createElement("summary");
+  summary.textContent = "Show raw risk data";
+  details.appendChild(summary);
+
+  const body = document.createElement("div");
+  body.className = "quoteRawRiskBody";
+  visibleSections.forEach((section) => {
+    section.classList.add("quoteRawRiskSection");
+    body.appendChild(section);
+  });
+  details.appendChild(body);
+
+  return details;
+}
+
 function createQuoteDetailPanel(detail) {
   const panel = document.createElement("div");
   panel.className = "quoteDetailPanel";
@@ -1527,52 +1618,10 @@ function createQuoteDetailPanel(detail) {
   }
 
   const advisorySection = createQuoteRiskAdvisorySection(detail.quote_risk_advisory || null);
-  if (advisorySection) {
-    panel.appendChild(advisorySection);
-  }
-
-  const riskFlags = Array.isArray(safeGet(assessment, "risk_flags", null))
-    ? assessment.risk_flags.filter((flag) => String(flag || "").trim())
-    : [];
-
-  if (assessment && (assessment.confidence_level || riskFlags.length)) {
-    const riskSection = document.createElement("section");
-    riskSection.className = "quoteRiskSection";
-
-    const riskTitle = document.createElement("div");
-    riskTitle.className = "quoteDetailTitle";
-    riskTitle.textContent = "Quote Risk Assessment";
-    riskSection.appendChild(riskTitle);
-
-    riskSection.appendChild(
-      createQuoteMetaRow(
-        "Confidence",
-        null,
-        makeRiskConfidenceBadge(assessment.confidence_level)
-      )
-    );
-
-    const flagsRow = document.createElement("div");
-    flagsRow.className = "quoteDetailMetaRow";
-    const flagsLabel = document.createElement("strong");
-    flagsLabel.textContent = "Flags:";
-    flagsRow.appendChild(flagsLabel);
-
-    if (riskFlags.length) {
-      const list = document.createElement("ul");
-      list.className = "quoteRiskFlags";
-      riskFlags.forEach((flag) => {
-        const item = document.createElement("li");
-        item.textContent = flag;
-        list.appendChild(item);
-      });
-      flagsRow.appendChild(list);
-    } else {
-      flagsRow.appendChild(document.createTextNode(" none"));
-    }
-
-    riskSection.appendChild(flagsRow);
-    panel.appendChild(riskSection);
+  const riskAssessmentSection = createQuoteRiskAssessmentSection(assessment);
+  const rawRiskDataSection = createRawRiskDataSection(advisorySection, riskAssessmentSection);
+  if (rawRiskDataSection) {
+    panel.appendChild(rawRiskDataSection);
   }
 
   return panel;
@@ -1679,7 +1728,9 @@ function renderQuotes(items) {
 
     const tdId = document.createElement("td");
     const code = document.createElement("code");
-    code.textContent = q.quote_id || "";
+    code.className = "adminDisplayId";
+    code.textContent = formatAdminDisplayId(q.quote_id || "");
+    code.title = q.quote_id || "";
     const created = document.createElement("div");
     created.className = "small";
     created.textContent = q.created_at || "";
@@ -2160,7 +2211,9 @@ function renderJobs(items) {
 
     const tdJob = document.createElement("td");
     const jobCode = document.createElement("code");
-    jobCode.textContent = j.job_id || "";
+    jobCode.className = "adminDisplayId";
+    jobCode.textContent = formatAdminDisplayId(j.job_id || "");
+    jobCode.title = j.job_id || "";
     const created = document.createElement("div");
     created.className = "small";
     created.textContent = j.created_at || "";
@@ -2168,7 +2221,9 @@ function renderJobs(items) {
 
     const tdQuote = document.createElement("td");
     const qCode = document.createElement("code");
-    qCode.textContent = j.quote_id || "";
+    qCode.className = "adminDisplayId";
+    qCode.textContent = formatAdminDisplayId(j.quote_id || "");
+    qCode.title = j.quote_id || "";
     tdQuote.appendChild(qCode);
 
     const tdStatus = document.createElement("td");

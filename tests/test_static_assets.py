@@ -338,9 +338,12 @@ def test_admin_page_gates_protected_dashboard_until_auth_load():
 
     protected_block = protected_match.group(1)
     remainder = admin_html.replace(protected_block, "", 1)
-    for heading in ["Recent Estimates", "Booking Requests", "Jobs", "Screenshot Intake Guidance (Read-Only)", "Screenshot Intake History (Read-Only)"]:
+    for heading in ["Recent Estimates", "Booking Requests", "Jobs"]:
         assert f"<h3>{heading}</h3>" in protected_block
         assert f"<h3>{heading}</h3>" not in remainder
+    for heading in ["Screenshot Intake Guidance (Read-Only)", "Screenshot Intake History (Read-Only)"]:
+        assert f"<summary>{heading}</summary>" in protected_block
+        assert f"<summary>{heading}</summary>" not in remainder
 
     assert 'id="adminProtectedDashboard"' in admin_html
     assert 'hidden aria-hidden="true" style="display:none"' in admin_html
@@ -378,6 +381,8 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "Quote Details" in admin_js
     assert "Internal Risk Summary" in admin_js
     assert "function createInternalRiskSummarySection(" in admin_js
+    assert "function createRawRiskDataSection(" in admin_js
+    assert "Show raw risk data" in admin_js
     assert "function createInternalRiskSummarySignals(" not in admin_js
     assert 'detail.quote_risk_summary || null' in admin_js
     risk_summary_match = re.search(
@@ -415,11 +420,23 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "Suggested actions:" in admin_js
     assert 'const assessment = detail.internal_risk_assessment || null;' in admin_js
     assert 'Array.isArray(safeGet(assessment, "risk_flags", null))' in admin_js
-    assert 'if (assessment && (assessment.confidence_level || riskFlags.length)) {' in admin_js
+    assert "const rawRiskDataSection = createRawRiskDataSection(advisorySection, riskAssessmentSection);" in admin_js
+    assert "panel.appendChild(rawRiskDataSection);" in admin_js
+    detail_panel_match = re.search(
+        r"function createQuoteDetailPanel\(detail\) \{(?P<body>.*?)\n\}\n\nfunction createQuoteDetailRow",
+        admin_js,
+        re.DOTALL,
+    )
+    assert detail_panel_match is not None
+    detail_panel_body = detail_panel_match.group("body")
+    assert "panel.appendChild(advisorySection);" not in detail_panel_body
+    assert "panel.appendChild(riskSection);" not in detail_panel_body
     assert '/admin/api/quotes/${encodeURIComponent(quoteId)}' in admin_js
     assert ".quoteDetailToggle" in admin_css
     assert ".quoteDetailPanel" in admin_css
     assert ".quoteRiskSection" in admin_css
+    assert ".quoteRawRiskDetails" in admin_css
+    assert ".quoteRawRiskDetails > summary" in admin_css
     assert ".quoteRiskFlags" in admin_css
     assert ".quoteRiskSummaryList" in admin_css
     assert ".quoteRiskLevel" in admin_css
@@ -428,6 +445,59 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert ".quote-risk-level-high" in admin_css
     assert ".quote-risk-level-owner-review" in admin_css
     assert ".risk-confidence-medium" in admin_css
+
+
+def test_desktop_admin_declutters_long_ids_and_reference_sections() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    mobile_css = Path("static/admin_mobile.css").read_text(encoding="utf-8")
+
+    assert "function formatAdminDisplayId(" in admin_js
+    assert 'return `${normalized.slice(0, 8)}…`;' in admin_js
+    assert "function createAdminIdCode(" in admin_js
+    assert ".adminDisplayId" in admin_css
+
+    for expected in [
+        "tdRec.appendChild(createAdminIdCode(entry.record_id));",
+        '["Quote", item.quote_id || "-"]',
+        'val.appendChild(createAdminIdCode(value));',
+        "jobCode.textContent = formatAdminDisplayId(j.job_id || \"\");",
+        "jobCode.title = j.job_id || \"\";",
+        "qCode.textContent = formatAdminDisplayId(j.quote_id || \"\");",
+        "qCode.title = j.quote_id || \"\";",
+    ]:
+        assert expected in admin_js
+
+    for expected in [
+        '<details class="adminReferenceDetails assistantCard">',
+        '<summary>Screenshot Intake Guidance (Read-Only)</summary>',
+        '<details class="adminReferenceDetails">',
+        '<summary>Admin Audit Log</summary>',
+        '<summary>Screenshot Intake History (Read-Only)</summary>',
+        ".adminReferenceDetails",
+        ".adminReferenceDetails > summary",
+    ]:
+        assert expected in admin_html or expected in admin_css
+
+    desktop_only_markers = [
+        "Show raw risk data",
+        "formatAdminDisplayId",
+        "adminReferenceDetails",
+    ]
+    for marker in desktop_only_markers:
+        assert marker in admin_html or marker in admin_js or marker in admin_css
+        assert marker not in quote_html
+        assert marker not in quote_js
+        assert marker not in quote_css
+        assert marker not in mobile_html
+        assert marker not in mobile_js
+        assert marker not in mobile_css
 
 
 def test_admin_page_includes_screenshot_assistant_shell() -> None:

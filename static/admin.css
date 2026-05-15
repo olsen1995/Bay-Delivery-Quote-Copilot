@@ -98,6 +98,26 @@ label {
 	box-shadow: var(--shadow-soft);
 }
 
+.adminReferenceDetails {
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 12px;
+	padding: 12px 14px;
+	background: rgba(255, 255, 255, 0.035);
+	box-shadow: none;
+	min-width: 0;
+}
+
+.adminReferenceDetails > summary {
+	cursor: pointer;
+	font-size: 0.98rem;
+	font-weight: 800;
+	color: var(--ink-strong);
+}
+
+.adminReferenceDetails[open] {
+	background: var(--surface);
+}
+
 #quotesBox,
 #requestsBox,
 #jobsBox,
@@ -638,6 +658,15 @@ tr:hover td {
 	background: rgba(255, 255, 255, 0.05);
 }
 
+.adminDisplayId {
+	display: inline-block;
+	max-width: 9ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	vertical-align: bottom;
+}
+
 button {
 	padding: 10px 14px;
 	cursor: pointer;
@@ -846,6 +875,34 @@ button:disabled {
 	gap: 10px;
 	padding-top: 12px;
 	border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quoteRawRiskDetails {
+	padding-top: 10px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	color: var(--ink-muted);
+}
+
+.quoteRawRiskDetails > summary {
+	cursor: pointer;
+	font-size: 0.9rem;
+	font-weight: 800;
+	color: var(--ink-muted);
+}
+
+.quoteRawRiskBody {
+	display: grid;
+	gap: 12px;
+	margin-top: 12px;
+	padding: 12px;
+	border: 1px dashed rgba(255, 255, 255, 0.16);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.quoteRawRiskSection:first-child {
+	padding-top: 0;
+	border-top: 0;
 }
 
 .quoteRiskFlags {
