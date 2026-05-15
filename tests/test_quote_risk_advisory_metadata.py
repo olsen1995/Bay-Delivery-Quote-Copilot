@@ -12,7 +12,7 @@ from app import main as main_module
 from app import storage
 from app.main import app
 from app.services import quote_service
-from app.services.quote_risk_scoring import build_quote_risk_advisory
+from app.services.quote_risk_scoring import build_quote_risk_advisory, build_quote_risk_summary
 
 
 def _admin_headers() -> dict[str, str]:
@@ -222,14 +222,293 @@ def test_weather_move_advisory_sets_enclosed_trailer_without_manual_review() -> 
     assert advisory["recommended_trailer"] == "newer_enclosed"
 
 
+@pytest.mark.parametrize(
+    ("request_fields", "advisory", "assessment", "expected"),
+    [
+        (
+            {
+                "service_type": "haul_away",
+                "garbage_bag_count": 4,
+                "trailer_fill_estimate": "quarter",
+                "access_difficulty": "normal",
+                "crew_size": 1,
+                "requested_job_date": "2026-05-20",
+                "requested_time_window": "morning",
+                "photos_uploaded": True,
+            },
+            None,
+            {"confidence_level": "high", "risk_flags": []},
+            {
+                "risk_level": "low",
+                "suggested_action": "approve",
+                "crew_suggestion": "one_worker_likely",
+                "trailer_suggestion": "single_axle",
+            },
+        ),
+        (
+            {
+                "service_type": "haul_away",
+                "dense_material_type": "tile",
+                "garbage_bag_count": 2,
+                "access_difficulty": "normal",
+            },
+            build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "tile"}),
+            {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+            {
+                "risk_level": "medium",
+                "suggested_action": "request_photos",
+                "crew_suggestion": "one_worker_likely",
+                "trailer_suggestion": "single_axle",
+            },
+        ),
+        (
+            {
+                "service_type": "haul_away",
+                "stairs_count": 2,
+                "basement_or_inside_removal": False,
+                "mixed_load": True,
+                "contains_scrap": True,
+                "contains_garbage": False,
+                "access_difficulty": "difficult",
+            },
+            build_quote_risk_advisory(
+                {
+                    "service_type": "haul_away",
+                    "stairs_count": 2,
+                    "basement_or_inside_removal": False,
+                    "mixed_load": True,
+                    "contains_scrap": True,
+                    "contains_garbage": False,
+                }
+            ),
+            {"confidence_level": "low", "risk_flags": ["access_volume_risk", "mixed_bulky_load_risk"]},
+            {
+                "risk_level": "high",
+                "suggested_action": "ask_followup",
+                "crew_suggestion": "two_workers_likely",
+                "trailer_suggestion": "unknown",
+            },
+        ),
+        (
+            {
+                "service_type": "haul_away",
+                "dense_material_type": "concrete",
+                "demolition_ripout": True,
+                "stairs_count": 3,
+            },
+            build_quote_risk_advisory(
+                {
+                    "service_type": "haul_away",
+                    "dense_material_type": "concrete",
+                    "demolition_ripout": True,
+                    "stairs_count": 3,
+                }
+            ),
+            {"confidence_level": "low", "risk_flags": ["dense_material_risk", "access_volume_risk"]},
+            {
+                "risk_level": "owner_review",
+                "suggested_action": "owner_review_before_approving",
+                "crew_suggestion": "owner_review",
+                "trailer_suggestion": "double_axle",
+            },
+        ),
+    ],
+)
+def test_quote_risk_summary_builder_returns_stable_admin_shape(
+    request_fields: dict[str, Any],
+    advisory: dict[str, Any] | None,
+    assessment: dict[str, Any],
+    expected: dict[str, str],
+) -> None:
+    summary = build_quote_risk_summary(request_fields, advisory, assessment)
+
+    assert set(summary) == {
+        "risk_level",
+        "reasons",
+        "missing_info",
+        "suggested_action",
+        "crew_suggestion",
+        "trailer_suggestion",
+        "pricing_caution",
+        "customer_visible",
+        "pricing_effect",
+    }
+    assert summary["risk_level"] == expected["risk_level"]
+    assert summary["suggested_action"] == expected["suggested_action"]
+    assert summary["crew_suggestion"] == expected["crew_suggestion"]
+    assert summary["trailer_suggestion"] == expected["trailer_suggestion"]
+    assert isinstance(summary["reasons"], list)
+    assert isinstance(summary["missing_info"], list)
+    assert summary["pricing_caution"] == "internal_advisory_only_no_price_change"
+    assert summary["customer_visible"] is False
+    assert summary["pricing_effect"] == "none"
+
+
+def test_quote_risk_summary_detects_missing_info_and_practical_reasons() -> None:
+    advisory = build_quote_risk_advisory(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "concrete",
+            "stairs_count": 3,
+            "basement_or_inside_removal": True,
+            "has_refrigerant_appliance": True,
+            "appliance_type": "fridge",
+        }
+    )
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "description": "stuff",
+            "garbage_bag_count": 0,
+            "trailer_fill_estimate": "",
+            "dense_material_type": "concrete",
+            "stairs_count": 3,
+            "basement_or_inside_removal": True,
+            "has_refrigerant_appliance": True,
+            "appliance_type": "fridge",
+        },
+        advisory,
+        {"confidence_level": "low", "risk_flags": ["missing_structured_scope", "dense_material_risk"]},
+    )
+
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+    assert set(summary["missing_info"]).issuperset(
+        {
+            "photos",
+            "item_count",
+            "access_details",
+            "disposal_type",
+            "preferred_date",
+            "preferred_time_window",
+        }
+    )
+    assert set(summary["reasons"]).issuperset(
+        {
+            "heavy_material_risk",
+            "access_or_stairs_risk",
+            "refrigerant_appliance_check",
+            "low_confidence_or_missing_scope",
+            "owner_review_recommended",
+        }
+    )
+
+
+def test_quote_risk_summary_does_not_request_photos_when_photo_context_exists() -> None:
+    advisory = build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "tile"})
+    assert advisory is not None
+    assert any("photo" in action.lower() for action in advisory["suggested_actions"])
+
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "tile",
+            "garbage_bag_count": 4,
+            "bag_type": "light",
+            "trailer_fill_estimate": "quarter",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+            "attachment_count": 2,
+        },
+        advisory,
+        {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+    )
+
+    assert "photos" not in summary["missing_info"]
+    assert summary["suggested_action"] == "ask_followup"
+
+
+def test_quote_risk_summary_still_requests_photos_when_photos_are_missing() -> None:
+    advisory = build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "tile"})
+
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "tile",
+            "garbage_bag_count": 4,
+            "bag_type": "light",
+            "trailer_fill_estimate": "quarter",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+        },
+        advisory,
+        {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+    )
+
+    assert "photos" in summary["missing_info"]
+    assert summary["suggested_action"] == "request_photos"
+
+
+def test_quote_risk_summary_owner_review_still_outranks_missing_photos() -> None:
+    advisory = build_quote_risk_advisory({"service_type": "haul_away", "dense_material_type": "concrete"})
+
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "dense_material_type": "concrete",
+            "garbage_bag_count": 4,
+            "bag_type": "heavy_mixed",
+            "trailer_fill_estimate": "quarter",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+        },
+        advisory,
+        {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]},
+    )
+
+    assert "photos" in summary["missing_info"]
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+
+
+def test_quote_risk_summary_other_missing_info_asks_followup_when_photos_present() -> None:
+    summary = build_quote_risk_summary(
+        {
+            "service_type": "haul_away",
+            "description": "stuff",
+            "access_difficulty": "normal",
+            "requested_job_date": "2026-05-20",
+            "requested_time_window": "morning",
+            "photos_uploaded": True,
+        },
+        None,
+        {"confidence_level": "high", "risk_flags": []},
+    )
+
+    assert "photos" not in summary["missing_info"]
+    assert "item_count" in summary["missing_info"]
+    assert summary["suggested_action"] == "ask_followup"
+
+
+def test_quote_risk_summary_builder_does_not_mutate_inputs() -> None:
+    request = {"service_type": "haul_away", "dense_material_type": "concrete"}
+    advisory = build_quote_risk_advisory(request)
+    assessment = {"confidence_level": "medium", "risk_flags": ["dense_material_risk"]}
+    request_before = dict(request)
+    advisory_before = dict(advisory or {})
+    assessment_before = dict(assessment)
+
+    build_quote_risk_summary(request, advisory, assessment)
+
+    assert request == request_before
+    assert advisory == advisory_before
+    assert assessment == assessment_before
+
+
 def test_public_quote_and_customer_review_exclude_advisory_metadata(client: TestClient) -> None:
     quote_response = client.post("/quote/calculate", json=_advisory_payload())
 
     assert quote_response.status_code == 200
     quote_body = quote_response.json()
     assert "quote_risk_advisory" not in quote_body
+    assert "quote_risk_summary" not in quote_body
     assert "quote_risk_advisory" not in quote_body["request"]
+    assert "quote_risk_summary" not in quote_body["request"]
     assert "quote_risk_advisory" not in quote_body["response"]
+    assert "quote_risk_summary" not in quote_body["response"]
 
     review_response = client.get(
         f"/quote/{quote_body['quote_id']}/view",
@@ -239,8 +518,11 @@ def test_public_quote_and_customer_review_exclude_advisory_metadata(client: Test
     assert review_response.status_code == 200
     review_body = review_response.json()
     assert "quote_risk_advisory" not in review_body
+    assert "quote_risk_summary" not in review_body
     assert "quote_risk_advisory" not in review_body["request"]
+    assert "quote_risk_summary" not in review_body["request"]
     assert "quote_risk_advisory" not in review_body["response"]
+    assert "quote_risk_summary" not in review_body["response"]
 
 
 def test_admin_quote_detail_includes_recomputed_advisory_metadata(client: TestClient) -> None:
@@ -251,9 +533,16 @@ def test_admin_quote_detail_includes_recomputed_advisory_metadata(client: TestCl
 
     assert admin_response.status_code == 200
     advisory = admin_response.json()["quote_risk_advisory"]
+    summary = admin_response.json()["quote_risk_summary"]
     assert advisory["customer_visible"] is False
     assert advisory["pricing_effect"] == "none"
     assert advisory["manual_review_recommended"] is True
+    assert summary["customer_visible"] is False
+    assert summary["pricing_effect"] == "none"
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+    assert summary["crew_suggestion"] == "owner_review"
+    assert summary["trailer_suggestion"] == "double_axle"
     assert {
         "DENSE_MATERIAL_RISK",
         "MIXED_LOAD_SORTING_RISK",
@@ -268,3 +557,4 @@ def test_gpt_quote_response_excludes_advisory_metadata() -> None:
     response = quote_service.build_gpt_quote_response(_base_payload())
 
     assert "quote_risk_advisory" not in response
+    assert "quote_risk_summary" not in response

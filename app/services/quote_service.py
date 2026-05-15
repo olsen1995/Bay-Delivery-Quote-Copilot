@@ -15,8 +15,12 @@ from app.quote_engine import (
     calculate_quote,
     load_config,
 )
-from app.services.quote_risk_scoring import build_quote_risk_advisory, build_quote_risk_assessment
-from app.storage import get_quote_record, save_quote
+from app.services.quote_risk_scoring import (
+    build_quote_risk_advisory,
+    build_quote_risk_assessment,
+    build_quote_risk_summary,
+)
+from app.storage import get_quote_record, get_quote_request_by_quote_id, list_attachments, save_quote
 
 logger = logging.getLogger(__name__)
 
@@ -354,6 +358,36 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
     }
 
 
+def _has_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _quote_risk_summary_request_context(
+    *,
+    quote_id: str,
+    request_payload: dict[str, Any],
+) -> dict[str, Any]:
+    context = dict(request_payload)
+
+    quote_request = get_quote_request_by_quote_id(quote_id)
+    if quote_request:
+        requested_job_date = quote_request.get("requested_job_date")
+        requested_time_window = quote_request.get("requested_time_window")
+        if _has_text(requested_job_date):
+            context["requested_job_date"] = requested_job_date
+        if _has_text(requested_time_window):
+            context["requested_time_window"] = requested_time_window
+        context["booking_submitted"] = bool(_has_text(requested_job_date) or _has_text(requested_time_window))
+
+    attachments = list_attachments(quote_id=quote_id, limit=50)
+    attachment_count = len(attachments)
+    context["attachment_count"] = attachment_count
+    context["photo_count"] = attachment_count
+    context["photos_uploaded"] = attachment_count > 0
+
+    return context
+
+
 def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
     quote = get_quote_record(quote_id)
     if not quote:
@@ -361,6 +395,7 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
 
     internal_risk_assessment: dict[str, Any] | None = None
     quote_risk_advisory: dict[str, Any] | None = None
+    quote_risk_summary: dict[str, Any] | None = None
     try:
         request_payload = quote.get("request")
         if not isinstance(request_payload, dict):
@@ -372,6 +407,15 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
         advisory = artifacts.get("quote_risk_advisory")
         if isinstance(advisory, dict):
             quote_risk_advisory = advisory
+        quote_risk_summary_request = _quote_risk_summary_request_context(
+            quote_id=quote_id,
+            request_payload=request_payload,
+        )
+        quote_risk_summary = build_quote_risk_summary(
+            quote_risk_summary_request,
+            quote_risk_advisory,
+            internal_risk_assessment,
+        )
     except Exception:
         logger.warning(
             "Failed to re-derive internal risk assessment for admin quote detail %s",
@@ -383,4 +427,5 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
         **quote,
         "internal_risk_assessment": internal_risk_assessment,
         "quote_risk_advisory": quote_risk_advisory,
+        "quote_risk_summary": quote_risk_summary,
     }

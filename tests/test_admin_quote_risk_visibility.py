@@ -33,6 +33,63 @@ def _quote_payload(**overrides: object) -> dict[str, object]:
     return payload
 
 
+def _save_quote_request_for_quote(
+    quote_body: dict[str, object],
+    *,
+    requested_job_date: str | None,
+    requested_time_window: str | None,
+) -> None:
+    quote_id = str(quote_body["quote_id"])
+    request_payload = quote_body["request"]
+    response_payload = quote_body["response"]
+    assert isinstance(request_payload, dict)
+    assert isinstance(response_payload, dict)
+    storage.save_quote_request(
+        {
+            "request_id": f"request-{quote_id}",
+            "created_at": "2026-04-16T12:05:00-04:00",
+            "status": "customer_accepted",
+            "quote_id": quote_id,
+            "customer_name": request_payload.get("customer_name"),
+            "customer_phone": request_payload.get("customer_phone"),
+            "job_address": request_payload.get("job_address"),
+            "job_description_customer": request_payload.get("job_description_customer"),
+            "job_description_internal": response_payload.get("job_description_internal"),
+            "service_type": request_payload.get("service_type"),
+            "cash_total_cad": response_payload.get("cash_total_cad"),
+            "emt_total_cad": response_payload.get("emt_total_cad"),
+            "request_json": request_payload,
+            "notes": None,
+            "requested_job_date": requested_job_date,
+            "requested_time_window": requested_time_window,
+            "customer_accepted_at": "2026-04-16T12:05:00-04:00",
+            "admin_approved_at": None,
+            "accept_token": quote_body.get("accept_token"),
+            "booking_token": "booking-token",
+            "booking_token_created_at": "2026-04-16T12:05:00-04:00",
+        }
+    )
+
+
+def _save_quote_attachment(quote_id: str) -> None:
+    storage.save_attachment(
+        {
+            "attachment_id": f"attachment-{quote_id}",
+            "created_at": "2026-04-16T12:10:00-04:00",
+            "quote_id": quote_id,
+            "request_id": None,
+            "job_id": None,
+            "analysis_id": None,
+            "filename": "customer-photo.jpg",
+            "mime_type": "image/jpeg",
+            "size_bytes": 12345,
+            "drive_file_id": "drive-photo",
+            "drive_web_view_link": "https://example.com/customer-photo",
+            "ocr_json": {},
+        }
+    )
+
+
 @pytest.fixture()
 def temp_quote_db(monkeypatch: pytest.MonkeyPatch) -> None:
     original_db_path = storage.DB_PATH
@@ -73,6 +130,119 @@ def test_admin_quote_detail_includes_internal_risk_assessment(temp_quote_db: Non
     assert "DENSE_MATERIAL_RISK" in {
         flag["code"] for flag in body["quote_risk_advisory"]["risk_flags"]
     }
+    assert body["quote_risk_summary"]["customer_visible"] is False
+    assert body["quote_risk_summary"]["pricing_effect"] == "none"
+    assert body["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert body["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"
+    assert "heavy_material_risk" in body["quote_risk_summary"]["reasons"]
+    assert "photos" in body["quote_risk_summary"]["missing_info"]
+
+
+def test_admin_quote_detail_risk_summary_uses_persisted_scheduling_and_photo_context(temp_quote_db: None) -> None:
+    with TestClient(app) as client:
+        quote_resp = client.post(
+            "/quote/calculate",
+            json=_quote_payload(
+                job_description_customer="Four garbage bags from garage",
+                description="Four garbage bags from garage",
+                estimated_hours=1.0,
+                crew_size=1,
+                garbage_bag_count=4,
+                bag_type="light",
+                trailer_fill_estimate="quarter",
+                access_difficulty="normal",
+            ),
+        )
+        assert quote_resp.status_code == 200
+        quote_body = quote_resp.json()
+        quote_id = quote_body["quote_id"]
+        _save_quote_request_for_quote(
+            quote_body,
+            requested_job_date="2026-05-20",
+            requested_time_window="morning",
+        )
+        _save_quote_attachment(quote_id)
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    summary = resp.json()["quote_risk_summary"]
+    assert summary["customer_visible"] is False
+    assert summary["pricing_effect"] == "none"
+    assert "preferred_date" not in summary["missing_info"]
+    assert "preferred_time_window" not in summary["missing_info"]
+    assert "photos" not in summary["missing_info"]
+    assert summary["suggested_action"] == "approve"
+
+
+def test_admin_quote_detail_with_attachments_does_not_request_photos_from_advisory_text(temp_quote_db: None) -> None:
+    with TestClient(app) as client:
+        quote_resp = client.post(
+            "/quote/calculate",
+            json=_quote_payload(
+                job_description_customer="Four bags of tile from garage",
+                description="Four bags of tile from garage",
+                estimated_hours=1.0,
+                crew_size=1,
+                garbage_bag_count=4,
+                bag_type="heavy_mixed",
+                trailer_fill_estimate="quarter",
+                access_difficulty="normal",
+                dense_material_type="tile",
+            ),
+        )
+        assert quote_resp.status_code == 200
+        quote_body = quote_resp.json()
+        quote_id = quote_body["quote_id"]
+        _save_quote_request_for_quote(
+            quote_body,
+            requested_job_date="2026-05-20",
+            requested_time_window="morning",
+        )
+        _save_quote_attachment(quote_id)
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    summary = resp.json()["quote_risk_summary"]
+    advisory_actions = resp.json()["quote_risk_advisory"]["suggested_actions"]
+    assert any("photo" in action.lower() for action in advisory_actions)
+    assert "photos" not in summary["missing_info"]
+    assert summary["suggested_action"] != "request_photos"
+    assert summary["suggested_action"] == "ask_followup"
+
+
+def test_admin_quote_detail_risk_summary_keeps_missing_context_when_absent(temp_quote_db: None) -> None:
+    with TestClient(app) as client:
+        quote_resp = client.post(
+            "/quote/calculate",
+            json=_quote_payload(
+                job_description_customer="Four garbage bags from garage",
+                description="Four garbage bags from garage",
+                estimated_hours=1.0,
+                crew_size=1,
+                garbage_bag_count=4,
+                bag_type="light",
+                trailer_fill_estimate="quarter",
+                access_difficulty="normal",
+            ),
+        )
+        assert quote_resp.status_code == 200
+        quote_body = quote_resp.json()
+        quote_id = quote_body["quote_id"]
+        _save_quote_request_for_quote(
+            quote_body,
+            requested_job_date=None,
+            requested_time_window=None,
+        )
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    summary = resp.json()["quote_risk_summary"]
+    assert "preferred_date" in summary["missing_info"]
+    assert "preferred_time_window" in summary["missing_info"]
+    assert "photos" in summary["missing_info"]
 
 
 def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails(temp_quote_db: None) -> None:
@@ -97,6 +267,7 @@ def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails
     assert body["quote_id"] == "legacy-riskless-quote"
     assert body["internal_risk_assessment"] is None
     assert body["quote_risk_advisory"] is None
+    assert body["quote_risk_summary"] is None
 
 
 def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quote_db: None) -> None:
@@ -120,6 +291,7 @@ def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quot
     assert body["response"] is None
     assert body["internal_risk_assessment"] is None
     assert body["quote_risk_advisory"] is None
+    assert body["quote_risk_summary"] is None
 
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
     assert "const request = detail?.request ?? {};" in admin_js
@@ -138,6 +310,8 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
         assert "internal_risk_assessment" not in quote_body["response"]
         assert "quote_risk_advisory" not in quote_body
         assert "quote_risk_advisory" not in quote_body["response"]
+        assert "quote_risk_summary" not in quote_body
+        assert "quote_risk_summary" not in quote_body["response"]
 
         review_resp = client.get(
             f"/quote/{quote_body['quote_id']}/view",
@@ -150,3 +324,5 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
     assert "internal_risk_assessment" not in review_body["response"]
     assert "quote_risk_advisory" not in review_body
     assert "quote_risk_advisory" not in review_body["response"]
+    assert "quote_risk_summary" not in review_body
+    assert "quote_risk_summary" not in review_body["response"]

@@ -232,6 +232,19 @@ function safeTrimmed(value) {
   return String(value || "").trim();
 }
 
+function normalizeBooleanLike(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1", "on"].includes(normalized)) return true;
+    if (["false", "no", "n", "0", "off", ""].includes(normalized)) return false;
+    return false;
+  }
+  return false;
+}
+
 function compactContextCustomerName(context) {
   return safeTrimmed(context.customer_name) || "";
 }
@@ -1233,6 +1246,27 @@ function makeRiskConfidenceBadge(level) {
   return badge;
 }
 
+function makeQuoteRiskLevelBadge(riskLevel) {
+  const normalized = String(riskLevel || "").trim().toLowerCase();
+  const labels = {
+    low: "Low risk",
+    medium: "Medium risk",
+    high: "High risk",
+    owner_review: "Owner review",
+  };
+  const classes = {
+    low: "quote-risk-level-low",
+    medium: "quote-risk-level-medium",
+    high: "quote-risk-level-high",
+    owner_review: "quote-risk-level-owner-review",
+  };
+  const className = classes[normalized] || "quote-risk-level-unknown";
+  const badge = document.createElement("span");
+  badge.className = "statusBadge quoteRiskLevel " + className;
+  badge.textContent = labels[normalized] || "Unknown risk";
+  return badge;
+}
+
 function createQuoteMetaRow(label, value, extraNode) {
   const row = document.createElement("div");
   row.className = "quoteDetailMetaRow";
@@ -1292,97 +1326,64 @@ function formatRiskAdvisoryLevel(value) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function normalizeBooleanLike(value) {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    const lower = value.trim().toLowerCase();
-    if (["true", "yes", "y", "1", "on"].includes(lower)) return true;
-    if (["false", "no", "n", "0", "off", ""].includes(lower)) return false;
-    return false;
-  }
-  return false;
+function formatRiskSummaryValue(value) {
+  const normalized = String(value || "").trim();
+  const labels = {
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    owner_review: "Owner review",
+    approve: "Approve if the rest of the request looks right",
+    ask_followup: "Ask follow-up before approving",
+    request_photos: "Request photos before approving",
+    owner_review_before_approving: "Owner review before approving",
+    one_worker_likely: "One worker likely",
+    two_workers_likely: "Two workers likely",
+    truck_only: "Truck only",
+    single_axle: "Single axle",
+    double_axle: "Double axle",
+    enclosed: "Enclosed",
+    unknown: "Unknown",
+    internal_advisory_only_no_price_change: "Internal advisory only - no quote total change",
+    heavy_material_risk: "Heavy material risk",
+    disposal_or_sorting_risk: "Disposal or sorting risk",
+    access_or_stairs_risk: "Access, stairs, or inside removal risk",
+    refrigerant_appliance_check: "Refrigerant appliance check",
+    demolition_or_ripout_scope: "Demolition or rip-out scope",
+    low_confidence_or_missing_scope: "Low confidence or missing scope",
+    owner_review_recommended: "Owner review recommended",
+    no_major_internal_risk_signals: "No major internal risk signals found",
+    photos: "Photos",
+    item_count: "Item count or load size",
+    access_details: "Access details",
+    disposal_type: "Disposal or heavy material type",
+    preferred_date: "Preferred date",
+    preferred_time_window: "Preferred time window",
+  };
+  return labels[normalized] || normalized.replaceAll("_", " ") || "Unknown";
 }
 
-function addSummarySignal(signals, text) {
-  if (!text) return;
-  if (!signals.includes(text)) signals.push(text);
+function appendRiskSummaryList(section, label, values) {
+  if (!Array.isArray(values) || !values.length) return;
+  const row = document.createElement("div");
+  row.className = "quoteDetailMetaRow";
+  const rowLabel = document.createElement("strong");
+  rowLabel.textContent = label;
+  row.appendChild(rowLabel);
+
+  const list = document.createElement("ul");
+  list.className = "quoteRiskSummaryList";
+  values.forEach((value) => {
+    const item = document.createElement("li");
+    item.textContent = formatRiskSummaryValue(value);
+    list.appendChild(item);
+  });
+  row.appendChild(list);
+  section.appendChild(row);
 }
 
-function createInternalRiskSummarySignals({ advisory, assessment, request }) {
-  const signals = [];
-  const advisoryFlags = Array.isArray(safeGet(advisory, "risk_flags", null))
-    ? advisory.risk_flags.filter((flag) => flag && typeof flag === "object")
-    : [];
-  const advisoryCodes = new Set(
-    advisoryFlags
-      .map((flag) => String(flag.code || "").trim())
-      .filter((code) => code)
-  );
-  const assessmentFlags = new Set(
-    Array.isArray(safeGet(assessment, "risk_flags", null))
-      ? assessment.risk_flags.map((flag) => String(flag || "").trim()).filter((flag) => flag)
-      : []
-  );
-
-  if (advisoryCodes.has("ACCESS_LABOUR_RISK") || assessmentFlags.has("access_volume_risk")) {
-    addSummarySignal(signals, "Access concern");
-  }
-  if (advisoryCodes.has("DENSE_MATERIAL_RISK") || assessmentFlags.has("dense_material_risk")) {
-    addSummarySignal(signals, "Heavy material concern");
-  }
-  if (
-    advisoryCodes.has("MIXED_LOAD_SORTING_RISK")
-    || assessmentFlags.has("mixed_bulky_load_risk")
-    || assessmentFlags.has("likely_underestimated_volume")
-  ) {
-    addSummarySignal(signals, "Disposal uncertainty");
-  }
-
-  const stairsCount = Number(request?.stairs_count || 0);
-  const floorCount = Number(request?.floor_count || 0);
-  const basementInside = normalizeBooleanLike(request?.basement_or_inside_removal);
-  if (
-    stairsCount >= 2
-    || floorCount >= 2
-    || basementInside
-    || advisoryCodes.has("ACCESS_LABOUR_RISK")
-  ) {
-    addSummarySignal(signals, "Stairs/long-carry concern");
-  }
-
-  if (advisoryCodes.has("REFRIGERANT_APPLIANCE_RISK")) {
-    addSummarySignal(signals, "Refrigerant appliance check");
-  }
-  if (advisoryCodes.has("DEMOLITION_SCOPE_RISK")) {
-    addSummarySignal(signals, "Demolition/rip-out caution");
-  }
-  if (
-    assessmentFlags.has("missing_structured_scope")
-    || assessmentFlags.has("low_input_signal")
-    || assessmentFlags.has("likely_underestimated_volume")
-  ) {
-    addSummarySignal(signals, "Photos/details recommended");
-  }
-
-  const suggestedActions = Array.isArray(safeGet(advisory, "suggested_actions", null))
-    ? advisory.suggested_actions.filter((action) => String(action || "").trim())
-    : [];
-  if (suggestedActions.length) {
-    addSummarySignal(signals, "Follow-up recommended");
-  }
-  if (normalizeBooleanLike(advisory?.manual_review_recommended)) {
-    addSummarySignal(signals, "Owner review recommended");
-  }
-
-  return signals;
-}
-
-function createInternalRiskSummarySection({ advisory, assessment, request }) {
-  const hasAdvisory = advisory && typeof advisory === "object";
-  const hasAssessment = assessment && typeof assessment === "object";
-  if (!hasAdvisory && !hasAssessment) return null;
+function createInternalRiskSummarySection(summary) {
+  if (!summary || typeof summary !== "object") return null;
 
   const section = document.createElement("section");
   section.className = "quoteRiskSection";
@@ -1392,43 +1393,18 @@ function createInternalRiskSummarySection({ advisory, assessment, request }) {
   title.textContent = "Internal Risk Summary";
   section.appendChild(title);
 
-  const riskLevel = formatRiskAdvisoryLevel(safeGet(advisory, "risk_level", ""));
-  if (riskLevel !== "Unknown") {
-    section.appendChild(createQuoteMetaRow("Risk level", riskLevel));
+  const riskLevel = String(summary.risk_level || "").trim();
+  if (riskLevel) {
+    section.appendChild(createQuoteMetaRow("Risk level", null, makeQuoteRiskLevelBadge(riskLevel)));
   }
 
-  const confidenceLevel = String(safeGet(assessment, "confidence_level", "")).trim();
-  if (confidenceLevel) {
-    section.appendChild(createQuoteMetaRow("Confidence", null, makeRiskConfidenceBadge(confidenceLevel)));
-  }
+  appendRiskSummaryList(section, "Reasons:", summary.reasons);
+  appendRiskSummaryList(section, "Missing info:", summary.missing_info);
 
-  const recommendedTrailer = String(safeGet(advisory, "recommended_trailer", "")).trim();
-  if (recommendedTrailer) {
-    section.appendChild(createQuoteMetaRow("Trailer note", formatStructuredIntakeValue(recommendedTrailer)));
-  }
-
-  const summarySignals = createInternalRiskSummarySignals({ advisory, assessment, request });
-  const watchOutRow = document.createElement("div");
-  watchOutRow.className = "quoteDetailMetaRow";
-  const watchOutLabel = document.createElement("strong");
-  watchOutLabel.textContent = "Watch-outs:";
-  watchOutRow.appendChild(watchOutLabel);
-
-  if (!summarySignals.length) {
-    watchOutRow.appendChild(document.createTextNode(" No major internal risk signals found."));
-    section.appendChild(watchOutRow);
-    return section;
-  }
-
-  const list = document.createElement("ul");
-  list.className = "quoteRiskSummaryList";
-  summarySignals.forEach((signal) => {
-    const item = document.createElement("li");
-    item.textContent = signal;
-    list.appendChild(item);
-  });
-  watchOutRow.appendChild(list);
-  section.appendChild(watchOutRow);
+  section.appendChild(createQuoteMetaRow("Suggested action", formatRiskSummaryValue(summary.suggested_action)));
+  section.appendChild(createQuoteMetaRow("Crew suggestion", formatRiskSummaryValue(summary.crew_suggestion)));
+  section.appendChild(createQuoteMetaRow("Trailer suggestion", formatRiskSummaryValue(summary.trailer_suggestion)));
+  section.appendChild(createQuoteMetaRow("Pricing caution", formatRiskSummaryValue(summary.pricing_caution)));
 
   return section;
 }
@@ -1545,11 +1521,7 @@ function createQuoteDetailPanel(detail) {
   }
 
   const assessment = detail.internal_risk_assessment || null;
-  const internalRiskSummarySection = createInternalRiskSummarySection({
-    advisory: detail.quote_risk_advisory || null,
-    assessment,
-    request: safeRequest,
-  });
+  const internalRiskSummarySection = createInternalRiskSummarySection(detail.quote_risk_summary || null);
   if (internalRiskSummarySection) {
     panel.appendChild(internalRiskSummarySection);
   }
