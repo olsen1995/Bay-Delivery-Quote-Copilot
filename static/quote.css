@@ -358,6 +358,42 @@ body.quotePage {
   margin-bottom: 14px;
 }
 
+.customerFlowGroup {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.customerFlowGroup:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.customerFlowLabel {
+  margin: 0 0 5px;
+  color: #fca5a5;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.customerFlowGroup h4 {
+  margin: 0 0 12px;
+  color: var(--quote-text);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.customerFlowGroup .row:last-child {
+  margin-bottom: 0;
+}
+
+.photoHelpGroup .hint {
+  margin-top: 0;
+}
+
 .panelLead {
   margin: 0 0 12px;
   color: var(--quote-muted);

@@ -487,7 +487,7 @@ function renderQuoteResult(data, quoteResponse) {
   noteTitle.textContent = "About this estimate";
   const noteBody = document.createElement("p");
   noteBody.className = "muted";
-  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after your booking request if they help Bay Delivery confirm scope and avoid surprises.";
+  noteBody.textContent = (quoteResponse.disclaimer || "") + " Photos are optional after your booking request if they help Bay Delivery confirm scope.";
   note.append(noteTitle, noteBody);
 
   const nextStep = document.createElement("div");
@@ -616,17 +616,17 @@ function syncServiceFields() {
   if (showScrap) {
     help.textContent = "Scrap pickup is usually quick to quote. Tell us whether the scrap is curbside or inside/on-property.";
     detailsSummary.textContent = "Details for your scrap pickup quote";
-    detailsLead.textContent = "Share location and access details. Photos are optional later if helpful.";
+    detailsLead.textContent = "Answer what you can. Not sure is okay. Photos are optional later if helpful.";
   } else if (showRoute) {
     help.textContent = "For moves and deliveries, add both pickup and dropoff addresses so we can quote the route.";
-    detailsSummary.textContent = "Required route details";
+    detailsSummary.textContent = "Pickup and dropoff details";
     detailsLead.textContent = "Enter both pickup and dropoff addresses. These fields are required for " + serviceTypeLabel(serviceType).toLowerCase() + " jobs.";
   } else if (showLoadCounts) {
-    help.textContent = "Use rough counts, location/access details, and heavy-item notes. Best estimates are fine.";
+    help.textContent = "Use rough counts, location/access details, and special-item notes. Best estimates are fine.";
     detailsSummary.textContent = "Load, access, and item details";
-    detailsLead.textContent = "Add the closest counts and access details. For loose junk, think in regular garbage bags. For trailer fill, choose the closest space used.";
+    detailsLead.textContent = "Add the closest counts and access details. For loose junk, use regular bags or choose the closest space estimate.";
   } else {
-    help.textContent = "Choose the service first. We will show only the fields needed for that job.";
+    help.textContent = "Pick the closest match. We will only show the details needed for that job.";
     detailsSummary.textContent = "Job details for your estimate";
     detailsLead.textContent = "Fill in the details that help Bay Delivery prepare an accurate estimate.";
   }
@@ -744,7 +744,7 @@ function showPersistedQuoteReview(data, acceptToken) {
   );
 
   const statusText = data.quote_request_status ? ` Current status: ${data.quote_request_status}.` : "";
-  const followupText = " Booking preferences remain subject to admin review and final confirmation.";
+  const followupText = " Booking preferences remain subject to Bay Delivery review and final confirmation.";
   showBox("flowStatus", persistedReviewHelperText + statusText + followupText, "info");
   scrollToElement("resultBox");
 }
