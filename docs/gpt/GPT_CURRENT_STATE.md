@@ -27,6 +27,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 	- Accepted-not-booked detail row cap
 	- Internal Quote Risk Summary
 	- Customer Quote Flow Simplification
+	- Lead source + repeat customer tracking (no-schema v1)
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
 - Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
 - PR #287 Customer Quote Flow Simplification did not change backend behavior, pricing, schema, admin, mobile admin, GPT grounding-source schema, Render config, workflows, requirements, or `VERSION`; no forbidden internal risk/pricing/advisory jargon was found in customer quote HTML/JS, and production live-safe smoke passed after deployment.
@@ -34,7 +35,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 ## Partial Or Still Future
 
 - Admin action shortcuts are only partial, not complete.
-- Lead source tracking, repeat customer marker, internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
+- Internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Customer-facing GPT/chatbot, automatic SMS/email sending, and auto-calendar scheduling remain future work.
 - Pricing PRs by service category have not started.
 - Internal GPT upgrade has not started beyond current grounding/state docs.
@@ -52,8 +53,11 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Keep completed-job reporting advisory-only and separate from pricing authority.
 - Keep Internal Quote Risk Summary advisory-only and separate from pricing authority; `customer_visible` remains false and `pricing_effect` remains `none`.
 - Keep pricing changes deferred to later category-specific PRs after evidence review.
-- Next recommended task after this docs refresh: Lead source + repeat customer tracking, because the customer quote flow is now cleaner and admin risk review is stronger; the next best business value is learning where leads come from and identifying repeat customers before pricing changes or heavier admin mutations.
-- Admin action shortcuts completion is useful, but it can drift into backend mutations and operational workflow changes. Job closeout checklist improvements are valuable, but likely touch job/cost capture flows and should wait until lead/repeat customer signal is captured.
+- PR #291 lead source + repeat customer tracking is complete (no-schema v1): optional public `lead_source` intake is accepted by `/quote/calculate`, blank/missing maps to `unknown`, invalid nonblank values reject with 422, and lead source persists through existing `request_json` flow into quotes, quote_requests, and jobs.
+- Desktop admin quote detail now renders Lead & Customer History while `customer_history` remains admin-only and read-only from normalized 10-digit phone history; customer/public quote and review responses do not expose `customer_history`.
+- Phone-history lookup now aligns SQL matching with Python-backed normalization and uncommon separator handling; `last_seen` ordering uses parsed datetimes.
+- No pricing influence, no schema migration, no mobile-admin changes, and `app/quote_engine.py` remains untouched.
+- Next recommended task after this docs refresh: plan Admin action shortcuts completion first, then plan job closeout checklist improvements after lead/repeat signal review.
 
 ## What Should Not Happen Next
 
