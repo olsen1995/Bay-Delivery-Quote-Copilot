@@ -980,21 +980,8 @@ def _normalize_history_phone(value: Any) -> Optional[str]:
     return digits
 
 
-def _sql_history_phone_digits_expr(value_sql: str) -> str:
-    expr = f"COALESCE(CAST({value_sql} AS TEXT), '')"
-    for char in (" ", "-", "(", ")", ".", "+", "/"):
-        expr = f"REPLACE({expr}, '{char}', '')"
-    return expr
-
-
-def _sql_phone_match_predicate(value_sql: str) -> str:
-    digits_expr = _sql_history_phone_digits_expr(value_sql)
-    return (
-        f"(({digits_expr}) = ? OR "
-        f"(LENGTH({digits_expr}) = 11 "
-        f"AND SUBSTR({digits_expr}, 1, 1) = '1' "
-        f"AND SUBSTR({digits_expr}, 2) = ?))"
-    )
+def _register_customer_history_sql_functions(conn: sqlite3.Connection) -> None:
+    conn.create_function("normalize_history_phone", 1, _normalize_history_phone)
 
 
 def _request_phone_from_json(value: Any) -> Optional[str]:
@@ -1078,23 +1065,24 @@ def load_customer_history_context(*, quote_id: str, customer_phone: Any) -> Dict
 
     conn = _connect()
     try:
+        _register_customer_history_sql_functions(conn)
         request_rows = conn.execute(
             f"""
             SELECT request_id, quote_id, customer_phone, created_at
             FROM quote_requests
             WHERE COALESCE(quote_id, '') <> ?
-              AND {_sql_phone_match_predicate("customer_phone")}
+              AND normalize_history_phone(customer_phone) = ?
             """,
-            (quote_id, phone_key, phone_key),
+            (quote_id, phone_key),
         ).fetchall()
         job_rows = conn.execute(
             f"""
             SELECT job_id, quote_id, customer_phone, created_at
             FROM jobs
             WHERE COALESCE(quote_id, '') <> ?
-              AND {_sql_phone_match_predicate("customer_phone")}
+              AND normalize_history_phone(customer_phone) = ?
             """,
-            (quote_id, phone_key, phone_key),
+            (quote_id, phone_key),
         ).fetchall()
         quote_rows = conn.execute(
             f"""
@@ -1102,7 +1090,7 @@ def load_customer_history_context(*, quote_id: str, customer_phone: Any) -> Dict
             FROM quotes AS q
             WHERE COALESCE(q.quote_id, '') <> ?
               AND json_valid(q.request_json) = 1
-              AND {_sql_phone_match_predicate("json_extract(q.request_json, '$.customer_phone')")}
+              AND normalize_history_phone(json_extract(q.request_json, '$.customer_phone')) = ?
               AND NOT EXISTS (
                   SELECT 1 FROM quote_requests AS qr WHERE qr.quote_id = q.quote_id
               )
@@ -1110,7 +1098,7 @@ def load_customer_history_context(*, quote_id: str, customer_phone: Any) -> Dict
                   SELECT 1 FROM jobs AS j WHERE j.quote_id = q.quote_id
               )
             """,
-            (quote_id, phone_key, phone_key),
+            (quote_id, phone_key),
         ).fetchall()
     finally:
         conn.close()

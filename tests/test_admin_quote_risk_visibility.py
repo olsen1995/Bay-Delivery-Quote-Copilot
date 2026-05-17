@@ -217,7 +217,68 @@ def test_customer_history_lookup_is_narrowed_by_phone_key() -> None:
     assert "SELECT job_id, quote_id, customer_phone, created_at FROM jobs" not in source
     assert "SELECT quote_id, created_at, request_json FROM quotes" not in source
     assert "WHERE" in source
-    assert "_sql_phone_match_predicate" in source
+    assert "normalize_history_phone(customer_phone) = ?" in source
+    assert "normalize_history_phone(json_extract(q.request_json, '$.customer_phone')) = ?" in source
+
+
+def test_customer_history_sql_prefilter_uses_python_phone_normalization(temp_quote_db: None) -> None:
+    _save_prior_quote_request(
+        request_id="prior-request-tab-newline",
+        quote_id="prior-request-tab-newline-quote",
+        customer_phone="705\t555\n1234",
+    )
+    _save_prior_job(
+        job_id="prior-job-cr",
+        quote_id="prior-job-cr-quote",
+        request_id="prior-job-cr-request",
+        customer_phone="(705)\r555.1234",
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-1234"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "repeat_customer"
+    assert history["previous_requests"] == 1
+    assert history["previous_jobs"] == 1
+    assert history["previous_quotes"] == 0
+
+
+def test_quote_only_history_sql_prefilter_uses_python_phone_normalization(temp_quote_db: None) -> None:
+    storage.save_quote(
+        {
+            "quote_id": "prior-quote-only-nbsp",
+            "created_at": "2026-04-14T08:00:00-04:00",
+            "request": {
+                "customer_name": "Prior Quote Only",
+                "customer_phone": "705\u00a0555\u00a01234",
+                "job_address": "14 Prior Quote Rd",
+                "description": "Prior quote only",
+                "service_type": "haul_away",
+            },
+            "response": {"cash_total_cad": 100.0, "emt_total_cad": 113.0},
+            "accept_token": "prior-quote-token",
+        }
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-1234"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "possible_repeat_customer"
+    assert history["previous_requests"] == 0
+    assert history["previous_jobs"] == 0
+    assert history["previous_quotes"] == 1
 
 
 def test_admin_quote_detail_last_seen_uses_parsed_timestamp_ordering(temp_quote_db: None) -> None:
