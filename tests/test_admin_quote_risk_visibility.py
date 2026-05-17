@@ -1,4 +1,5 @@
 import base64
+import inspect
 import tempfile
 from pathlib import Path
 
@@ -207,6 +208,46 @@ def test_admin_quote_detail_includes_lead_source_and_repeat_customer_history(tem
     assert history["previous_jobs"] == 1
     assert history["previous_quotes"] == 0
     assert history["last_seen"] == "2026-04-17T09:00:00-04:00"
+
+
+def test_customer_history_lookup_is_narrowed_by_phone_key() -> None:
+    source = inspect.getsource(storage.load_customer_history_context)
+
+    assert "SELECT request_id, quote_id, customer_phone, created_at FROM quote_requests" not in source
+    assert "SELECT job_id, quote_id, customer_phone, created_at FROM jobs" not in source
+    assert "SELECT quote_id, created_at, request_json FROM quotes" not in source
+    assert "WHERE" in source
+    assert "_sql_phone_match_predicate" in source
+
+
+def test_admin_quote_detail_last_seen_uses_parsed_timestamp_ordering(temp_quote_db: None) -> None:
+    _save_prior_quote_request(
+        request_id="prior-request-zulu",
+        quote_id="prior-request-zulu-quote",
+        customer_phone="705-555-0144",
+        created_at="2026-05-02T00:30:00Z",
+    )
+    _save_prior_job(
+        job_id="prior-job-offset",
+        quote_id="prior-job-offset-quote",
+        request_id="prior-job-offset-request",
+        customer_phone="1-705-555-0144",
+        created_at="2026-05-01T20:45:00-04:00",
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-0144"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "repeat_customer"
+    assert history["previous_requests"] == 1
+    assert history["previous_jobs"] == 1
+    assert history["last_seen"] == "2026-05-01T20:45:00-04:00"
 
 
 def test_admin_quote_detail_marks_prior_quote_only_match_as_possible_repeat(temp_quote_db: None) -> None:

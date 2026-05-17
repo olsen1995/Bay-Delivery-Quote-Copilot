@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, NotRequired, Optional, Tuple, TypedDict, cast
 from uuid import uuid4
@@ -980,6 +980,23 @@ def _normalize_history_phone(value: Any) -> Optional[str]:
     return digits
 
 
+def _sql_history_phone_digits_expr(value_sql: str) -> str:
+    expr = f"COALESCE(CAST({value_sql} AS TEXT), '')"
+    for char in (" ", "-", "(", ")", ".", "+", "/"):
+        expr = f"REPLACE({expr}, '{char}', '')"
+    return expr
+
+
+def _sql_phone_match_predicate(value_sql: str) -> str:
+    digits_expr = _sql_history_phone_digits_expr(value_sql)
+    return (
+        f"(({digits_expr}) = ? OR "
+        f"(LENGTH({digits_expr}) = 11 "
+        f"AND SUBSTR({digits_expr}, 1, 1) = '1' "
+        f"AND SUBSTR({digits_expr}, 2) = ?))"
+    )
+
+
 def _request_phone_from_json(value: Any) -> Optional[str]:
     if isinstance(value, dict):
         return value.get("customer_phone") if isinstance(value.get("customer_phone"), str) else None
@@ -1014,6 +1031,40 @@ def _customer_history_payload(
     }
 
 
+def _parse_history_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        raw_value = value.strip()
+        if not raw_value:
+            return None
+        if raw_value.endswith("Z"):
+            raw_value = f"{raw_value[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw_value)
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _latest_history_timestamp(values: List[Any]) -> Optional[str]:
+    latest_value: Optional[str] = None
+    latest_dt: Optional[datetime] = None
+    for value in values:
+        parsed = _parse_history_datetime(value)
+        if parsed is None:
+            continue
+        if latest_dt is None or parsed > latest_dt:
+            latest_dt = parsed
+            latest_value = str(value)
+    return latest_value
+
+
 def load_customer_history_context(*, quote_id: str, customer_phone: Any) -> Dict[str, Any]:
     """Return conservative, read-only customer history context for admin quote detail."""
     phone_key = _normalize_history_phone(customer_phone)
@@ -1023,55 +1074,66 @@ def load_customer_history_context(*, quote_id: str, customer_phone: Any) -> Dict
     previous_requests = 0
     previous_jobs = 0
     previous_quotes = 0
-    last_seen_values: List[str] = []
+    last_seen_values: List[Any] = []
 
     conn = _connect()
     try:
         request_rows = conn.execute(
-            "SELECT request_id, quote_id, customer_phone, created_at FROM quote_requests"
+            f"""
+            SELECT request_id, quote_id, customer_phone, created_at
+            FROM quote_requests
+            WHERE COALESCE(quote_id, '') <> ?
+              AND {_sql_phone_match_predicate("customer_phone")}
+            """,
+            (quote_id, phone_key, phone_key),
         ).fetchall()
         job_rows = conn.execute(
-            "SELECT job_id, quote_id, customer_phone, created_at FROM jobs"
+            f"""
+            SELECT job_id, quote_id, customer_phone, created_at
+            FROM jobs
+            WHERE COALESCE(quote_id, '') <> ?
+              AND {_sql_phone_match_predicate("customer_phone")}
+            """,
+            (quote_id, phone_key, phone_key),
         ).fetchall()
-        linked_quote_ids = {
-            str(row["quote_id"])
-            for row in request_rows
-            if row["quote_id"] is not None
-        } | {
-            str(row["quote_id"])
-            for row in job_rows
-            if row["quote_id"] is not None
-        }
-        quote_rows = conn.execute("SELECT quote_id, created_at, request_json FROM quotes").fetchall()
+        quote_rows = conn.execute(
+            f"""
+            SELECT q.quote_id, q.created_at, q.request_json
+            FROM quotes AS q
+            WHERE COALESCE(q.quote_id, '') <> ?
+              AND json_valid(q.request_json) = 1
+              AND {_sql_phone_match_predicate("json_extract(q.request_json, '$.customer_phone')")}
+              AND NOT EXISTS (
+                  SELECT 1 FROM quote_requests AS qr WHERE qr.quote_id = q.quote_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM jobs AS j WHERE j.quote_id = q.quote_id
+              )
+            """,
+            (quote_id, phone_key, phone_key),
+        ).fetchall()
     finally:
         conn.close()
 
     for row in request_rows:
-        if str(row["quote_id"] or "") == quote_id:
-            continue
         if _normalize_history_phone(row["customer_phone"]) == phone_key:
             previous_requests += 1
             if row["created_at"]:
                 last_seen_values.append(str(row["created_at"]))
 
     for row in job_rows:
-        if str(row["quote_id"] or "") == quote_id:
-            continue
         if _normalize_history_phone(row["customer_phone"]) == phone_key:
             previous_jobs += 1
             if row["created_at"]:
                 last_seen_values.append(str(row["created_at"]))
 
     for row in quote_rows:
-        row_quote_id = str(row["quote_id"] or "")
-        if row_quote_id == quote_id or row_quote_id in linked_quote_ids:
-            continue
         if _normalize_history_phone(_request_phone_from_json(row["request_json"])) == phone_key:
             previous_quotes += 1
             if row["created_at"]:
                 last_seen_values.append(str(row["created_at"]))
 
-    last_seen = max(last_seen_values) if last_seen_values else None
+    last_seen = _latest_history_timestamp(last_seen_values)
     if previous_requests or previous_jobs:
         return _customer_history_payload(
             status="repeat_customer",
