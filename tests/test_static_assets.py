@@ -14,6 +14,12 @@ def test_homepage_images_exist():
         img_path = Path("static/images") / img
         assert img_path.exists(), f"Referenced image {img} does not exist"
 
+def test_homepage_logo_and_primary_cta_are_present() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+
+    assert 'src="/static/images/logo.jpg"' in index_html
+    assert 'alt="Bay Delivery"' in index_html
+    assert 'href="/quote">Get My Fast Estimate<' in index_html
 
 def test_static_pages_reference_shared_favicon() -> None:
     """Ensure routed HTML pages avoid browser fallback requests for /favicon.ico."""
