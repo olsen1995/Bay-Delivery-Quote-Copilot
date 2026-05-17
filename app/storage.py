@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -328,6 +329,7 @@ KNOWN_TABLES = [
 
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
+_PHONE_DIGITS_RE = re.compile(r"\D+")
 
 
 def _validate_table_name(table_name: str) -> str:
@@ -965,6 +967,128 @@ def list_quotes(limit: int = 50, *, include_expired: bool = False, offset: int =
         out.append(item)
 
     return out
+
+
+def _normalize_history_phone(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    digits = _PHONE_DIGITS_RE.sub("", value)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        return None
+    return digits
+
+
+def _request_phone_from_json(value: Any) -> Optional[str]:
+    if isinstance(value, dict):
+        return value.get("customer_phone") if isinstance(value.get("customer_phone"), str) else None
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except Exception:
+            return None
+        if isinstance(parsed, dict):
+            phone = parsed.get("customer_phone")
+            return phone if isinstance(phone, str) else None
+    return None
+
+
+def _customer_history_payload(
+    *,
+    status: str,
+    label: str,
+    previous_requests: int = 0,
+    previous_jobs: int = 0,
+    previous_quotes: int = 0,
+    last_seen: Optional[str] = None,
+) -> Dict[str, Any]:
+    return {
+        "status": status,
+        "label": label,
+        "previous_requests": previous_requests,
+        "previous_jobs": previous_jobs,
+        "previous_quotes": previous_quotes,
+        "last_seen": last_seen,
+        "match_basis": "phone" if status != "unavailable" else None,
+    }
+
+
+def load_customer_history_context(*, quote_id: str, customer_phone: Any) -> Dict[str, Any]:
+    """Return conservative, read-only customer history context for admin quote detail."""
+    phone_key = _normalize_history_phone(customer_phone)
+    if phone_key is None:
+        return _customer_history_payload(status="unavailable", label="Customer history unavailable")
+
+    previous_requests = 0
+    previous_jobs = 0
+    previous_quotes = 0
+    last_seen_values: List[str] = []
+
+    conn = _connect()
+    try:
+        request_rows = conn.execute(
+            "SELECT request_id, quote_id, customer_phone, created_at FROM quote_requests"
+        ).fetchall()
+        job_rows = conn.execute(
+            "SELECT job_id, quote_id, customer_phone, created_at FROM jobs"
+        ).fetchall()
+        linked_quote_ids = {
+            str(row["quote_id"])
+            for row in request_rows
+            if row["quote_id"] is not None
+        } | {
+            str(row["quote_id"])
+            for row in job_rows
+            if row["quote_id"] is not None
+        }
+        quote_rows = conn.execute("SELECT quote_id, created_at, request_json FROM quotes").fetchall()
+    finally:
+        conn.close()
+
+    for row in request_rows:
+        if str(row["quote_id"] or "") == quote_id:
+            continue
+        if _normalize_history_phone(row["customer_phone"]) == phone_key:
+            previous_requests += 1
+            if row["created_at"]:
+                last_seen_values.append(str(row["created_at"]))
+
+    for row in job_rows:
+        if str(row["quote_id"] or "") == quote_id:
+            continue
+        if _normalize_history_phone(row["customer_phone"]) == phone_key:
+            previous_jobs += 1
+            if row["created_at"]:
+                last_seen_values.append(str(row["created_at"]))
+
+    for row in quote_rows:
+        row_quote_id = str(row["quote_id"] or "")
+        if row_quote_id == quote_id or row_quote_id in linked_quote_ids:
+            continue
+        if _normalize_history_phone(_request_phone_from_json(row["request_json"])) == phone_key:
+            previous_quotes += 1
+            if row["created_at"]:
+                last_seen_values.append(str(row["created_at"]))
+
+    last_seen = max(last_seen_values) if last_seen_values else None
+    if previous_requests or previous_jobs:
+        return _customer_history_payload(
+            status="repeat_customer",
+            label="Repeat customer",
+            previous_requests=previous_requests,
+            previous_jobs=previous_jobs,
+            previous_quotes=previous_quotes,
+            last_seen=last_seen,
+        )
+    if previous_quotes:
+        return _customer_history_payload(
+            status="possible_repeat_customer",
+            label="Possible repeat customer",
+            previous_quotes=previous_quotes,
+            last_seen=last_seen,
+        )
+    return _customer_history_payload(status="new_customer", label="New customer")
 
 
 ADMIN_OPS_BOARD_COUNT_KEYS = (

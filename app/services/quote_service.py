@@ -20,7 +20,13 @@ from app.services.quote_risk_scoring import (
     build_quote_risk_assessment,
     build_quote_risk_summary,
 )
-from app.storage import get_quote_record, get_quote_request_by_quote_id, list_attachments, save_quote
+from app.storage import (
+    get_quote_record,
+    get_quote_request_by_quote_id,
+    list_attachments,
+    load_customer_history_context,
+    save_quote,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +54,15 @@ _STRUCTURED_INTAKE_FIELDS = (
     "weather_protection_required",
 )
 _STRUCTURED_INTAKE_SUPPLIED_KEY = "_structured_intake_fields_supplied"
+LEAD_SOURCE_LABELS = {
+    "facebook": "Facebook",
+    "google": "Google",
+    "referral": "Referral",
+    "marketplace": "Marketplace",
+    "repeat_customer": "Repeat customer",
+    "other": "Other",
+    "unknown": "Unknown",
+}
 
 
 def _normalize_customer_phone(value: str | None) -> str | None:
@@ -62,6 +77,25 @@ def _normalize_customer_phone(value: str | None) -> str | None:
     if len(digits) != 10:
         return None
     return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+
+
+def normalize_lead_source(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    normalized = str(value).strip()
+    if not normalized:
+        return "unknown"
+    if normalized not in LEAD_SOURCE_LABELS:
+        raise HTTPException(status_code=400, detail="Invalid lead_source.")
+    return normalized
+
+
+def _lead_source_metadata(value: Any) -> dict[str, str]:
+    try:
+        normalized = normalize_lead_source(value)
+    except HTTPException:
+        normalized = "unknown"
+    return {"value": normalized, "label": LEAD_SOURCE_LABELS[normalized]}
 
 
 def _normalize_load_mode(load_mode: Any) -> str:
@@ -212,6 +246,7 @@ def _structured_intake_values(request_payload: dict[str, Any]) -> dict[str, Any]
 
 def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     _validate_quote_boundary(request_payload)
+    lead_source = normalize_lead_source(request_payload.get("lead_source"))
     requested_service_type = str(request_payload.get("service_type", "")).strip()
     normalized_load_mode = _normalize_load_mode(request_payload.get("load_mode"))
     baseline_engine_quote = calculate_quote(
@@ -236,6 +271,7 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "description": request_payload.get("description") or request_payload.get("job_description_customer"),
         "service_type": baseline_engine_quote["service_type"],
         "payment_method": request_payload.get("payment_method"),
+        "lead_source": lead_source,
         "pickup_address": request_payload.get("pickup_address"),
         "dropoff_address": request_payload.get("dropoff_address"),
         "estimated_hours": float(request_payload.get("estimated_hours", 0.0)),
@@ -396,8 +432,9 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
     internal_risk_assessment: dict[str, Any] | None = None
     quote_risk_advisory: dict[str, Any] | None = None
     quote_risk_summary: dict[str, Any] | None = None
+    request_payload = quote.get("request")
+    safe_request_payload = request_payload if isinstance(request_payload, dict) else {}
     try:
-        request_payload = quote.get("request")
         if not isinstance(request_payload, dict):
             raise TypeError("Saved quote request is not a structured object.")
         artifacts = build_quote_artifacts(dict(request_payload))
@@ -425,6 +462,11 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
 
     return {
         **quote,
+        "lead_source": _lead_source_metadata(safe_request_payload.get("lead_source")),
+        "customer_history": load_customer_history_context(
+            quote_id=quote_id,
+            customer_phone=safe_request_payload.get("customer_phone"),
+        ),
         "internal_risk_assessment": internal_risk_assessment,
         "quote_risk_advisory": quote_risk_advisory,
         "quote_risk_summary": quote_risk_summary,

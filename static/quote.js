@@ -947,6 +947,7 @@ el("btnCalc").addEventListener("click", async () => {
     const customerPhone = (el("customer_phone").value || "").trim();
     const jobAddress = (el("job_address").value || "").trim();
     const description = (el("description").value || "").trim();
+    const leadSource = (el("lead_source").value || "").trim();
 
     const isHaulAway = serviceType === "haul_away";
     const isScrap = serviceType === "scrap_pickup";
@@ -970,7 +971,8 @@ el("btnCalc").addEventListener("click", async () => {
       garbage_bag_count: usesLoadCounts ? parseInt(el("garbage_bag_count").value || "0", 10) : 0,
       mattresses_count: usesLoadCounts ? parseInt(el("mattresses_count").value || "0", 10) : 0,
       box_springs_count: usesLoadCounts ? parseInt(el("box_springs_count").value || "0", 10) : 0,
-      scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside"
+      scrap_pickup_location: isScrap ? el("scrap_pickup_location").value : "curbside",
+      lead_source: leadSource || "unknown"
     };
 
     if (isHaulAway) {

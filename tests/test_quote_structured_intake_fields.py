@@ -90,6 +90,7 @@ def test_old_quote_payload_still_returns_quote(client: TestClient) -> None:
 
     assert response.status_code == 200
     body = response.json()
+    assert body["request"]["lead_source"] == "unknown"
     assert body["response"]["cash_total_cad"] > 0
     assert body["response"]["emt_total_cad"] > body["response"]["cash_total_cad"]
 
@@ -141,12 +142,53 @@ def test_structured_intake_blank_optional_selects_normalize_to_none(client: Test
     assert request["appliance_type"] is None
 
 
+@pytest.mark.parametrize(
+    "lead_source",
+    [
+        "facebook",
+        "google",
+        "referral",
+        "marketplace",
+        "repeat_customer",
+        "other",
+        "unknown",
+    ],
+)
+def test_lead_source_values_are_accepted(client: TestClient, lead_source: str) -> None:
+    response = client.post("/quote/calculate", json=_base_payload(lead_source=lead_source))
+
+    assert response.status_code == 200
+    assert response.json()["request"]["lead_source"] == lead_source
+
+
+@pytest.mark.parametrize("lead_source", ["", "   ", None])
+def test_blank_or_missing_lead_source_stores_unknown(client: TestClient, lead_source: Any) -> None:
+    response = client.post("/quote/calculate", json=_base_payload(lead_source=lead_source))
+
+    assert response.status_code == 200
+    assert response.json()["request"]["lead_source"] == "unknown"
+
+
+def test_invalid_nonblank_lead_source_is_rejected(client: TestClient) -> None:
+    response = client.post("/quote/calculate", json=_base_payload(lead_source="flyer"))
+
+    assert response.status_code == 422
+
+
 def test_structured_intake_fields_do_not_change_quote_totals(client: TestClient) -> None:
     baseline = client.post("/quote/calculate", json=_base_payload()).json()["response"]
     enriched = client.post("/quote/calculate", json=_base_payload(**_structured_fields())).json()["response"]
 
     assert enriched["cash_total_cad"] == baseline["cash_total_cad"]
     assert enriched["emt_total_cad"] == baseline["emt_total_cad"]
+
+
+def test_lead_source_does_not_change_quote_totals(client: TestClient) -> None:
+    baseline = client.post("/quote/calculate", json=_base_payload()).json()["response"]
+    sourced = client.post("/quote/calculate", json=_base_payload(lead_source="facebook")).json()["response"]
+
+    assert sourced["cash_total_cad"] == baseline["cash_total_cad"]
+    assert sourced["emt_total_cad"] == baseline["emt_total_cad"]
 
 
 def test_structured_intake_fields_are_not_quote_engine_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -166,6 +208,7 @@ def test_structured_intake_fields_are_not_quote_engine_inputs(monkeypatch: pytes
     for kwargs in seen_kwargs:
         for field in _structured_fields():
             assert field not in kwargs
+        assert "lead_source" not in kwargs
 
 
 def test_structured_intake_fields_are_stored_in_quote_request_json(client: TestClient) -> None:
@@ -177,6 +220,40 @@ def test_structured_intake_fields_are_stored_in_quote_request_json(client: TestC
     assert saved_quote is not None
     for field, expected in _structured_fields().items():
         assert saved_quote["request"][field] == expected
+
+
+def test_lead_source_persists_through_request_and_job_json(client: TestClient) -> None:
+    quote_response = client.post("/quote/calculate", json=_base_payload(lead_source="referral"))
+    assert quote_response.status_code == 200
+    quote_body = quote_response.json()
+    quote_id = quote_body["quote_id"]
+    accept_token = quote_body["accept_token"]
+
+    saved_quote = storage.get_quote_record(quote_id)
+    assert saved_quote is not None
+    assert saved_quote["request"]["lead_source"] == "referral"
+
+    accept_response = client.post(
+        f"/quote/{quote_id}/decision",
+        json={"action": "accept", "accept_token": accept_token},
+    )
+    assert accept_response.status_code == 200
+    request_id = accept_response.json()["request_id"]
+
+    saved_request = storage.get_quote_request_record(request_id)
+    assert saved_request is not None
+    assert saved_request["request_json"]["lead_source"] == "referral"
+
+    approval_response = client.post(
+        f"/admin/api/quote-requests/{request_id}/decision",
+        headers=_admin_headers(),
+        json={"action": "approve"},
+    )
+    assert approval_response.status_code == 200
+
+    saved_job = storage.get_job_by_quote_id(quote_id)
+    assert saved_job is not None
+    assert saved_job["request_json"]["lead_source"] == "referral"
 
 
 def test_structured_intake_fields_persist_through_request_and_job_json(client: TestClient) -> None:

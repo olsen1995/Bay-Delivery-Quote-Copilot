@@ -172,6 +172,11 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Photos help us confirm scope faster." in quote_html
     assert "After you submit your booking request, add photos here if they help Bay Delivery confirm scope." in quote_html
     assert "After you see your estimate, you can accept and share your preferred day and time window." in quote_html
+    assert "How did you hear about us? (optional)" in quote_html
+    assert re.search(r'<select(?=[^>]*\bid="lead_source")(?=[^>]*\bname="lead_source")[^>]*>', quote_html)
+    for option_value in ["facebook", "google", "referral", "marketplace", "repeat_customer", "other"]:
+        assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
+    assert "lead_source: leadSource || \"unknown\"" in quote_js
     assert "Booking requests and optional photos come after acceptance." not in quote_html
     assert "Optional photos come after that." not in quote_html
     assert "Service type" not in quote_html
@@ -379,6 +384,15 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert "View Details" in admin_js
     assert "Hide Details" in admin_js
     assert "Quote Details" in admin_js
+    assert "Lead & Customer History" in admin_js
+    assert "function createLeadCustomerHistorySection(" in admin_js
+    assert 'detail.lead_source || null' in admin_js
+    assert 'detail.customer_history || null' in admin_js
+    assert "Lead source" in admin_js
+    assert "Customer history" in admin_js
+    assert "Previous requests" in admin_js
+    assert "Previous jobs" in admin_js
+    assert "Last seen" in admin_js
     assert "Internal Risk Summary" in admin_js
     assert "function createInternalRiskSummarySection(" in admin_js
     assert "function createRawRiskDataSection(" in admin_js
@@ -434,6 +448,7 @@ def test_admin_page_includes_quote_detail_risk_panel() -> None:
     assert '/admin/api/quotes/${encodeURIComponent(quoteId)}' in admin_js
     assert ".quoteDetailToggle" in admin_css
     assert ".quoteDetailPanel" in admin_css
+    assert ".leadCustomerHistorySection" in admin_css
     assert ".quoteRiskSection" in admin_css
     assert ".quoteRawRiskDetails" in admin_css
     assert ".quoteRawRiskDetails > summary" in admin_css
@@ -899,6 +914,10 @@ def test_quote_structured_intake_static_surfaces_are_desktop_only() -> None:
     assert "quote_risk_summary" not in mobile_js
     assert "Quote Risk Advisory" not in mobile_html
     assert "Quote Risk Advisory" not in mobile_js
+    assert "Lead & Customer History" not in mobile_html
+    assert "Lead & Customer History" not in mobile_js
+    assert "customer_history" not in mobile_html
+    assert "customer_history" not in mobile_js
 
 
 def test_desktop_admin_includes_daily_ops_board_only() -> None:
