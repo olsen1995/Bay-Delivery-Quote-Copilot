@@ -77,11 +77,12 @@ Completed roadmap work reflected in the repo today:
 - Accepted-not-booked detail row cap.
 - Internal Quote Risk Summary.
 - Customer Quote Flow Simplification.
+- Lead source + repeat customer tracking (no-schema v1).
 
 Partial or still future roadmap work:
 
 - Admin action shortcuts are only partial, not complete.
-- Lead source tracking, repeat customer marker, internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
+- Internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Customer-facing GPT/chatbot, automatic SMS/email sending, and auto-calendar scheduling remain future work.
 - Pricing PRs by service category have not started.
 - Internal GPT upgrade has not started beyond current grounding/state docs.
@@ -216,14 +217,15 @@ Rules:
 
 ## Best Immediate Next Task
 
-Lead source + repeat customer tracking.
+Plan admin action shortcuts completion (do not implement in this docs PR).
 
-The customer quote flow is now cleaner and admin risk review is stronger. The next best business value is learning where leads come from and identifying repeat customers before pricing changes or heavier admin mutations.
+PR #291 completed lead source + repeat customer tracking in no-schema v1: optional public lead source intake is accepted by `/quote/calculate`, blank/missing maps to `unknown`, invalid nonblank values reject with 422, lead source persists through existing `request_json` flow into quotes/quote_requests/jobs, desktop admin quote detail shows Lead & Customer History, repeat-customer context is admin-only/read-only, normalized phone matching and parsed-datetime `last_seen` ordering are in place, and customer/public responses do not expose `customer_history`.
 
 Why other options lose right now:
 
-- Admin action shortcuts completion is useful, but it can drift into backend mutations and operational workflow changes.
-- Job closeout checklist improvements are valuable, but likely touch job/cost capture flows and should wait until lead/repeat customer signal is captured.
+- Job closeout checklist improvements are still valuable, but should follow shortcut planning and reuse newly captured lead/repeat signals.
+
+Keep this as a planning decision first: no pricing, schema, customer-flow, admin-behavior, mobile-admin, or runtime changes in this documentation refresh.
 
 Keep pricing work later and category-specific after more operational evidence review.
 
