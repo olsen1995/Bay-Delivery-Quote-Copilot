@@ -543,19 +543,19 @@ label {
 .followupQuickActions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
-	margin-top: 8px;
-	max-width: 230px;
+	gap: 5px;
+	margin-top: 7px;
+	max-width: 210px;
 }
 
 .followupQuickAction {
 	width: auto;
-	padding: 6px 8px;
-	border-radius: 8px;
+	padding: 5px 7px;
+	border-radius: 7px;
 	background: rgba(255, 255, 255, 0.08);
 	border-color: rgba(255, 255, 255, 0.14);
 	box-shadow: none;
-	font-size: 0.76rem;
+	font-size: 0.72rem;
 	line-height: 1.2;
 }
 

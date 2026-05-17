@@ -757,6 +757,10 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     assert '["waiting_on_customer", "Waiting on customer"]' in admin_js
     assert '["not_ready", "Not ready"]' in admin_js
     assert '["closed_no_followup", "Closed - no follow-up"]' in admin_js
+    assert "quoteRequestFollowupQuickActions" in admin_js
+    for label in ["Needs", "Contacted", "Waiting", "Not ready", "Close", "Unmark"]:
+        assert f'"{label}"' in admin_js
+    assert "Mark this request closed with no follow-up? You can unmark it later." in admin_js
     assert 'createTable(["Request", "Customer", "Job", "Requested", "Follow-up", "Totals", "Actions"])' in admin_js
     assert "function createFollowupStatusControl(item)" in admin_js
     assert "function createFollowupQuickActions(item)" in admin_js
@@ -772,7 +776,11 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     )
     assert quick_actions is not None
     quick_body = quick_actions.group("body")
-    assert 'updateQuoteRequestFollowupStatus(item.request_id || "", value);' in quick_body
+    assert "quoteRequestFollowupQuickActions.forEach" in quick_body
+    assert 'updateQuoteRequestFollowupStatus(item.request_id || "", action.value);' in quick_body
+    assert 'updateQuoteRequestFollowupStatus(item.request_id || "", null);' in quick_body
+    assert "selectedValue(item.followup_status)" in quick_body
+    assert 'if (action.confirm && !confirm(action.confirm)) return;' in quick_body
     assert "/followup-status" not in quick_body
     assert "fetch" not in quick_body
     assert "followup_status" not in mobile_html

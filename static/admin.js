@@ -119,6 +119,17 @@ const quoteRequestFollowupOptions = [
   ["not_ready", "Not ready"],
   ["closed_no_followup", "Closed - no follow-up"]
 ];
+const quoteRequestFollowupQuickActions = [
+  { value: "needs_followup", label: "Needs" },
+  { value: "contacted", label: "Contacted" },
+  { value: "waiting_on_customer", label: "Waiting" },
+  { value: "not_ready", label: "Not ready" },
+  {
+    value: "closed_no_followup",
+    label: "Close",
+    confirm: "Mark this request closed with no follow-up? You can unmark it later."
+  }
+];
 const followupMessageFormatOptions = [
   ["text", "Text message"],
   ["email", "Email"]
@@ -1876,18 +1887,31 @@ async function updateQuoteRequestFollowupStatus(requestId, followupStatus) {
 function createFollowupQuickActions(item) {
   const wrap = document.createElement("div");
   wrap.className = "followupQuickActions";
+  const currentValue = selectedValue(item.followup_status);
 
-  quoteRequestFollowupOptions.forEach(([value, text]) => {
+  quoteRequestFollowupQuickActions.forEach((action) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "followupQuickAction";
-    if (selectedValue(item.followup_status) === value) button.classList.add("isActive");
-    button.textContent = text;
+    if (currentValue === action.value) button.classList.add("isActive");
+    button.textContent = action.label;
     button.addEventListener("click", () => {
-      updateQuoteRequestFollowupStatus(item.request_id || "", value);
+      if (action.confirm && !confirm(action.confirm)) return;
+      updateQuoteRequestFollowupStatus(item.request_id || "", action.value);
     });
     wrap.appendChild(button);
   });
+
+  if (currentValue) {
+    const clearButton = document.createElement("button");
+    clearButton.type = "button";
+    clearButton.className = "followupQuickAction";
+    clearButton.textContent = "Unmark";
+    clearButton.addEventListener("click", () => {
+      updateQuoteRequestFollowupStatus(item.request_id || "", null);
+    });
+    wrap.appendChild(clearButton);
+  }
 
   return wrap;
 }
