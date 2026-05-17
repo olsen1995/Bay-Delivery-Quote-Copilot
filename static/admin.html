@@ -166,6 +166,110 @@
       <div id="profitReportBox"></div>
     </div>
 
+    <details id="manualCompletedJobsSection" class="card dataCard mt18 adminProtectedSection manualCompletedJobsSection" data-admin-protected="true" hidden aria-hidden="true">
+      <summary>Manual Completed Job Calibration Log</summary>
+      <div class="muted">Internal calibration evidence only. Does not change quote prices.</div>
+      <form id="manualCompletedJobForm" class="manualCompletedJobForm">
+        <div class="manualCompletedJobGrid">
+          <label>
+            <span>Job title</span>
+            <input name="job_title" type="text" maxlength="120" required />
+          </label>
+          <label>
+            <span>Service type</span>
+            <input name="service_type" type="text" maxlength="120" required />
+          </label>
+          <label>
+            <span>Secondary category</span>
+            <input name="secondary_category" type="text" maxlength="120" />
+          </label>
+          <label>
+            <span>Quoted price CAD</span>
+            <input name="quoted_price_cad" type="number" min="0" step="0.01" inputmode="decimal" />
+          </label>
+          <label>
+            <span>Actual collected CAD</span>
+            <input name="actual_collected_cad" type="number" min="0.01" step="0.01" inputmode="decimal" required />
+          </label>
+          <label>
+            <span>Crew size</span>
+            <input name="crew_size" type="number" min="1" step="1" inputmode="numeric" required />
+          </label>
+          <label>
+            <span>Duration hours</span>
+            <input name="duration_hours" type="number" min="0.01" step="0.25" inputmode="decimal" required />
+          </label>
+          <label>
+            <span>Labour hours</span>
+            <input name="labour_hours" type="number" min="0" step="0.25" inputmode="decimal" aria-describedby="manualLabourHoursPreview" />
+          </label>
+          <label>
+            <span>Disposal cost CAD</span>
+            <input name="disposal_cost_cad" type="number" min="0" step="0.01" inputmode="decimal" />
+          </label>
+          <label>
+            <span>Fuel cost CAD</span>
+            <input name="fuel_cost_cad" type="number" min="0" step="0.01" inputmode="decimal" />
+          </label>
+          <label>
+            <span>Other costs CAD</span>
+            <input name="other_costs_cad" type="number" min="0" step="0.01" inputmode="decimal" />
+          </label>
+          <label>
+            <span>Difficulty</span>
+            <select name="difficulty">
+              <option value="">Not specified</option>
+              <option value="easy">Easy</option>
+              <option value="normal">Normal</option>
+              <option value="hard">Hard</option>
+              <option value="very_hard">Very hard</option>
+            </select>
+          </label>
+          <label>
+            <span>Access difficulty</span>
+            <select name="access_difficulty">
+              <option value="">Not specified</option>
+              <option value="normal">Normal</option>
+              <option value="awkward">Awkward</option>
+              <option value="difficult">Difficult</option>
+            </select>
+          </label>
+          <label>
+            <span>Pricing result</span>
+            <select name="pricing_result" required>
+              <option value="">Choose result</option>
+              <option value="underquoted">Underquoted</option>
+              <option value="fair">Fair</option>
+              <option value="profitable">Profitable</option>
+              <option value="painful">Painful</option>
+            </select>
+          </label>
+        </div>
+        <div class="manualCompletedJobFlags">
+          <label><input name="disassembly_required" type="checkbox" /> <span>Disassembly required</span></label>
+          <label><input name="dense_materials" type="checkbox" /> <span>Dense materials</span></label>
+          <label><input name="underquoted" type="checkbox" /> <span>Underquoted</span></label>
+          <label><input name="painful_job" type="checkbox" /> <span>Painful job</span></label>
+        </div>
+        <div id="manualLabourHoursPreview" class="small muted">Labour hours auto-calculate from crew size and duration if left blank.</div>
+        <div class="manualCompletedJobTextGrid">
+          <label>
+            <span>Notes</span>
+            <textarea name="notes" maxlength="1000" rows="3" placeholder="Photos in Drive, receipt numbers, external job context"></textarea>
+          </label>
+          <label>
+            <span>Calibration note</span>
+            <textarea name="calibration_note" maxlength="1000" rows="3" placeholder="Pricing lesson for future owner review"></textarea>
+          </label>
+        </div>
+        <div class="manualCompletedJobActions">
+          <button class="actionBtn" type="submit">Save Calibration Entry</button>
+          <div id="manualCompletedJobStatus" class="statusNotice muted" role="status" aria-live="polite"></div>
+        </div>
+      </form>
+      <div id="manualCompletedJobsBox" class="manualCompletedJobList"></div>
+    </details>
+
     <details class="adminReferenceDetails adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
       <summary>Screenshot Intake History (Read-Only)</summary>
       <div class="muted">Recent screenshot intake analyses for operator context. No quote drafting actions are available on desktop admin.</div>

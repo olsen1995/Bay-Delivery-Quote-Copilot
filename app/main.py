@@ -64,6 +64,7 @@ from app.storage import (
     init_db,
     is_token_expired,
     Job,
+    list_completed_job_calibration_entries,
     list_attachments,
     list_admin_audit_log,
     list_gpt_quote_observability,
@@ -71,6 +72,7 @@ from app.storage import (
     list_quote_requests,
     list_quotes,
     save_attachment,
+    save_completed_job_calibration_entry,
     save_gpt_quote_observability_event,
     update_job,
     update_job_costing,
@@ -109,6 +111,11 @@ _ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
         "action_type": "import_db",
         "entity_type": "database",
         "record_id": "primary",
+    },
+    ("POST", "/admin/api/manual-completed-jobs"): {
+        "action_type": "create_manual_completed_job_calibration_entry",
+        "entity_type": "completed_job_calibration_entry",
+        "record_id": "draft",
     },
     ("POST", "/admin/api/drive/restore"): {
         "action_type": "drive_restore",
@@ -1446,6 +1453,57 @@ class JobCostingPayload(BaseModel):
         return v
 
 
+class ManualCompletedJobPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_title: str = Field(..., min_length=1, max_length=120)
+    service_type: str = Field(..., min_length=1, max_length=120)
+    secondary_category: Optional[str] = Field(None, max_length=120)
+    quoted_price_cad: Optional[float] = Field(None, ge=0)
+    actual_collected_cad: float = Field(..., gt=0)
+    crew_size: int = Field(..., ge=1)
+    duration_hours: float = Field(..., gt=0)
+    labour_hours: Optional[float] = Field(None, ge=0)
+    disposal_cost_cad: Optional[float] = Field(None, ge=0)
+    fuel_cost_cad: Optional[float] = Field(None, ge=0)
+    other_costs_cad: Optional[float] = Field(None, ge=0)
+    difficulty: Optional[Literal["easy", "normal", "hard", "very_hard"]] = None
+    access_difficulty: Optional[Literal["normal", "awkward", "difficult"]] = None
+    disassembly_required: bool = False
+    dense_materials: bool = False
+    underquoted: bool = False
+    painful_job: bool = False
+    pricing_result: Literal["underquoted", "fair", "profitable", "painful"]
+    notes: Optional[str] = Field(None, max_length=1000)
+    calibration_note: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("job_title", "service_type", mode="before")
+    @classmethod
+    def strip_required_text(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("Field is required")
+            return stripped
+        return v
+
+    @field_validator("secondary_category", "notes", "calibration_note", mode="before")
+    @classmethod
+    def strip_optional_manual_text(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped or None
+        return v
+
+    @field_validator("difficulty", "access_difficulty", "pricing_result", mode="before")
+    @classmethod
+    def normalize_manual_vocab(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip().lower()
+            return stripped or None
+        return v
+
+
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
     provided_fields = getattr(body, "model_fields_set", None)
@@ -1632,6 +1690,55 @@ def admin_ops_queue_summary(request: Request):
 def admin_completed_job_profit_report(request: Request):
     _require_admin(request)
     return completed_job_profit_report.build_completed_job_profit_report()
+
+
+@app.get("/admin/api/manual-completed-jobs")
+def admin_list_manual_completed_jobs(request: Request, limit: int = 10):
+    _require_admin(request)
+    return {"items": list_completed_job_calibration_entries(limit=limit)}
+
+
+@app.post("/admin/api/manual-completed-jobs")
+def admin_create_manual_completed_job(
+    request: Request,
+    body: ManualCompletedJobPayload,
+    background_tasks: BackgroundTasks,
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+    entry_id = str(uuid4())
+    record = body.model_dump(exclude_unset=True)
+    record.update(
+        {
+            "entry_id": entry_id,
+            "created_at": _now_local_iso(),
+            "updated_at": None,
+            "operator_username": operator_username,
+        }
+    )
+
+    try:
+        entry = save_completed_job_calibration_entry(record)
+    except ValueError as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="create_manual_completed_job_calibration_entry",
+            entity_type="completed_job_calibration_entry",
+            record_id=entry_id,
+            success=False,
+            error_summary=str(exc),
+        )
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    _try_log_admin_audit(
+        operator_username=operator_username,
+        action_type="create_manual_completed_job_calibration_entry",
+        entity_type="completed_job_calibration_entry",
+        record_id=entry["entry_id"],
+        success=True,
+    )
+    _maybe_auto_snapshot(background_tasks)
+    return {"ok": True, "entry": entry}
 
 
 @app.post("/admin/api/quote-requests/{request_id}/followup-status")
