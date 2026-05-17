@@ -685,6 +685,73 @@ def test_completed_job_profit_report_desktop_only_assets() -> None:
         assert phrase not in quote_html.lower()
         assert phrase not in quote_js.lower()
         assert phrase not in quote_css.lower()
+
+
+def test_manual_completed_job_calibration_log_desktop_only_assets() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    assert "Manual Completed Job Calibration Log" in admin_html
+    assert "Internal calibration evidence only. Does not change quote prices." in admin_html
+    assert 'id="manualCompletedJobsSection"' in admin_html
+    assert 'id="manualCompletedJobForm"' in admin_html
+    assert 'id="manualCompletedJobsBox"' in admin_html
+    assert 'data-admin-protected="true"' in admin_html
+
+    assert "/admin/api/manual-completed-jobs" in admin_js
+    assert "function renderManualCompletedJobs(" in admin_js
+    assert "function manualCompletedJobPayloadFromForm(" in admin_js
+    assert "function refreshManualCompletedJobsBestEffort(" in admin_js
+    assert "No manual calibration entries yet." in admin_js
+    assert "Saved manual completed-job calibration entry." in admin_js
+
+    for label in [
+        "Job title",
+        "Service type",
+        "Secondary category",
+        "Quoted price CAD",
+        "Actual collected CAD",
+        "Crew size",
+        "Duration hours",
+        "Labour hours",
+        "Disassembly required",
+        "Dense materials",
+        "Underquoted",
+        "Painful job",
+        "Pricing result",
+        "Calibration note",
+    ]:
+        assert label in admin_html or label in admin_js
+
+    assert ".manualCompletedJobForm" in admin_css
+    assert ".manualCompletedJobList" in admin_css
+
+    banned_mobile = [
+        "Manual Completed Job Calibration Log",
+        "manualCompletedJobs",
+        "/admin/api/manual-completed-jobs",
+        "manual completed-job calibration",
+    ]
+    for phrase in banned_mobile:
+        assert phrase not in mobile_html
+        assert phrase not in mobile_js
+
+    banned_quote = [
+        "manual completed job calibration",
+        "manual completed-job calibration",
+        "/admin/api/manual-completed-jobs",
+        "calibration evidence",
+    ]
+    for phrase in banned_quote:
+        assert phrase not in quote_html.lower()
+        assert phrase not in quote_js.lower()
+        assert phrase not in quote_css.lower()
     assert '["Attachment", "Filename", "Type", "Size", "Uploaded", "OCR Status", "OCR Preview"]' in admin_js
     assert 'ocr_json' in admin_js
     assert 'Click Analyze Intake to save reviewed fields.' not in admin_js

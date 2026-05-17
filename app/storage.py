@@ -59,6 +59,9 @@ QUOTE_REQUEST_FOLLOWUP_STATUS_CHECK_SQL = (
 ALLOWED_JOB_COSTING_PAYMENT_METHODS = ("cash", "emt", "other")
 ALLOWED_JOB_PAYMENT_STATUSES = ("not_paid_yet", "partial_payment", "paid_in_full")
 ALLOWED_JOB_PROFIT_STATUSES = ("underquoted", "fair", "profitable", "painful")
+ALLOWED_MANUAL_CALIBRATION_PRICING_RESULTS = ("underquoted", "fair", "profitable", "painful")
+ALLOWED_MANUAL_CALIBRATION_DIFFICULTIES = ("easy", "normal", "hard", "very_hard")
+ALLOWED_MANUAL_CALIBRATION_ACCESS_DIFFICULTIES = ("normal", "awkward", "difficult")
 JOB_COSTING_PAYMENT_METHOD_CHECK_SQL = (
     "payment_method IS NULL OR payment_method IN ('cash', 'emt', 'other')"
 )
@@ -69,6 +72,15 @@ JOB_PAYMENT_STATUS_CHECK_SQL = (
 JOB_PROFIT_STATUS_CHECK_SQL = (
     "job_profit_status IS NULL OR job_profit_status IN "
     "('underquoted', 'fair', 'profitable', 'painful')"
+)
+MANUAL_CALIBRATION_PRICING_RESULT_CHECK_SQL = (
+    "pricing_result IN ('underquoted', 'fair', 'profitable', 'painful')"
+)
+MANUAL_CALIBRATION_DIFFICULTY_CHECK_SQL = (
+    "difficulty IS NULL OR difficulty IN ('easy', 'normal', 'hard', 'very_hard')"
+)
+MANUAL_CALIBRATION_ACCESS_DIFFICULTY_CHECK_SQL = (
+    "access_difficulty IS NULL OR access_difficulty IN ('normal', 'awkward', 'difficult')"
 )
 
 
@@ -110,6 +122,33 @@ class Job(TypedDict):
     quote_accuracy_note: Optional[str]
     disposal_receipt_note: Optional[str]
     scheduling_context: NotRequired[Dict[str, Any]]
+
+
+class CompletedJobCalibrationEntry(TypedDict):
+    entry_id: str
+    created_at: str
+    updated_at: Optional[str]
+    operator_username: str
+    job_title: str
+    service_type: str
+    secondary_category: Optional[str]
+    quoted_price_cad: Optional[float]
+    actual_collected_cad: float
+    crew_size: int
+    duration_hours: float
+    labour_hours: Optional[float]
+    disposal_cost_cad: Optional[float]
+    fuel_cost_cad: Optional[float]
+    other_costs_cad: Optional[float]
+    difficulty: Optional[str]
+    access_difficulty: Optional[str]
+    disassembly_required: int
+    dense_materials: int
+    underquoted: int
+    painful_job: int
+    pricing_result: str
+    notes: Optional[str]
+    calibration_note: Optional[str]
 
 
 class QuoteRecord(TypedDict):
@@ -319,6 +358,7 @@ KNOWN_TABLES = [
     "quotes",
     "quote_requests",
     "jobs",
+    "completed_job_calibration_entries",
     "attachments",
     "screenshot_assistant_analyses",
     "admin_audit_log",
@@ -575,6 +615,37 @@ def init_db() -> None:
                 job_profit_status TEXT CHECK ({JOB_PROFIT_STATUS_CHECK_SQL}),
                 quote_accuracy_note TEXT,
                 disposal_receipt_note TEXT
+            )
+            """
+        )
+
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS completed_job_calibration_entries (
+                entry_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                operator_username TEXT NOT NULL,
+                job_title TEXT NOT NULL,
+                service_type TEXT NOT NULL,
+                secondary_category TEXT,
+                quoted_price_cad REAL,
+                actual_collected_cad REAL NOT NULL,
+                crew_size INTEGER NOT NULL,
+                duration_hours REAL NOT NULL,
+                labour_hours REAL,
+                disposal_cost_cad REAL,
+                fuel_cost_cad REAL,
+                other_costs_cad REAL,
+                difficulty TEXT CHECK ({MANUAL_CALIBRATION_DIFFICULTY_CHECK_SQL}),
+                access_difficulty TEXT CHECK ({MANUAL_CALIBRATION_ACCESS_DIFFICULTY_CHECK_SQL}),
+                disassembly_required INTEGER NOT NULL DEFAULT 0,
+                dense_materials INTEGER NOT NULL DEFAULT 0,
+                underquoted INTEGER NOT NULL DEFAULT 0,
+                painful_job INTEGER NOT NULL DEFAULT 0,
+                pricing_result TEXT NOT NULL CHECK ({MANUAL_CALIBRATION_PRICING_RESULT_CHECK_SQL}),
+                notes TEXT,
+                calibration_note TEXT
             )
             """
         )
@@ -1454,6 +1525,235 @@ def load_completed_job_profit_report_sources(*, limit: int = 200) -> List[Dict[s
         return [dict(row) for row in rows]
     finally:
         conn.close()
+
+
+# =========================
+# Manual Completed Job Calibration Entries
+# =========================
+
+_MANUAL_CALIBRATION_TEXT_LIMITS = {
+    "updated_at": 80,
+    "job_title": 120,
+    "service_type": 120,
+    "secondary_category": 120,
+    "notes": 1000,
+    "calibration_note": 1000,
+}
+
+
+def _required_limited_text(value: Any, field_name: str, max_length: int) -> str:
+    if value is None:
+        raise ValueError(f"{field_name} is required")
+    text = str(value).strip()
+    if not text:
+        raise ValueError(f"{field_name} is required")
+    return text[:max_length]
+
+
+def _optional_limited_text(value: Any, field_name: str) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text[:_MANUAL_CALIBRATION_TEXT_LIMITS[field_name]]
+
+
+def _required_positive_float(value: Any, field_name: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return parsed
+
+
+def _required_positive_int(value: Any, field_name: str) -> int:
+    parsed_float = float(value)
+    if not parsed_float.is_integer():
+        raise ValueError(f"{field_name} must be a whole number")
+    parsed = int(parsed_float)
+    if parsed < 1:
+        raise ValueError(f"{field_name} must be at least 1")
+    return parsed
+
+
+def _optional_nonnegative_float(value: Any, field_name: str) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    parsed = float(value)
+    if parsed < 0:
+        raise ValueError(f"{field_name} must be non-negative")
+    return parsed
+
+
+def _normalize_bool_int(value: Any) -> int:
+    if isinstance(value, str):
+        return 1 if value.strip().lower() in {"1", "true", "yes", "on"} else 0
+    return 1 if bool(value) else 0
+
+
+def _optional_enum(value: Any, field_name: str, allowed: Tuple[str, ...]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+    if normalized not in allowed:
+        raise ValueError(f"{field_name} must be one of: {', '.join(allowed)}")
+    return normalized
+
+
+def _required_enum(value: Any, field_name: str, allowed: Tuple[str, ...]) -> str:
+    normalized = _optional_enum(value, field_name, allowed)
+    if normalized is None:
+        raise ValueError(f"{field_name} is required")
+    return normalized
+
+
+def _normalize_completed_job_calibration_entry(
+    entry: Dict[str, Any],
+) -> CompletedJobCalibrationEntry:
+    crew_size = _required_positive_int(entry.get("crew_size"), "crew_size")
+    duration_hours = round(_required_positive_float(entry.get("duration_hours"), "duration_hours"), 2)
+    labour_hours = _optional_nonnegative_float(entry.get("labour_hours"), "labour_hours")
+    if labour_hours is None:
+        labour_hours = round(crew_size * duration_hours, 2)
+    else:
+        labour_hours = round(labour_hours, 2)
+
+    normalized: CompletedJobCalibrationEntry = {
+        "entry_id": _required_limited_text(entry.get("entry_id"), "entry_id", 120),
+        "created_at": _required_limited_text(entry.get("created_at"), "created_at", 80),
+        "updated_at": _optional_limited_text(entry.get("updated_at"), "updated_at"),
+        "operator_username": _required_limited_text(entry.get("operator_username"), "operator_username", 120),
+        "job_title": _required_limited_text(
+            entry.get("job_title"),
+            "job_title",
+            _MANUAL_CALIBRATION_TEXT_LIMITS["job_title"],
+        ),
+        "service_type": _required_limited_text(
+            entry.get("service_type"),
+            "service_type",
+            _MANUAL_CALIBRATION_TEXT_LIMITS["service_type"],
+        ),
+        "secondary_category": _optional_limited_text(entry.get("secondary_category"), "secondary_category"),
+        "quoted_price_cad": _optional_nonnegative_float(entry.get("quoted_price_cad"), "quoted_price_cad"),
+        "actual_collected_cad": round(
+            _required_positive_float(entry.get("actual_collected_cad"), "actual_collected_cad"),
+            2,
+        ),
+        "crew_size": crew_size,
+        "duration_hours": duration_hours,
+        "labour_hours": labour_hours,
+        "disposal_cost_cad": _optional_nonnegative_float(entry.get("disposal_cost_cad"), "disposal_cost_cad"),
+        "fuel_cost_cad": _optional_nonnegative_float(entry.get("fuel_cost_cad"), "fuel_cost_cad"),
+        "other_costs_cad": _optional_nonnegative_float(entry.get("other_costs_cad"), "other_costs_cad"),
+        "difficulty": _optional_enum(
+            entry.get("difficulty"),
+            "difficulty",
+            ALLOWED_MANUAL_CALIBRATION_DIFFICULTIES,
+        ),
+        "access_difficulty": _optional_enum(
+            entry.get("access_difficulty"),
+            "access_difficulty",
+            ALLOWED_MANUAL_CALIBRATION_ACCESS_DIFFICULTIES,
+        ),
+        "disassembly_required": _normalize_bool_int(entry.get("disassembly_required")),
+        "dense_materials": _normalize_bool_int(entry.get("dense_materials")),
+        "underquoted": _normalize_bool_int(entry.get("underquoted")),
+        "painful_job": _normalize_bool_int(entry.get("painful_job")),
+        "pricing_result": _required_enum(
+            entry.get("pricing_result"),
+            "pricing_result",
+            ALLOWED_MANUAL_CALIBRATION_PRICING_RESULTS,
+        ),
+        "notes": _optional_limited_text(entry.get("notes"), "notes"),
+        "calibration_note": _optional_limited_text(entry.get("calibration_note"), "calibration_note"),
+    }
+    return normalized
+
+
+def save_completed_job_calibration_entry(
+    entry: Dict[str, Any],
+) -> CompletedJobCalibrationEntry:
+    normalized = _normalize_completed_job_calibration_entry(entry)
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO completed_job_calibration_entries (
+                entry_id, created_at, updated_at, operator_username,
+                job_title, service_type, secondary_category,
+                quoted_price_cad, actual_collected_cad, crew_size,
+                duration_hours, labour_hours, disposal_cost_cad,
+                fuel_cost_cad, other_costs_cad, difficulty,
+                access_difficulty, disassembly_required, dense_materials,
+                underquoted, painful_job, pricing_result, notes,
+                calibration_note
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized["entry_id"],
+                normalized["created_at"],
+                normalized["updated_at"],
+                normalized["operator_username"],
+                normalized["job_title"],
+                normalized["service_type"],
+                normalized["secondary_category"],
+                normalized["quoted_price_cad"],
+                normalized["actual_collected_cad"],
+                normalized["crew_size"],
+                normalized["duration_hours"],
+                normalized["labour_hours"],
+                normalized["disposal_cost_cad"],
+                normalized["fuel_cost_cad"],
+                normalized["other_costs_cad"],
+                normalized["difficulty"],
+                normalized["access_difficulty"],
+                normalized["disassembly_required"],
+                normalized["dense_materials"],
+                normalized["underquoted"],
+                normalized["painful_job"],
+                normalized["pricing_result"],
+                normalized["notes"],
+                normalized["calibration_note"],
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return normalized
+
+
+def _manual_completed_jobs_limit(limit: int = 10) -> int:
+    try:
+        parsed = int(limit)
+    except (TypeError, ValueError):
+        parsed = 10
+    if parsed <= 0:
+        parsed = 10
+    return min(parsed, 25)
+
+
+def list_completed_job_calibration_entries(
+    limit: int = 10,
+) -> List[CompletedJobCalibrationEntry]:
+    safe_limit = _manual_completed_jobs_limit(limit)
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM completed_job_calibration_entries
+            ORDER BY datetime(created_at) DESC, entry_id DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [cast(CompletedJobCalibrationEntry, dict(row)) for row in rows]
 
 
 def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:

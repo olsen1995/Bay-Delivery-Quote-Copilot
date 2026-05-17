@@ -90,6 +90,8 @@ const followupMessageContextSummary = document.getElementById("followupMessageCo
 const followupMessageDraftInput = document.getElementById("followupMessageDraft");
 const followupMessageCopyBtn = document.getElementById("followupMessageCopyBtn");
 const followupMessageStatusLine = document.getElementById("followupMessageStatusLine");
+const manualCompletedJobForm = document.getElementById("manualCompletedJobForm");
+const manualCompletedJobStatus = document.getElementById("manualCompletedJobStatus");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
@@ -647,7 +649,7 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "profitReportBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
+  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "profitReportBox", "manualCompletedJobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
@@ -1263,6 +1265,169 @@ async function refreshProfitReportBestEffort() {
     renderProfitReport(report);
   } catch {
     renderProfitReportError();
+  }
+}
+
+function manualCompletedJobFlags(entry) {
+  const flags = [];
+  if (entry.disassembly_required) flags.push("Disassembly required");
+  if (entry.dense_materials) flags.push("Dense materials");
+  if (entry.underquoted) flags.push("Underquoted");
+  if (entry.painful_job) flags.push("Painful job");
+  return flags;
+}
+
+function renderManualCompletedJobs(items) {
+  const box = document.getElementById("manualCompletedJobsBox");
+  if (!box) return;
+  if (!items || items.length === 0) return addEmptyState(box, "No manual calibration entries yet.");
+  clearNode(box);
+
+  const list = document.createElement("div");
+  list.className = "manualCompletedJobList";
+
+  items.forEach((entry) => {
+    const card = document.createElement("section");
+    card.className = "manualCompletedJobCard";
+
+    const header = document.createElement("div");
+    header.className = "manualCompletedJobCardHeader";
+
+    const title = document.createElement("strong");
+    title.textContent = entry.job_title || "Completed job";
+
+    const result = document.createElement("span");
+    result.className = "pill";
+    result.textContent = entry.pricing_result || "review";
+    header.append(title, result);
+    card.appendChild(header);
+
+    const meta = document.createElement("div");
+    meta.className = "small muted";
+    const labourHours = entry.labour_hours !== null && entry.labour_hours !== undefined ? `${Number(entry.labour_hours).toFixed(2)} labour-hours` : "labour-hours not recorded";
+    meta.textContent = [
+      formatIsoDate(entry.created_at),
+      entry.service_type || "service not recorded",
+      entry.actual_collected_cad !== null && entry.actual_collected_cad !== undefined ? formatMoney(Number(entry.actual_collected_cad)) : "collected not recorded",
+      `${entry.crew_size || 0} crew`,
+      `${entry.duration_hours || 0} hours`,
+      labourHours
+    ].filter(Boolean).join(" • ");
+    card.appendChild(meta);
+
+    const flags = manualCompletedJobFlags(entry);
+    if (flags.length) {
+      const flagLine = document.createElement("div");
+      flagLine.className = "small";
+      flagLine.textContent = flags.join(", ");
+      card.appendChild(flagLine);
+    }
+
+    if (entry.calibration_note) {
+      const note = document.createElement("div");
+      note.className = "small manualCompletedJobNote";
+      note.textContent = entry.calibration_note;
+      card.appendChild(note);
+    }
+
+    list.appendChild(card);
+  });
+
+  box.appendChild(list);
+}
+
+function renderManualCompletedJobsError() {
+  const box = document.getElementById("manualCompletedJobsBox");
+  if (!box) return;
+  clearNode(box);
+  const div = document.createElement("div");
+  div.className = "emptyState";
+  const msg = document.createElement("span");
+  msg.className = "bad";
+  msg.textContent = "Manual calibration log could not load. Core admin data is still available.";
+  div.appendChild(msg);
+  box.appendChild(div);
+}
+
+async function refreshManualCompletedJobsBestEffort() {
+  try {
+    const payload = await fetchJSON("/admin/api/manual-completed-jobs?limit=10");
+    renderManualCompletedJobs(payload.items || []);
+  } catch {
+    renderManualCompletedJobsError();
+  }
+}
+
+function manualCompletedJobPayloadFromForm(form) {
+  const data = new FormData(form);
+  const textField = (field) => {
+    const value = String(data.get(field) || "").trim();
+    return value || null;
+  };
+  const numberField = (field) => {
+    const value = String(data.get(field) || "").trim();
+    return value ? Number(value) : null;
+  };
+  const payload = {
+    job_title: textField("job_title"),
+    service_type: textField("service_type"),
+    secondary_category: textField("secondary_category"),
+    quoted_price_cad: numberField("quoted_price_cad"),
+    actual_collected_cad: numberField("actual_collected_cad"),
+    crew_size: numberField("crew_size"),
+    duration_hours: numberField("duration_hours"),
+    labour_hours: numberField("labour_hours"),
+    disposal_cost_cad: numberField("disposal_cost_cad"),
+    fuel_cost_cad: numberField("fuel_cost_cad"),
+    other_costs_cad: numberField("other_costs_cad"),
+    difficulty: textField("difficulty"),
+    access_difficulty: textField("access_difficulty"),
+    disassembly_required: data.get("disassembly_required") === "on",
+    dense_materials: data.get("dense_materials") === "on",
+    underquoted: data.get("underquoted") === "on",
+    painful_job: data.get("painful_job") === "on",
+    pricing_result: textField("pricing_result"),
+    notes: textField("notes"),
+    calibration_note: textField("calibration_note")
+  };
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === null) delete payload[key];
+  });
+  return payload;
+}
+
+function updateManualLabourHoursPreview() {
+  if (!manualCompletedJobForm) return;
+  const preview = document.getElementById("manualLabourHoursPreview");
+  if (!preview) return;
+  const crew = Number(new FormData(manualCompletedJobForm).get("crew_size") || 0);
+  const hours = Number(new FormData(manualCompletedJobForm).get("duration_hours") || 0);
+  if (crew > 0 && hours > 0) {
+    preview.textContent = `Labour hours auto-calculate to ${(crew * hours).toFixed(2)} if left blank.`;
+    return;
+  }
+  preview.textContent = "Labour hours auto-calculate from crew size and duration if left blank.";
+}
+
+async function saveManualCompletedJob(event) {
+  event.preventDefault();
+  if (!manualCompletedJobForm) return;
+  setLine(manualCompletedJobStatus, "muted", "Saving manual completed-job calibration entry...");
+  try {
+    const resp = await fetchJSON("/admin/api/manual-completed-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(manualCompletedJobPayloadFromForm(manualCompletedJobForm))
+    });
+    manualCompletedJobForm.reset();
+    updateManualLabourHoursPreview();
+    renderManualCompletedJobs([resp.entry].filter(Boolean));
+    await refreshManualCompletedJobsBestEffort();
+    setLine(manualCompletedJobStatus, "ok", "Saved manual completed-job calibration entry.");
+  } catch (err) {
+    const parsed = parseApiError(err);
+    const detail = safeGet(parsed, "data.detail", "") || parsed.raw || "Save failed.";
+    setLine(manualCompletedJobStatus, "bad", "Manual calibration entry was not saved. " + detail);
   }
 }
 
@@ -2966,6 +3131,7 @@ async function refreshAll() {
     setProtectedDashboardVisible(true);
     void refreshOpsQueueBestEffort();
     void refreshProfitReportBestEffort();
+    void refreshManualCompletedJobsBestEffort();
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
     adminSessionReady = false;
@@ -3005,6 +3171,10 @@ if (followupMessageScenarioSelect) followupMessageScenarioSelect.addEventListene
 if (followupMessageFormatSelect) followupMessageFormatSelect.addEventListener("change", updateFollowupMessageDraft);
 if (followupMessageContextSelect) followupMessageContextSelect.addEventListener("change", updateFollowupMessageDraft);
 if (followupMessageCopyBtn) followupMessageCopyBtn.addEventListener("click", copyFollowupMessageDraft);
+if (manualCompletedJobForm) {
+  manualCompletedJobForm.addEventListener("submit", saveManualCompletedJob);
+  manualCompletedJobForm.addEventListener("input", updateManualLabourHoursPreview);
+}
 
 resetProtectedDashboard();
 closeScheduleModal();
