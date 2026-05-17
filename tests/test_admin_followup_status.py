@@ -217,6 +217,12 @@ def test_admin_followup_status_update_accepts_valid_values_and_clear(
     assert payload["request"]["status"] == "customer_accepted"
     assert storage.get_quote_request_record("req-followup-1")["followup_status"] == "contacted"
 
+    audit_entry = storage.list_admin_audit_log(limit=1)[0]
+    assert audit_entry["action_type"] == "update_followup_status"
+    assert audit_entry["entity_type"] == "quote_request"
+    assert audit_entry["record_id"] == "req-followup-1"
+    assert audit_entry["success"] == 1
+
     list_response = client.get("/admin/api/quote-requests", headers=admin_headers)
     assert list_response.status_code == 200
     assert list_response.json()["items"][0]["followup_status"] == "contacted"
