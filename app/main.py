@@ -1028,6 +1028,7 @@ class QuoteRequestPayload(BaseModel):
     access_difficulty: str = Field("normal", max_length=50)
     has_dense_materials: bool = Field(False)
     load_mode: Optional[str] = Field("standard", max_length=20)
+    lead_source: Optional[Literal["facebook", "google", "referral", "marketplace", "repeat_customer", "other", "unknown"]] = Field("unknown")
     stairs_count: Optional[int] = Field(None, ge=0)
     floor_count: Optional[int] = Field(None, ge=0)
     basement_or_inside_removal: Optional[bool] = Field(None)
@@ -1081,6 +1082,16 @@ class QuoteRequestPayload(BaseModel):
         if isinstance(v, str):
             value = v.strip().lower()
             return value or None
+        return v
+
+    @field_validator("lead_source", mode="before")
+    @classmethod
+    def normalize_lead_source(cls, v):
+        if v is None:
+            return "unknown"
+        if isinstance(v, str):
+            value = v.strip()
+            return value or "unknown"
         return v
 
 

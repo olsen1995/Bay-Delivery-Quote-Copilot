@@ -1312,6 +1312,37 @@ function createQuoteMetaRow(label, value, extraNode) {
   return row;
 }
 
+function createLeadCustomerHistorySection(leadSource, customerHistory) {
+  const hasLeadSource = leadSource && typeof leadSource === "object";
+  const hasCustomerHistory = customerHistory && typeof customerHistory === "object";
+  if (!hasLeadSource && !hasCustomerHistory) return null;
+
+  const section = document.createElement("section");
+  section.className = "quoteRiskSection leadCustomerHistorySection";
+
+  const title = document.createElement("div");
+  title.className = "quoteDetailTitle";
+  title.textContent = "Lead & Customer History";
+  section.appendChild(title);
+
+  const leadLabel = hasLeadSource ? String(leadSource.label || "Unknown").trim() : "Unknown";
+  section.appendChild(createQuoteMetaRow("Lead source", leadLabel || "Unknown"));
+
+  if (hasCustomerHistory) {
+    section.appendChild(createQuoteMetaRow("Customer history", customerHistory.label || "Customer history unavailable"));
+    section.appendChild(createQuoteMetaRow("Previous requests", String(customerHistory.previous_requests ?? 0)));
+    section.appendChild(createQuoteMetaRow("Previous jobs", String(customerHistory.previous_jobs ?? 0)));
+    if (Number(customerHistory.previous_quotes || 0) > 0) {
+      section.appendChild(createQuoteMetaRow("Previous quote-only matches", String(customerHistory.previous_quotes || 0)));
+    }
+    if (customerHistory.last_seen) {
+      section.appendChild(createQuoteMetaRow("Last seen", formatIsoDate(customerHistory.last_seen)));
+    }
+  }
+
+  return section;
+}
+
 function hasStructuredIntakeValue(request, field) {
   if (!Object.prototype.hasOwnProperty.call(request, field)) return false;
   const value = request[field];
@@ -1607,6 +1638,14 @@ function createQuoteDetailPanel(detail) {
   panel.appendChild(meta);
 
   const structuredIntakeSection = createStructuredIntakeSection(safeRequest);
+  const leadCustomerHistorySection = createLeadCustomerHistorySection(
+    detail.lead_source || null,
+    detail.customer_history || null
+  );
+  if (leadCustomerHistorySection) {
+    panel.appendChild(leadCustomerHistorySection);
+  }
+
   if (structuredIntakeSection) {
     panel.appendChild(structuredIntakeSection);
   }

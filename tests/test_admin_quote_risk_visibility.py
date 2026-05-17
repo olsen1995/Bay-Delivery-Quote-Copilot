@@ -1,4 +1,5 @@
 import base64
+import inspect
 import tempfile
 from pathlib import Path
 
@@ -90,6 +91,70 @@ def _save_quote_attachment(quote_id: str) -> None:
     )
 
 
+def _save_prior_quote_request(
+    *,
+    request_id: str,
+    quote_id: str,
+    customer_name: str = "Prior Customer",
+    customer_phone: str | None = "7055550144",
+    created_at: str = "2026-04-15T09:00:00-04:00",
+) -> None:
+    storage.save_quote_request(
+        {
+            "request_id": request_id,
+            "created_at": created_at,
+            "status": "customer_accepted",
+            "quote_id": quote_id,
+            "customer_name": customer_name,
+            "customer_phone": customer_phone,
+            "job_address": "15 Prior Request Rd",
+            "job_description_customer": "Prior request",
+            "job_description_internal": "Prior request",
+            "service_type": "haul_away",
+            "cash_total_cad": 150.0,
+            "emt_total_cad": 169.5,
+            "request_json": {"customer_phone": customer_phone, "service_type": "haul_away"},
+            "notes": None,
+            "requested_job_date": None,
+            "requested_time_window": None,
+            "customer_accepted_at": created_at,
+            "admin_approved_at": None,
+            "accept_token": "prior-accept-token",
+            "booking_token": None,
+            "booking_token_created_at": None,
+        }
+    )
+
+
+def _save_prior_job(
+    *,
+    job_id: str,
+    quote_id: str,
+    request_id: str,
+    customer_phone: str | None = "(705) 555-0144",
+    created_at: str = "2026-04-17T09:00:00-04:00",
+) -> None:
+    storage.save_job(
+        {
+            "job_id": job_id,
+            "created_at": created_at,
+            "status": "completed",
+            "quote_id": quote_id,
+            "request_id": request_id,
+            "customer_name": "Prior Job Customer",
+            "customer_phone": customer_phone,
+            "job_address": "17 Prior Job Ave",
+            "job_description_customer": "Prior job",
+            "job_description_internal": "Prior job",
+            "service_type": "haul_away",
+            "cash_total_cad": 175.0,
+            "emt_total_cad": 197.75,
+            "request_json": {"customer_phone": customer_phone, "service_type": "haul_away"},
+            "notes": None,
+        }
+    )
+
+
 @pytest.fixture()
 def temp_quote_db(monkeypatch: pytest.MonkeyPatch) -> None:
     original_db_path = storage.DB_PATH
@@ -108,6 +173,237 @@ def temp_quote_db(monkeypatch: pytest.MonkeyPatch) -> None:
     storage.DB_PATH = original_db_path
     storage._TABLE_COL_CACHE.clear()
     storage._TABLE_COL_CACHE.update(original_cache)
+
+
+def test_admin_quote_detail_includes_lead_source_and_repeat_customer_history(temp_quote_db: None) -> None:
+    _save_prior_quote_request(
+        request_id="prior-request-match",
+        quote_id="prior-request-quote",
+        customer_phone="705.555.0144",
+    )
+    _save_prior_job(
+        job_id="prior-job-match",
+        quote_id="prior-job-quote",
+        request_id="prior-job-request",
+        customer_phone="+1 (705) 555-0144",
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post(
+            "/quote/calculate",
+            json=_quote_payload(lead_source="facebook", customer_phone="705-555-0144"),
+        )
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["lead_source"] == {"value": "facebook", "label": "Facebook"}
+    history = body["customer_history"]
+    assert history["status"] == "repeat_customer"
+    assert history["label"] == "Repeat customer"
+    assert history["previous_requests"] == 1
+    assert history["previous_jobs"] == 1
+    assert history["previous_quotes"] == 0
+    assert history["last_seen"] == "2026-04-17T09:00:00-04:00"
+
+
+def test_customer_history_lookup_is_narrowed_by_phone_key() -> None:
+    source = inspect.getsource(storage.load_customer_history_context)
+
+    assert "SELECT request_id, quote_id, customer_phone, created_at FROM quote_requests" not in source
+    assert "SELECT job_id, quote_id, customer_phone, created_at FROM jobs" not in source
+    assert "SELECT quote_id, created_at, request_json FROM quotes" not in source
+    assert "WHERE" in source
+    assert "normalize_history_phone(customer_phone) = ?" in source
+    assert "normalize_history_phone(json_extract(q.request_json, '$.customer_phone')) = ?" in source
+
+
+def test_customer_history_sql_prefilter_uses_python_phone_normalization(temp_quote_db: None) -> None:
+    _save_prior_quote_request(
+        request_id="prior-request-tab-newline",
+        quote_id="prior-request-tab-newline-quote",
+        customer_phone="705\t555\n1234",
+    )
+    _save_prior_job(
+        job_id="prior-job-cr",
+        quote_id="prior-job-cr-quote",
+        request_id="prior-job-cr-request",
+        customer_phone="(705)\r555.1234",
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-1234"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "repeat_customer"
+    assert history["previous_requests"] == 1
+    assert history["previous_jobs"] == 1
+    assert history["previous_quotes"] == 0
+
+
+def test_quote_only_history_sql_prefilter_uses_python_phone_normalization(temp_quote_db: None) -> None:
+    storage.save_quote(
+        {
+            "quote_id": "prior-quote-only-nbsp",
+            "created_at": "2026-04-14T08:00:00-04:00",
+            "request": {
+                "customer_name": "Prior Quote Only",
+                "customer_phone": "705\u00a0555\u00a01234",
+                "job_address": "14 Prior Quote Rd",
+                "description": "Prior quote only",
+                "service_type": "haul_away",
+            },
+            "response": {"cash_total_cad": 100.0, "emt_total_cad": 113.0},
+            "accept_token": "prior-quote-token",
+        }
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-1234"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "possible_repeat_customer"
+    assert history["previous_requests"] == 0
+    assert history["previous_jobs"] == 0
+    assert history["previous_quotes"] == 1
+
+
+def test_admin_quote_detail_last_seen_uses_parsed_timestamp_ordering(temp_quote_db: None) -> None:
+    _save_prior_quote_request(
+        request_id="prior-request-zulu",
+        quote_id="prior-request-zulu-quote",
+        customer_phone="705-555-0144",
+        created_at="2026-05-02T00:30:00Z",
+    )
+    _save_prior_job(
+        job_id="prior-job-offset",
+        quote_id="prior-job-offset-quote",
+        request_id="prior-job-offset-request",
+        customer_phone="1-705-555-0144",
+        created_at="2026-05-01T20:45:00-04:00",
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-0144"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "repeat_customer"
+    assert history["previous_requests"] == 1
+    assert history["previous_jobs"] == 1
+    assert history["last_seen"] == "2026-05-01T20:45:00-04:00"
+
+
+def test_admin_quote_detail_marks_prior_quote_only_match_as_possible_repeat(temp_quote_db: None) -> None:
+    storage.save_quote(
+        {
+            "quote_id": "prior-quote-only",
+            "created_at": "2026-04-14T08:00:00-04:00",
+            "request": {
+                "customer_name": "Prior Quote Only",
+                "customer_phone": "7055550144",
+                "job_address": "14 Prior Quote Rd",
+                "description": "Prior quote only",
+                "service_type": "haul_away",
+            },
+            "response": {"cash_total_cad": 100.0, "emt_total_cad": 113.0},
+            "accept_token": "prior-quote-token",
+        }
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-0144"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "possible_repeat_customer"
+    assert history["label"] == "Possible repeat customer"
+    assert history["previous_requests"] == 0
+    assert history["previous_jobs"] == 0
+    assert history["previous_quotes"] == 1
+
+
+def test_admin_quote_detail_excludes_current_quote_from_customer_history(temp_quote_db: None) -> None:
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-0144"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "new_customer"
+    assert history["label"] == "New customer"
+    assert history["previous_requests"] == 0
+    assert history["previous_jobs"] == 0
+    assert history["previous_quotes"] == 0
+
+
+def test_admin_quote_detail_does_not_use_name_only_match_as_repeat(temp_quote_db: None) -> None:
+    _save_prior_quote_request(
+        request_id="prior-name-only",
+        quote_id="prior-name-only-quote",
+        customer_name="Risk Visibility Tester",
+        customer_phone="705-555-9999",
+    )
+
+    with TestClient(app) as client:
+        quote_resp = client.post("/quote/calculate", json=_quote_payload(customer_phone="705-555-0144"))
+        assert quote_resp.status_code == 200
+        quote_id = quote_resp.json()["quote_id"]
+
+        resp = client.get(f"/admin/api/quotes/{quote_id}", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    assert resp.json()["customer_history"]["label"] == "New customer"
+
+
+def test_admin_quote_detail_reports_unavailable_history_for_unusable_legacy_phone(temp_quote_db: None) -> None:
+    storage.save_quote(
+        {
+            "quote_id": "legacy-unusable-phone",
+            "created_at": "2026-04-16T12:00:00-04:00",
+            "request": {
+                "customer_name": "Legacy Phone",
+                "customer_phone": "call me",
+                "job_address": "16 Legacy Rd",
+                "description": "Legacy unusable phone",
+                "service_type": "haul_away",
+            },
+            "response": {"cash_total_cad": 125.0, "emt_total_cad": 141.25},
+            "accept_token": "legacy-token",
+        }
+    )
+
+    with TestClient(app) as client:
+        resp = client.get("/admin/api/quotes/legacy-unusable-phone", headers=_admin_headers())
+
+    assert resp.status_code == 200
+    history = resp.json()["customer_history"]
+    assert history["status"] == "unavailable"
+    assert history["label"] == "Customer history unavailable"
 
 
 def test_admin_quote_detail_includes_internal_risk_assessment(temp_quote_db: None) -> None:
@@ -268,6 +564,8 @@ def test_admin_quote_detail_returns_null_risk_assessment_when_risk_redrive_fails
     assert body["internal_risk_assessment"] is None
     assert body["quote_risk_advisory"] is None
     assert body["quote_risk_summary"] is None
+    assert body["lead_source"] == {"value": "unknown", "label": "Unknown"}
+    assert body["customer_history"]["label"] == "Customer history unavailable"
 
 
 def test_admin_quote_detail_handles_null_request_and_response_payloads(temp_quote_db: None) -> None:
@@ -312,6 +610,8 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
         assert "quote_risk_advisory" not in quote_body["response"]
         assert "quote_risk_summary" not in quote_body
         assert "quote_risk_summary" not in quote_body["response"]
+        assert "customer_history" not in quote_body
+        assert "customer_history" not in quote_body["response"]
 
         review_resp = client.get(
             f"/quote/{quote_body['quote_id']}/view",
@@ -326,3 +626,5 @@ def test_public_quote_responses_still_exclude_internal_risk_assessment(temp_quot
     assert "quote_risk_advisory" not in review_body["response"]
     assert "quote_risk_summary" not in review_body
     assert "quote_risk_summary" not in review_body["response"]
+    assert "customer_history" not in review_body
+    assert "customer_history" not in review_body["response"]
