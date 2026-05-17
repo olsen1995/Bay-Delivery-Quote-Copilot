@@ -179,6 +179,17 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "After you submit your booking request, add photos here if they help Bay Delivery confirm scope." in quote_html
     assert "After you see your estimate, you can accept and share your preferred day and time window." in quote_html
     assert "How did you hear about us? (optional)" in quote_html
+    for control_id in [
+        "service_type",
+        "description",
+        "customer_name",
+        "customer_phone",
+        "job_address",
+        "lead_source",
+    ]:
+        assert f'id="{control_id}"' in quote_html
+    assert '<button class="btn" id="btnCalc" type="button">See My Estimate</button>' in quote_html
+    assert '<button class="btn secondary" id="btnClear" type="button">Clear</button>' in quote_html
     assert re.search(r'<select(?=[^>]*\bid="lead_source")(?=[^>]*\bname="lead_source")[^>]*>', quote_html)
     for option_value in ["facebook", "google", "referral", "marketplace", "repeat_customer", "other"]:
         assert re.search(rf'<option[^>]*\bvalue="{re.escape(option_value)}"[^>]*>', quote_html)
@@ -207,6 +218,44 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "customerFlowLabel" in quote_css
     assert "quoteResultIncluded" in quote_css
     assert "quoteInfoCard" in quote_css
+
+
+def test_quote_page_mobile_polish_preserves_one_form_flow() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    assert "@media (max-width: 720px)" in quote_css
+    assert ".progressCard" in quote_css
+    assert "overflow-x: auto;" in quote_css
+    assert "scroll-snap-type: x proximity;" in quote_css
+    assert "#quoteForm > .btnRow" in quote_css
+    assert "position: sticky;" in quote_css
+    assert "env(safe-area-inset-bottom)" in quote_css
+    assert ".detailPanel" in quote_css
+    assert ".customerFlowGroup" in quote_css
+
+    assert quote_html.count('<form id="quoteForm" class="formWrap" novalidate>') == 1
+    assert quote_html.count('id="btnCalc"') == 1
+    assert quote_html.count('id="btnClear"') == 1
+    assert ">See My Estimate<" in quote_html
+    assert ">Clear<" in quote_html
+
+    forbidden_step_machine_markers = [
+        "btnNext",
+        "btnBack",
+        "quoteStepIndex",
+        "currentQuoteStep",
+        "goToStep",
+        "nextStepButton",
+        "backStepButton",
+    ]
+    for marker in forbidden_step_machine_markers:
+        assert marker not in quote_html
+        assert marker not in quote_js
+
+    assert not re.search(r"<button[^>]*>\s*Next\s*</button>", quote_html, re.IGNORECASE)
+    assert not re.search(r"<button[^>]*>\s*Back\s*</button>", quote_html, re.IGNORECASE)
 
 
 def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:

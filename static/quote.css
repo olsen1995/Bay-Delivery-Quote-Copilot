@@ -801,6 +801,10 @@ body.quotePage {
 }
 
 @media (max-width: 720px) {
+  .quotePage {
+    padding-bottom: 92px;
+  }
+
   .quotePage .topbar {
     padding: 12px;
   }
@@ -820,20 +824,97 @@ body.quotePage {
   .stageCard,
   .resultBox,
   .statusBox {
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .progressCard {
+    padding: 15px;
+  }
+
+  .flowProgress {
+    display: flex;
+    grid-template-columns: none;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .flowStep {
+    flex: 0 0 124px;
+    gap: 7px;
+    padding: 8px 9px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    scroll-snap-align: start;
+  }
+
+  .flowStepBadge {
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
   }
 
   .quotePage .container {
-    gap: 16px;
+    gap: 14px;
   }
 
   .formSection {
-    padding: 14px;
-    margin-bottom: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .sectionHeader,
+  .sectionHeader.compact {
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .sectionLead,
+  .firstStepHint,
+  .startIntro {
+    line-height: 1.42;
+  }
+
+  .detailPanel {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .detailPanel[open] summary {
+    margin-bottom: 10px;
+  }
+
+  .customerFlowGroup {
+    margin-top: 14px;
+    padding-top: 14px;
+  }
+
+  .customerFlowGroup h4 {
+    margin-bottom: 9px;
   }
 
   .secondarySection .row {
-    margin-bottom: 8px;
+    margin-bottom: 7px;
+  }
+
+  #quoteForm {
+    padding-bottom: 8px;
+  }
+
+  #quoteForm > .btnRow {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    margin: 12px -16px 0;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(11, 11, 16, 0), rgba(11, 11, 16, 0.96) 28%, rgba(11, 11, 16, 0.98));
+    backdrop-filter: blur(10px);
+  }
+
+  #quoteForm > .stepHelper {
+    margin-bottom: 0;
   }
 
   .btnRow .btn {
