@@ -98,7 +98,7 @@ def _render_quote_list(limit: int) -> None:
         print("REFUSED: --limit must be greater than zero.")
         raise SystemExit(2)
 
-    quotes = storage.list_quotes(limit=effective_limit)
+    quotes = storage.list_quotes(limit=effective_limit, include_expired=True)
     rows = [_extract_quote_context(quote) for quote in quotes]
 
     print(f"Database path: {storage._resolve_db_path()}")

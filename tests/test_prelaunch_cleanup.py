@@ -52,6 +52,7 @@ def _seed_quote_with_context(
     service_type: str = "dump_run",
     job_address: str = "123 Example St",
     cash_total_cad: float = 150.0,
+    admin_status: str = "pending",
 ) -> None:
     storage.save_quote(
         {
@@ -70,6 +71,7 @@ def _seed_quote_with_context(
                 "emt_total_cad": round(cash_total_cad * 1.13, 2),
             },
             "accept_token": f"accept-{quote_id}",
+            "admin_status": admin_status,
         }
     )
 
@@ -357,6 +359,7 @@ def test_script_list_quotes_shows_full_ids_and_context(
         service_type="dump_run",
         job_address="22 Backup Ave",
         cash_total_cad=275.0,
+        admin_status="expired",
     )
 
     assert cleanup_script.main(["--list-quotes", "--limit", "2"]) == 0
@@ -374,6 +377,7 @@ def test_script_list_quotes_shows_full_ids_and_context(
     assert "quote-clean-me" not in output
     assert storage.get_quote_record("quote-full-1") is not None
     assert storage.get_quote_record("quote-full-2") is not None
+    assert storage.get_quote_record("quote-full-2")["admin_status"] == "expired"
 
 
 def test_script_runs_directly_from_repo_root_with_temp_db(tmp_path: Path) -> None:
