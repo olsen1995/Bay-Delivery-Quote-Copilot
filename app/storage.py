@@ -266,6 +266,33 @@ class AdminOpsQueueSources(TypedDict):
     accepted_not_booked_detail_sources: List[Dict[str, Any]]
 
 
+class PrelaunchCleanupPlan(TypedDict):
+    db_path: str
+    requested_quote_ids: List[str]
+    found_quote_ids: List[str]
+    missing_quote_ids: List[str]
+    request_ids: List[str]
+    job_ids: List[str]
+    attachment_ids: List[str]
+    counts: Dict[str, int]
+    quotes: List[QuoteRecord]
+    quote_requests: List[QuoteRequestRecord]
+    jobs: List[Job]
+    attachments: List[AttachmentRecord]
+
+
+class PrelaunchCleanupResult(TypedDict):
+    db_path: str
+    requested_quote_ids: List[str]
+    found_quote_ids: List[str]
+    missing_quote_ids: List[str]
+    deleted_quote_ids: List[str]
+    deleted_request_ids: List[str]
+    deleted_job_ids: List[str]
+    deleted_attachment_ids: List[str]
+    counts: Dict[str, int]
+
+
 def _validate_deposit_status(value: Any) -> None:
     if value is None:
         return
@@ -2937,6 +2964,174 @@ def list_admin_audit_log(limit: int = 50) -> List[Dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+def _normalize_prelaunch_cleanup_quote_ids(quote_ids: List[str]) -> List[str]:
+    normalized_ids: List[str] = []
+    seen: set[str] = set()
+    for quote_id in quote_ids:
+        normalized = str(quote_id or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        normalized_ids.append(normalized)
+    if not normalized_ids:
+        raise ValueError("At least one quote_id is required for prelaunch cleanup.")
+    return normalized_ids
+
+
+def _placeholder_sql(values: List[str]) -> str:
+    return ", ".join(["?"] * len(values))
+
+
+def _load_prelaunch_cleanup_plan(conn: sqlite3.Connection, quote_ids: List[str]) -> PrelaunchCleanupPlan:
+    normalized_quote_ids = _normalize_prelaunch_cleanup_quote_ids(quote_ids)
+    quote_placeholders = _placeholder_sql(normalized_quote_ids)
+
+    quote_rows = conn.execute(
+        f"""
+        SELECT quote_id
+        FROM quotes
+        WHERE quote_id IN ({quote_placeholders})
+        ORDER BY datetime(created_at) DESC, quote_id ASC
+        """,
+        normalized_quote_ids,
+    ).fetchall()
+    found_quote_ids = [str(row["quote_id"]) for row in quote_rows]
+    missing_quote_ids = [quote_id for quote_id in normalized_quote_ids if quote_id not in found_quote_ids]
+
+    request_ids: List[str] = []
+    if found_quote_ids:
+        found_quote_placeholders = _placeholder_sql(found_quote_ids)
+        request_rows = conn.execute(
+            f"""
+            SELECT request_id
+            FROM quote_requests
+            WHERE quote_id IN ({found_quote_placeholders})
+            ORDER BY datetime(created_at) DESC, request_id ASC
+            """,
+            found_quote_ids,
+        ).fetchall()
+        request_ids = [str(row["request_id"]) for row in request_rows]
+
+    job_ids: List[str] = []
+    if found_quote_ids or request_ids:
+        job_clauses: List[str] = []
+        job_params: List[str] = []
+        if found_quote_ids:
+            job_clauses.append(f"quote_id IN ({_placeholder_sql(found_quote_ids)})")
+            job_params.extend(found_quote_ids)
+        if request_ids:
+            job_clauses.append(f"request_id IN ({_placeholder_sql(request_ids)})")
+            job_params.extend(request_ids)
+        job_rows = conn.execute(
+            f"""
+            SELECT job_id
+            FROM jobs
+            WHERE {' OR '.join(job_clauses)}
+            ORDER BY datetime(created_at) DESC, job_id ASC
+            """,
+            job_params,
+        ).fetchall()
+        job_ids = [str(row["job_id"]) for row in job_rows]
+
+    attachment_ids: List[str] = []
+    if found_quote_ids or request_ids or job_ids:
+        attachment_clauses: List[str] = []
+        attachment_params: List[str] = []
+        if found_quote_ids:
+            attachment_clauses.append(f"quote_id IN ({_placeholder_sql(found_quote_ids)})")
+            attachment_params.extend(found_quote_ids)
+        if request_ids:
+            attachment_clauses.append(f"request_id IN ({_placeholder_sql(request_ids)})")
+            attachment_params.extend(request_ids)
+        if job_ids:
+            attachment_clauses.append(f"job_id IN ({_placeholder_sql(job_ids)})")
+            attachment_params.extend(job_ids)
+        attachment_rows = conn.execute(
+            f"""
+            SELECT attachment_id
+            FROM attachments
+            WHERE {' OR '.join(attachment_clauses)}
+            ORDER BY datetime(created_at) DESC, attachment_id ASC
+            """,
+            attachment_params,
+        ).fetchall()
+        attachment_ids = [str(row["attachment_id"]) for row in attachment_rows]
+
+    return {
+        "db_path": str(_resolve_db_path()),
+        "requested_quote_ids": normalized_quote_ids,
+        "found_quote_ids": found_quote_ids,
+        "missing_quote_ids": missing_quote_ids,
+        "request_ids": request_ids,
+        "job_ids": job_ids,
+        "attachment_ids": attachment_ids,
+        "counts": {
+            "quotes": len(found_quote_ids),
+            "quote_requests": len(request_ids),
+            "jobs": len(job_ids),
+            "attachments": len(attachment_ids),
+        },
+        "quotes": [quote for quote in (get_quote_record(quote_id) for quote_id in found_quote_ids) if quote is not None],
+        "quote_requests": [
+            quote_request
+            for quote_request in (get_quote_request_record(request_id) for request_id in request_ids)
+            if quote_request is not None
+        ],
+        "jobs": [job for job in (get_job(job_id) for job_id in job_ids) if job is not None],
+        "attachments": list_attachments_by_ids(attachment_ids),
+    }
+
+
+def plan_prelaunch_test_data_cleanup(quote_ids: List[str]) -> PrelaunchCleanupPlan:
+    conn = _connect()
+    try:
+        return _load_prelaunch_cleanup_plan(conn, quote_ids)
+    finally:
+        conn.close()
+
+
+def _delete_rows_by_ids(conn: sqlite3.Connection, table: str, column: str, ids: List[str]) -> None:
+    if not ids:
+        return
+    safe_table = _validate_table_name(table)
+    conn.execute(
+        f"DELETE FROM {safe_table} WHERE {column} IN ({_placeholder_sql(ids)})",
+        ids,
+    )
+
+
+def apply_prelaunch_test_data_cleanup(quote_ids: List[str]) -> PrelaunchCleanupResult:
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cleanup_plan = _load_prelaunch_cleanup_plan(conn, quote_ids)
+        _delete_rows_by_ids(conn, "attachments", "attachment_id", cleanup_plan["attachment_ids"])
+        _delete_rows_by_ids(conn, "jobs", "job_id", cleanup_plan["job_ids"])
+        _delete_rows_by_ids(conn, "quote_requests", "request_id", cleanup_plan["request_ids"])
+        _delete_rows_by_ids(conn, "quotes", "quote_id", cleanup_plan["found_quote_ids"])
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+    return {
+        "db_path": cleanup_plan["db_path"],
+        "requested_quote_ids": cleanup_plan["requested_quote_ids"],
+        "found_quote_ids": cleanup_plan["found_quote_ids"],
+        "missing_quote_ids": cleanup_plan["missing_quote_ids"],
+        "deleted_quote_ids": cleanup_plan["found_quote_ids"],
+        "deleted_request_ids": cleanup_plan["request_ids"],
+        "deleted_job_ids": cleanup_plan["job_ids"],
+        "deleted_attachment_ids": cleanup_plan["attachment_ids"],
+        "counts": cleanup_plan["counts"],
+    }
 
 
 def save_gpt_quote_observability_event(record: GptQuoteObservabilityRecord) -> None:
