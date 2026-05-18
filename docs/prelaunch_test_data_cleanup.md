@@ -14,6 +14,27 @@ Current verified production contract:
 
 If Render Shell or an equivalent safe production shell is not available, stop. Do not improvise with a local copy, a permanent admin delete control, or a broad DB import/export reset.
 
+## Find Full Quote IDs First
+
+The desktop admin Recent Estimates list shows shortened identifiers. Do not use those shortened IDs for cleanup.
+
+Before any dry run, use the read-only list mode to copy the full `quote_id` values from the live database:
+
+```bash
+python scripts/create_prelaunch_test_data_cleanup.py --list-quotes --limit 25
+```
+
+The output includes:
+
+- `quote_id`
+- `created_at`
+- `customer_name` when available
+- `service_type` when available
+- `job_address` when available
+- `cash_total_cad` when available
+
+Use the full `quote_id` values from this output in the cleanup allowlist.
+
 ## Backup-First Requirement
 
 Before any destructive apply step:
@@ -33,6 +54,8 @@ python scripts/create_prelaunch_test_data_cleanup.py \
   --quote-id quote_test_1 \
   --quote-id quote_test_2
 ```
+
+If you have not already copied the full quote IDs, run `--list-quotes` first and then paste the full IDs into the dry-run command.
 
 Dry run is the default. It prints:
 

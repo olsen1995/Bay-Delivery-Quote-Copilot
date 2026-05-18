@@ -44,6 +44,36 @@ def _seed_quote(quote_id: str, *, created_at: str = "2026-05-18T10:00:00") -> No
     )
 
 
+def _seed_quote_with_context(
+    quote_id: str,
+    *,
+    created_at: str = "2026-05-18T10:00:00",
+    customer_name: str = "Customer Example",
+    service_type: str = "dump_run",
+    job_address: str = "123 Example St",
+    cash_total_cad: float = 150.0,
+) -> None:
+    storage.save_quote(
+        {
+            "quote_id": quote_id,
+            "created_at": created_at,
+            "request": {
+                "customer_name": customer_name,
+                "customer_phone": "705-555-0101",
+                "job_address": job_address,
+                "job_description_customer": f"Prelaunch test quote {quote_id}",
+                "service_type": service_type,
+            },
+            "response": {
+                "job_description_internal": f"Internal test quote {quote_id}",
+                "cash_total_cad": cash_total_cad,
+                "emt_total_cad": round(cash_total_cad * 1.13, 2),
+            },
+            "accept_token": f"accept-{quote_id}",
+        }
+    )
+
+
 def _seed_quote_request(request_id: str, quote_id: str, *, created_at: str = "2026-05-18T10:05:00") -> None:
     storage.save_quote_request(
         {
@@ -261,6 +291,44 @@ def test_script_refuses_apply_without_backup_confirmation(
     assert storage.get_quote_record("quote-clean-me") is not None
 
 
+def test_script_list_quotes_shows_full_ids_and_context(
+    isolated_db: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _seed_quote_with_context(
+        "quote-full-1",
+        created_at="2026-05-18T09:00:00",
+        customer_name="Test Pilot",
+        service_type="haul_away",
+        job_address="10 Launch Rd",
+        cash_total_cad=600.0,
+    )
+    _seed_quote_with_context(
+        "quote-full-2",
+        created_at="2026-05-18T08:00:00",
+        customer_name="Second Example",
+        service_type="dump_run",
+        job_address="22 Backup Ave",
+        cash_total_cad=275.0,
+    )
+
+    assert cleanup_script.main(["--list-quotes", "--limit", "2"]) == 0
+    output = capsys.readouterr().out
+
+    assert "Mode: DRY RUN" not in output
+    assert "Apply completed." not in output
+    assert "quote-full-1" in output
+    assert "quote-full-2" in output
+    assert "Test Pilot" in output
+    assert "haul_away" in output
+    assert "10 Launch Rd" in output
+    assert "600.0" in output
+    assert "Second Example" in output
+    assert "quote-clean-me" not in output
+    assert storage.get_quote_record("quote-full-1") is not None
+    assert storage.get_quote_record("quote-full-2") is not None
+
+
 def test_script_runs_directly_from_repo_root_with_temp_db(tmp_path: Path) -> None:
     db_path = tmp_path / "direct-prelaunch-cleanup.sqlite3"
     env = os.environ.copy()
@@ -319,6 +387,65 @@ def test_script_runs_directly_from_repo_root_with_temp_db(tmp_path: Path) -> Non
     storage.DB_PATH = storage.DEFAULT_DB_PATH
     try:
         assert storage.get_quote_record("quote-clean-me") is None
+    finally:
+        if previous_db_env is None:
+            os.environ.pop("BAYDELIVERY_DB_PATH", None)
+        else:
+            os.environ["BAYDELIVERY_DB_PATH"] = previous_db_env
+
+
+def test_script_list_quotes_runs_directly_from_repo_root_with_temp_db(tmp_path: Path) -> None:
+    db_path = tmp_path / "direct-prelaunch-list.sqlite3"
+    env = os.environ.copy()
+    env["BAYDELIVERY_DB_PATH"] = str(db_path)
+
+    previous_db_env = os.environ.get("BAYDELIVERY_DB_PATH")
+    os.environ["BAYDELIVERY_DB_PATH"] = str(db_path)
+    storage.DB_PATH = storage.DEFAULT_DB_PATH
+    storage._TABLE_COL_CACHE.clear()
+    try:
+        storage.init_db()
+        _seed_quote_with_context(
+            "quote-full-1",
+            created_at="2026-05-18T09:00:00",
+            customer_name="Test Pilot",
+            service_type="haul_away",
+            job_address="10 Launch Rd",
+            cash_total_cad=600.0,
+        )
+    finally:
+        if previous_db_env is None:
+            os.environ.pop("BAYDELIVERY_DB_PATH", None)
+        else:
+            os.environ["BAYDELIVERY_DB_PATH"] = previous_db_env
+
+    list_run = subprocess.run(
+        [
+            sys.executable,
+            "scripts/create_prelaunch_test_data_cleanup.py",
+            "--list-quotes",
+            "--limit",
+            "1",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert list_run.returncode == 0, list_run.stderr
+    assert "ModuleNotFoundError" not in list_run.stderr
+    assert f"Database path: {db_path}" in list_run.stdout
+    assert "quote-full-1" in list_run.stdout
+    assert "Test Pilot" in list_run.stdout
+    assert "Dry run only. No rows were deleted." not in list_run.stdout
+
+    previous_db_env = os.environ.get("BAYDELIVERY_DB_PATH")
+    os.environ["BAYDELIVERY_DB_PATH"] = str(db_path)
+    storage.DB_PATH = storage.DEFAULT_DB_PATH
+    try:
+        assert storage.get_quote_record("quote-full-1") is not None
     finally:
         if previous_db_env is None:
             os.environ.pop("BAYDELIVERY_DB_PATH", None)
