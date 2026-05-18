@@ -17,6 +17,7 @@ If Render Shell or an equivalent safe production shell is not available, stop. D
 ## Find Full Quote IDs First
 
 The desktop admin Recent Estimates list shows shortened identifiers. Do not use those shortened IDs for cleanup.
+Those shortened IDs are only for the UI and are not valid cleanup inputs.
 
 Before any dry run, use the read-only list mode to copy the full `quote_id` values from the live database:
 

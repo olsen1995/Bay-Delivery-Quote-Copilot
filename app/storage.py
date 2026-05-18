@@ -3001,26 +3001,26 @@ def _load_prelaunch_cleanup_plan(conn: sqlite3.Connection, quote_ids: List[str])
     missing_quote_ids = [quote_id for quote_id in normalized_quote_ids if quote_id not in found_quote_ids]
 
     request_ids: List[str] = []
-    if found_quote_ids:
-        found_quote_placeholders = _placeholder_sql(found_quote_ids)
+    if normalized_quote_ids:
+        normalized_quote_placeholders = _placeholder_sql(normalized_quote_ids)
         request_rows = conn.execute(
             f"""
             SELECT request_id
             FROM quote_requests
-            WHERE quote_id IN ({found_quote_placeholders})
+            WHERE quote_id IN ({normalized_quote_placeholders})
             ORDER BY datetime(created_at) DESC, request_id ASC
             """,
-            found_quote_ids,
+            normalized_quote_ids,
         ).fetchall()
         request_ids = [str(row["request_id"]) for row in request_rows]
 
     job_ids: List[str] = []
-    if found_quote_ids or request_ids:
+    if normalized_quote_ids or request_ids:
         job_clauses: List[str] = []
         job_params: List[str] = []
-        if found_quote_ids:
-            job_clauses.append(f"quote_id IN ({_placeholder_sql(found_quote_ids)})")
-            job_params.extend(found_quote_ids)
+        if normalized_quote_ids:
+            job_clauses.append(f"quote_id IN ({_placeholder_sql(normalized_quote_ids)})")
+            job_params.extend(normalized_quote_ids)
         if request_ids:
             job_clauses.append(f"request_id IN ({_placeholder_sql(request_ids)})")
             job_params.extend(request_ids)
@@ -3036,12 +3036,12 @@ def _load_prelaunch_cleanup_plan(conn: sqlite3.Connection, quote_ids: List[str])
         job_ids = [str(row["job_id"]) for row in job_rows]
 
     attachment_ids: List[str] = []
-    if found_quote_ids or request_ids or job_ids:
+    if normalized_quote_ids or request_ids or job_ids:
         attachment_clauses: List[str] = []
         attachment_params: List[str] = []
-        if found_quote_ids:
-            attachment_clauses.append(f"quote_id IN ({_placeholder_sql(found_quote_ids)})")
-            attachment_params.extend(found_quote_ids)
+        if normalized_quote_ids:
+            attachment_clauses.append(f"quote_id IN ({_placeholder_sql(normalized_quote_ids)})")
+            attachment_params.extend(normalized_quote_ids)
         if request_ids:
             attachment_clauses.append(f"request_id IN ({_placeholder_sql(request_ids)})")
             attachment_params.extend(request_ids)

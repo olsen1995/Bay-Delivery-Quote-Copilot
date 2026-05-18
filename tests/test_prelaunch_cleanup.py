@@ -216,6 +216,14 @@ def _seed_test_lineage(quote_id: str, request_id: str, job_id: str) -> None:
     _seed_attachment(f"att-job-{job_id}", job_id=job_id)
 
 
+def _seed_orphaned_lineage(quote_id: str, request_id: str, job_id: str) -> None:
+    _seed_quote_request(request_id, quote_id)
+    _seed_job(job_id, quote_id, request_id)
+    _seed_attachment(f"att-quote-{quote_id}", quote_id=quote_id)
+    _seed_attachment(f"att-request-{request_id}", request_id=request_id)
+    _seed_attachment(f"att-job-{job_id}", job_id=job_id)
+
+
 def test_plan_prelaunch_cleanup_resolves_only_allowlisted_lineage(isolated_db: Path) -> None:
     _seed_test_lineage("quote-clean-me", "request-clean-me", "job-clean-me")
     _seed_test_lineage("quote-keep-me", "request-keep-me", "job-keep-me")
@@ -274,6 +282,45 @@ def test_apply_prelaunch_cleanup_deletes_only_allowlisted_lineage_and_preserves_
         "Backyard cleanup with tarp fence teardown",
     ]
     assert len(storage.list_admin_audit_log(limit=10)) == 1
+
+
+def test_orphaned_lineage_is_detected_and_deleted_when_quote_row_is_missing(
+    isolated_db: Path,
+) -> None:
+    _seed_orphaned_lineage("quote-orphaned", "request-orphaned", "job-orphaned")
+    _seed_test_lineage("quote-keep-me", "request-keep-me", "job-keep-me")
+
+    plan = storage.plan_prelaunch_test_data_cleanup(["quote-orphaned"])
+
+    assert plan["found_quote_ids"] == []
+    assert plan["missing_quote_ids"] == ["quote-orphaned"]
+    assert plan["request_ids"] == ["request-orphaned"]
+    assert plan["job_ids"] == ["job-orphaned"]
+    assert set(plan["attachment_ids"]) == {
+        "att-quote-quote-orphaned",
+        "att-request-request-orphaned",
+        "att-job-job-orphaned",
+    }
+    assert plan["counts"] == {"quotes": 0, "quote_requests": 1, "jobs": 1, "attachments": 3}
+
+    result = storage.apply_prelaunch_test_data_cleanup(["quote-orphaned"])
+
+    assert result["deleted_quote_ids"] == []
+    assert result["deleted_request_ids"] == ["request-orphaned"]
+    assert result["deleted_job_ids"] == ["job-orphaned"]
+    assert set(result["deleted_attachment_ids"]) == {
+        "att-quote-quote-orphaned",
+        "att-request-request-orphaned",
+        "att-job-job-orphaned",
+    }
+    assert storage.get_quote_record("quote-orphaned") is None
+    assert storage.get_quote_request_record("request-orphaned") is None
+    assert storage.get_job("job-orphaned") is None
+    assert storage.list_attachments(quote_id="quote-orphaned") == []
+
+    assert storage.get_quote_record("quote-keep-me") is not None
+    assert storage.get_quote_request_record("request-keep-me") is not None
+    assert storage.get_job("job-keep-me") is not None
 
 
 def test_script_refuses_apply_without_backup_confirmation(
