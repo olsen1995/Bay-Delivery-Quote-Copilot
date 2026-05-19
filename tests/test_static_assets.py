@@ -150,10 +150,15 @@ def test_sticky_mobile_call_is_hidden_by_default_and_mobile_only() -> None:
     base_body = base_match.group("body")
     assert "display: none;" in base_body
     assert "display: flex;" not in base_body
-    assert re.search(
-        r"@media \(max-width: 720px\)\{\s*\.stickyMobileCall\{ display: flex; \}\s*\}",
+    mobile_match = re.search(
+        r"@media \(max-width: 720px\)\{(?P<body>.*?\.stickyMobileCall\{(?P<call_body>.*?)\n  \}.*?)\n\}",
         site_css,
+        re.DOTALL,
     )
+    assert mobile_match is not None
+    mobile_call_body = mobile_match.group("call_body")
+    assert "display: flex;" in mobile_call_body
+    assert "bottom: calc(18px + env(safe-area-inset-bottom));" in mobile_call_body
 
 
 def test_quote_page_phase_a_guidance_copy_is_present() -> None:
@@ -256,6 +261,34 @@ def test_quote_page_mobile_polish_preserves_one_form_flow() -> None:
 
     assert not re.search(r"<button[^>]*>\s*Next\s*</button>", quote_html, re.IGNORECASE)
     assert not re.search(r"<button[^>]*>\s*Back\s*</button>", quote_html, re.IGNORECASE)
+
+
+def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+
+    assert "2-5. Job details" not in quote_html
+    assert '<p class="customerFlowLabel">Step ' not in quote_html
+    for label in ["Load details", "Access details", "Special items", "Photo guidance"]:
+        assert f'<p class="customerFlowLabel">{label}</p>' in quote_html
+
+    assert "admin dashboard" not in index_html.lower()
+    assert "Bay Delivery confirms before scheduling." in index_html
+
+    mobile_quote_css = quote_css[quote_css.index("@media (max-width: 720px)") :]
+    assert "overflow-x: hidden;" in mobile_quote_css
+    assert re.search(r"\.quotePage \.container > \*\s*\{[^}]*min-width:\s*0;", mobile_quote_css, re.S)
+    assert re.search(r"\.quoteTrustStrip\s*\{[^}]*min-width:\s*0;", mobile_quote_css, re.S)
+    assert re.search(r"\.quoteTrustStrip\s*\{[^}]*overflow-x:\s*auto;", mobile_quote_css, re.S)
+    assert re.search(r"\.flowProgress\s*\{[^}]*max-width:\s*100%;", mobile_quote_css, re.S)
+    assert re.search(r"\.flowStep\s*\{[^}]*min-width:\s*0;", mobile_quote_css, re.S)
+
+    mobile_site_css = site_css[site_css.index("@media (max-width: 720px)") :]
+    assert re.search(r"\.container\s*\{[^}]*padding-bottom:\s*96px;", mobile_site_css, re.S)
+    assert re.search(r"\.hero \.heroCard:first-child\s*\{[^}]*padding-bottom:\s*88px;", mobile_site_css, re.S)
+    assert re.search(r"\.stickyMobileCall\s*\{[^}]*bottom:\s*calc\(18px \+ env\(safe-area-inset-bottom\)\);", mobile_site_css, re.S)
 
 
 def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:

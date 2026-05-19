@@ -158,6 +158,10 @@ a:hover { opacity: 0.9; }
 
 
 @media (max-width: 720px){
+  .container{
+    padding-bottom: 96px;
+  }
+
   .topbar{
     flex-direction: column;
     align-items: center;
@@ -173,6 +177,10 @@ a:hover { opacity: 0.9; }
     width: clamp(200px, 62vw, 240px);
     padding: 12px;
     border-radius: 24px;
+  }
+
+  .hero .heroCard:first-child{
+    padding-bottom: 88px;
   }
 
   .toplinks{
@@ -547,7 +555,13 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.45); }
   letter-spacing: 0.2px;
 }
 @media (max-width: 720px){
-  .stickyMobileCall{ display: flex; }
+  .stickyMobileCall{
+    display: flex;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    right: 12px;
+    width: 52px;
+    height: 52px;
+  }
 }
 
 .footer{
