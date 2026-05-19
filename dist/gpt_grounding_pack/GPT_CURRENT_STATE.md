@@ -20,14 +20,14 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
 - Completed roadmap work reflected in the repo today:
-	- Admin Daily Ops Board read model
-	- Completed Job Profit Review Report
-	- Follow-Up Message Helper
-	- Accepted, Not Booked scheduling queue
-	- Accepted-not-booked detail row cap
-	- Internal Quote Risk Summary
-	- Customer Quote Flow Simplification
-	- Lead source + repeat customer tracking (no-schema v1)
+ 	- Admin Daily Ops Board read model
+ 	- Completed Job Profit Review Report
+ 	- Follow-Up Message Helper
+ 	- Accepted, Not Booked scheduling queue
+ 	- Accepted-not-booked detail row cap
+ 	- Internal Quote Risk Summary
+ 	- Customer Quote Flow Simplification
+ 	- Lead source + repeat customer tracking (no-schema v1)
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
 - Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
 - PR #287 Customer Quote Flow Simplification did not change backend behavior, pricing, schema, admin, mobile admin, GPT grounding-source schema, Render config, workflows, requirements, or `VERSION`; no forbidden internal risk/pricing/advisory jargon was found in customer quote HTML/JS, and production live-safe smoke passed after deployment.
@@ -41,6 +41,7 @@ Booking request notification infrastructure is installed but **disabled until cu
 Render SMTP/env vars must not be configured until Austin explicitly authorizes customer launch.
 
 Leave these unset until customer launch:
+
 - `BOOKING_REQUEST_NOTIFICATIONS_ENABLED`
 - `BOOKING_NOTIFICATION_EMAIL_TO`
 - `BOOKING_NOTIFICATION_EMAIL_FROM`
