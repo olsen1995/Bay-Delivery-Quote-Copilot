@@ -36,6 +36,12 @@ ALLOWED_PAYMENT_ATTEMPT_STATUSES = (
     "failed",
     "expired",
 )
+ALLOWED_NOTIFICATION_ATTEMPT_STATUSES = (
+    "pending",
+    "sent",
+    "failed",
+    "skipped",
+)
 ALLOWED_QUOTE_ADMIN_STATUSES = ("pending", "expired")
 ALLOWED_QUOTE_REQUEST_FOLLOWUP_STATUSES = (
     "needs_followup",
@@ -50,6 +56,9 @@ DEPOSIT_STATUS_CHECK_SQL = (
 )
 PAYMENT_ATTEMPT_STATUS_CHECK_SQL = (
     "status IN ('created', 'pending', 'succeeded', 'failed', 'expired')"
+)
+NOTIFICATION_ATTEMPT_STATUS_CHECK_SQL = (
+    "status IN ('pending', 'sent', 'failed', 'skipped')"
 )
 QUOTE_ADMIN_STATUS_CHECK_SQL = "admin_status IN ('pending', 'expired')"
 QUOTE_REQUEST_FOLLOWUP_STATUS_CHECK_SQL = (
@@ -246,6 +255,20 @@ class WebhookEventRecord(TypedDict):
     payload_json: Any
 
 
+class NotificationAttemptRecord(TypedDict):
+    event_type: str
+    request_id: str
+    quote_id: Optional[str]
+    channel: str
+    recipient: Optional[str]
+    status: str
+    attempt_count: int
+    created_at: str
+    updated_at: str
+    sent_at: Optional[str]
+    last_error: Optional[str]
+
+
 class GptQuoteObservabilityRecord(TypedDict):
     timestamp: str
     route_name: str
@@ -305,6 +328,13 @@ def _validate_payment_attempt_status(value: Any) -> str:
     if not isinstance(value, str) or value not in ALLOWED_PAYMENT_ATTEMPT_STATUSES:
         allowed = ", ".join(repr(item) for item in ALLOWED_PAYMENT_ATTEMPT_STATUSES)
         raise ValueError(f"payment_attempt.status must be one of: {allowed}")
+    return value
+
+
+def _validate_notification_attempt_status(value: Any) -> str:
+    if not isinstance(value, str) or value not in ALLOWED_NOTIFICATION_ATTEMPT_STATUSES:
+        allowed = ", ".join(repr(item) for item in ALLOWED_NOTIFICATION_ATTEMPT_STATUSES)
+        raise ValueError(f"notification_attempt.status must be one of: {allowed}")
     return value
 
 
@@ -392,6 +422,7 @@ KNOWN_TABLES = [
     "gpt_quote_observability",
     "payment_attempts",
     "webhook_events",
+    "notification_attempts",
 ]
 
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
@@ -740,6 +771,25 @@ def init_db() -> None:
                 processed_at TEXT,
                 payload_json TEXT NOT NULL,
                 UNIQUE(provider, provider_event_id)
+            )
+            """
+        )
+
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS notification_attempts (
+                event_type TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                quote_id TEXT,
+                channel TEXT NOT NULL,
+                recipient TEXT,
+                status TEXT NOT NULL DEFAULT 'pending' CHECK ({NOTIFICATION_ATTEMPT_STATUS_CHECK_SQL}),
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                sent_at TEXT,
+                last_error TEXT,
+                UNIQUE(request_id, event_type)
             )
             """
         )
@@ -2301,6 +2351,185 @@ def mark_webhook_event_processed(
         conn.close()
 
     return get_webhook_event(provider, provider_event_id)
+
+
+# =========================
+# Notification attempts
+# =========================
+
+def _notification_attempt_from_row(row: sqlite3.Row) -> NotificationAttemptRecord:
+    return {
+        "event_type": row["event_type"],
+        "request_id": row["request_id"],
+        "quote_id": row["quote_id"],
+        "channel": row["channel"],
+        "recipient": row["recipient"],
+        "status": row["status"],
+        "attempt_count": int(row["attempt_count"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "sent_at": row["sent_at"],
+        "last_error": row["last_error"],
+    }
+
+
+def reserve_notification_attempt(
+    *,
+    request_id: str,
+    event_type: str,
+    quote_id: Optional[str],
+    channel: str,
+    recipient: Optional[str],
+    created_at: str,
+) -> Optional[NotificationAttemptRecord]:
+    conn = _connect()
+    try:
+        cursor = conn.execute(
+            """
+            INSERT OR IGNORE INTO notification_attempts
+            (event_type, request_id, quote_id, channel, recipient, status, attempt_count, created_at, updated_at, sent_at, last_error)
+            VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, NULL, NULL)
+            """,
+            (event_type, request_id, quote_id, channel, recipient, created_at, created_at),
+        )
+        conn.commit()
+        if cursor.rowcount == 0:
+            return None
+    finally:
+        conn.close()
+
+    return get_notification_attempt(request_id, event_type)
+
+
+def get_notification_attempt(request_id: str, event_type: str) -> Optional[NotificationAttemptRecord]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM notification_attempts
+            WHERE request_id = ? AND event_type = ?
+            """,
+            (request_id, event_type),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return _notification_attempt_from_row(row)
+
+
+def list_notification_attempts(limit: int = 50) -> List[NotificationAttemptRecord]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM notification_attempts
+            ORDER BY datetime(created_at) DESC, request_id ASC, event_type ASC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [_notification_attempt_from_row(row) for row in rows]
+
+
+def _update_notification_attempt(
+    request_id: str,
+    event_type: str,
+    *,
+    status: str,
+    updated_at: str,
+    sent_at: Any = UNSET,
+    last_error: Any = UNSET,
+    increment_attempt_count: bool = False,
+) -> Optional[NotificationAttemptRecord]:
+    validated_status = _validate_notification_attempt_status(status)
+    assignments = ["status = ?", "updated_at = ?"]
+    values: List[Any] = [validated_status, updated_at]
+
+    if sent_at is not UNSET:
+        assignments.append("sent_at = ?")
+        values.append(sent_at)
+    if last_error is not UNSET:
+        assignments.append("last_error = ?")
+        values.append(last_error)
+    if increment_attempt_count:
+        assignments.append("attempt_count = attempt_count + 1")
+
+    values.extend([request_id, event_type])
+    conn = _connect()
+    try:
+        conn.execute(
+            f"""
+            UPDATE notification_attempts
+            SET {", ".join(assignments)}
+            WHERE request_id = ? AND event_type = ?
+            """,
+            values,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_notification_attempt(request_id, event_type)
+
+
+def mark_notification_attempt_sent(
+    request_id: str,
+    event_type: str,
+    *,
+    sent_at: str,
+) -> Optional[NotificationAttemptRecord]:
+    return _update_notification_attempt(
+        request_id,
+        event_type,
+        status="sent",
+        updated_at=sent_at,
+        sent_at=sent_at,
+        last_error=None,
+        increment_attempt_count=True,
+    )
+
+
+def mark_notification_attempt_failed(
+    request_id: str,
+    event_type: str,
+    *,
+    failed_at: str,
+    last_error: str,
+) -> Optional[NotificationAttemptRecord]:
+    return _update_notification_attempt(
+        request_id,
+        event_type,
+        status="failed",
+        updated_at=failed_at,
+        sent_at=None,
+        last_error=last_error,
+        increment_attempt_count=True,
+    )
+
+
+def mark_notification_attempt_skipped(
+    request_id: str,
+    event_type: str,
+    *,
+    skipped_at: str,
+    last_error: str,
+) -> Optional[NotificationAttemptRecord]:
+    return _update_notification_attempt(
+        request_id,
+        event_type,
+        status="skipped",
+        updated_at=skipped_at,
+        sent_at=None,
+        last_error=last_error,
+        increment_attempt_count=False,
+    )
 
 
 # =========================
