@@ -13,23 +13,33 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Pricing authority enforces a universal $60 CAD minimum floor on final quote outputs.
 - Admin operations surfaces exist (`/admin`, `/admin/mobile`, `/admin/uploads`) with protected admin actions.
 - Desktop admin now includes a read-only Daily Ops Queue backed by `GET /admin/api/ops-queue`.
+- Desktop admin now includes Daily Ops Board shortcut chips powered by `opsBoardShortcutsByKey` for faster manual navigation from queue cards into existing admin workflows.
 - Desktop admin now includes a Follow-Up Message Helper that drafts copy-ready messages for common scenarios.
 - Desktop admin now includes an Accepted, Not Booked queue sourced from `accepted_not_booked_items` on the existing ops-queue payload.
 - Accepted-not-booked detail rows are capped at 50 while `counts.accepted_not_booked` remains the uncapped true total.
+- Desktop admin now includes a Manual Completed Job Calibration Log backed by `GET /admin/api/manual-completed-jobs`, `POST /admin/api/manual-completed-jobs`, and persisted `completed_job_calibration_entries` storage.
 - Customer Quote Flow Simplification is complete: the public quote page now uses friendlier customer-facing wording and plain-language progressive disclosure while preserving structured intake field IDs, payload compatibility, and the existing `/quote/calculate` path.
 - Quote-request and job lifecycle foundations are implemented and persisted in SQLite.
 - Security, abuse controls, and deployment notes are documented and in active use.
+- Prelaunch Test Data Cleanup tooling is approved and documented: operators should use the allowlisted dry-run/apply workflow in `scripts/create_prelaunch_test_data_cleanup.py` and `docs/prelaunch_test_data_cleanup.md` rather than ad hoc cleanup steps.
 - Completed roadmap work reflected in the repo today:
 	- Admin Daily Ops Board read model
+	- Admin Action Shortcuts Completion (PR #293)
 	- Completed Job Profit Review Report
 	- Follow-Up Message Helper
 	- Accepted, Not Booked scheduling queue
 	- Accepted-not-booked detail row cap
 	- Internal Quote Risk Summary
+	- Manual Completed Job Calibration Log (PR #296)
+	- Prelaunch Test Data Cleanup Tooling (PR #297)
 	- Customer Quote Flow Simplification
 	- Lead source + repeat customer tracking (no-schema v1)
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
+- Manual Completed Job Calibration Log is internal-only evidence capture for owner review and future pricing planning; it does not change quote pricing and should be used to preserve real completed-job learnings ahead of category-specific pricing PRs.
 - Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
+- PR #293 Admin Action Shortcuts Completion is complete: desktop admin Daily Ops Board cards now expose shortcut chips that route Austin and Dan into existing manual admin flows without changing pricing, customer payloads, mobile admin, Render config, workflows, requirements, or `VERSION`.
+- PR #296 Manual Completed Job Calibration Log is complete: desktop admin now supports manual completed-job evidence capture through `/admin/api/manual-completed-jobs` backed by `completed_job_calibration_entries`; this is internal-only, advisory-only evidence capture for future pricing review, not a second pricing engine.
+- PR #297 Prelaunch Test Data Cleanup Tooling is complete: the repo now includes an approved allowlisted dry-run/apply cleanup process via `scripts/create_prelaunch_test_data_cleanup.py` plus `docs/prelaunch_test_data_cleanup.md`; operators should use this backup-first workflow instead of ad hoc live cleanup steps.
 - PR #287 Customer Quote Flow Simplification did not change backend behavior, pricing, schema, admin, mobile admin, GPT grounding-source schema, Render config, workflows, requirements, or `VERSION`; no forbidden internal risk/pricing/advisory jargon was found in customer quote HTML/JS, and production live-safe smoke passed after deployment.
 - PR #298 Launch UI Mobile Polish is complete: fixed mobile quote page horizontal overflow, simplified quote flow section wording, replaced public homepage "admin dashboard" wording with operator-appropriate copy, adjusted mobile homepage call button spacing; no backend, pricing, storage, mobile-admin, Render, workflow, GPT, dependency, or version changes; production live-safe smoke passed after merge.
 - PR #299 Booking Request Notification Alerts is complete: added internal booking request notification alert infrastructure. Trigger point is `POST /quote/{quote_id}/booking` after `booking_service.submit_booking_details(...)` succeeds. Notifications are internal-only. SMTP email via Python standard library. Disabled by default unless `BOOKING_REQUEST_NOTIFICATIONS_ENABLED=true`. No customer-facing email/SMS/booking confirmation/calendar scheduling. Notification failure does not break the customer booking response. Added `notification_attempts` SQLite table for duplicate/failure tracking. Sent attempts suppress duplicate emails. Failed/skipped attempts can retry. Fresh pending suppresses race duplicate sends. Stale pending after 15 minutes can retry. SMTP secrets are not logged or stored. Tests monkeypatch SMTP; no real emails sent. `DEPLOYMENT_NOTES.md` documents Render env vars and safe setup. Production live-safe smoke passed after merge (run ID 26102113271, SHA c428bf988fdbe4b06e3463cc47e9393942c10d0d).
@@ -57,7 +67,6 @@ When Austin authorizes launch, configure these on Render following `DEPLOYMENT_N
 
 ## Partial Or Still Future
 
-- Admin action shortcuts are only partial, not complete.
 - Internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Customer-facing GPT/chatbot, automatic SMS/email sending, and auto-calendar scheduling remain future work.
 - Pricing PRs by service category have not started.
@@ -73,15 +82,17 @@ When Austin authorizes launch, configure these on Render following `DEPLOYMENT_N
 - Preserve one-pricing-engine discipline and protected pricing authority.
 - Maintain clear customer/admin operational boundaries.
 - Keep Daily Ops Queue items as admin attention flags only; use existing admin surfaces for any manual follow-up.
+- Keep Daily Ops Board shortcut chips manual and bounded to existing admin workflows; they should navigate operators faster, not create new pricing or mutation authority.
 - Keep the Follow-Up Message Helper advisory-only: copy-ready drafts, no automated sending, no saved message history, and no backend mutation.
 - Keep completed-job reporting advisory-only and separate from pricing authority.
+- Keep the Manual Completed Job Calibration Log advisory-only and separate from pricing authority; it is evidence capture for owner review, not automated pricing.
 - Keep Internal Quote Risk Summary advisory-only and separate from pricing authority; `customer_visible` remains false and `pricing_effect` remains `none`.
+- Keep prelaunch cleanup execution backup-first, allowlisted, and operator-run through `scripts/create_prelaunch_test_data_cleanup.py`; do not improvise ad hoc cleanup steps.
 - Keep pricing changes deferred to later category-specific PRs after evidence review.
 - PR #291 lead source + repeat customer tracking is complete (no-schema v1): optional public `lead_source` intake is accepted by `/quote/calculate`, blank/missing maps to `unknown`, invalid nonblank values reject with 422, and lead source persists through existing `request_json` flow into quotes, quote_requests, and jobs.
 - Desktop admin quote detail now renders Lead & Customer History while `customer_history` remains admin-only and read-only from normalized 10-digit phone history; customer/public quote and review responses do not expose `customer_history`.
 - Phone-history lookup now aligns SQL matching with Python-backed normalization and uncommon separator handling; `last_seen` ordering uses parsed datetimes.
 - No pricing influence, no schema migration, no mobile-admin changes, and `app/quote_engine.py` remains untouched.
-- Next recommended task after this docs refresh: plan Admin action shortcuts completion first, then plan job closeout checklist improvements after lead/repeat signal review.
 - Do not configure Render SMTP/env vars for booking notifications until Austin explicitly authorizes customer launch.
 - When Austin authorizes launch, follow `DEPLOYMENT_NOTES.md` Render setup steps and perform a controlled live notification test before treating notifications as active.
 
