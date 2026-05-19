@@ -12,6 +12,13 @@
   --line-soft: var(--quote-border);
 }
 
+.quotePage,
+.quotePage *,
+.quotePage *::before,
+.quotePage *::after {
+  box-sizing: border-box;
+}
+
 body.quotePage {
   color: var(--quote-text);
   background:
@@ -803,14 +810,12 @@ body.quotePage {
 @media (max-width: 720px) {
   .quotePage {
     padding-bottom: 92px;
-    overflow-x: hidden;
   }
 
   .quotePage .container {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow-x: hidden;
   }
 
   .quotePage .container > * {

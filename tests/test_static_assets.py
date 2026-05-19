@@ -277,8 +277,14 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
     assert "admin dashboard" not in index_html.lower()
     assert "Bay Delivery confirms before scheduling." in index_html
 
+    assert re.search(
+        r"\.quotePage,\s*\.quotePage \*,\s*\.quotePage \*::before,\s*\.quotePage \*::after\s*\{[^}]*box-sizing:\s*border-box;",
+        quote_css,
+        re.S,
+    )
+
     mobile_quote_css = quote_css[quote_css.index("@media (max-width: 720px)") :]
-    assert "overflow-x: hidden;" in mobile_quote_css
+    assert "overflow-x: hidden;" not in mobile_quote_css
     assert re.search(r"\.quotePage \.container > \*\s*\{[^}]*min-width:\s*0;", mobile_quote_css, re.S)
     assert re.search(r"\.quoteTrustStrip\s*\{[^}]*min-width:\s*0;", mobile_quote_css, re.S)
     assert re.search(r"\.quoteTrustStrip\s*\{[^}]*overflow-x:\s*auto;", mobile_quote_css, re.S)
