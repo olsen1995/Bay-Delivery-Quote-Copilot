@@ -31,6 +31,28 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
 - Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
 - PR #287 Customer Quote Flow Simplification did not change backend behavior, pricing, schema, admin, mobile admin, GPT grounding-source schema, Render config, workflows, requirements, or `VERSION`; no forbidden internal risk/pricing/advisory jargon was found in customer quote HTML/JS, and production live-safe smoke passed after deployment.
+- PR #298 Launch UI Mobile Polish is complete: fixed mobile quote page horizontal overflow, simplified quote flow section wording, replaced public homepage "admin dashboard" wording with operator-appropriate copy, adjusted mobile homepage call button spacing; no backend, pricing, storage, mobile-admin, Render, workflow, GPT, dependency, or version changes; production live-safe smoke passed after merge.
+- PR #299 Booking Request Notification Alerts is complete: added internal booking request notification alert infrastructure. Trigger point is `POST /quote/{quote_id}/booking` after `booking_service.submit_booking_details(...)` succeeds. Notifications are internal-only. SMTP email via Python standard library. Disabled by default unless `BOOKING_REQUEST_NOTIFICATIONS_ENABLED=true`. No customer-facing email/SMS/booking confirmation/calendar scheduling. Notification failure does not break the customer booking response. Added `notification_attempts` SQLite table for duplicate/failure tracking. Sent attempts suppress duplicate emails. Failed/skipped attempts can retry. Fresh pending suppresses race duplicate sends. Stale pending after 15 minutes can retry. SMTP secrets are not logged or stored. Tests monkeypatch SMTP; no real emails sent. `DEPLOYMENT_NOTES.md` documents Render env vars and safe setup. Production live-safe smoke passed after merge (run ID 26102113271, SHA c428bf988fdbe4b06e3463cc47e9393942c10d0d).
+
+## Notification Policy
+
+Booking request notification infrastructure is installed but **disabled until customer launch**.
+
+Render SMTP/env vars must not be configured until Austin explicitly authorizes customer launch.
+
+Leave these unset until customer launch:
+- `BOOKING_REQUEST_NOTIFICATIONS_ENABLED`
+- `BOOKING_NOTIFICATION_EMAIL_TO`
+- `BOOKING_NOTIFICATION_EMAIL_FROM`
+- `BOOKING_NOTIFICATION_SMTP_HOST`
+- `BOOKING_NOTIFICATION_SMTP_PORT`
+- `BOOKING_NOTIFICATION_SMTP_USERNAME`
+- `BOOKING_NOTIFICATION_SMTP_PASSWORD`
+- `BOOKING_NOTIFICATION_SMTP_STARTTLS`
+- `BOOKING_NOTIFICATION_EMAIL_REPLY_TO`
+- `APP_BASE_URL`
+
+When Austin authorizes launch, configure these on Render following `DEPLOYMENT_NOTES.md`, then perform a controlled live notification test before treating notifications as active.
 
 ## Partial Or Still Future
 
@@ -40,6 +62,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Pricing PRs by service category have not started.
 - Internal GPT upgrade has not started beyond current grounding/state docs.
 - Photo Evidence / Photo Assistant remains future advisory-only work.
+- Customer launch SMTP configuration and controlled live notification test are pending Austin authorization.
 
 ## Current Priorities
 
@@ -58,6 +81,8 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Phone-history lookup now aligns SQL matching with Python-backed normalization and uncommon separator handling; `last_seen` ordering uses parsed datetimes.
 - No pricing influence, no schema migration, no mobile-admin changes, and `app/quote_engine.py` remains untouched.
 - Next recommended task after this docs refresh: plan Admin action shortcuts completion first, then plan job closeout checklist improvements after lead/repeat signal review.
+- Do not configure Render SMTP/env vars for booking notifications until Austin explicitly authorizes customer launch.
+- When Austin authorizes launch, follow `DEPLOYMENT_NOTES.md` Render setup steps and perform a controlled live notification test before treating notifications as active.
 
 ## What Should Not Happen Next
 

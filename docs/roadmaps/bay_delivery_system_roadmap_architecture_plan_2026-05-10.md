@@ -66,7 +66,7 @@ The recommended build path is intentionally conservative:
 | 9     | Internal GPT Upgrade                          | Let GPT summarize ops board, risk, follow-ups, and calibration findings. Still internal-only and advisory.                                      |
 | 10    | Photo Evidence / Photo Assistant              | Attach photos and use advisory image notes later. Do not let image AI auto-price or override quote_engine.py.                                   |
 
-## Current Delivery Status (May 14, 2026)
+## Current Delivery Status (May 19, 2026)
 
 Completed roadmap work reflected in the repo today:
 
@@ -78,6 +78,8 @@ Completed roadmap work reflected in the repo today:
 - Internal Quote Risk Summary.
 - Customer Quote Flow Simplification.
 - Lead source + repeat customer tracking (no-schema v1).
+- Launch UI Mobile Polish (PR #298): fixed mobile quote page horizontal overflow, simplified quote flow section wording, replaced public homepage admin wording, adjusted mobile call button spacing.
+- Booking Request Notification Alert Infrastructure (PR #299): internal-only SMTP notification on booking submission, disabled by default, `notification_attempts` SQLite table, duplicate/failure suppression with 15-minute stale retry window; notification sending remains OFF until customer launch.
 
 Partial or still future roadmap work:
 
@@ -87,6 +89,7 @@ Partial or still future roadmap work:
 - Pricing PRs by service category have not started.
 - Internal GPT upgrade has not started beyond current grounding/state docs.
 - Photo Evidence / Photo Assistant remains future advisory-only work.
+- Customer launch SMTP configuration and controlled live notification test are pending Austin authorization.
 
 ## Customer Flow Design
 
