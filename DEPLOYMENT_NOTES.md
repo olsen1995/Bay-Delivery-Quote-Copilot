@@ -51,10 +51,47 @@ Before changing code for production incidents, inspect whether the issue is actu
 - CORS allowlist
 - trusted proxy and forwarded IP handling
 - admin credentials
+- booking request notification SMTP settings
 - storage backend selection
 - Google integration settings
 
 Prefer env-only fixes when the application code already supports the intended behavior.
+
+---
+
+## Internal Booking Request Notifications
+
+Internal booking request email notifications are disabled by default. They send only after a customer completes the booking details step after accepting an estimate. They do not send on quote calculation, quote viewing, estimate acceptance only, admin views, admin follow-up changes, admin approval/rejection, cleanup tooling, or read-only scripts.
+
+Configure these values in Render environment variables only:
+
+- `BOOKING_REQUEST_NOTIFICATIONS_ENABLED=true`
+- `BOOKING_NOTIFICATION_EMAIL_TO=<internal Bay Delivery inbox>`
+- `BOOKING_NOTIFICATION_EMAIL_FROM=<verified sender address>`
+- `BOOKING_NOTIFICATION_SMTP_HOST=<smtp host>`
+- `BOOKING_NOTIFICATION_SMTP_PORT=<smtp port, defaults to 587 when unset>`
+- `BOOKING_NOTIFICATION_SMTP_USERNAME=<smtp username>`
+- `BOOKING_NOTIFICATION_SMTP_PASSWORD=<smtp password or app password>`
+- `BOOKING_NOTIFICATION_SMTP_STARTTLS=<true or false, defaults to true when unset>`
+- `BOOKING_NOTIFICATION_EMAIL_REPLY_TO=<optional reply-to address>`
+- `APP_BASE_URL=https://bay-delivery-quote-copilot.onrender.com`
+
+Rules:
+
+- never commit SMTP secrets
+- never paste SMTP secrets into chat, docs, screenshots, or issue/PR text
+- use an Austin/Bay Delivery internal recipient only
+- do not use customer email addresses as notification recipients
+- this feature does not send customer-facing email, SMS, booking confirmations, calendar scheduling, or customer promises
+- missing SMTP config fails closed: the booking request still succeeds, no email is sent, and a sanitized notification attempt status is recorded
+- SMTP failures are best-effort: the customer booking response must still succeed after the booking request is stored
+
+Production verification:
+
+- first deploy with notifications disabled, or with the recipient set to an internal test inbox
+- do not run live tests that email a customer
+- if a controlled live booking request is created for verification, clean it up only through the approved admin/prelaunch cleanup process and preserve manual Completed Job Calibration Log records
+- live-safe smoke does not need SMTP secrets and should not send notification emails
 
 ---
 

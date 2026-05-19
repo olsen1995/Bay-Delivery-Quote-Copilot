@@ -48,6 +48,7 @@ from app.abuse_controls import (
 from app import gcalendar, gdrive, storage
 from app.services import (
     admin_ops_queue,
+    booking_notification_service,
     booking_service,
     completed_job_profit_report,
     job_scheduling_service,
@@ -1540,14 +1541,18 @@ def quote_review_view(quote_id: str, request: Request):
 
 
 @app.post("/quote/{quote_id}/booking")
-async def submit_booking(quote_id: str, body: BookingDetails):
-    return booking_service.submit_booking_details(
+async def submit_booking(quote_id: str, body: BookingDetails, background_tasks: BackgroundTasks):
+    result = booking_service.submit_booking_details(
         quote_id,
         booking_token=body.booking_token,
         requested_job_date=body.requested_job_date,
         requested_time_window=body.requested_time_window,
         notes=body.notes,
     )
+    request_id = str(result.get("request_id") or "")
+    if result.get("ok") is True and request_id:
+        background_tasks.add_task(booking_notification_service.notify_customer_booking_submitted, request_id)
+    return result
 
 
 @app.post("/quote/upload-photos")
