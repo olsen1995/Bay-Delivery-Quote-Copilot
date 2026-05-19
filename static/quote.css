@@ -12,6 +12,13 @@
   --line-soft: var(--quote-border);
 }
 
+.quotePage,
+.quotePage *,
+.quotePage *::before,
+.quotePage *::after {
+  box-sizing: border-box;
+}
+
 body.quotePage {
   color: var(--quote-text);
   background:
@@ -805,18 +812,37 @@ body.quotePage {
     padding-bottom: 92px;
   }
 
+  .quotePage .container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .quotePage .container > * {
+    min-width: 0;
+  }
+
   .quotePage .topbar {
     padding: 12px;
   }
 
   .quoteTrustStrip {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 8px;
-    justify-content: center;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
 
   .quoteTrustBadge {
+    flex: 0 0 auto;
     font-size: 0.76rem;
     padding: 6px 10px;
+    scroll-snap-align: start;
   }
 
   .quotePage .heroCard,
@@ -832,6 +858,9 @@ body.quotePage {
   }
 
   .flowProgress {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     display: flex;
     grid-template-columns: none;
     gap: 8px;
@@ -843,6 +872,7 @@ body.quotePage {
 
   .flowStep {
     flex: 0 0 124px;
+    min-width: 0;
     gap: 7px;
     padding: 8px 9px;
     border-radius: 10px;
