@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from datetime import date, timedelta
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 
@@ -413,7 +414,7 @@ def test_pending_notification_attempt_suppresses_duplicate_race(
         quote_id=str(quote["quote_id"]),
         channel="email",
         recipient="ops@baydelivery.test",
-        created_at="2026-05-19T10:00:00",
+        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
 
     result = _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
@@ -426,6 +427,51 @@ def test_pending_notification_attempt_suppresses_duplicate_race(
     assert attempt["status"] == "pending"
     assert attempt["attempt_count"] == 0
     assert attempt["sent_at"] is None
+
+
+def test_stale_pending_notification_attempt_retries_and_sends(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_notifications(monkeypatch)
+    sent_messages: list[str] = []
+    monkeypatch.setattr(
+        booking_notification_service,
+        "_send_smtp_email",
+        lambda _config, subject, _body: sent_messages.append(subject),
+    )
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+    stale_minutes = storage.NOTIFICATION_PENDING_STALE_THRESHOLD_MINUTES + 1
+    stale_created_at = (
+        datetime.now(timezone.utc) - timedelta(minutes=stale_minutes)
+    ).isoformat(timespec="seconds")
+
+    pending = storage.reserve_notification_attempt(
+        request_id=str(accepted["request_id"]),
+        event_type="customer_booking_submitted",
+        quote_id=str(quote["quote_id"]),
+        channel="email",
+        recipient="ops@baydelivery.test",
+        created_at=stale_created_at,
+    )
+
+    result = _submit_booking(
+        client,
+        str(quote["quote_id"]),
+        str(accepted["booking_token"]),
+        notes="Retry stale pending notification attempt.",
+    )
+
+    assert pending is not None
+    assert result == {"ok": True, "request_id": accepted["request_id"]}
+    assert len(sent_messages) == 1
+    attempt = storage.get_notification_attempt(accepted["request_id"], "customer_booking_submitted")
+    assert attempt is not None
+    assert attempt["status"] == "sent"
+    assert attempt["attempt_count"] == 2
+    assert attempt["sent_at"] is not None
+    assert attempt["last_error"] is None
 
 
 def test_email_body_contains_operator_fields_without_customer_promise(

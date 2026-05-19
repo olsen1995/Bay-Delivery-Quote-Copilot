@@ -42,6 +42,7 @@ ALLOWED_NOTIFICATION_ATTEMPT_STATUSES = (
     "failed",
     "skipped",
 )
+NOTIFICATION_PENDING_STALE_THRESHOLD_MINUTES = 15
 ALLOWED_QUOTE_ADMIN_STATUSES = ("pending", "expired")
 ALLOWED_QUOTE_REQUEST_FOLLOWUP_STATUSES = (
     "needs_followup",
@@ -2373,6 +2374,32 @@ def _notification_attempt_from_row(row: sqlite3.Row) -> NotificationAttemptRecor
     }
 
 
+def _parse_notification_attempt_datetime(value: Any) -> Optional[datetime]:
+    if not isinstance(value, str):
+        return None
+    raw_value = value.strip()
+    if not raw_value:
+        return None
+    normalized = raw_value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _is_pending_notification_attempt_stale(updated_at: Any, *, now_iso: str) -> bool:
+    now_dt = _parse_notification_attempt_datetime(now_iso) or datetime.now(timezone.utc)
+    updated_dt = _parse_notification_attempt_datetime(updated_at)
+    if updated_dt is None:
+        # Invalid timestamps are treated as stale so retries are not permanently blocked.
+        return True
+    stale_after = timedelta(minutes=NOTIFICATION_PENDING_STALE_THRESHOLD_MINUTES)
+    return now_dt - updated_dt >= stale_after
+
+
 def reserve_notification_attempt(
     *,
     request_id: str,
@@ -2396,9 +2423,45 @@ def reserve_notification_attempt(
 
         if existing:
             existing_record = _notification_attempt_from_row(existing)
-            if existing_record["status"] in {"sent", "pending"}:
+            if existing_record["status"] == "sent":
                 conn.commit()
                 return None
+
+            if existing_record["status"] == "pending":
+                if not _is_pending_notification_attempt_stale(
+                    existing_record.get("updated_at"),
+                    now_iso=created_at,
+                ):
+                    conn.commit()
+                    return None
+
+                conn.execute(
+                    """
+                    UPDATE notification_attempts
+                    SET quote_id = ?,
+                        channel = ?,
+                        recipient = ?,
+                        status = 'pending',
+                        attempt_count = attempt_count + 1,
+                        updated_at = ?,
+                        sent_at = NULL,
+                        last_error = NULL
+                    WHERE request_id = ?
+                      AND event_type = ?
+                      AND status = 'pending'
+                    """,
+                    (quote_id, channel, recipient, created_at, request_id, event_type),
+                )
+                row = conn.execute(
+                    """
+                    SELECT *
+                    FROM notification_attempts
+                    WHERE request_id = ? AND event_type = ?
+                    """,
+                    (request_id, event_type),
+                ).fetchone()
+                conn.commit()
+                return _notification_attempt_from_row(row) if row else None
 
             conn.execute(
                 """
