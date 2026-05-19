@@ -2384,21 +2384,69 @@ def reserve_notification_attempt(
 ) -> Optional[NotificationAttemptRecord]:
     conn = _connect()
     try:
-        cursor = conn.execute(
+        conn.execute("BEGIN IMMEDIATE")
+        existing = conn.execute(
             """
-            INSERT OR IGNORE INTO notification_attempts
+            SELECT *
+            FROM notification_attempts
+            WHERE request_id = ? AND event_type = ?
+            """,
+            (request_id, event_type),
+        ).fetchone()
+
+        if existing:
+            existing_record = _notification_attempt_from_row(existing)
+            if existing_record["status"] in {"sent", "pending"}:
+                conn.commit()
+                return None
+
+            conn.execute(
+                """
+                UPDATE notification_attempts
+                SET quote_id = ?,
+                    channel = ?,
+                    recipient = ?,
+                    status = 'pending',
+                    updated_at = ?,
+                    sent_at = NULL,
+                    last_error = NULL
+                WHERE request_id = ?
+                  AND event_type = ?
+                  AND status IN ('failed', 'skipped')
+                """,
+                (quote_id, channel, recipient, created_at, request_id, event_type),
+            )
+            row = conn.execute(
+                """
+                SELECT *
+                FROM notification_attempts
+                WHERE request_id = ? AND event_type = ?
+                """,
+                (request_id, event_type),
+            ).fetchone()
+            conn.commit()
+            return _notification_attempt_from_row(row) if row else None
+
+        conn.execute(
+            """
+            INSERT INTO notification_attempts
             (event_type, request_id, quote_id, channel, recipient, status, attempt_count, created_at, updated_at, sent_at, last_error)
             VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, NULL, NULL)
             """,
             (event_type, request_id, quote_id, channel, recipient, created_at, created_at),
         )
+        row = conn.execute(
+            """
+            SELECT *
+            FROM notification_attempts
+            WHERE request_id = ? AND event_type = ?
+            """,
+            (request_id, event_type),
+        ).fetchone()
         conn.commit()
-        if cursor.rowcount == 0:
-            return None
+        return _notification_attempt_from_row(row) if row else None
     finally:
         conn.close()
-
-    return get_notification_attempt(request_id, event_type)
 
 
 def get_notification_attempt(request_id: str, event_type: str) -> Optional[NotificationAttemptRecord]:
@@ -2528,7 +2576,7 @@ def mark_notification_attempt_skipped(
         updated_at=skipped_at,
         sent_at=None,
         last_error=last_error,
-        increment_attempt_count=False,
+        increment_attempt_count=True,
     )
 
 

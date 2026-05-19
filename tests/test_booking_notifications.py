@@ -298,6 +298,136 @@ def test_smtp_failure_is_sanitized_and_does_not_break_booking_flow(
     assert "super-secret-password" not in str(attempt["last_error"])
 
 
+def test_failed_notification_attempt_can_retry_and_send_after_smtp_recovers(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_notifications(monkeypatch)
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+    smtp_calls = 0
+    sent_messages: list[str] = []
+
+    def fake_send(_config, subject: str, _body: str) -> None:
+        nonlocal smtp_calls
+        smtp_calls += 1
+        if smtp_calls == 1:
+            raise RuntimeError("SMTP exploded with password super-secret-password")
+        sent_messages.append(subject)
+
+    monkeypatch.setattr(booking_notification_service, "_send_smtp_email", fake_send)
+
+    first = _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
+    failed_attempt = storage.get_notification_attempt(
+        accepted["request_id"],
+        "customer_booking_submitted",
+    )
+
+    assert first == {"ok": True, "request_id": accepted["request_id"]}
+    assert failed_attempt is not None
+    assert failed_attempt["status"] == "failed"
+    assert failed_attempt["attempt_count"] == 1
+    assert "super-secret-password" not in str(failed_attempt["last_error"])
+
+    second = _submit_booking(
+        client,
+        str(quote["quote_id"]),
+        str(accepted["booking_token"]),
+        notes="Retry after SMTP recovery.",
+    )
+
+    assert second == first
+    assert smtp_calls == 2
+    assert len(sent_messages) == 1
+    sent_attempt = storage.get_notification_attempt(accepted["request_id"], "customer_booking_submitted")
+    assert sent_attempt is not None
+    assert sent_attempt["status"] == "sent"
+    assert sent_attempt["attempt_count"] == 2
+    assert sent_attempt["sent_at"] is not None
+    assert sent_attempt["last_error"] is None
+
+
+def test_skipped_notification_attempt_retries_after_config_is_fixed(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BOOKING_REQUEST_NOTIFICATIONS_ENABLED", "true")
+    monkeypatch.setenv("BOOKING_NOTIFICATION_SMTP_PASSWORD", "super-secret-password")
+    sent_messages: list[str] = []
+    monkeypatch.setattr(
+        booking_notification_service,
+        "_send_smtp_email",
+        lambda _config, subject, _body: sent_messages.append(subject),
+    )
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+
+    first = _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
+    skipped_attempt = storage.get_notification_attempt(
+        accepted["request_id"],
+        "customer_booking_submitted",
+    )
+
+    assert first == {"ok": True, "request_id": accepted["request_id"]}
+    assert sent_messages == []
+    assert skipped_attempt is not None
+    assert skipped_attempt["status"] == "skipped"
+    assert skipped_attempt["attempt_count"] == 1
+    assert "missing notification config" in str(skipped_attempt["last_error"])
+    assert "super-secret-password" not in str(skipped_attempt["last_error"])
+
+    _enable_notifications(monkeypatch)
+    second = _submit_booking(
+        client,
+        str(quote["quote_id"]),
+        str(accepted["booking_token"]),
+        notes="Retry after config is fixed.",
+    )
+
+    assert second == first
+    assert len(sent_messages) == 1
+    sent_attempt = storage.get_notification_attempt(accepted["request_id"], "customer_booking_submitted")
+    assert sent_attempt is not None
+    assert sent_attempt["status"] == "sent"
+    assert sent_attempt["attempt_count"] == 2
+    assert sent_attempt["sent_at"] is not None
+    assert sent_attempt["last_error"] is None
+
+
+def test_pending_notification_attempt_suppresses_duplicate_race(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_notifications(monkeypatch)
+    sent_messages: list[str] = []
+    monkeypatch.setattr(
+        booking_notification_service,
+        "_send_smtp_email",
+        lambda _config, subject, _body: sent_messages.append(subject),
+    )
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+    pending = storage.reserve_notification_attempt(
+        request_id=str(accepted["request_id"]),
+        event_type="customer_booking_submitted",
+        quote_id=str(quote["quote_id"]),
+        channel="email",
+        recipient="ops@baydelivery.test",
+        created_at="2026-05-19T10:00:00",
+    )
+
+    result = _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
+
+    assert pending is not None
+    assert result == {"ok": True, "request_id": accepted["request_id"]}
+    assert sent_messages == []
+    attempt = storage.get_notification_attempt(accepted["request_id"], "customer_booking_submitted")
+    assert attempt is not None
+    assert attempt["status"] == "pending"
+    assert attempt["attempt_count"] == 0
+    assert attempt["sent_at"] is None
+
+
 def test_email_body_contains_operator_fields_without_customer_promise(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
