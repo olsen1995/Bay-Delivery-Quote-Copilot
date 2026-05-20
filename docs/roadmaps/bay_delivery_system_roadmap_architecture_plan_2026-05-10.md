@@ -66,27 +66,32 @@ The recommended build path is intentionally conservative:
 | 9     | Internal GPT Upgrade                          | Let GPT summarize ops board, risk, follow-ups, and calibration findings. Still internal-only and advisory.                                      |
 | 10    | Photo Evidence / Photo Assistant              | Attach photos and use advisory image notes later. Do not let image AI auto-price or override quote_engine.py.                                   |
 
-## Current Delivery Status (May 14, 2026)
+## Current Delivery Status (May 19, 2026)
 
 Completed roadmap work reflected in the repo today:
 
 - Admin Daily Ops Board read model.
+- Admin Action Shortcuts Completion (PR #293): desktop admin Daily Ops Board cards now expose shortcut chips into existing manual admin flows.
 - Completed Job Profit Review Report.
 - Follow-Up Message Helper.
 - Accepted, Not Booked scheduling queue.
 - Accepted-not-booked detail row cap.
 - Internal Quote Risk Summary.
+- Manual Completed Job Calibration Log (PR #296): desktop admin evidence capture plus `/admin/api/manual-completed-jobs` backed by `completed_job_calibration_entries`.
+- Prelaunch Test Data Cleanup Tooling (PR #297): approved allowlisted dry-run/apply cleanup workflow documented in `docs/prelaunch_test_data_cleanup.md` and executed via `scripts/create_prelaunch_test_data_cleanup.py`.
 - Customer Quote Flow Simplification.
 - Lead source + repeat customer tracking (no-schema v1).
+- Launch UI Mobile Polish (PR #298): fixed mobile quote page horizontal overflow, simplified quote flow section wording, replaced public homepage admin wording, adjusted mobile call button spacing.
+- Booking Request Notification Alert Infrastructure (PR #299): internal-only SMTP notification on booking submission, disabled by default, `notification_attempts` SQLite table, duplicate/failure suppression with 15-minute stale retry window; notification sending remains OFF until customer launch.
 
 Partial or still future roadmap work:
 
-- Admin action shortcuts are only partial, not complete.
 - Internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Customer-facing GPT/chatbot, automatic SMS/email sending, and auto-calendar scheduling remain future work.
 - Pricing PRs by service category have not started.
 - Internal GPT upgrade has not started beyond current grounding/state docs.
 - Photo Evidence / Photo Assistant remains future advisory-only work.
+- Customer launch SMTP configuration and controlled live notification test are pending Austin authorization.
 
 ## Customer Flow Design
 
