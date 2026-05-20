@@ -23,17 +23,17 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Security, abuse controls, and deployment notes are documented and in active use.
 - Prelaunch Test Data Cleanup tooling is approved and documented: operators should use the allowlisted dry-run/apply workflow in `scripts/create_prelaunch_test_data_cleanup.py` and `docs/prelaunch_test_data_cleanup.md` rather than ad hoc cleanup steps.
 - Completed roadmap work reflected in the repo today:
-	- Admin Daily Ops Board read model
-	- Admin Action Shortcuts Completion (PR #293)
-	- Completed Job Profit Review Report
-	- Follow-Up Message Helper
-	- Accepted, Not Booked scheduling queue
-	- Accepted-not-booked detail row cap
-	- Internal Quote Risk Summary
-	- Manual Completed Job Calibration Log (PR #296)
-	- Prelaunch Test Data Cleanup Tooling (PR #297)
-	- Customer Quote Flow Simplification
-	- Lead source + repeat customer tracking (no-schema v1)
+  - Admin Daily Ops Board read model
+  - Admin Action Shortcuts Completion (PR #293)
+  - Completed Job Profit Review Report
+  - Follow-Up Message Helper
+  - Accepted, Not Booked scheduling queue
+  - Accepted-not-booked detail row cap
+  - Internal Quote Risk Summary
+  - Manual Completed Job Calibration Log (PR #296)
+  - Prelaunch Test Data Cleanup Tooling (PR #297)
+  - Customer Quote Flow Simplification
+  - Lead source + repeat customer tracking (no-schema v1)
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
 - Manual Completed Job Calibration Log is internal-only evidence capture for owner review and future pricing planning; it does not change quote pricing and should be used to preserve real completed-job learnings ahead of category-specific pricing PRs.
 - Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
