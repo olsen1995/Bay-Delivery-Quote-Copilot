@@ -157,6 +157,85 @@ Tie-breaker:
 - If the risk is unclear, use plan-only.
 - Even when skipping plan-only, briefly state the plan before implementation.
 
+## High-Value Review Habits to Practice
+
+Use these habits especially when reviewing or fixing Bay Delivery PRs.
+
+### 1. Review-Fix Regression Isolation
+
+When a review comment identifies a bug, first create or identify one targeted failing test that proves the bug.
+
+Then patch only the owning helper, query, or small behavior path.
+
+Avoid broad refactors.
+
+Examples:
+- A desktop-admin ReferenceError should be covered by the smallest static or JavaScript regression check possible.
+- A backend photo-request gating bug should be covered by targeted tests around missing_info, attachment_count, and quote-linked photo signals.
+- A read-model ordering bug should be fixed in the query or order key, not by rewriting the whole read model.
+
+### 2. Protected-Surface Validation Discipline
+
+Before every narrow PR, explicitly identify protected surfaces.
+
+Then prove the PR did not touch unrelated protected areas.
+
+Always finish with:
+- focused tests
+- full pytest when appropriate
+- protected no-go diff
+- clear final report
+
+Protected surfaces usually include:
+- pricing authority
+- quote totals
+- customer quote payloads
+- GPT grounding docs/generated pack
+- workflows
+- Render config
+- dependencies
+- mobile admin
+- production cleanup tooling
+
+### 3. Release-Verification Contract Design
+
+For release and production verification tasks, express expectations as contracts, not vibes.
+
+Prefer:
+- explicit CLI flags
+- one health fetch path
+- commit/version parity checks
+- structured workflow-run reporting
+- exact url/status/conclusion/createdAt/headSha output
+
+Do not rely on ad hoc manual release checks when a repeatable script or workflow contract is possible.
+
+### 4. Docs and Generated-Artifact Publication Hygiene
+
+When source docs feed generated artifacts, treat them as one publish unit.
+
+If docs/gpt changes:
+- regenerate dist/gpt_grounding_pack
+- update manifest hashes
+- run GPT grounding parity
+- stage ignored generated files intentionally if required
+- verify source and exported files match
+
+Do not merge docs/GPT changes with stale generated output.
+
+### 5. Contract-Safe Static UX Polish
+
+For static UI polish, prefer CSS/layout fixes before changing JS behavior or payload contracts.
+
+When improving visible UX:
+- preserve field IDs
+- preserve enum values
+- preserve payload construction
+- preserve endpoint behavior
+- avoid public leakage of internal pricing, risk, or admin language
+
+Use tests to prove the public quote contract stayed intact.
+
 ## Protected Surfaces
 
 Before implementation, identify protected surfaces.
@@ -210,85 +289,6 @@ For dependency changes, include:
 - lockfile freshness logic
 - full tests
 - pip-audit -r requirements.lock.txt
-
-## High-Value Review Habits to Practice
-
-Use these habits especially when reviewing or fixing Bay Delivery PRs.
-
-### 1. Review-Fix Regression Isolation
-
-When a review comment identifies a bug, first create or identify one targeted failing test that proves the bug.
-
-Then patch only the owning helper, query, or small behavior path.
-
-Avoid broad refactors.
-
-Examples:
-- A desktop-admin ReferenceError should be covered by the smallest static/JS regression check possible.
-- A backend photo-request gating bug should be covered by targeted tests around missing_info, attachment_count, and quote-linked photo signals.
-- A read-model ordering bug should be fixed in the query/order key, not by rewriting the whole read model.
-
-### 2. Protected-Surface Validation Discipline
-
-Before every narrow PR, explicitly identify protected surfaces.
-
-Then prove the PR did not touch unrelated protected areas.
-
-Always finish with:
-- focused tests
-- full pytest when appropriate
-- protected no-go diff
-- clear final report
-
-Protected surfaces usually include:
-- pricing authority
-- quote totals
-- customer quote payloads
-- GPT grounding docs/generated pack
-- workflows
-- Render config
-- dependencies
-- mobile admin
-- production cleanup tooling
-
-### 3. Release-Verification Contract Design
-
-For release/production verification tasks, express expectations as contracts, not vibes.
-
-Prefer:
-- explicit CLI flags
-- one health fetch path
-- commit/version parity checks
-- structured workflow-run reporting
-- exact url/status/conclusion/createdAt/headSha output
-
-Do not rely on ad hoc manual release checks when a repeatable script or workflow contract is possible.
-
-### 4. Docs and Generated-Artifact Publication Hygiene
-
-When source docs feed generated artifacts, treat them as one publish unit.
-
-If docs/gpt changes:
-- regenerate dist/gpt_grounding_pack
-- update manifest hashes
-- run GPT grounding parity
-- stage ignored generated files intentionally if required
-- verify source and exported files match
-
-Do not merge docs/GPT changes with stale generated output.
-
-### 5. Contract-Safe Static UX Polish
-
-For static UI polish, prefer CSS/layout fixes before changing JS behavior or payload contracts.
-
-When improving visible UX:
-- preserve field IDs
-- preserve enum values
-- preserve payload construction
-- preserve endpoint behavior
-- avoid public leakage of internal pricing/risk/admin language
-
-Use tests to prove the public quote contract stayed intact.
 
 ## Dependency Lock Refresh Rule
 
