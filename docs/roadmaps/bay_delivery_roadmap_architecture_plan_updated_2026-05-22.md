@@ -1,7 +1,7 @@
 # Bay Delivery Quote Copilot - Roadmap & Architecture Plan
 
-Prepared: May 10, 2026  
-Updated: May 22, 2026  
+Prepared: May 10, 2026
+Updated: May 22, 2026
 Prepared for: Austin / Bay Delivery
 
 ## Executive Principle
@@ -28,7 +28,7 @@ Key updates:
 As of May 22, 2026:
 
 | Area | Status |
-|---|---|
+| --- | --- |
 | Render deploy | Current after redeploy |
 | Live health | `ok=true`, `version=0.11.0`, `drive_configured=true`, `commit=65187325cbdb` |
 | Production smoke | Passed |
@@ -69,7 +69,7 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 ## Target System Architecture
 
 | Layer | Purpose | Boundary Rule | Current Status |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Customer Quote Page | Collect simple job facts | Use plain customer language. Do not show internal risk or pricing jargon. | Complete and visually verified |
 | Simple Intake Translator | Turn answers into structured internal facts | Advisory only. Supports risk review but does not set prices. | Partially complete through structured intake/risk context |
 | Quote Service | Validate and route quote requests | Backend remains source of truth for request handling. | Complete/stable |
@@ -89,7 +89,7 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 ## Completed Work Since May 10
 
 | Area / PR | Status | Notes |
-|---|---|---|
+| --- | --- | --- |
 | PR #273 - create admin daily ops board read model | Complete | Desktop-admin read-only operations board added. |
 | PR #278 - create completed job profit review report | Complete | Admin-only completed-job profit/margin evidence. |
 | PR #279 - create GPT grounding roadmap state refresh | Complete | GPT/current-state docs refreshed and grounding parity restored. |
@@ -126,14 +126,14 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 These entries are now useful evidence for future pricing review, but they do not change pricing automatically.
 
 | Job | Amount Collected | Usefulness |
-|---|---:|---|
+| --- | ---: | --- |
 | Old shed removal / teardown and haul-away | $1,200 CAD | Strong premium demolition/haul-away anchor. Similar work should not be treated like a basic dump run. |
 | Backyard tarp / fence teardown and cleanup | $600 CAD | Useful small-to-mid backyard teardown/cleanup anchor where access and debris are manageable. |
 
 ## What Is Not Completed Yet
 
 | Item | Status | Recommended Handling |
-|---|---|---|
+| --- | --- | --- |
 | Production Observability and Launch Monitoring Plan | Not complete | Recommended next task; plan-only first. |
 | Better Stack uptime/page monitoring | Not configured | External setup first; repo changes only if needed. |
 | Sentry backend error tracking | Not implemented | Future privacy-safe PR only after plan. |
@@ -156,7 +156,7 @@ These entries are now useful evidence for future pricing review, but they do not
 ## Roadmap Phases - Updated Status
 
 | Phase | Build | Purpose / Scope | Status |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 0 | Current-state verification | Confirm main, tests, Render /health, public quote, admin/mobile gates, version parity, and GPT pack parity before new work. | Complete and repeated after deploy |
 | 1 | Admin Daily Ops Board | Read-only cards for requests, follow-ups, accepted-not-booked, upcoming jobs, missing costs, owner review, stale quotes. | Complete |
 | 2 | Admin Action Shortcuts | Practical buttons/chips after the board proves useful. | Complete v1 |
@@ -260,7 +260,7 @@ gpt_admin_logs
 Possible fields:
 
 | Field | Purpose |
-|---|---|
+| --- | --- |
 | `log_id` | Unique log id |
 | `created_at` | Timestamp |
 | `source` | `internal_gpt` |
@@ -307,7 +307,7 @@ Recommended v1 surface:
 ### Recommended PR Breakdown
 
 | Order | PR Title | Scope |
-|---|---|---|
+| --- | --- | --- |
 | 1 | create GPT admin job log plan | Docs/plan only; no implementation. |
 | 2 | create GPT admin log storage and API | Add table, POST endpoint, validation, auth, audit, tests. |
 | 3 | create admin GPT notes display | Desktop-admin read-only display. No mobile/customer exposure. |
@@ -316,7 +316,7 @@ Recommended v1 surface:
 ### Risk Review
 
 | Level | Risk |
-|---|---|
+| --- | --- |
 | P1 | GPT accidentally mutates pricing, lifecycle status, scheduling, customer messages, or exposes internal notes publicly. Must be structurally prevented. |
 | P2 | GPT logs too much sensitive PII or creates noisy/spammy admin clutter. Needs validation, length caps, and clear UI separation. |
 | P3 | Admin UI could become crowded. Keep logs collapsed and clearly advisory. |
@@ -328,7 +328,7 @@ Before adding more feature work, plan production visibility.
 Recommended free-first stack:
 
 | Tool / Area | Purpose | Status |
-|---|---|---|
+| --- | --- | --- |
 | Existing Production Live-Safe Smoke | Health/version/commit/page safety | Complete and working |
 | Better Stack free tier | Uptime/page monitoring | Not configured |
 | Sentry free Developer tier | Backend error tracking | Not implemented |
@@ -348,7 +348,7 @@ Monitoring boundaries:
 ### Add / Already Added
 
 | Item | Status | Why |
-|---|---|---|
+| --- | --- | --- |
 | Lead source tracking | Complete no-schema v1 | Helps know where leads come from. |
 | Repeat customer marker/history | Complete no-schema v1 | Helps trust good customers and spot patterns. |
 | Manual completed-job calibration log | Complete | Captures real job evidence without fake lifecycle jobs. |
@@ -358,7 +358,7 @@ Monitoring boundaries:
 ### Add / Still Future
 
 | Item | Why |
-|---|---|
+| --- | --- |
 | Production observability plan | Prevent deploy drift, missed downtime, page issues, and invisible backend failures. |
 | GPT admin job logs / notes | Preserve useful GPT observations inside admin without giving GPT authority. |
 | Internal customer notes | Track good customer, slow payer, no-show risk, recurring underestimation patterns. |
@@ -370,7 +370,7 @@ Monitoring boundaries:
 ### Fix / Refine
 
 | Area | Refinement |
-|---|---|
+| --- | --- |
 | Admin hierarchy | Keep top as Daily Ops Board; middle as Requests/Jobs/Costing; bottom as Reports/Backup/Settings/Developer/GPT logs. |
 | Customer copy | Keep local, helpful wording. Avoid internal labels and numbered-step confusion. |
 | Risk wording | Use practical admin wording: review before approving, ask for photos, likely 2-person job, disposal uncertain. |
@@ -380,7 +380,7 @@ Monitoring boundaries:
 ### Remove / Avoid
 
 | Thing | Reason |
-|---|---|
+| --- | --- |
 | Admin-side quote drafting as primary flow | Keep admin as operations. Use public quote flow and internal GPT separately for drafts. |
 | Raw JSON in main workflow | Hide raw request payloads/details behind a details/developer section. |
 | Customer-facing risk jargon | Do not show pricing risk, manual review, recommended trailer, under-margin, or operating-cost gap to customers. |
@@ -393,7 +393,7 @@ Monitoring boundaries:
 Pricing changes should wait until admin risk summaries, completed-job reporting, and manual calibration evidence are reviewed. Then change one service category per PR with focused tests and before/after calibration cases.
 
 | Order | Category | Reason |
-|---|---|---|
+| --- | --- | --- |
 | 1 | Demolition / rip-out | Highest risk. Shed and teardown calibration supports premium handling. Add premium/manual-review floors and strong minimum protections first. |
 | 2 | Moving labour | Protect 2-worker minimums, stairs, long carry, inside work, and customer-belonging risk. |
 | 3 | Heavy/dense dump runs | Protect concrete, tile, bricks, dirt, wet debris, shingles, drywall, and disposal uncertainty. |
@@ -442,7 +442,7 @@ Why:
 ## Codex / Agent Usage Rules
 
 | Task Type | Tool | Plan-only? | Pursue Goal / Goal Mode |
-|---|---|---:|---:|
+| --- | --- | ---: | ---: |
 | Production observability plan | Codex | Yes | Off |
 | GPT admin job log plan | Codex | Yes | Off |
 | Read-only live visual audit | VS Code Repo Maintainer | No implementation | Off |
@@ -453,7 +453,7 @@ Why:
 ## Updated Exact Future PR Sequence
 
 | Order | PR Title | Scope | Status |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | create production observability and launch monitoring plan | Plan free-first production monitoring, error tracking, UX tracking, search visibility, and backup monitoring. | Next recommended |
 | 2 | create GPT admin job log plan | Plan internal GPT-to-admin notes/logging without implementation. | After observability plan or if GPT workflow is prioritized |
 | 3 | create privacy safe Sentry integration | Backend error tracking with PII-safe config. | Future |
