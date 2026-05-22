@@ -10,7 +10,7 @@ sandbox_mode = "workspace-write"
 sandbox = "unelevated"
 
 [sandbox_workspace_write]
-network_access = false
+network_access = true
 
 [features]
 hooks = true
