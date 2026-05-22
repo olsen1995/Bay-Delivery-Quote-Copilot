@@ -42,3 +42,83 @@ python -m playwright install
 
 Write-Host "==> Environment setup complete"
 '''
+
+[setup.win32]
+script = '''
+$ErrorActionPreference = "Stop"
+
+Set-Location "$env:CODEX_WORKTREE_PATH"
+
+Write-Host "==> Working directory: $(Get-Location)"
+
+if (Test-Path ".\.venv\Scripts\Activate.ps1") {
+    Write-Host "==> Activating existing .venv"
+    . .\.venv\Scripts\Activate.ps1
+} else {
+    Write-Host "==> No .venv found, creating .venv"
+    python -m venv .venv
+    . .\.venv\Scripts\Activate.ps1
+}
+
+Write-Host "==> Python version"
+python --version
+
+Write-Host "==> Pip version"
+python -m pip --version
+
+Write-Host "==> Upgrading pip"
+python -m pip install --upgrade pip
+
+if (Test-Path ".\requirements.lock.txt") {
+    Write-Host "==> Installing requirements.lock.txt"
+    python -m pip install -r requirements.lock.txt
+} elseif (Test-Path ".\requirements.txt") {
+    Write-Host "==> Installing requirements.txt"
+    python -m pip install -r requirements.txt
+} else {
+    Write-Host "==> No requirements file found"
+}
+
+if (Test-Path ".\requirements-dev.txt") {
+    Write-Host "==> Installing requirements-dev.txt"
+    python -m pip install -r requirements-dev.txt
+} else {
+    Write-Host "==> No requirements-dev.txt found"
+}
+
+Write-Host "==> Checking Playwright availability"
+python -c "import playwright; print('Playwright package available')" 2>$null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "==> Installing Playwright browsers"
+    python -m playwright install
+} else {
+    Write-Host "==> Playwright package not available; skipping browser install"
+}
+
+Write-Host "==> Running lightweight repo checks"
+python tools/check_version_parity.py
+python tools/check_gpt_grounding_pack_parity.py
+python -m compileall app tools scripts tests
+
+Write-Host "==> Environment setup complete"
+'''
+
+[cleanup]
+script = '''
+$ErrorActionPreference = "Continue"
+
+Set-Location "$env:CODEX_WORKTREE_PATH"
+
+Write-Host "==> Cleaning temporary local artifacts"
+
+if (Test-Path ".\.cache\tmp") {
+    Remove-Item ".\.cache\tmp" -Recurse -Force
+}
+
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+    docker compose down --remove-orphans
+}
+
+Write-Host "==> Cleanup complete"
+'''
