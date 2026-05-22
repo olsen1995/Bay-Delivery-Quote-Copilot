@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections import deque
 import base64
+import hashlib
 import hmac
 import json
 import logging
@@ -36,7 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.abuse_controls import (
     RateLimitMiddleware,
@@ -58,7 +59,10 @@ from app.services import (
 )
 from app.storage import (
     export_db_to_json,
+    get_completed_job_calibration_entry,
+    get_gpt_admin_note_by_idempotency_key,
     get_job,
+    get_recent_gpt_admin_note_by_payload_hash,
     GptQuoteObservabilityRecord,
     get_quote_record,
     import_db_from_json,
@@ -68,12 +72,14 @@ from app.storage import (
     list_completed_job_calibration_entries,
     list_attachments,
     list_admin_audit_log,
+    list_gpt_admin_notes,
     list_gpt_quote_observability,
     list_jobs,
     list_quote_requests,
     list_quotes,
     save_attachment,
     save_completed_job_calibration_entry,
+    save_gpt_admin_note,
     save_gpt_quote_observability_event,
     update_job,
     update_job_costing,
@@ -102,11 +108,17 @@ _gpt_quote_rate_limit = 10
 _gpt_quote_rate_limit_window = 60
 _gpt_quote_rate_limit_buckets: dict[str, deque[float]] = {}
 _gpt_quote_rate_limit_lock = Lock()
+_gpt_admin_notes_rate_limit = 5
+_gpt_admin_notes_rate_limit_window = 60
+_gpt_admin_notes_rate_limit_buckets: dict[str, deque[float]] = {}
+_gpt_admin_notes_rate_limit_lock = Lock()
 _ADMIN_VALIDATION_AUDIT_MAX_SUMMARY_LENGTH = 240
 _GPT_QUOTE_ROUTE_NAME = "/api/gpt/quote"
+_GPT_ADMIN_NOTES_ROUTE_NAME = "/api/gpt/admin-notes"
 _GPT_QUOTE_OBSERVABILITY_STATE_KEY = "gpt_quote_observability"
 _GPT_GROUNDING_REVISION_HEADER = "x-gpt-grounding-revision"
 _MAX_GROUNDING_REVISION_LENGTH = 120
+_GPT_ADMIN_NOTE_DUPLICATE_WINDOW_SECONDS = 300
 _ADMIN_VALIDATION_AUDIT_ROUTES: dict[tuple[str, str], dict[str, str]] = {
     ("POST", "/admin/api/db/import"): {
         "action_type": "import_db",
@@ -401,6 +413,7 @@ SIZE_LIMIT_RULES = [
     ),
     SizeLimitRule(method="POST", exact_path="/quote/calculate", max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", exact_path="/api/gpt/quote", max_bytes=JSON_SIZE_CAP_BYTES),
+    SizeLimitRule(method="POST", exact_path="/api/gpt/admin-notes", max_bytes=16 * 1024),
     SizeLimitRule(method="POST", exact_path="/admin/api/db/import", max_bytes=DB_IMPORT_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/admin/api/", max_bytes=JSON_SIZE_CAP_BYTES),
     SizeLimitRule(method="POST", prefix_path="/quote/", max_bytes=JSON_SIZE_CAP_BYTES),
@@ -478,6 +491,10 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 def _now_local_iso() -> str:
     # Keep timestamps as ISO strings (local time) for admin readability.
     return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _now_local_iso_microseconds() -> str:
+    return datetime.now().astimezone().isoformat(timespec="microseconds")
 
 
 def _drive_enabled() -> bool:
@@ -633,6 +650,33 @@ def _require_gpt_internal_token(request: Request) -> None:
     _enforce_gpt_quote_rate_limit(request)
 
 
+def _request_has_valid_gpt_internal_token(request: Request) -> bool:
+    expected_token = _configured_gpt_internal_token()
+    if expected_token is None:
+        return False
+
+    header = request.headers.get("authorization") or ""
+    if not header.lower().startswith("bearer "):
+        return False
+
+    provided_token = header.split(" ", 1)[1].strip()
+    return bool(provided_token) and hmac.compare_digest(provided_token, expected_token)
+
+
+def _require_gpt_admin_notes_token(request: Request) -> None:
+    expected_token = _configured_gpt_internal_token()
+    if expected_token is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+
+    header = request.headers.get("authorization") or ""
+    if not header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Invalid internal API token.")
+
+    provided_token = header.split(" ", 1)[1].strip()
+    if not provided_token or not hmac.compare_digest(provided_token, expected_token):
+        raise HTTPException(status_code=401, detail="Invalid internal API token.")
+
+
 def _enforce_gpt_quote_rate_limit(request: Request) -> None:
     ip = extract_client_ip(request)
     now = time.time()
@@ -668,6 +712,36 @@ def _enforce_gpt_quote_rate_limit(request: Request) -> None:
 def clear_gpt_quote_rate_limit_state() -> None:
     with _gpt_quote_rate_limit_lock:
         _gpt_quote_rate_limit_buckets.clear()
+
+
+def _enforce_gpt_admin_notes_rate_limit(request: Request) -> None:
+    ip = extract_client_ip(request)
+    now = time.time()
+    window_start = now - _gpt_admin_notes_rate_limit_window
+    is_rate_limited = False
+
+    with _gpt_admin_notes_rate_limit_lock:
+        bucket = _gpt_admin_notes_rate_limit_buckets.setdefault(ip, deque())
+
+        while bucket and bucket[0] <= window_start:
+            bucket.popleft()
+
+        if not bucket:
+            _gpt_admin_notes_rate_limit_buckets.pop(ip, None)
+            bucket = _gpt_admin_notes_rate_limit_buckets.setdefault(ip, deque())
+
+        if len(bucket) >= _gpt_admin_notes_rate_limit:
+            is_rate_limited = True
+        else:
+            bucket.append(now)
+
+    if is_rate_limited:
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+
+
+def clear_gpt_admin_notes_rate_limit_state() -> None:
+    with _gpt_admin_notes_rate_limit_lock:
+        _gpt_admin_notes_rate_limit_buckets.clear()
 
 
 # =========================
@@ -743,6 +817,16 @@ async def request_validation_audit_handler(request: Request, exc: RequestValidat
             server_grounding_revision=_configured_gpt_grounding_revision(),
             caller_grounding_revision=_caller_declared_gpt_grounding_revision(request),
         )
+    if request.method.upper() == "POST" and request.url.path == _GPT_ADMIN_NOTES_ROUTE_NAME:
+        if _request_has_valid_gpt_internal_token(request):
+            _try_log_admin_audit(
+                operator_username="internal_gpt",
+                action_type="create_gpt_admin_note",
+                entity_type="gpt_admin_note",
+                record_id="validation_error",
+                success=False,
+                error_summary=_summarize_validation_error(exc),
+            )
     return await request_validation_exception_handler(request, exc)
 
 
@@ -1147,6 +1231,120 @@ class GptQuoteRequestPayload(BaseModel):
         return v
 
 
+class GptAdminNotePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    related_entity_type: Literal[
+        "quote",
+        "quote_request",
+        "job",
+        "completed_job_calibration_entry",
+        "general",
+    ]
+    related_entity_id: Optional[str] = Field(None, max_length=160)
+    note_type: Literal[
+        "job_observation",
+        "quote_caution",
+        "missing_info",
+        "follow_up_recommendation",
+        "completed_job_calibration_observation",
+        "customer_message_draft",
+        "photo_access_density_risk",
+        "owner_review_context",
+    ]
+    title: str = Field(..., min_length=1, max_length=120)
+    summary: str = Field(..., min_length=1, max_length=1200)
+    recommendation: Optional[str] = Field(None, max_length=1000)
+    customer_message_draft: Optional[str] = Field(None, max_length=1000)
+    risk_flags: list[str] = Field(default_factory=list, max_length=10)
+    follow_up_needed: bool = False
+    idempotency_key: Optional[str] = Field(None, max_length=160)
+
+    @field_validator(
+        "related_entity_id",
+        "title",
+        "summary",
+        "recommendation",
+        "customer_message_draft",
+        "idempotency_key",
+        mode="before",
+    )
+    @classmethod
+    def strip_text(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped or None
+        return v
+
+    @field_validator("risk_flags", mode="before")
+    @classmethod
+    def normalize_risk_flags(cls, v):
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("risk_flags must be a list")
+        normalized: list[str] = []
+        for item in v:
+            text = str(item).strip().lower()
+            text = re.sub(r"[^a-z0-9_-]+", "_", text).strip("_")
+            if len(text) > 40:
+                raise ValueError("risk flag values must be 40 characters or fewer")
+            if text and text not in normalized:
+                normalized.append(text)
+            if len(normalized) > 10:
+                raise ValueError("risk_flags may include at most 10 items")
+        return normalized
+
+    @model_validator(mode="after")
+    def require_related_entity_id(self):
+        if self.related_entity_type != "general" and not self.related_entity_id:
+            raise ValueError("related_entity_id is required unless related_entity_type is general")
+        return self
+
+
+def _gpt_admin_note_payload_hash(payload: GptAdminNotePayload) -> str:
+    payload_data = payload.model_dump(exclude_none=True)
+    payload_data.pop("idempotency_key", None)
+    canonical = json.dumps(payload_data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _gpt_admin_note_related_entity_exists(
+    related_entity_type: str,
+    related_entity_id: str | None,
+) -> bool:
+    if related_entity_type == "general":
+        return True
+    if not related_entity_id:
+        return False
+    if related_entity_type == "quote":
+        return get_quote_record(related_entity_id) is not None
+    if related_entity_type == "quote_request":
+        return storage.get_quote_request_record(related_entity_id) is not None
+    if related_entity_type == "job":
+        return get_job(related_entity_id) is not None
+    if related_entity_type == "completed_job_calibration_entry":
+        return get_completed_job_calibration_entry(related_entity_id) is not None
+    return False
+
+
+def _audit_gpt_admin_note_failure(record_id: str, error_summary: str) -> None:
+    _try_log_admin_audit(
+        operator_username="internal_gpt",
+        action_type="create_gpt_admin_note",
+        entity_type="gpt_admin_note",
+        record_id=record_id,
+        success=False,
+        error_summary=error_summary,
+    )
+
+
+def _gpt_admin_note_response(note: dict[str, Any], *, created: bool) -> dict[str, Any]:
+    return {"note_id": note["note_id"], "created": created}
+
+
 @app.post("/quote/calculate")
 async def quote_calculate(payload: QuoteRequestPayload):
     request_payload = payload.model_dump()
@@ -1198,6 +1396,69 @@ async def gpt_quote(request: Request, payload: GptQuoteRequestPayload):
         caller_grounding_revision=caller_grounding_revision,
     )
     return response
+
+
+@app.post(_GPT_ADMIN_NOTES_ROUTE_NAME, include_in_schema=False, dependencies=[Depends(_require_gpt_admin_notes_token)])
+async def gpt_admin_notes(request: Request, payload: GptAdminNotePayload):
+    note_id = str(uuid4())
+    idempotency_key = payload.idempotency_key
+    if idempotency_key:
+        existing = get_gpt_admin_note_by_idempotency_key(idempotency_key)
+        if existing is not None:
+            return _gpt_admin_note_response(existing, created=False)
+
+    if not _gpt_admin_note_related_entity_exists(
+        payload.related_entity_type,
+        payload.related_entity_id,
+    ):
+        _audit_gpt_admin_note_failure("pending", "related entity not found")
+        raise HTTPException(status_code=404, detail="related entity not found")
+
+    payload_hash = _gpt_admin_note_payload_hash(payload)
+    duplicate_since = (
+        datetime.now().astimezone() - timedelta(seconds=_GPT_ADMIN_NOTE_DUPLICATE_WINDOW_SECONDS)
+    ).isoformat(timespec="seconds")
+    duplicate = get_recent_gpt_admin_note_by_payload_hash(payload_hash, duplicate_since)
+    if duplicate is not None:
+        _audit_gpt_admin_note_failure(duplicate["note_id"], "duplicate_note")
+        raise HTTPException(status_code=409, detail="duplicate_note")
+
+    try:
+        _enforce_gpt_admin_notes_rate_limit(request)
+    except HTTPException as exc:
+        _audit_gpt_admin_note_failure("rate_limited", str(exc.detail))
+        raise
+
+    record = payload.model_dump()
+    record.update(
+        {
+            "note_id": note_id,
+            "created_at": _now_local_iso_microseconds(),
+            "updated_at": None,
+            "source": "internal_gpt",
+            "customer_visible": False,
+            "pricing_effect": "none",
+            "review_status": "open",
+            "payload_hash": payload_hash,
+            "server_grounding_revision": _configured_gpt_grounding_revision(),
+            "caller_grounding_revision": _caller_declared_gpt_grounding_revision(request),
+        }
+    )
+
+    try:
+        note = save_gpt_admin_note(record)
+    except ValueError as exc:
+        _audit_gpt_admin_note_failure(note_id, str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    _try_log_admin_audit(
+        operator_username="internal_gpt",
+        action_type="create_gpt_admin_note",
+        entity_type="gpt_admin_note",
+        record_id=note["note_id"],
+        success=True,
+    )
+    return _gpt_admin_note_response(note, created=True)
 
 
 class CustomerDecision(BaseModel):
@@ -2454,3 +2715,27 @@ def admin_gpt_quote_observability(request: Request):
     """
     _require_admin(request)
     return {"items": list_gpt_quote_observability(limit=50)}
+
+
+@app.get("/admin/api/gpt-notes")
+def admin_gpt_notes(
+    request: Request,
+    limit: int = 50,
+    related_entity_type: Optional[str] = None,
+    related_entity_id: Optional[str] = None,
+    review_status: Optional[str] = None,
+):
+    """
+    Returns internal GPT admin notes as JSON. Requires admin authentication.
+    """
+    _require_admin(request)
+    try:
+        items = list_gpt_admin_notes(
+            limit=limit,
+            related_entity_type=related_entity_type,
+            related_entity_id=related_entity_id,
+            review_status=review_status,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"items": items}

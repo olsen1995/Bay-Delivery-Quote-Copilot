@@ -72,6 +72,24 @@ ALLOWED_JOB_PROFIT_STATUSES = ("underquoted", "fair", "profitable", "painful")
 ALLOWED_MANUAL_CALIBRATION_PRICING_RESULTS = ("underquoted", "fair", "profitable", "painful")
 ALLOWED_MANUAL_CALIBRATION_DIFFICULTIES = ("easy", "normal", "hard", "very_hard")
 ALLOWED_MANUAL_CALIBRATION_ACCESS_DIFFICULTIES = ("normal", "awkward", "difficult")
+ALLOWED_GPT_ADMIN_NOTE_RELATED_ENTITY_TYPES = (
+    "quote",
+    "quote_request",
+    "job",
+    "completed_job_calibration_entry",
+    "general",
+)
+ALLOWED_GPT_ADMIN_NOTE_TYPES = (
+    "job_observation",
+    "quote_caution",
+    "missing_info",
+    "follow_up_recommendation",
+    "completed_job_calibration_observation",
+    "customer_message_draft",
+    "photo_access_density_risk",
+    "owner_review_context",
+)
+ALLOWED_GPT_ADMIN_NOTE_REVIEW_STATUSES = ("open", "reviewed", "archived")
 JOB_COSTING_PAYMENT_METHOD_CHECK_SQL = (
     "payment_method IS NULL OR payment_method IN ('cash', 'emt', 'other')"
 )
@@ -92,6 +110,17 @@ MANUAL_CALIBRATION_DIFFICULTY_CHECK_SQL = (
 MANUAL_CALIBRATION_ACCESS_DIFFICULTY_CHECK_SQL = (
     "access_difficulty IS NULL OR access_difficulty IN ('normal', 'awkward', 'difficult')"
 )
+GPT_ADMIN_NOTE_RELATED_ENTITY_TYPE_CHECK_SQL = (
+    "related_entity_type IN "
+    "('quote', 'quote_request', 'job', 'completed_job_calibration_entry', 'general')"
+)
+GPT_ADMIN_NOTE_TYPE_CHECK_SQL = (
+    "note_type IN "
+    "('job_observation', 'quote_caution', 'missing_info', 'follow_up_recommendation', "
+    "'completed_job_calibration_observation', 'customer_message_draft', "
+    "'photo_access_density_risk', 'owner_review_context')"
+)
+GPT_ADMIN_NOTE_REVIEW_STATUS_CHECK_SQL = "review_status IN ('open', 'reviewed', 'archived')"
 
 
 class Job(TypedDict):
@@ -159,6 +188,29 @@ class CompletedJobCalibrationEntry(TypedDict):
     pricing_result: str
     notes: Optional[str]
     calibration_note: Optional[str]
+
+
+class GptAdminNoteRecord(TypedDict):
+    note_id: str
+    created_at: str
+    updated_at: Optional[str]
+    source: str
+    related_entity_type: str
+    related_entity_id: Optional[str]
+    note_type: str
+    title: str
+    summary: str
+    recommendation: Optional[str]
+    customer_message_draft: Optional[str]
+    risk_flags: List[str]
+    follow_up_needed: bool
+    customer_visible: bool
+    pricing_effect: str
+    review_status: str
+    idempotency_key: Optional[str]
+    payload_hash: str
+    server_grounding_revision: Optional[str]
+    caller_grounding_revision: Optional[str]
 
 
 class QuoteRecord(TypedDict):
@@ -421,6 +473,7 @@ KNOWN_TABLES = [
     "screenshot_assistant_analyses",
     "admin_audit_log",
     "gpt_quote_observability",
+    "gpt_admin_notes",
     "payment_attempts",
     "webhook_events",
     "notification_attempts",
@@ -809,6 +862,33 @@ def init_db() -> None:
                 risk_flags_json TEXT NOT NULL,
                 failure_reason TEXT,
                 latency_ms INTEGER,
+                server_grounding_revision TEXT,
+                caller_grounding_revision TEXT
+            )
+            """
+        )
+
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS gpt_admin_notes (
+                note_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                source TEXT NOT NULL DEFAULT 'internal_gpt' CHECK (source = 'internal_gpt'),
+                related_entity_type TEXT NOT NULL CHECK ({GPT_ADMIN_NOTE_RELATED_ENTITY_TYPE_CHECK_SQL}),
+                related_entity_id TEXT,
+                note_type TEXT NOT NULL CHECK ({GPT_ADMIN_NOTE_TYPE_CHECK_SQL}),
+                title TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                recommendation TEXT,
+                customer_message_draft TEXT,
+                risk_flags_json TEXT NOT NULL DEFAULT '[]',
+                follow_up_needed INTEGER NOT NULL DEFAULT 0,
+                customer_visible INTEGER NOT NULL DEFAULT 0 CHECK (customer_visible = 0),
+                pricing_effect TEXT NOT NULL DEFAULT 'none' CHECK (pricing_effect = 'none'),
+                review_status TEXT NOT NULL DEFAULT 'open' CHECK ({GPT_ADMIN_NOTE_REVIEW_STATUS_CHECK_SQL}),
+                idempotency_key TEXT UNIQUE,
+                payload_hash TEXT NOT NULL,
                 server_grounding_revision TEXT,
                 caller_grounding_revision TEXT
             )
@@ -1832,6 +1912,343 @@ def list_completed_job_calibration_entries(
         conn.close()
 
     return [cast(CompletedJobCalibrationEntry, dict(row)) for row in rows]
+
+
+def get_completed_job_calibration_entry(entry_id: str) -> Optional[CompletedJobCalibrationEntry]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM completed_job_calibration_entries WHERE entry_id = ?",
+            (entry_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return cast(CompletedJobCalibrationEntry, dict(row))
+
+
+_GPT_ADMIN_NOTE_TEXT_LIMITS = {
+    "note_id": 120,
+    "created_at": 80,
+    "updated_at": 80,
+    "related_entity_id": 160,
+    "title": 120,
+    "summary": 1200,
+    "recommendation": 1000,
+    "customer_message_draft": 1000,
+    "idempotency_key": 160,
+    "payload_hash": 128,
+    "server_grounding_revision": 120,
+    "caller_grounding_revision": 120,
+}
+
+
+def _optional_gpt_admin_note_text(value: Any, field_name: str) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    limit = _GPT_ADMIN_NOTE_TEXT_LIMITS[field_name]
+    if len(text) > limit:
+        raise ValueError(f"{field_name} must be {limit} characters or fewer")
+    return text
+
+
+def _normalize_gpt_admin_note_flag(value: Any) -> str:
+    text = str(value).strip().lower()
+    text = re.sub(r"[^a-z0-9_-]+", "_", text).strip("_")
+    if len(text) > 40:
+        raise ValueError("risk flag values must be 40 characters or fewer")
+    return text
+
+
+def _normalize_gpt_admin_note_risk_flags(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("risk_flags must be a list")
+
+    flags: List[str] = []
+    for item in value:
+        flag = _normalize_gpt_admin_note_flag(item)
+        if flag and flag not in flags:
+            flags.append(flag)
+        if len(flags) > 10:
+            raise ValueError("risk_flags may include at most 10 items")
+    return flags
+
+
+def _row_to_gpt_admin_note(row: sqlite3.Row) -> GptAdminNoteRecord:
+    try:
+        raw_flags = json.loads(row["risk_flags_json"]) if row["risk_flags_json"] else []
+    except (TypeError, ValueError):
+        raw_flags = []
+    risk_flags = [str(flag) for flag in raw_flags] if isinstance(raw_flags, list) else []
+
+    return {
+        "note_id": row["note_id"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "source": row["source"],
+        "related_entity_type": row["related_entity_type"],
+        "related_entity_id": row["related_entity_id"],
+        "note_type": row["note_type"],
+        "title": row["title"],
+        "summary": row["summary"],
+        "recommendation": row["recommendation"],
+        "customer_message_draft": row["customer_message_draft"],
+        "risk_flags": risk_flags,
+        "follow_up_needed": bool(row["follow_up_needed"]),
+        "customer_visible": bool(row["customer_visible"]),
+        "pricing_effect": row["pricing_effect"],
+        "review_status": row["review_status"],
+        "idempotency_key": row["idempotency_key"],
+        "payload_hash": row["payload_hash"],
+        "server_grounding_revision": row["server_grounding_revision"],
+        "caller_grounding_revision": row["caller_grounding_revision"],
+    }
+
+
+def _normalize_gpt_admin_note_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    related_entity_type = _required_enum(
+        record.get("related_entity_type"),
+        "related_entity_type",
+        ALLOWED_GPT_ADMIN_NOTE_RELATED_ENTITY_TYPES,
+    )
+    related_entity_id = _optional_gpt_admin_note_text(record.get("related_entity_id"), "related_entity_id")
+    if related_entity_type != "general" and not related_entity_id:
+        raise ValueError("related_entity_id is required unless related_entity_type is general")
+
+    return {
+        "note_id": _required_limited_text(
+            record.get("note_id"),
+            "note_id",
+            _GPT_ADMIN_NOTE_TEXT_LIMITS["note_id"],
+        ),
+        "created_at": _required_limited_text(
+            record.get("created_at"),
+            "created_at",
+            _GPT_ADMIN_NOTE_TEXT_LIMITS["created_at"],
+        ),
+        "updated_at": _optional_gpt_admin_note_text(record.get("updated_at"), "updated_at"),
+        "source": "internal_gpt",
+        "related_entity_type": related_entity_type,
+        "related_entity_id": related_entity_id,
+        "note_type": _required_enum(
+            record.get("note_type"),
+            "note_type",
+            ALLOWED_GPT_ADMIN_NOTE_TYPES,
+        ),
+        "title": _required_limited_text(
+            record.get("title"),
+            "title",
+            _GPT_ADMIN_NOTE_TEXT_LIMITS["title"],
+        ),
+        "summary": _required_limited_text(
+            record.get("summary"),
+            "summary",
+            _GPT_ADMIN_NOTE_TEXT_LIMITS["summary"],
+        ),
+        "recommendation": _optional_gpt_admin_note_text(record.get("recommendation"), "recommendation"),
+        "customer_message_draft": _optional_gpt_admin_note_text(
+            record.get("customer_message_draft"),
+            "customer_message_draft",
+        ),
+        "risk_flags": _normalize_gpt_admin_note_risk_flags(record.get("risk_flags")),
+        "follow_up_needed": _normalize_bool_int(record.get("follow_up_needed")),
+        "customer_visible": 0,
+        "pricing_effect": "none",
+        "review_status": _required_enum(
+            record.get("review_status", "open"),
+            "review_status",
+            ALLOWED_GPT_ADMIN_NOTE_REVIEW_STATUSES,
+        ),
+        "idempotency_key": _optional_gpt_admin_note_text(record.get("idempotency_key"), "idempotency_key"),
+        "payload_hash": _required_limited_text(
+            record.get("payload_hash"),
+            "payload_hash",
+            _GPT_ADMIN_NOTE_TEXT_LIMITS["payload_hash"],
+        ),
+        "server_grounding_revision": _optional_gpt_admin_note_text(
+            record.get("server_grounding_revision"),
+            "server_grounding_revision",
+        ),
+        "caller_grounding_revision": _optional_gpt_admin_note_text(
+            record.get("caller_grounding_revision"),
+            "caller_grounding_revision",
+        ),
+    }
+
+
+def save_gpt_admin_note(record: Dict[str, Any]) -> GptAdminNoteRecord:
+    normalized = _normalize_gpt_admin_note_record(record)
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO gpt_admin_notes (
+                note_id, created_at, updated_at, source, related_entity_type,
+                related_entity_id, note_type, title, summary, recommendation,
+                customer_message_draft, risk_flags_json, follow_up_needed,
+                customer_visible, pricing_effect, review_status, idempotency_key,
+                payload_hash, server_grounding_revision, caller_grounding_revision
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized["note_id"],
+                normalized["created_at"],
+                normalized["updated_at"],
+                normalized["source"],
+                normalized["related_entity_type"],
+                normalized["related_entity_id"],
+                normalized["note_type"],
+                normalized["title"],
+                normalized["summary"],
+                normalized["recommendation"],
+                normalized["customer_message_draft"],
+                json.dumps(normalized["risk_flags"], ensure_ascii=False),
+                normalized["follow_up_needed"],
+                normalized["customer_visible"],
+                normalized["pricing_effect"],
+                normalized["review_status"],
+                normalized["idempotency_key"],
+                normalized["payload_hash"],
+                normalized["server_grounding_revision"],
+                normalized["caller_grounding_revision"],
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    saved = get_gpt_admin_note(normalized["note_id"])
+    if saved is None:
+        raise RuntimeError("GPT admin note was not saved")
+    return saved
+
+
+def get_gpt_admin_note(note_id: str) -> Optional[GptAdminNoteRecord]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM gpt_admin_notes WHERE note_id = ?",
+            (note_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return _row_to_gpt_admin_note(row)
+
+
+def get_gpt_admin_note_by_idempotency_key(
+    idempotency_key: str,
+) -> Optional[GptAdminNoteRecord]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM gpt_admin_notes WHERE idempotency_key = ?",
+            (idempotency_key,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return _row_to_gpt_admin_note(row)
+
+
+def get_recent_gpt_admin_note_by_payload_hash(
+    payload_hash: str,
+    since_created_at: str,
+) -> Optional[GptAdminNoteRecord]:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM gpt_admin_notes
+            WHERE payload_hash = ?
+              AND datetime(created_at) >= datetime(?)
+            ORDER BY datetime(created_at) DESC, rowid DESC
+            LIMIT 1
+            """,
+            (payload_hash, since_created_at),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return _row_to_gpt_admin_note(row)
+
+
+def _gpt_admin_notes_limit(limit: int = 50) -> int:
+    try:
+        parsed = int(limit)
+    except (TypeError, ValueError):
+        parsed = 50
+    if parsed <= 0:
+        parsed = 50
+    return min(parsed, 100)
+
+
+def list_gpt_admin_notes(
+    limit: int = 50,
+    *,
+    related_entity_type: Optional[str] = None,
+    related_entity_id: Optional[str] = None,
+    review_status: Optional[str] = None,
+) -> List[GptAdminNoteRecord]:
+    safe_limit = _gpt_admin_notes_limit(limit)
+    clauses: List[str] = []
+    params: List[Any] = []
+
+    if related_entity_type is not None:
+        normalized_type = _required_enum(
+            related_entity_type,
+            "related_entity_type",
+            ALLOWED_GPT_ADMIN_NOTE_RELATED_ENTITY_TYPES,
+        )
+        clauses.append("related_entity_type = ?")
+        params.append(normalized_type)
+
+    if related_entity_id is not None:
+        clauses.append("related_entity_id = ?")
+        params.append(str(related_entity_id).strip())
+
+    if review_status is not None:
+        normalized_status = _required_enum(
+            review_status,
+            "review_status",
+            ALLOWED_GPT_ADMIN_NOTE_REVIEW_STATUSES,
+        )
+        clauses.append("review_status = ?")
+        params.append(normalized_status)
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(safe_limit)
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM gpt_admin_notes
+            {where_sql}
+            ORDER BY created_at DESC, rowid DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [_row_to_gpt_admin_note(row) for row in rows]
 
 
 def update_quote_admin_status(quote_id: str, admin_status: str) -> Optional[QuoteRecord]:
