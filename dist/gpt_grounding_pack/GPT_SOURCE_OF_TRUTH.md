@@ -60,7 +60,7 @@ The internal GPT Admin Notes interface is `POST /api/gpt/admin-notes`.
 - GPT should attach notes to known `quote`, `quote_request`, `job`, or `completed_job_calibration_entry` IDs when available.
 - GPT should use `related_entity_type=general` only when no specific entity ID exists.
 - GPT should use a stable `idempotency_key` for retry safety.
-- Caller grounding revision belongs in the `X-GPT-Grounding-Revision` header, not in the JSON body.
+- GPT Builder action schema does not expose caller grounding revision as an action parameter. Backend may still support grounding revision observability outside the Builder schema. Do not put caller grounding revision in the JSON body.
 - Notes must be concise and operationally useful, without unnecessary PII.
 - Notes must never include passwords, tokens, auth headers, raw uploads, base64, Drive links as authority, or full customer records.
 - The endpoint does not create quotes, jobs, bookings, schedules, payments, or customer messages.

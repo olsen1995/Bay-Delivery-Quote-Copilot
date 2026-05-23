@@ -41,7 +41,7 @@ No second pricing path is allowed.
 - Notes are internal-only, admin-visible only, advisory-only, `customer_visible=false`, and `pricing_effect=none`.
 - GPT should attach notes to known quote, quote_request, job, or completed_job_calibration_entry IDs when available; use general notes only when no entity ID exists.
 - GPT should use idempotency keys for retry safety.
-- Caller grounding revision is header-based through `X-GPT-Grounding-Revision`, not body-based.
+- GPT Builder action schema does not expose caller grounding revision as an action parameter. Backend may still support grounding revision observability outside the Builder schema. Do not put caller grounding revision in the JSON body.
 - The endpoint does not create quotes, jobs, bookings, schedules, payments, or customer messages.
 - The endpoint does not approve, reject, expire, schedule, contact, price, message, send, update payments, or alter lifecycle status.
 - The endpoint does not change quote pricing and must never override `app/quote_engine.py`.

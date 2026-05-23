@@ -16,8 +16,6 @@ paths:
       x-openai-isConsequential: false
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/GptGroundingRevisionHeader"
       requestBody:
         required: true
         content:
@@ -47,8 +45,6 @@ paths:
       x-openai-isConsequential: true
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/GptGroundingRevisionHeader"
       requestBody:
         required: true
         content:
@@ -81,15 +77,6 @@ components:
       scheme: bearer
       bearerFormat: internal-token
       description: Internal bearer token expected by the backend. Do not store token values in this schema.
-  parameters:
-    GptGroundingRevisionHeader:
-      name: X-GPT-Grounding-Revision
-      in: header
-      required: false
-      description: Optional caller-declared GPT grounding revision for backend observability. Do not include this in the JSON body.
-      schema:
-        type: string
-        maxLength: 120
   schemas:
     GptQuoteRequest:
       type: object
