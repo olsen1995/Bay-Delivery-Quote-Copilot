@@ -672,6 +672,68 @@ def test_admin_page_includes_screenshot_assistant_shell() -> None:
     assert 'No message/OCR-based intake suggestions detected.' in admin_js
 
 
+def test_desktop_admin_includes_collapsed_gpt_notes_display_only() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+
+    assert '<details id="gptAdminNotesSection" class="adminReferenceDetails gptAdminNotesSection adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">' in admin_html
+    assert '<summary>GPT Notes (Advisory)</summary>' in admin_html
+    assert "GPT-generated advisory notes." in admin_html
+    assert "Does not change pricing, status, schedule, payment, or customer messages." in admin_html
+    assert "Review before acting." in admin_html
+    assert 'id="gptAdminNotesBox"' in admin_html
+    assert "gptAdminNotesSection" in admin_css
+    assert "gptAdminNoteCard" in admin_css
+    assert 'const notes = await fetchJSON("/admin/api/gpt-notes");' in admin_js
+    assert "async function refreshGptAdminNotesBestEffort()" in admin_js
+    assert "function renderGptAdminNotes(notes)" in admin_js
+    assert "void refreshGptAdminNotesBestEffort();" in admin_js
+    assert "GPT notes could not load. Core admin data is still available." in admin_js
+    assert "No GPT advisory notes yet." in admin_js
+    for field_name in [
+        "created_at",
+        "related_entity_type",
+        "related_entity_id",
+        "note_type",
+        "title",
+        "summary",
+        "recommendation",
+        "customer_message_draft",
+        "risk_flags",
+        "follow_up_needed",
+        "review_status",
+        "server_grounding_revision",
+        "caller_grounding_revision",
+    ]:
+        assert field_name in admin_js
+
+    section_start = admin_html.index('id="gptAdminNotesSection"')
+    section_tag = admin_html[admin_html.rfind("<details", 0, section_start):admin_html.index(">", section_start)]
+    assert " open" not in section_tag
+
+    render_match = re.search(
+        r"function renderGptAdminNotes\(notes\) \{(?P<body>.*?)\n\}\n\nfunction renderGptAdminNotesError",
+        admin_js,
+        re.S,
+    )
+    assert render_match is not None
+    render_body = render_match.group("body")
+    assert "textContent" in render_body
+    assert "innerHTML" not in render_body
+    assert "insertAdjacentHTML" not in render_body
+
+    for public_or_mobile_asset in [mobile_html, mobile_js, quote_html, quote_js, index_html]:
+        assert "GPT Notes" not in public_or_mobile_asset
+        assert "/admin/api/gpt-notes" not in public_or_mobile_asset
+        assert "gptAdminNotes" not in public_or_mobile_asset
+
+
 def test_completed_job_profit_report_desktop_only_assets() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
