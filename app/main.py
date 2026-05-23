@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -62,7 +63,8 @@ from app.storage import (
     get_completed_job_calibration_entry,
     get_gpt_admin_note_by_idempotency_key,
     get_job,
-    get_recent_gpt_admin_note_by_payload_hash,
+    GptAdminNoteDuplicatePayload,
+    GptAdminNoteIdempotencyReplay,
     GptQuoteObservabilityRecord,
     get_quote_record,
     import_db_from_json,
@@ -1414,14 +1416,10 @@ async def gpt_admin_notes(request: Request, payload: GptAdminNotePayload):
         _audit_gpt_admin_note_failure("pending", "related entity not found")
         raise HTTPException(status_code=404, detail="related entity not found")
 
-    payload_hash = _gpt_admin_note_payload_hash(payload)
     duplicate_since = (
         datetime.now().astimezone() - timedelta(seconds=_GPT_ADMIN_NOTE_DUPLICATE_WINDOW_SECONDS)
     ).isoformat(timespec="seconds")
-    duplicate = get_recent_gpt_admin_note_by_payload_hash(payload_hash, duplicate_since)
-    if duplicate is not None:
-        _audit_gpt_admin_note_failure(duplicate["note_id"], "duplicate_note")
-        raise HTTPException(status_code=409, detail="duplicate_note")
+    payload_hash = _gpt_admin_note_payload_hash(payload)
 
     try:
         _enforce_gpt_admin_notes_rate_limit(request)
@@ -1446,10 +1444,18 @@ async def gpt_admin_notes(request: Request, payload: GptAdminNotePayload):
     )
 
     try:
-        note = save_gpt_admin_note(record)
+        note = save_gpt_admin_note(record, duplicate_since_created_at=duplicate_since)
+    except GptAdminNoteIdempotencyReplay as exc:
+        return _gpt_admin_note_response(exc.note, created=False)
+    except GptAdminNoteDuplicatePayload as exc:
+        _audit_gpt_admin_note_failure(exc.note["note_id"], "duplicate_note")
+        raise HTTPException(status_code=409, detail="duplicate_note")
     except ValueError as exc:
         _audit_gpt_admin_note_failure(note_id, str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
+    except sqlite3.IntegrityError:
+        _audit_gpt_admin_note_failure(note_id, "integrity_error")
+        raise HTTPException(status_code=409, detail="conflicting_note")
 
     _try_log_admin_audit(
         operator_username="internal_gpt",

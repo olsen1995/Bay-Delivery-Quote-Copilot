@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app import main as main_app
 from app import storage
 from app.main import app, clear_gpt_admin_notes_rate_limit_state
 
@@ -54,6 +55,33 @@ def _valid_payload(**overrides: Any) -> dict[str, Any]:
     }
     payload.update(overrides)
     return payload
+
+
+def _storage_note_record(**overrides: Any) -> dict[str, Any]:
+    record = {
+        "note_id": "storage-note-1",
+        "created_at": "2026-05-22T10:00:00-04:00",
+        "updated_at": None,
+        "source": "internal_gpt",
+        "related_entity_type": "general",
+        "related_entity_id": None,
+        "note_type": "missing_info",
+        "title": "Storage note",
+        "summary": "Storage note summary.",
+        "recommendation": None,
+        "customer_message_draft": None,
+        "risk_flags": [],
+        "follow_up_needed": False,
+        "customer_visible": False,
+        "pricing_effect": "none",
+        "review_status": "open",
+        "idempotency_key": "storage-note-key",
+        "payload_hash": "storage-note-hash",
+        "server_grounding_revision": None,
+        "caller_grounding_revision": None,
+    }
+    record.update(overrides)
+    return record
 
 
 def _audit_items() -> list[dict[str, Any]]:
@@ -386,6 +414,70 @@ def test_gpt_admin_notes_idempotency_key_returns_existing_without_second_row(
     assert _count_notes() == 1
 
 
+def test_gpt_admin_notes_post_handles_idempotency_insert_race(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _valid_payload(idempotency_key="race-idempotency-key")
+    created = client.post("/api/gpt/admin-notes", headers=_gpt_auth(), json=payload)
+    assert created.status_code == 200
+
+    existing = storage.get_gpt_admin_note_by_idempotency_key("race-idempotency-key")
+    assert existing is not None
+
+    monkeypatch.setattr(main_app, "get_gpt_admin_note_by_idempotency_key", lambda _: None)
+
+    def raise_idempotency_replay(*args: Any, **kwargs: Any) -> None:
+        raise storage.GptAdminNoteIdempotencyReplay(existing)
+
+    monkeypatch.setattr(main_app, "save_gpt_admin_note", raise_idempotency_replay)
+
+    replayed = client.post(
+        "/api/gpt/admin-notes",
+        headers=_gpt_auth(),
+        json=_valid_payload(
+            idempotency_key="race-idempotency-key",
+            title="Race replay",
+        ),
+    )
+
+    assert replayed.status_code == 200
+    assert replayed.json() == {"note_id": created.json()["note_id"], "created": False}
+    assert _count_notes() == 1
+
+
+def test_save_gpt_admin_note_converts_idempotency_integrity_race(
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    saved = storage.save_gpt_admin_note(_storage_note_record())
+    original_lookup = storage._get_gpt_admin_note_by_idempotency_key_conn
+    call_count = 0
+
+    def miss_then_find(conn: sqlite3.Connection, idempotency_key: str):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return None
+        return original_lookup(conn, idempotency_key)
+
+    monkeypatch.setattr(storage, "_get_gpt_admin_note_by_idempotency_key_conn", miss_then_find)
+
+    with pytest.raises(storage.GptAdminNoteIdempotencyReplay) as exc_info:
+        storage.save_gpt_admin_note(
+            _storage_note_record(
+                note_id="storage-note-2",
+                title="Second storage note",
+                payload_hash="different-storage-note-hash",
+            ),
+            duplicate_since_created_at="2026-05-22T09:00:00-04:00",
+        )
+
+    assert call_count == 2
+    assert exc_info.value.note["note_id"] == saved["note_id"]
+    assert _count_notes() == 1
+
+
 def test_gpt_admin_notes_exact_duplicate_payload_without_key_returns_409(
     client: TestClient,
 ) -> None:
@@ -405,6 +497,28 @@ def test_gpt_admin_notes_exact_duplicate_payload_without_key_returns_409(
         and item["error_summary"] == "duplicate_note"
         for item in _audit_items()
     )
+
+
+def test_save_gpt_admin_note_checks_duplicate_payload_inside_insert_transaction(
+    isolated_db: Path,
+) -> None:
+    saved = storage.save_gpt_admin_note(
+        _storage_note_record(idempotency_key=None),
+        duplicate_since_created_at="2026-05-22T09:00:00-04:00",
+    )
+
+    with pytest.raises(storage.GptAdminNoteDuplicatePayload) as exc_info:
+        storage.save_gpt_admin_note(
+            _storage_note_record(
+                note_id="storage-note-2",
+                title="Duplicate storage note",
+                idempotency_key=None,
+            ),
+            duplicate_since_created_at="2026-05-22T09:00:00-04:00",
+        )
+
+    assert exc_info.value.note["note_id"] == saved["note_id"]
+    assert _count_notes() == 1
 
 
 def test_gpt_admin_notes_rate_limit_allows_five_successful_creates_per_minute(
@@ -475,6 +589,36 @@ def test_admin_gpt_notes_get_requires_admin_auth_and_filters_newest_first(
     assert len(filtered_items) == 1
     assert filtered_items[0]["related_entity_type"] == "job"
     assert filtered_items[0]["related_entity_id"] == ids["job"]
+
+
+def test_list_gpt_admin_notes_orders_by_normalized_datetime_with_offsets(
+    isolated_db: Path,
+) -> None:
+    storage.save_gpt_admin_note(
+        _storage_note_record(
+            note_id="newer-normalized",
+            created_at="2026-05-22T10:30:00-04:00",
+            title="Newer normalized",
+            idempotency_key="newer-normalized",
+            payload_hash="newer-normalized",
+        )
+    )
+    storage.save_gpt_admin_note(
+        _storage_note_record(
+            note_id="older-lexical",
+            created_at="2026-05-22T15:00:00+02:00",
+            title="Older lexical",
+            idempotency_key="older-lexical",
+            payload_hash="older-lexical",
+        )
+    )
+
+    items = storage.list_gpt_admin_notes(limit=10)
+
+    assert [item["note_id"] for item in items] == [
+        "newer-normalized",
+        "older-lexical",
+    ]
 
 
 def test_gpt_admin_notes_survives_backup_export_import_round_trip(

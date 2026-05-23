@@ -213,6 +213,19 @@ class GptAdminNoteRecord(TypedDict):
     caller_grounding_revision: Optional[str]
 
 
+class GptAdminNoteConflictError(Exception):
+    def __init__(self, note: GptAdminNoteRecord) -> None:
+        self.note = note
+
+
+class GptAdminNoteIdempotencyReplay(GptAdminNoteConflictError):
+    pass
+
+
+class GptAdminNoteDuplicatePayload(GptAdminNoteConflictError):
+    pass
+
+
 class QuoteRecord(TypedDict):
     quote_id: str
     created_at: str
@@ -2083,44 +2096,80 @@ def _normalize_gpt_admin_note_record(record: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def save_gpt_admin_note(record: Dict[str, Any]) -> GptAdminNoteRecord:
+def save_gpt_admin_note(
+    record: Dict[str, Any],
+    *,
+    duplicate_since_created_at: Optional[str] = None,
+) -> GptAdminNoteRecord:
     normalized = _normalize_gpt_admin_note_record(record)
     conn = _connect()
     try:
-        conn.execute(
-            """
-            INSERT INTO gpt_admin_notes (
-                note_id, created_at, updated_at, source, related_entity_type,
-                related_entity_id, note_type, title, summary, recommendation,
-                customer_message_draft, risk_flags_json, follow_up_needed,
-                customer_visible, pricing_effect, review_status, idempotency_key,
-                payload_hash, server_grounding_revision, caller_grounding_revision
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                normalized["note_id"],
-                normalized["created_at"],
-                normalized["updated_at"],
-                normalized["source"],
-                normalized["related_entity_type"],
-                normalized["related_entity_id"],
-                normalized["note_type"],
-                normalized["title"],
-                normalized["summary"],
-                normalized["recommendation"],
-                normalized["customer_message_draft"],
-                json.dumps(normalized["risk_flags"], ensure_ascii=False),
-                normalized["follow_up_needed"],
-                normalized["customer_visible"],
-                normalized["pricing_effect"],
-                normalized["review_status"],
+        conn.execute("BEGIN IMMEDIATE")
+        if normalized["idempotency_key"]:
+            existing = _get_gpt_admin_note_by_idempotency_key_conn(
+                conn,
                 normalized["idempotency_key"],
+            )
+            if existing is not None:
+                conn.rollback()
+                raise GptAdminNoteIdempotencyReplay(existing)
+
+        if duplicate_since_created_at is not None:
+            duplicate = _get_recent_gpt_admin_note_by_payload_hash_conn(
+                conn,
                 normalized["payload_hash"],
-                normalized["server_grounding_revision"],
-                normalized["caller_grounding_revision"],
-            ),
-        )
+                duplicate_since_created_at,
+            )
+            if duplicate is not None:
+                conn.rollback()
+                raise GptAdminNoteDuplicatePayload(duplicate)
+
+        try:
+            conn.execute(
+                """
+                INSERT INTO gpt_admin_notes (
+                    note_id, created_at, updated_at, source, related_entity_type,
+                    related_entity_id, note_type, title, summary, recommendation,
+                    customer_message_draft, risk_flags_json, follow_up_needed,
+                    customer_visible, pricing_effect, review_status, idempotency_key,
+                    payload_hash, server_grounding_revision, caller_grounding_revision
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    normalized["note_id"],
+                    normalized["created_at"],
+                    normalized["updated_at"],
+                    normalized["source"],
+                    normalized["related_entity_type"],
+                    normalized["related_entity_id"],
+                    normalized["note_type"],
+                    normalized["title"],
+                    normalized["summary"],
+                    normalized["recommendation"],
+                    normalized["customer_message_draft"],
+                    json.dumps(normalized["risk_flags"], ensure_ascii=False),
+                    normalized["follow_up_needed"],
+                    normalized["customer_visible"],
+                    normalized["pricing_effect"],
+                    normalized["review_status"],
+                    normalized["idempotency_key"],
+                    normalized["payload_hash"],
+                    normalized["server_grounding_revision"],
+                    normalized["caller_grounding_revision"],
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            existing = None
+            if normalized["idempotency_key"]:
+                existing = _get_gpt_admin_note_by_idempotency_key_conn(
+                    conn,
+                    normalized["idempotency_key"],
+                )
+            conn.rollback()
+            if existing is not None:
+                raise GptAdminNoteIdempotencyReplay(existing) from exc
+            raise
         conn.commit()
     finally:
         conn.close()
@@ -2129,6 +2178,40 @@ def save_gpt_admin_note(record: Dict[str, Any]) -> GptAdminNoteRecord:
     if saved is None:
         raise RuntimeError("GPT admin note was not saved")
     return saved
+
+
+def _get_gpt_admin_note_by_idempotency_key_conn(
+    conn: sqlite3.Connection,
+    idempotency_key: str,
+) -> Optional[GptAdminNoteRecord]:
+    row = conn.execute(
+        "SELECT * FROM gpt_admin_notes WHERE idempotency_key = ?",
+        (idempotency_key,),
+    ).fetchone()
+    if not row:
+        return None
+    return _row_to_gpt_admin_note(row)
+
+
+def _get_recent_gpt_admin_note_by_payload_hash_conn(
+    conn: sqlite3.Connection,
+    payload_hash: str,
+    since_created_at: str,
+) -> Optional[GptAdminNoteRecord]:
+    row = conn.execute(
+        """
+        SELECT *
+        FROM gpt_admin_notes
+        WHERE payload_hash = ?
+          AND julianday(created_at) >= julianday(?)
+        ORDER BY julianday(created_at) DESC, rowid DESC
+        LIMIT 1
+        """,
+        (payload_hash, since_created_at),
+    ).fetchone()
+    if not row:
+        return None
+    return _row_to_gpt_admin_note(row)
 
 
 def get_gpt_admin_note(note_id: str) -> Optional[GptAdminNoteRecord]:
@@ -2151,16 +2234,9 @@ def get_gpt_admin_note_by_idempotency_key(
 ) -> Optional[GptAdminNoteRecord]:
     conn = _connect()
     try:
-        row = conn.execute(
-            "SELECT * FROM gpt_admin_notes WHERE idempotency_key = ?",
-            (idempotency_key,),
-        ).fetchone()
+        return _get_gpt_admin_note_by_idempotency_key_conn(conn, idempotency_key)
     finally:
         conn.close()
-
-    if not row:
-        return None
-    return _row_to_gpt_admin_note(row)
 
 
 def get_recent_gpt_admin_note_by_payload_hash(
@@ -2169,23 +2245,13 @@ def get_recent_gpt_admin_note_by_payload_hash(
 ) -> Optional[GptAdminNoteRecord]:
     conn = _connect()
     try:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM gpt_admin_notes
-            WHERE payload_hash = ?
-              AND datetime(created_at) >= datetime(?)
-            ORDER BY datetime(created_at) DESC, rowid DESC
-            LIMIT 1
-            """,
-            (payload_hash, since_created_at),
-        ).fetchone()
+        return _get_recent_gpt_admin_note_by_payload_hash_conn(
+            conn,
+            payload_hash,
+            since_created_at,
+        )
     finally:
         conn.close()
-
-    if not row:
-        return None
-    return _row_to_gpt_admin_note(row)
 
 
 def _gpt_admin_notes_limit(limit: int = 50) -> int:
@@ -2240,7 +2306,7 @@ def list_gpt_admin_notes(
             SELECT *
             FROM gpt_admin_notes
             {where_sql}
-            ORDER BY created_at DESC, rowid DESC
+            ORDER BY julianday(created_at) DESC, rowid DESC
             LIMIT ?
             """,
             params,
