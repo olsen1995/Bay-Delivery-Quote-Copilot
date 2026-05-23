@@ -114,14 +114,14 @@ Reference: `docs/gpt/GPT_REFRESH_WORKFLOW.md`, `docs/gpt/GPT_KNOWLEDGE_PACK.md`.
 
 ## 6) GPT Acceptance Verification (Fresh Chat Required)
 
-After any grounding refresh, run the full A1–A10 acceptance set in a **fresh chat**:
+After any grounding refresh, run the full A1-A19 acceptance set in a **fresh chat**:
 
 - `docs/gpt/GPT_ACCEPTANCE_TESTS.md`
 
 Record outcome as:
 
-- Pass: all A1–A10 aligned with expected responses.
-- Fail: record failed IDs, fix grounding gap, refresh again, then rerun all A1–A10.
+- Pass: all A1-A19 aligned with expected responses.
+- Fail: record failed IDs, fix grounding gap, refresh again, then rerun all A1-A19.
 
 ---
 
@@ -136,7 +136,7 @@ Create or update an internal release verification note/log entry with:
   - env/deployment-sensitive checks
   - live-safe smoke
   - GPT refresh (if required)
-  - GPT acceptance A1–A10 (if refresh performed)
+  - GPT acceptance A1-A19 (if refresh performed)
 - Final status: PASS / FAIL
 - Follow-up issue/ticket link if anything failed
 

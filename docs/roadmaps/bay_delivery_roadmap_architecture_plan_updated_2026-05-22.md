@@ -1,7 +1,7 @@
 # Bay Delivery Quote Copilot - Roadmap & Architecture Plan
 
 Prepared: May 10, 2026
-Updated: May 22, 2026
+Updated: May 23, 2026
 Prepared for: Austin / Bay Delivery
 
 ## Executive Principle
@@ -10,32 +10,39 @@ Customer side stays simple. Admin side tells Austin and Dan what needs attention
 
 The system should stay boring, stable, and profitable. New features should make Bay Delivery easier to operate, not create a second pricing brain, a public chatbot, or a fragile CRM clone.
 
-## May 22 Update Summary
+## May 23 Update Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #303 and adds a future GPT-to-admin logging concept.
+This update refreshes the May 10 roadmap with actual completed work through PR #307 and the manual GPT Builder/live action verification that followed.
 
 Key updates:
 
 - Marked completed admin, quote-flow, risk, reporting, scheduling, cleanup, notification, security, and docs work.
 - Added current verified production state after redeploy and Production Live-Safe Smoke.
 - Added real completed-job calibration evidence already entered into admin.
-- Added **GPT Admin Job Logs / GPT Notes** as a future internal-only feature.
-- Re-ranked the next practical tasks: production observability first, then GPT admin logging plan, then later pricing/category improvements.
+- Marked the GPT Admin Notes pipeline complete: backend/storage/API, desktop admin display, GPT Action schema/docs/grounding, Builder compatibility cleanup, Custom GPT refresh, `getGptQuote` action retest, and live fake `createGptAdminNote` action/admin display verification.
+- Re-ranked the next practical tasks: launch-readiness/current-state audit after this roadmap sync first, then booking notification failure/skipped-send visibility planning as a later candidate, then later pricing/category improvements.
 - Preserved all hard boundaries: one pricing engine, SQLite as source of truth, admin-only internal risk, no customer-facing GPT pricing path.
 
-## Current Verified Production State
+## Current Verified Repo / GPT State
 
-As of May 22, 2026:
+As of May 23, 2026:
 
 | Area | Status |
 | --- | --- |
-| Render deploy | Current after redeploy |
-| Live health | `ok=true`, `version=0.11.0`, `drive_configured=true`, `commit=65187325cbdb` |
-| Production smoke | Passed |
-| Smoke run | `https://github.com/olsen1995/Bay-Delivery-Quote-Copilot/actions/runs/26292365349` |
-| Smoke head SHA | `65187325cbdbc21897579078207ea2adba4de46b` |
-| Live visual audit | Passed with no P1/P2 blockers |
-| Public quote copy | Current, old confusing labels removed |
+| Main verification | Verified through PR #307 |
+| Latest verified main commit | `83f58e5 create GPT action builder compatibility cleanup (#307)` |
+| Version parity | Passed: `0.11.0` |
+| GPT grounding pack parity | Passed |
+| Compileall | Passed |
+| Focused GPT/admin/static tests | `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed; `tests/test_static_assets.py` 36 passed |
+| Full pytest | Passed: 711 |
+| Protected no-go diff after PR #307 | No output |
+| Custom GPT Knowledge | Updated from `dist/gpt_grounding_pack` after PR #307 |
+| Custom GPT Actions schema | Updated from `docs/gpt/GPT_ACTIONS_OPENAPI.yaml` after PR #307 |
+| GPT Builder | Updated and saved |
+| Manual `getGptQuote` action test | Passed after Builder schema cleanup |
+| Manual live fake admin-note action test | Passed through Custom GPT -> Render endpoint -> SQLite -> desktop admin GPT Notes display |
+| Observed fake GPT Admin Note id | `f39e3b09-ff31-4449-a431-dadda7daab6b` |
 | Manual completed-job calibration entries | Entered |
 | Current blockers | No known P1/P2 blockers |
 
@@ -81,9 +88,9 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 | Completed Job Reporting | Learn from actual profit, cost, and margin data | Evidence for owner review and future pricing PRs. | Complete v1 |
 | Manual Completed Job Calibration Log | Capture real jobs that did not originate from the public quote flow | Internal-only evidence. No pricing effect. | Complete and in use |
 | Booking Notification Alerts | Internal notification infrastructure for submitted booking requests | Disabled until launch authorization. No customer-facing confirmation. | Installed, disabled |
-| Production Observability | Monitor uptime, deploy drift, customer-page health, errors, and launch readiness | Free-first, privacy-safe, no admin/customer PII leakage. | Not completed; recommended next plan |
-| Internal GPT Layer | Quote support, summarization, draft help, risk explanation | Internal-only and recommendation-only. Never pricing authority. | Partial: quote action exists |
-| GPT Admin Job Logs / Notes | Let GPT create admin-visible internal notes for review | Future; must be consequential, audit-logged, admin-only, and pricing_effect=none. | Not completed; planned concept |
+| Production Observability | Monitor uptime, deploy drift, customer-page health, errors, and launch readiness | Free-first, privacy-safe, no admin/customer PII leakage. | Not completed; later plan candidate |
+| Internal GPT Layer | Quote support, summarization, draft help, risk explanation, and bounded advisory admin notes | Internal-only and recommendation-only. Never pricing authority. | Complete current v1: quote action and GPT Admin Notes action verified |
+| GPT Admin Notes | Let GPT create admin-visible internal advisory notes for Austin/Dan review | Consequential, audit-logged, admin-only, `customer_visible=false`, and `pricing_effect=none`. | Complete current v1 |
 | Photo Evidence / Photo Assistant | Attach photos and use advisory image notes later | Do not let image AI auto-price or override quote engine. | Future |
 
 ## Completed Work Since May 10
@@ -117,6 +124,12 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 | PR #301 - create idna security lock refresh | Complete | Dependency security lock refresh. |
 | PR #302 - fix GPT grounding parity after skill docs | Complete | Generated grounding pack refreshed after docs drift. |
 | PR #303 - create Codex review habit guidance | Complete | Repo-scoped Codex safety skill guidance expanded. |
+| PR #304 - create GPT admin notes storage and API | Complete | Internal bearer-protected GPT Admin Notes POST endpoint, persisted storage, admin GET endpoint, validation, idempotency/retry safety, duplicate handling, audit logging, backup/export/import coverage, Starlette security fix, and tests. |
+| PR #305 - create admin GPT notes display | Complete | Collapsed read-only desktop admin GPT Notes (Advisory) display with safe DOM text rendering, fetch/display handling, empty/error states, desktop-only exposure, and static tests. |
+| PR #306 - create GPT admin notes action schema refresh | Complete | Added `createGptAdminNote` to GPT Action schema/docs/grounding, marked `x-openai-isConsequential: true`, and regenerated the grounding pack. |
+| PR #307 - create GPT action builder compatibility cleanup | Complete | Removed unsupported `X-GPT-Grounding-Revision` action parameter from the Builder-facing OpenAPI schema, updated docs wording, and regenerated the grounding pack. |
+| Manual Custom GPT Builder refresh after PR #307 | Complete | Knowledge files and Actions schema were updated from repo-generated sources; Builder was saved. |
+| Manual GPT action verification after PR #307 | Complete | `getGptQuote` passed after Builder schema cleanup, and a live fake `createGptAdminNote` action wrote through Render to SQLite and appeared in desktop admin GPT Notes (Advisory). |
 | Production redeploy + live-safe smoke | Complete | Smoke run passed at head SHA `65187325cbdbc21897579078207ea2adba4de46b`. |
 | Live visual audit | Complete | No P1/P2 issues; only minor P3 polish. |
 | Manual calibration entries | Complete | $1,200 old shed removal and $600 backyard tarp/fence teardown entered. |
@@ -140,7 +153,7 @@ These entries are now useful evidence for future pricing review, but they do not
 | Microsoft Clarity public-page UX tracking | Not implemented | Future public-pages-only, admin-excluded setup. |
 | Google Search Console | Not confirmed complete | External setup; repo change only if verification/sitemap needs it. |
 | Customer launch SMTP configuration | Not authorized/configured | Keep env vars unset until launch authorization and controlled test. |
-| GPT Admin Job Logs / GPT Notes | Not implemented | Plan-only first; future admin-only auditable write path. |
+| Booking notification failure/skipped-send admin visibility | Not implemented | Later candidate after launch-readiness/current-state audit; plan first before admin/runtime work. |
 | Internal customer notes | Not implemented | Future admin-only feature. |
 | Job difficulty score | Not implemented | Future risk/triage feature. |
 | Full missing-info detector | Not complete | Future admin guidance feature. |
@@ -167,12 +180,14 @@ These entries are now useful evidence for future pricing review, but they do not
 | 7 | Scheduling Fields + Accepted Not Booked Queue | Track requested/confirmed scheduling context and surface accepted-not-booked work. | Complete v1 |
 | 8 | Lead Source + Repeat Customer Tracking | Capture lead source and show customer history in admin. | Complete no-schema v1 |
 | 9 | Manual Completed Job Calibration Log | Capture real non-public-quote completed jobs for owner review. | Complete and in use |
-| 10 | Production Observability and Launch Monitoring | Better uptime, error, UX, search, and backup visibility. | Recommended next plan |
-| 11 | GPT Admin Job Logs / Notes | Let GPT send internal admin-visible notes/logs for review. | Future; plan-only first |
-| 12 | Job Closeout + Internal Notes + Difficulty Scoring | More complete post-job and customer history intelligence. | Future |
-| 13 | Pricing PRs by Service Category | Deliberate category pricing changes after evidence review. | Future/deferred |
-| 14 | Photo Evidence / Photo Assistant | Advisory image notes; no auto-pricing. | Future/deferred |
-| 15 | Customer-Facing GPT / SMS / Auto Scheduling | Customer automation layer. | Future/high-risk; defer |
+| 10 | GPT Admin Notes | Let GPT send internal admin-visible advisory notes for review. | Complete current v1 |
+| 11 | Launch-Readiness / Current-State Audit | Re-check repo, GPT Builder, Render/live state, docs parity, and launch blockers after this roadmap sync. | Recommended next task |
+| 12 | Production Observability and Launch Monitoring | Better uptime, error, UX, search, and backup visibility. | Later plan candidate |
+| 13 | Booking Notification Failure Visibility | Show failed/skipped booking notification attempts clearly in desktop admin before launch. | Later plan candidate |
+| 14 | Job Closeout + Internal Notes + Difficulty Scoring | More complete post-job and customer history intelligence. | Future |
+| 15 | Pricing PRs by Service Category | Deliberate category pricing changes after evidence review. | Future/deferred |
+| 16 | Photo Evidence / Photo Assistant | Advisory image notes; no auto-pricing. | Future/deferred |
+| 17 | Customer-Facing GPT / SMS / Auto Scheduling | Customer automation layer. | Future/high-risk; defer |
 
 ## Customer Flow Design
 
@@ -215,17 +230,17 @@ Daily Ops Board cards:
 - Owner Review
 - Stale Quotes
 
-## GPT Admin Job Logs / GPT Notes - Proposed Future Feature
+## GPT Admin Notes - Completed Current v1
 
 ### Goal
 
-Let the internal Bay Delivery GPT send structured notes into the admin system for Austin/Dan to review.
+Let the internal Bay Delivery GPT send structured advisory notes into the admin system for Austin/Dan to review.
 
 This should help capture GPT observations without giving GPT authority over pricing, scheduling, messages, or job status.
 
-### Safe Version
+### Completed Safe Version
 
-The safe v1 is an internal-only, admin-visible, audit-logged note system.
+The completed v1 is an internal-only, admin-visible, audit-logged note system.
 
 GPT may create logs such as:
 
@@ -249,79 +264,43 @@ GPT must not directly:
 - expose internal risk/profit/margin data to customers
 - create a second pricing path
 
-### Proposed Data Shape
+### Completed Data/API Shape
 
-Possible table name:
-
-```text
-gpt_admin_logs
-```
-
-Possible fields:
-
-| Field | Purpose |
-| --- | --- |
-| `log_id` | Unique log id |
-| `created_at` | Timestamp |
-| `source` | `internal_gpt` |
-| `related_entity_type` | `quote`, `quote_request`, `job`, `manual_calibration`, or `general` |
-| `related_entity_id` | Optional id for the related entity |
-| `title` | Short admin-facing title |
-| `summary` | Main log body |
-| `recommendation` | Optional suggested next step |
-| `risk_flags` | Optional internal risk labels |
-| `follow_up_needed` | Boolean advisory flag |
-| `customer_visible` | Hardcoded false |
-| `pricing_effect` | Hardcoded `none` |
-| `created_by` | `internal_gpt` or operator source |
-
-### Proposed API Shape
-
-Future endpoint options:
+Completed table:
 
 ```text
-POST /api/gpt/admin-log
-GET /admin/api/gpt-logs
+gpt_admin_notes
 ```
 
-Recommendation:
+Completed interfaces:
 
-- `POST /api/gpt/admin-log` should use the internal GPT bearer token.
-- It should be marked as consequential because it writes production admin data.
-- It should validate allowed entity types and max lengths.
-- It should rate-limit or otherwise prevent spam.
-- It should audit successful and failed attempts.
-- It should not accept customer-visible logs.
-- It should not accept pricing-effect values other than `none`.
+- Internal GPT write action: `POST /api/gpt/admin-notes`, bearer-token protected by `GPT_INTERNAL_API_TOKEN`.
+- Admin read path: `GET /admin/api/gpt-notes`, admin-auth protected.
+- GPT Action operation: `createGptAdminNote`.
+- Action is marked consequential because it writes persisted production admin data.
+- Notes are advisory-only, internal-only, admin-visible only, `customer_visible=false`, and `pricing_effect=none`.
+- Backend validation, idempotency/retry safety, duplicate handling, rate limiting, audit logging, backup/export/import coverage, and tests are complete.
+- GPT Builder action schema no longer exposes unsupported caller grounding revision as an action parameter.
+- Desktop admin shows a collapsed read-only `GPT Notes (Advisory)` section with safe DOM text rendering, empty/error states, and no mobile/customer exposure.
 
-### Proposed Admin UI
+### Manual Verification Completed
 
-Recommended v1 surface:
-
-- Desktop admin only.
-- Collapsed section: `GPT Notes / GPT Job Logs`.
-- Optional detail placement later on quote/job detail views.
-- Do not add to mobile admin v1 unless there is a strong field-use reason.
-- Clearly label every note as GPT-generated and advisory.
-
-### Recommended PR Breakdown
-
-| Order | PR Title | Scope |
-| --- | --- | --- |
-| 1 | create GPT admin job log plan | Docs/plan only; no implementation. |
-| 2 | create GPT admin log storage and API | Add table, POST endpoint, validation, auth, audit, tests. |
-| 3 | create admin GPT notes display | Desktop-admin read-only display. No mobile/customer exposure. |
-| 4 | create GPT admin log action schema refresh | Update GPT OpenAPI schema, grounding docs, and exported pack after backend is live. |
+- Custom GPT Knowledge files were updated from `dist/gpt_grounding_pack` after PR #307.
+- Custom GPT Actions schema was updated from `docs/gpt/GPT_ACTIONS_OPENAPI.yaml` after PR #307.
+- GPT Builder was updated and saved.
+- Manual `getGptQuote` action test passed after Builder schema cleanup.
+- Manual live fake `createGptAdminNote` action test passed through Custom GPT -> Render endpoint -> SQLite -> desktop admin GPT Notes display.
+- Observed fake note id: `f39e3b09-ff31-4449-a431-dadda7daab6b`.
 
 ### Risk Review
 
 | Level | Risk |
 | --- | --- |
 | P1 | GPT accidentally mutates pricing, lifecycle status, scheduling, customer messages, or exposes internal notes publicly. Must be structurally prevented. |
-| P2 | GPT logs too much sensitive PII or creates noisy/spammy admin clutter. Needs validation, length caps, and clear UI separation. |
+| P2 | GPT notes could become noisy or include unnecessary PII. Existing validation, length caps, and advisory UI separation reduce this risk; operator review still matters. |
 | P3 | Admin UI could become crowded. Keep logs collapsed and clearly advisory. |
 
-## Production Observability and Launch Monitoring - Recommended Next Plan
+## Production Observability and Launch Monitoring - Later Plan Candidate
 
 Before adding more feature work, plan production visibility.
 
@@ -360,7 +339,7 @@ Monitoring boundaries:
 | Item | Why |
 | --- | --- |
 | Production observability plan | Prevent deploy drift, missed downtime, page issues, and invisible backend failures. |
-| GPT admin job logs / notes | Preserve useful GPT observations inside admin without giving GPT authority. |
+| Booking notification failure/skipped-send visibility | Help Austin/Dan see failed or skipped internal booking alert attempts before launch. |
 | Internal customer notes | Track good customer, slow payer, no-show risk, recurring underestimation patterns. |
 | Job difficulty score | Internal 1-5 triage from easy curbside through manual-review risk. |
 | Missing-info detector | Show exactly what to ask for: photos, item count, access, disposal type, preferred date. |
@@ -405,46 +384,47 @@ Pricing changes should wait until admin risk summaries, completed-job reporting,
 ### Recommended next task
 
 ```text
-create production observability and launch monitoring plan
+launch-readiness/current-state audit after roadmap sync
 ```
 
 Mode:
 
 ```text
-Plan-only. Do not implement.
+Read-only audit. Do not mutate production data.
 ```
 
 Why this comes next:
 
-- Production is now deployed and smoke-tested.
-- Live visual audit found no P1/P2 issues.
-- Manual calibration entries are already entered.
-- Monitoring protects production before adding more capabilities.
-- Better Stack, Sentry, Clarity, Search Console, and backup monitoring need privacy and scope decisions before any repo changes.
+- Main is verified through PR #307, and GPT Builder/live action verification has completed.
+- Roadmap/current-state docs need to be treated as freshly synced before the next launch decision.
+- A launch-readiness pass should re-check repo state, GPT grounding/current-state parity, live Render health/version/commit, public quote/admin entry points, and any remaining launch blockers before new feature work.
+- This protects production and avoids choosing the next feature from stale docs.
 
-### Recommended next GPT/repo task after observability planning
+### Recommended next feature candidate after launch-readiness audit
 
 ```text
-create GPT admin job log plan
+show booking notification failures/skipped sends in desktop admin before launch
 ```
 
 Mode:
 
 ```text
-Plan-only. Do not implement.
+Plan first. Implement only as a narrow follow-up PR if launch-readiness audit is clear.
 ```
 
 Why:
 
-- GPT admin logs are useful, but they touch schema/storage, auth, GPT Actions, admin UI, audit logging, privacy, and production data.
-- It should be designed before any implementation PR.
+- Booking notification infrastructure exists but remains disabled until launch authorization.
+- Failed/skipped notification attempts are tracked internally but are not yet operator-visible in desktop admin.
+- This is useful before launch, but it should not displace the immediate launch-readiness/current-state audit.
 
 ## Codex / Agent Usage Rules
 
 | Task Type | Tool | Plan-only? | Pursue Goal / Goal Mode |
 | --- | --- | ---: | ---: |
+| Launch-readiness/current-state audit | Codex or VS Code Agent | Read-only | Off |
+| Booking notification failure visibility plan | Codex | Yes | Off |
 | Production observability plan | Codex | Yes | Off |
-| GPT admin job log plan | Codex | Yes | Off |
 | Read-only live visual audit | VS Code Repo Maintainer | No implementation | Off |
 | Narrow UI/copy/static PR | Codex | Brief plan then implement | On if scope is narrow |
 | Review-comment fix | Codex | Brief plan then implement | On |
@@ -454,18 +434,38 @@ Why:
 
 | Order | PR Title | Scope | Status |
 | --- | --- | --- | --- |
-| 1 | create production observability and launch monitoring plan | Plan free-first production monitoring, error tracking, UX tracking, search visibility, and backup monitoring. | Next recommended |
-| 2 | create GPT admin job log plan | Plan internal GPT-to-admin notes/logging without implementation. | After observability plan or if GPT workflow is prioritized |
-| 3 | create privacy safe Sentry integration | Backend error tracking with PII-safe config. | Future |
-| 4 | create public page analytics boundary | Optional Clarity/Search Console/public-page tracking plan or implementation. | Future |
-| 5 | create GPT admin log storage and API | Add internal-only GPT note write path with audit logging. | Future, only after plan approval |
-| 6 | create admin GPT notes display | Desktop-admin display for GPT-generated advisory notes. | Future |
-| 7 | create GPT admin log action schema refresh | Update GPT Action schema and grounding after backend support is live. | Future |
-| 8 | create job closeout checklist improvements | Improve post-job costing/evidence capture. | Future |
-| 9 | create pricing readiness review | Review completed-job/manual calibration evidence before category pricing PRs. | Future |
-| 10 | create demolition pricing safeguards | First category-specific pricing PR, if evidence supports it. | Future/deferred |
+| 1 | create launch readiness current state audit | Read-only verification of repo, GPT Builder/live action state, Render health/version/commit, public quote/admin shells, docs parity, and launch blockers. | Next recommended |
+| 2 | create booking notification failure visibility plan | Plan desktop-admin visibility for failed/skipped notification attempts before launch. | Later candidate after audit |
+| 3 | create production observability and launch monitoring plan | Plan free-first production monitoring, error tracking, UX tracking, search visibility, and backup monitoring. | Future |
+| 4 | create privacy safe Sentry integration | Backend error tracking with PII-safe config. | Future |
+| 5 | create public page analytics boundary | Optional Clarity/Search Console/public-page tracking plan or implementation. | Future |
+| 6 | create job closeout checklist improvements | Improve post-job costing/evidence capture. | Future |
+| 7 | create pricing readiness review | Review completed-job/manual calibration evidence before category pricing PRs. | Future |
+| 8 | create demolition pricing safeguards | First category-specific pricing PR, if evidence supports it. | Future/deferred |
 
-## Codex Prompt Seed - Production Observability Plan
+## Codex Prompt Seed - Launch-Readiness / Current-State Audit
+
+```text
+REASONING:
+High
+
+MODE:
+Read-only audit. Do not modify files. Do not create a branch. Do not open a PR. Do not mutate production data.
+
+TASK:
+Run a launch-readiness/current-state audit for Bay Delivery Quote Copilot after the roadmap/current-state docs sync.
+
+GOAL:
+Verify current repo/main state, docs/GPT grounding parity, Custom GPT Builder/action state from available evidence, Render live health/version/commit, public quote/admin entry points, and remaining launch blockers before choosing any new feature work.
+
+BOUNDARIES:
+No pricing changes. No customer quote flow changes. No admin behavior changes. No schema/storage changes. No Render/workflow/requirements/VERSION changes. Do not submit live quote forms, create bookings, write GPT notes, send notifications, clean data, or trigger customer-facing actions.
+
+FINAL REPORT:
+Return verified repo commit/version, validation results, GPT grounding/current-state status, live Render health/version/commit status, public/admin page audit results, protected no-go result, P1/P2/P3 launch blockers, and the next recommended task.
+```
+
+## Codex Prompt Seed - Booking Notification Failure Visibility Plan
 
 ```text
 REASONING:
@@ -475,38 +475,16 @@ MODE:
 Plan-only. Do not implement. Do not modify files. Do not create a branch. Do not open a PR.
 
 TASK:
-Create a Production Observability and Launch Monitoring Plan for Bay Delivery Quote Copilot.
+Plan desktop-admin visibility for booking notification failed/skipped sends before launch.
 
 GOAL:
-Plan the safest free-first monitoring setup for launch: Better Stack, Sentry, Microsoft Clarity, Google Search Console, existing GitHub smoke tests, Render logs, and future backup freshness visibility.
+Design the smallest operator-visible way to show booking notification attempt failures/skipped sends so Austin/Dan can catch missed internal alerts before launch authorization.
 
 BOUNDARIES:
-No pricing changes. No customer quote flow changes. No admin behavior changes. No schema/storage changes. No Render/workflow/requirements/VERSION changes. No third-party scripts or SDKs in this task. Do not mutate production data.
+No customer-facing messaging changes. No notification sending behavior changes. No SMTP/env var changes. No pricing changes. No customer quote flow changes. No mobile-admin changes unless explicitly justified later. Do not mutate production data.
 
 FINAL REPORT:
-Return the recommended free-first stack, P1/P2/P3 concerns, implementation order, whether repo changes are needed now, and confirm no files were modified.
-```
-
-## Codex Prompt Seed - GPT Admin Job Log Plan
-
-```text
-REASONING:
-Extra High
-
-MODE:
-Plan-only. Do not implement. Do not modify files. Do not create a branch. Do not open a PR.
-
-TASK:
-Plan a safe internal GPT-to-admin job log feature for Bay Delivery Quote Copilot.
-
-GOAL:
-Design an internal-only, admin-visible, audit-logged GPT notes/logs feature where GPT can record advisory job observations, quote cautions, missing-info recommendations, follow-up suggestions, and calibration observations.
-
-BOUNDARIES:
-GPT must not change pricing, approve/reject quote requests, schedule jobs, mark jobs complete, mutate lifecycle status, send SMS/email, create customer-facing messages automatically, expose internal data to customers, or create a second pricing engine.
-
-FINAL REPORT:
-Return proposed architecture, endpoint/table/UI options, auth/consequential-action recommendation, required tests, PR breakdown, P1/P2/P3 risks, whether to proceed now or defer, and confirmation no files were modified.
+Return proposed read path, desktop-admin display option, tests, protected surfaces, P1/P2/P3 risks, and whether to proceed only after launch-readiness audit is clear.
 ```
 
 ## Final Operating Loop
