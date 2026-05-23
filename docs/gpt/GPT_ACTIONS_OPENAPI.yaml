@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Bay Delivery Internal GPT Quote Action
-  version: 0.10.1
-  description: Source schema for the internal Bay Delivery GPT Builder quote action.
+  title: Bay Delivery Internal GPT Actions
+  version: 0.11.0
+  description: Source schema for internal Bay Delivery GPT Builder quote and advisory admin note actions.
 servers:
   - url: https://bay-delivery-quote-copilot.onrender.com
 security:
@@ -16,6 +16,8 @@ paths:
       x-openai-isConsequential: false
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GptGroundingRevisionHeader"
       requestBody:
         required: true
         content:
@@ -37,6 +39,41 @@ paths:
           description: Request body does not match the action schema.
         "429":
           description: Internal GPT quote rate limit exceeded.
+  /api/gpt/admin-notes:
+    post:
+      operationId: createGptAdminNote
+      summary: Create advisory GPT admin note
+      description: Internal Bay Delivery advisory note creation for admin review. Persists an internal-only GPT Admin Note and never changes pricing, lifecycle status, scheduling, payments, customer messages, or customer-visible records.
+      x-openai-isConsequential: true
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GptGroundingRevisionHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GptAdminNoteRequest"
+      responses:
+        "200":
+          description: Advisory GPT Admin Note created, or existing note returned for an idempotent replay.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GptAdminNoteResponse"
+        "400":
+          description: Backend validation or storage value error.
+        "401":
+          description: Missing or invalid internal bearer token.
+        "404":
+          description: Endpoint disabled because the internal token is unset, or the related entity was not found.
+        "409":
+          description: Duplicate or conflicting advisory note.
+        "422":
+          description: Request body does not match the action schema.
+        "429":
+          description: Internal GPT admin notes rate limit exceeded.
 components:
   securitySchemes:
     bearerAuth:
@@ -44,6 +81,15 @@ components:
       scheme: bearer
       bearerFormat: internal-token
       description: Internal bearer token expected by the backend. Do not store token values in this schema.
+  parameters:
+    GptGroundingRevisionHeader:
+      name: X-GPT-Grounding-Revision
+      in: header
+      required: false
+      description: Optional caller-declared GPT grounding revision for backend observability. Do not include this in the JSON body.
+      schema:
+        type: string
+        maxLength: 120
   schemas:
     GptQuoteRequest:
       type: object
@@ -210,3 +256,91 @@ components:
           items:
             type: string
           description: Internal risk flags from backend risk assessment.
+    GptAdminNoteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - related_entity_type
+        - note_type
+        - title
+        - summary
+      properties:
+        related_entity_type:
+          type: string
+          enum:
+            - quote
+            - quote_request
+            - job
+            - completed_job_calibration_entry
+            - general
+          description: Entity type the advisory note should attach to. Prefer a specific known entity; use general only when no entity ID exists.
+        related_entity_id:
+          type:
+            - string
+            - "null"
+          maxLength: 160
+          description: Existing entity ID for quote, quote_request, job, or completed_job_calibration_entry notes. Required by backend unless related_entity_type is general.
+        note_type:
+          type: string
+          enum:
+            - job_observation
+            - quote_caution
+            - missing_info
+            - follow_up_recommendation
+            - completed_job_calibration_observation
+            - customer_message_draft
+            - photo_access_density_risk
+            - owner_review_context
+          description: Advisory note classification for admin review.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Concise operational note title.
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 1200
+          description: Concise advisory summary for Austin or Dan. Do not include passwords, tokens, auth headers, raw uploads, base64, Drive links as authority, or full customer records.
+        recommendation:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+          description: Optional internal recommendation for admin review or follow-up. Must not instruct pricing, status, scheduling, payment, or customer-message mutations.
+        customer_message_draft:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+          description: Optional draft/copy-only customer message. The action does not send messages.
+        risk_flags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 40
+          description: Optional concise risk flag slugs. Backend normalizes values and de-duplicates them.
+        follow_up_needed:
+          type: boolean
+          default: false
+          description: Whether the note should flag likely admin follow-up.
+        idempotency_key:
+          type:
+            - string
+            - "null"
+          maxLength: 160
+          description: Stable retry key. Prefer providing one so retries do not create duplicate notes.
+    GptAdminNoteResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - note_id
+        - created
+      properties:
+        note_id:
+          type: string
+          description: Persisted GPT Admin Note ID.
+        created:
+          type: boolean
+          description: True when a new note was created; false when an existing note was returned for an idempotent replay.

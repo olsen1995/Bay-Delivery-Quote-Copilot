@@ -46,6 +46,28 @@ The internal GPT quote interface is `POST /api/gpt/quote`.
 - GPT may still add reasoning, grounded context, explicit uncertainty notes, and risk framing around those totals without inventing facts or assumptions.
 - GPT should use this endpoint for authoritative totals when available rather than inventing totals.
 
+## Internal GPT Admin Notes Endpoint
+
+The internal GPT Admin Notes interface is `POST /api/gpt/admin-notes`.
+
+- It is internal-only for Austin and Dan.
+- It is hidden from public customer flows.
+- It is bearer-token protected via `GPT_INTERNAL_API_TOKEN`.
+- If `GPT_INTERNAL_API_TOKEN` is unset, the endpoint fails closed and is unavailable.
+- It is consequential because it writes persisted production admin data.
+- It creates advisory GPT Admin Notes for admin review and follow-up context.
+- Created notes are admin-visible only; internal notes must not be exposed to customers.
+- GPT should attach notes to known `quote`, `quote_request`, `job`, or `completed_job_calibration_entry` IDs when available.
+- GPT should use `related_entity_type=general` only when no specific entity ID exists.
+- GPT should use a stable `idempotency_key` for retry safety.
+- Caller grounding revision belongs in the `X-GPT-Grounding-Revision` header, not in the JSON body.
+- Notes must be concise and operationally useful, without unnecessary PII.
+- Notes must never include passwords, tokens, auth headers, raw uploads, base64, Drive links as authority, or full customer records.
+- The endpoint does not create quotes, jobs, bookings, schedules, payments, or customer messages.
+- The endpoint does not approve, reject, expire, schedule, contact, price, message, send, or update payments.
+- The endpoint does not change quote pricing and must never override `app/quote_engine.py`.
+- The endpoint stores notes with `customer_visible=false` and `pricing_effect=none`; those fields are backend-controlled and are not accepted from GPT.
+
 ## Grounding Precedence
 
 1. `PROJECT_RULES.md`
@@ -80,7 +102,7 @@ Queue sections are:
 
 For "What should I do today?" style questions, GPT should tell Austin/Dan to check the Daily Ops Queue first and treat every queue item as an attention flag that points to existing manual admin workflows.
 
-GPT must not imply that it, or the queue, can approve, reject, expire, schedule, contact, price, message, send, or mutate records.
+GPT must not imply that it, or the queue, can approve, reject, expire, schedule, contact, price, message, send, or mutate records, except for the separately bounded advisory GPT Admin Note write action when explicitly useful.
 
 ### Copy-Only Customer Drafts
 

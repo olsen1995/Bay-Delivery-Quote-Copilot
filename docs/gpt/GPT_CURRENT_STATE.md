@@ -37,6 +37,9 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - Completed-job profit reporting is internal and read-only evidence for owner review and future calibration; it does not change quote pricing.
 - Manual Completed Job Calibration Log is internal-only evidence capture for owner review and future pricing planning; it does not change quote pricing and should be used to preserve real completed-job learnings ahead of category-specific pricing PRs.
 - Internal Quote Risk Summary is admin-only, read-only/recomputed, desktop-admin-only, and exposed on quote detail as `quote_risk_summary`; it is not customer-visible, not persisted, and has no pricing effect.
+- PR #304 GPT Admin Notes backend is complete: the repo has an internal bearer-protected `POST /api/gpt/admin-notes` endpoint, persisted `gpt_admin_notes` storage, admin-auth `GET /admin/api/gpt-notes`, validation, idempotency/retry safety, duplicate handling, rate limiting, audit logging, backup/export/import coverage, and focused tests.
+- PR #305 Admin GPT Notes display is complete: desktop admin shows collapsed GPT Notes (Advisory), fetches `/admin/api/gpt-notes`, renders with safe DOM text handling, labels content advisory-only, and keeps GPT notes out of public and mobile surfaces.
+- GPT Admin Notes Action schema refresh is complete: the Custom GPT action schema and grounding docs now describe `createGptAdminNote` as the bounded, consequential, internal-only advisory-note write action. Runtime app behavior, pricing, customer quote flow, admin UI, mobile admin, Render, workflows, dependencies, tests, tools, scripts, and version markers remain unchanged by the refresh.
 - PR #293 Admin Action Shortcuts Completion is complete: desktop admin Daily Ops Board cards now expose shortcut chips that route Austin and Dan into existing manual admin flows without changing pricing, customer payloads, mobile admin, Render config, workflows, requirements, or `VERSION`.
 - PR #296 Manual Completed Job Calibration Log is complete: desktop admin now supports manual completed-job evidence capture through `/admin/api/manual-completed-jobs` backed by `completed_job_calibration_entries`; this is internal-only, advisory-only evidence capture for future pricing review, not a second pricing engine.
 - PR #297 Prelaunch Test Data Cleanup Tooling is complete: the repo now includes an approved allowlisted dry-run/apply cleanup process via `scripts/create_prelaunch_test_data_cleanup.py` plus `docs/prelaunch_test_data_cleanup.md`; operators should use this backup-first workflow instead of ad hoc live cleanup steps.
@@ -87,6 +90,7 @@ When Austin authorizes launch, configure these on Render following `DEPLOYMENT_N
 - Keep completed-job reporting advisory-only and separate from pricing authority.
 - Keep the Manual Completed Job Calibration Log advisory-only and separate from pricing authority; it is evidence capture for owner review, not automated pricing.
 - Keep Internal Quote Risk Summary advisory-only and separate from pricing authority; `customer_visible` remains false and `pricing_effect` remains `none`.
+- Keep GPT Admin Notes advisory-only and separate from pricing authority; the GPT may create notes only through `createGptAdminNote`, and notes must remain internal-only, admin-visible only, `customer_visible=false`, and `pricing_effect=none`.
 - Keep prelaunch cleanup execution backup-first, allowlisted, and operator-run through `scripts/create_prelaunch_test_data_cleanup.py`; do not improvise ad hoc cleanup steps.
 - Keep pricing changes deferred to later category-specific PRs after evidence review.
 - PR #291 lead source + repeat customer tracking is complete (no-schema v1): optional public `lead_source` intake is accepted by `/quote/calculate`, blank/missing maps to `unknown`, invalid nonblank values reject with 422, and lead source persists through existing `request_json` flow into quotes, quote_requests, and jobs.
@@ -103,7 +107,8 @@ When Austin authorizes launch, configure these on Render following `DEPLOYMENT_N
 - No broad speculative architecture work.
 - No unnecessary flow rewrites in stable areas.
 - No mixing unrelated runtime changes into documentation tasks.
-- No GPT or Daily Ops Queue actions that approve, reject, expire, schedule, contact, price, message, or mutate records.
+- No GPT or Daily Ops Queue actions that approve, reject, expire, schedule, contact, price, message, update payments, or mutate lifecycle records.
+- No GPT writes except the bounded consequential `createGptAdminNote` action for internal advisory admin notes.
 - No automated follow-up sending, no saved follow-up message history, and no customer-facing exposure of internal helper content.
 - No automatic pricing changes from completed-job reporting.
 
@@ -122,6 +127,12 @@ An internal-only `POST /api/gpt/quote` endpoint now exists as a non-persistent i
 When the endpoint is available, GPT should use its returned totals rather than inventing totals or generating independent pricing.
 
 This internal endpoint does not replace the customer quote flow, booking flow, or live Render customer path, and it is not a customer-facing quote route.
+
+An internal-only `POST /api/gpt/admin-notes` endpoint now exists as a consequential write action for advisory GPT Admin Notes.
+
+When the action is useful for admin review, follow-up, or calibration context, GPT may create a note through `createGptAdminNote`. It should prefer known `quote`, `quote_request`, `job`, or `completed_job_calibration_entry` IDs, use `related_entity_type=general` only when no entity ID exists, and use an `idempotency_key` for retry safety.
+
+This note action does not create quotes, jobs, bookings, schedules, payments, or customer messages. It does not change pricing, lifecycle status, payment state, admin approvals, customer communications, or customer-visible records. Notes remain internal-only, admin-visible only, advisory-only, `customer_visible=false`, and `pricing_effect=none`.
 
 ## Daily Ops Queue Grounding
 
@@ -143,7 +154,7 @@ The accepted-not-booked queue is additive inside the existing ops-queue response
 
 For "What should I do today?" style questions, GPT should tell Austin/Dan to check the Daily Ops Queue first, then use the existing admin sections for manual review and follow-up.
 
-The queue does not approve, reject, expire, schedule, contact, price, message, send, or mutate records. It only shows attention flags from existing admin data.
+The queue does not approve, reject, expire, schedule, contact, price, message, send, or mutate records. It only shows attention flags from existing admin data. Any GPT write permission is limited to the separate consequential `createGptAdminNote` advisory-note action.
 
 ## Follow-Up Message Helper Grounding
 
