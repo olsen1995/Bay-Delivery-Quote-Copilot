@@ -13,5 +13,5 @@ sandbox = "unelevated"
 network_access = true
 
 [features]
-hooks = true
+.hooks = true
 workspace_dependencies = false
