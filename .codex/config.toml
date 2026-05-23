@@ -1,5 +1,5 @@
 model = "gpt-5.5"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 personality = "pragmatic"
 
 allow_login_shell = false
@@ -7,11 +7,135 @@ approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 [windows]
-sandbox = "unelevated"
+# "elevated" is preferred when it works on your machine.
+# If Codex fails to start or Windows sandboxing acts weird, switch this back to "unelevated".
+sandbox = "elevated"
 
 [sandbox_workspace_write]
-network_access = true
+network_access = false
+
+[marketplaces.openai-bundled]
+last_updated = "2026-05-23T03:59:21Z"
+source_type = "local"
+source = '\\?\C:\Users\austi\.codex\.tmp\bundled-marketplaces\openai-bundled'
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-05-23T00:24:00Z"
+source_type = "local"
+source = '\\?\C:\Users\austi\.cache\codex-runtimes\codex-primary-runtime\plugins\openai-primary-runtime'
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[plugins."superpowers@openai-curated"]
+enabled = true
+
+[plugins."build-ios-apps@openai-curated"]
+enabled = false
+
+[plugins."build-web-apps@openai-curated"]
+enabled = false
+
+[plugins."test-android-apps@openai-curated"]
+enabled = false
+
+[plugins."chatgpt-apps@openai-curated"]
+enabled = false
+
+[plugins."render@openai-curated"]
+enabled = true
+
+[plugins."codex-security@openai-curated"]
+enabled = true
+
+[plugins."google-calendar@openai-curated"]
+enabled = false
+
+[plugins."documents@openai-primary-runtime"]
+enabled = false
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = false
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = false
+
+[plugins."gmail@openai-curated"]
+enabled = false
+
+[plugins."openai-developers@openai-curated"]
+enabled = true
+
+[plugins."google-drive@openai-curated"]
+enabled = false
+
+[plugins."chrome@openai-bundled"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true
 
 [features]
-.hooks = true
-workspace_dependencies = false
+memories = true
+hooks = false
+workspace_dependencies = true
+js_repl = false
+
+[memories]
+generate_memories = true
+use_memories = true
+disable_on_external_context = true
+
+[projects.'c:\repos\bay-delivery-quote-copilot']
+trust_level = "trusted"
+
+[apps.connector_76869538009648d5b282a4bb21c3d157.tools.github_create_pull_request]
+approval_mode = "approve"
+
+[apps.connector_2128aebfecb84f64a069897515042a44]
+enabled = false
+
+[apps.connector_947e0d954944416db111db556030eea6]
+enabled = false
+
+[apps.connector_c0f748249d6a42aea4b00fd375570ded]
+enabled = false
+
+[[skills.config]]
+name = "build-web-apps:stripe-best-practices"
+enabled = false
+
+[[skills.config]]
+name = "build-web-apps:supabase-postgres-best-practices"
+enabled = false
+
+[[skills.config]]
+name = "build-web-apps:react-best-practices"
+enabled = false
+
+[[skills.config]]
+name = "build-web-apps:shadcn"
+enabled = false
+
+[mcp_servers.node_repl]
+args = []
+command = 'C:\Users\austi\AppData\Local\OpenAI\Codex\bin\3c238e29bbc930ff\node_repl.exe'
+startup_timeout_sec = 120
+
+[mcp_servers.node_repl.env]
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+BROWSER_USE_MARKETPLACE_NAME = "openai-bundled"
+CODEX_CLI_PATH = 'C:\Users\austi\AppData\Local\OpenAI\Codex\bin\3f4fb8cdd344abc7\codex.exe'
+CODEX_HOME = 'C:\Users\austi\.codex'
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = ""
+NODE_REPL_NODE_PATH = 'C:\Users\austi\AppData\Local\OpenAI\Codex\bin\5b9024f90663758b\node.exe'
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "167fdf579477181fba1773c1efb067b00c5a64fe85dafb50a2001bde198dc739"
+NODE_REPL_TRUSTED_CODE_PATHS = 'C:\Users\austi\.codex'
+NODE_REPL_UNTRUSTED_ENV_ALLOWLIST = "BROWSER_USE_MARKETPLACE_NAME"
+
+[desktop]
+reviewDelivery = "inline"
+git-always-force-push = false
+git-show-sidebar-pr-icons = true
+conversationDetailMode = "STEPS_COMMANDS"
