@@ -3,7 +3,7 @@
     {
       "file": "docs/gpt/GPT_SOURCE_OF_TRUTH.md",
       "output": "GPT_SOURCE_OF_TRUTH.md",
-      "sha256": "38cdef9e9b053c32e48abfcca3681dd5cb1ffd4dafb3069e5e5783d27a4ef90b"
+      "sha256": "d4f68fd2b4b056d8b86a3610155507956bf816de04050a9cb902a1891632dde6"
     },
     {
       "file": "docs/gpt/GPT_BUSINESS_RULES.md",
@@ -13,12 +13,12 @@
     {
       "file": "docs/gpt/GPT_CURRENT_STATE.md",
       "output": "GPT_CURRENT_STATE.md",
-      "sha256": "18ad43cd949a53fe6ca3ea1364a921917a2995e3f2343a8e0a437a4ea6e9bcf4"
+      "sha256": "141ae03937867824d6f5d3339f7c92107005b94e63c0ff879e45fcac25a546bf"
     },
     {
       "file": "docs/gpt/GPT_SYSTEM_BOUNDARIES.md",
       "output": "GPT_SYSTEM_BOUNDARIES.md",
-      "sha256": "64965fce106cbab812e50ea9897d5b3149dd8bd0c5136cba7324bba0f017ca65"
+      "sha256": "0a5e3be988a911d9ff7842a1f0e03edf4a259b73f40c91427b71af6de76bc92f"
     },
     {
       "file": "docs/gpt/GPT_WORKFLOW_RULES.md",
@@ -28,12 +28,12 @@
     {
       "file": "docs/gpt/GPT_BUILDER_INSTRUCTIONS.md",
       "output": "GPT_BUILDER_INSTRUCTIONS.md",
-      "sha256": "bc47fb42d437a8140fb0b7f8932c66cf17b4ad6c09865c768580ebc73f3ae108"
+      "sha256": "3116eec219c09c6c1d7b9c9b55d6ac92a75922ee8213867e76421f3ab8e0047a"
     },
     {
       "file": "docs/gpt/GPT_ACCEPTANCE_TESTS.md",
       "output": "GPT_ACCEPTANCE_TESTS.md",
-      "sha256": "564641ad20650e24ecef7c4f1e87b22f4c7398b94b7488859f3050fa6e0c2691"
+      "sha256": "c4c8d7a738f5f236e2fc1e60ddeb3992649742a8b1be8053d603ce52d9fd2760"
     },
     {
       "file": "PROJECT_RULES.md",
