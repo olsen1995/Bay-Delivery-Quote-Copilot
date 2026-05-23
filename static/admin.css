@@ -125,8 +125,52 @@ label {
 #acceptedNotBookedQueueBox,
 #auditLogBox,
 #assistantHistoryBox,
+#gptAdminNotesBox,
 #followupMessageContextSummary {
 	overflow-x: auto;
+}
+
+.gptAdminNotesSection {
+	grid-column: 1 / -1;
+}
+
+.gptAdminNotesList {
+	display: grid;
+	gap: 12px;
+	margin-top: 12px;
+}
+
+.gptAdminNoteCard {
+	display: grid;
+	gap: 10px;
+	padding: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 10px;
+	background: rgba(9, 13, 22, 0.52);
+}
+
+.gptAdminNoteHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.gptAdminNoteTitle {
+	font-weight: 800;
+	color: var(--ink-strong);
+}
+
+.gptAdminNoteMeta {
+	font-size: 0.86rem;
+	color: var(--ink-muted);
+	white-space: nowrap;
+}
+
+.gptAdminNoteFields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 14px;
 }
 
 .mt18 { margin-top: 18px; }

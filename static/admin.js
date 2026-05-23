@@ -649,7 +649,7 @@ function setProtectedDashboardVisible(isVisible) {
 
 function resetProtectedDashboard() {
   setProtectedDashboardVisible(false);
-  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "profitReportBox", "manualCompletedJobsBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
+  const boxIds = ["opsQueueBox", "quotesBox", "requestsBox", "jobsBox", "profitReportBox", "manualCompletedJobsBox", "gptAdminNotesBox", "assistantResultBox", "assistantHistoryBox", "assistantUploadList"];
   boxIds.forEach((id) => {
     const box = document.getElementById(id);
     if (box) clearNode(box);
@@ -1265,6 +1265,104 @@ async function refreshProfitReportBestEffort() {
     renderProfitReport(report);
   } catch {
     renderProfitReportError();
+  }
+}
+
+const gptAdminNoteFields = [
+  ["Created", "created_at"],
+  ["Related type", "related_entity_type"],
+  ["Related ID", "related_entity_id"],
+  ["Note type", "note_type"],
+  ["Title", "title"],
+  ["Summary", "summary"],
+  ["Recommendation", "recommendation"],
+  ["Customer message draft", "customer_message_draft"],
+  ["Risk flags", "risk_flags"],
+  ["Follow-up needed", "follow_up_needed"],
+  ["Review status", "review_status"],
+  ["Server grounding revision", "server_grounding_revision"],
+  ["Caller grounding revision", "caller_grounding_revision"],
+];
+
+function formatGptAdminNoteValue(note, key) {
+  const value = note ? note[key] : "";
+  if (key === "risk_flags") {
+    return Array.isArray(value) ? value.filter(Boolean).join(", ") : String(value || "");
+  }
+  if (key === "follow_up_needed") return value ? "Yes" : "No";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function createGptAdminNoteField(note, label, key) {
+  const value = formatGptAdminNoteValue(note, key);
+  return createQuoteMetaRow(label, value);
+}
+
+function renderGptAdminNotes(notes) {
+  const box = document.getElementById("gptAdminNotesBox");
+  if (!box) return;
+  const items = Array.isArray(notes) ? notes : [];
+  if (!items.length) return addEmptyState(box, "No GPT advisory notes yet.");
+  clearNode(box);
+
+  const list = document.createElement("div");
+  list.className = "gptAdminNotesList";
+
+  items.forEach((note) => {
+    const card = document.createElement("section");
+    card.className = "gptAdminNoteCard";
+
+    const header = document.createElement("div");
+    header.className = "gptAdminNoteHeader";
+
+    const title = document.createElement("div");
+    title.className = "gptAdminNoteTitle";
+    title.textContent = formatGptAdminNoteValue(note, "title") || "Untitled GPT note";
+
+    const meta = document.createElement("div");
+    meta.className = "gptAdminNoteMeta";
+    meta.textContent = formatGptAdminNoteValue(note, "created_at");
+
+    header.append(title, meta);
+    card.appendChild(header);
+
+    const advisory = document.createElement("div");
+    advisory.className = "small muted";
+    advisory.textContent = "Advisory only. Review before acting; operational changes still require explicit admin actions.";
+    card.appendChild(advisory);
+
+    const fields = document.createElement("div");
+    fields.className = "gptAdminNoteFields";
+    gptAdminNoteFields.forEach(([label, key]) => {
+      fields.appendChild(createGptAdminNoteField(note || {}, label, key));
+    });
+    card.appendChild(fields);
+
+    list.appendChild(card);
+  });
+
+  box.appendChild(list);
+}
+
+function renderGptAdminNotesError() {
+  const box = document.getElementById("gptAdminNotesBox");
+  if (!box) return;
+  clearNode(box);
+  const div = document.createElement("div");
+  div.className = "emptyState";
+  const msg = document.createElement("span");
+  msg.className = "bad";
+  msg.textContent = "GPT notes could not load. Core admin data is still available.";
+  div.appendChild(msg);
+  box.appendChild(div);
+}
+
+async function refreshGptAdminNotesBestEffort() {
+  try {
+    const notes = await fetchJSON("/admin/api/gpt-notes");
+    renderGptAdminNotes(notes.items || []);
+  } catch {
+    renderGptAdminNotesError();
   }
 }
 
@@ -3132,6 +3230,7 @@ async function refreshAll() {
     void refreshOpsQueueBestEffort();
     void refreshProfitReportBestEffort();
     void refreshManualCompletedJobsBestEffort();
+    void refreshGptAdminNotesBestEffort();
     setLine(statusLine, "ok", "Admin data loaded successfully.");
   } catch (err) {
     adminSessionReady = false;
