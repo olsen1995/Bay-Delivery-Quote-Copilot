@@ -32,7 +32,7 @@ As of May 24, 2026:
 | --- | --- |
 | Main verification | Verified through PR #312 |
 | Latest verified main commit | `d420dfc create quote page step heading clarity polish (#312)` |
-| Latest verified main commit (full SHA) | `d420dfccf563d2361cd72c72135e720a5f7efef4` |
+| Latest verified main commit (full SHA) | `d420dfca57906830bcf4e623c5229697d5cde149` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
