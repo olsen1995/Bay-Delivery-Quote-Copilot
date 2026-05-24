@@ -151,6 +151,17 @@ def _seed_customer_accepted_request() -> str:
     return "req-admin-no-notify"
 
 
+def _admin_quote_request_item(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    request_id: str,
+) -> dict[str, object]:
+    response = client.get("/admin/api/quote-requests", headers=admin_headers)
+    assert response.status_code == 200
+    items = response.json()["items"]
+    return next(item for item in items if item["request_id"] == request_id)
+
+
 def test_booking_submission_sends_one_internal_notification_and_dedupes_retry(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -226,6 +237,34 @@ def test_non_booking_routes_do_not_send_or_record_notification(
     assert storage.list_notification_attempts(limit=10) == []
 
 
+def test_admin_quote_requests_exposes_unavailable_notification_status_without_sending(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_notifications(monkeypatch)
+    sent_messages: list[str] = []
+    monkeypatch.setattr(
+        booking_notification_service,
+        "_send_smtp_email",
+        lambda _config, _subject, _body: sent_messages.append(_subject),
+    )
+    request_id = _seed_customer_accepted_request()
+
+    item = _admin_quote_request_item(client, admin_headers, request_id)
+
+    assert sent_messages == []
+    assert storage.list_notification_attempts(limit=10) == []
+    assert item["booking_notification"] == {
+        "status": "unavailable",
+        "channel": None,
+        "attempt_count": 0,
+        "updated_at": None,
+        "sent_at": None,
+        "last_error": None,
+    }
+
+
 def test_disabled_notifications_skip_without_breaking_booking_flow(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -247,6 +286,37 @@ def test_disabled_notifications_skip_without_breaking_booking_flow(
     assert attempt is not None
     assert attempt["status"] == "skipped"
     assert attempt["last_error"] == "notifications disabled"
+
+
+def test_admin_quote_requests_exposes_skipped_notification_status(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent_messages: list[str] = []
+    monkeypatch.setattr(
+        booking_notification_service,
+        "_send_smtp_email",
+        lambda _config, _subject, _body: sent_messages.append(_subject),
+    )
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+
+    _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
+    item = _admin_quote_request_item(client, admin_headers, str(accepted["request_id"]))
+
+    assert sent_messages == []
+    assert item["booking_notification"] == {
+        "status": "skipped",
+        "channel": "email",
+        "attempt_count": 1,
+        "updated_at": item["booking_notification"]["updated_at"],
+        "sent_at": None,
+        "last_error": "notifications disabled",
+    }
+    assert item["booking_notification"]["updated_at"]
+    assert "recipient" not in item["booking_notification"]
+    assert "event_type" not in item["booking_notification"]
 
 
 def test_missing_smtp_config_skips_safely_without_sending(
@@ -299,6 +369,34 @@ def test_smtp_failure_is_sanitized_and_does_not_break_booking_flow(
     assert "super-secret-password" not in str(attempt["last_error"])
 
 
+def test_admin_quote_requests_exposes_failed_notification_status_without_secret_detail(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_notifications(monkeypatch)
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+
+    def fake_send(_config, _subject: str, _body: str) -> None:
+        raise RuntimeError("SMTP exploded with password super-secret-password for ops@baydelivery.test")
+
+    monkeypatch.setattr(booking_notification_service, "_send_smtp_email", fake_send)
+
+    _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
+    item = _admin_quote_request_item(client, admin_headers, str(accepted["request_id"]))
+
+    notification = item["booking_notification"]
+    assert notification["status"] == "failed"
+    assert notification["channel"] == "email"
+    assert notification["attempt_count"] == 1
+    assert notification["sent_at"] is None
+    assert notification["last_error"] == "send failed"
+    assert "super-secret-password" not in str(notification)
+    assert "ops@baydelivery.test" not in str(notification)
+    assert "RuntimeError" not in str(notification)
+
+
 def test_failed_notification_attempt_can_retry_and_send_after_smtp_recovers(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -346,6 +444,35 @@ def test_failed_notification_attempt_can_retry_and_send_after_smtp_recovers(
     assert sent_attempt["attempt_count"] == 2
     assert sent_attempt["sent_at"] is not None
     assert sent_attempt["last_error"] is None
+
+
+def test_admin_quote_requests_exposes_sent_notification_status(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_notifications(monkeypatch)
+    sent_messages: list[str] = []
+    monkeypatch.setattr(
+        booking_notification_service,
+        "_send_smtp_email",
+        lambda _config, subject, _body: sent_messages.append(subject),
+    )
+    quote = _calculate_quote(client)
+    accepted = _accept_quote(client, quote)
+
+    _submit_booking(client, str(quote["quote_id"]), str(accepted["booking_token"]))
+    item = _admin_quote_request_item(client, admin_headers, str(accepted["request_id"]))
+
+    assert len(sent_messages) == 1
+    notification = item["booking_notification"]
+    assert notification["status"] == "sent"
+    assert notification["channel"] == "email"
+    assert notification["attempt_count"] == 1
+    assert notification["sent_at"] is not None
+    assert notification["updated_at"] is not None
+    assert notification["last_error"] is None
+    assert "recipient" not in notification
 
 
 def test_skipped_notification_attempt_retries_after_config_is_fixed(
