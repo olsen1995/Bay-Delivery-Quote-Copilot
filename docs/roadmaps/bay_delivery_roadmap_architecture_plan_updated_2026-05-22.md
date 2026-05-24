@@ -12,7 +12,7 @@ The system should stay boring, stable, and profitable. New features should make 
 
 ## May 23 Update Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #309 and the launch-readiness/current-state audit verification that followed.
+This update refreshes the May 10 roadmap with actual completed work through PR #312 and the launch-readiness/current-state audit verification that followed.
 
 Key updates:
 
@@ -30,15 +30,15 @@ As of May 24, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #309 |
-| Latest verified main commit | `7386ccc create version 0.12.0 bump (#309)` |
-| Latest verified main commit (full SHA) | `7386cccd233a213716a80869ee3220da8ff0a948` |
+| Main verification | Verified through PR #312 |
+| Latest verified main commit | `d420dfc create quote page step heading clarity polish (#312)` |
+| Latest verified main commit (full SHA) | `d420dfccf563d2361cd72c72135e720a5f7efef4` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
 | Focused GPT/admin/static tests | `tests/test_static_assets.py` 36 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed; `tests/test_launch_smoke_playwright.py` 4 passed |
-| Full pytest | Passed: 711 |
-| Protected no-go diff after PR #309 | No output |
+| Full pytest | Passed: 716 |
+| Protected no-go diff after PR #312 | No output |
 | Custom GPT Knowledge | Updated from `dist/gpt_grounding_pack` after PR #307 |
 | Custom GPT Actions schema | Updated from `docs/gpt/GPT_ACTIONS_OPENAPI.yaml` after PR #307 |
 | GPT Builder | Updated and saved |
@@ -48,8 +48,8 @@ As of May 24, 2026:
 | Manual completed-job calibration entries | Entered |
 | Launch-readiness/current-state audit | Complete; verdict: launch-ready with notes |
 | P1 blockers | None found |
-| Outstanding non-code verification | Live Render /health version+commit parity and production live-safe smoke remain unverified in this network-off audit |
-| Current blockers | No P1 blockers; roadmap/current-state docs drift corrected in this refresh |
+| Outstanding non-code verification | None for this docs/instruction refresh scope |
+| Current blockers | No P1 blockers for this scope |
 
 ## Recommended Repo Save Location
 

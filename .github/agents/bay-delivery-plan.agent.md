@@ -103,16 +103,18 @@ Planning must respect this process.
 
 Always check whether the task belongs to the active roadmap.
 
-Known current roadmap sequence around the active work:
+Current verified baseline:
 
-1. Admin Daily Ops Board
-2. Admin Ops Board Action Shortcuts
-3. Customer Quote Flow Simplification
-4. Internal Quote Risk Summary
-5. Completed Job Profit Review Report
-6. Follow-Up Message Helper
-7. Scheduling Fields + Accepted Not Booked Queue
-8. Later pricing PRs by service category
+- Main is verified through PR #312.
+- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Current version: `0.12.0`.
+
+Current active roadmap/current-state focus:
+
+1. Keep project instructions/current-state docs aligned with verified baseline.
+2. Continue quote-page simplification follow-on work with compatibility guardrails.
+3. Continue follow-up/scheduling/admin workflow refinements only when explicitly scoped.
+4. Keep pricing PRs later and one service category per PR.
 
 Pricing comes later and must be one service category per PR.
 

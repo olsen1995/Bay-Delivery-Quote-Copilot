@@ -285,18 +285,19 @@ Admin side carries the complexity.
 
 Follow the roadmap order unless Austin explicitly changes it.
 
-Current exact PR sequence:
+Current verified baseline:
 
-1. `create admin daily ops board read model`
-2. `create admin ops board action shortcuts`
-3. `create customer quote flow simplification`
-4. `create internal quote risk summary`
-5. `create completed job profit review report`
-6. `create follow up message helper`
-7. `create job scheduling fields and accepted not booked queue`
-8. Pricing PRs by service category
-9. Internal GPT upgrade
-10. Photo evidence / photo assistant
+- Main is verified through PR #312.
+- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Current version: `0.12.0`.
+
+Current active roadmap/current-state sequence:
+
+1. Keep project instructions and current-state documentation aligned with verified baseline before new broad feature work.
+2. Continue customer quote-page simplification follow-on work with payload compatibility preserved.
+3. Continue admin follow-up/scheduling workflow improvements only when explicitly scoped.
+4. Defer pricing PRs by service category until evidence and explicit approval.
+5. Keep internal GPT and photo-assistant changes separately scoped.
 
 Do not skip ahead to SEO/growth, GPT, image AI, or pricing work while an earlier roadmap safety/reporting feature is still pending, unless Austin explicitly approves the reorder.
 

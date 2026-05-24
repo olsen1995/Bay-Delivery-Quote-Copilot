@@ -75,6 +75,13 @@ If the issue touches any of these, inspection and plan summary are mandatory:
 - backup/import/export/restore
 - customer quote payloads
 
+## Austin tool-routing preference
+
+- Use VS Code agents to save Codex tokens for lower-risk docs, version, verification, static/frontend polish, and straightforward repo hygiene.
+- For VS Code agents, use plan-first for everything except docs-only, version-only, and read-only verification.
+- Use Codex for higher-risk backend, security, auth, storage/schema, GPT Actions, pricing-adjacent, deployment/workflow, dependency/security, and broad cross-file implementation.
+- If VS Code implementation starts touching backend, pricing, payloads, auth, schema, GPT, Render/workflows, dependencies, or version files unexpectedly, stop and report.
+
 ## Read-only post-merge verification mode
 
 When the task is post-merge verification:

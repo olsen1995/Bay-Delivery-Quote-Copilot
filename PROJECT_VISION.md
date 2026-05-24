@@ -42,6 +42,12 @@ The app has moved beyond a basic quote calculator. It now supports a stronger op
 - backup/recovery support
 - protected pricing authority
 
+Current verified baseline markers:
+
+- Main is verified through PR #312.
+- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Current repo version: `0.12.0`.
+
 Recent roadmap work completed:
 
 1. **Admin Daily Ops Board**
@@ -67,9 +73,18 @@ Recent roadmap work completed:
    - The report uses existing completed-job costing fields to show collected revenue, known costs, profit, margin, missing cost data, owner-review flags, and category breakdowns.
    - This is read-only and exists to support owner review and future pricing calibration.
 
+6. **Launch Readiness Current-State Docs Refresh**
+   - Baseline documentation and verification guidance were refreshed to support launch-safe operations.
+
+7. **Booking Notification Status Visibility**
+   - Internal workflow visibility for booking notification status was improved without changing pricing authority.
+
+8. **Quote Page Step Heading Clarity Polish**
+   - Customer quote-step heading clarity was improved while preserving payload compatibility and quote-flow behavior.
+
 Current repo version:
 
-- `0.11.0`
+- `0.12.0`
 
 ---
 
@@ -230,6 +245,9 @@ Completed so far:
 - Customer Quote Flow Simplification
 - Internal Quote Risk Summary
 - Completed Job Profit Review Report
+- Launch Readiness Current-State Docs Refresh
+- Booking Notification Status Visibility
+- Quote Page Step Heading Clarity Polish
 
 Next likely roadmap item:
 
