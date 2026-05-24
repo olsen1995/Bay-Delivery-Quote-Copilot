@@ -167,23 +167,24 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
 
     assert "Start with a simple estimate." in quote_html
-    assert "Quick answers now. Bay Delivery confirms final booking details" in quote_html
+    assert "Quick answers now. Choose a service, describe the job, and add optional details if they help." in quote_html
     assert "Share job details" in quote_html
     assert "Review your estimate" in quote_html
     assert "Accept or decline" in quote_html
     assert "Send a booking request" in quote_html
     assert "Add optional photos" in quote_html
     assert "1. Choose a service" in quote_html
-    assert "2. Tell us about the job" in quote_html
-    assert "3. Access and location" in quote_html
-    assert "4. Special or heavy items" in quote_html
-    assert "5. Photos can help" in quote_html
-    assert "6. Your contact details" in quote_html
+    assert "2. Describe the job" in quote_html
+    assert "3. Optional details" in quote_html
+    assert "Access and location" in quote_html
+    assert "Special or heavy items" in quote_html
+    assert "4. Your contact details" in quote_html
     assert 'id="serviceDetailsSummary"' in quote_html
     assert 'id="serviceDetailsLead"' in quote_html
-    assert 'id="serviceDetailsPanel" class="detailPanel" open' in quote_html
+    assert 'id="serviceDetailsPanel" class="detailPanel"' in quote_html
+    assert 'id="serviceDetailsPanel" class="detailPanel" open' not in quote_html
     assert "Answer what you can. Not sure is okay." in quote_html
-    assert "Tell us what needs to be moved, removed, delivered, or cleaned up." in quote_html
+    assert "What needs to be moved, removed, delivered, or cleaned up?" in quote_html
     assert "Where is it located?" in quote_html
     assert "Any special or heavy items?" in quote_html
     assert "Required for moves and deliveries." in quote_html
@@ -191,10 +192,13 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "Most jobs are 5-10 bags. Adjust if needed." in quote_html
     assert "Heavy items help Bay Delivery bring the right setup." in quote_html
     assert "Choose the closest match. Add a note if you are not sure." in quote_html
-    assert "Photos help us confirm scope faster." in quote_html
     assert "After you submit your booking request, add photos here if they help Bay Delivery confirm scope." in quote_html
     assert "After you see your estimate, you can accept and share your preferred day and time window." in quote_html
     assert "How did you hear about us? (optional)" in quote_html
+    assert quote_html.index('<label for="description">Job description</label>') < quote_html.index('id="serviceDetailsPanel"')
+    assert quote_html.count("Tell us about the job") == 0
+    assert "Start your estimate" in quote_html
+    assert "photoHelpGroup" not in quote_html
     for control_id in [
         "service_type",
         "description",
@@ -234,6 +238,7 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "customerFlowLabel" in quote_css
     assert "quoteResultIncluded" in quote_css
     assert "quoteInfoCard" in quote_css
+    assert ".detailPanel:not([open])" in quote_css
 
 
 def test_quote_page_mobile_polish_preserves_one_form_flow() -> None:
@@ -282,8 +287,9 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
 
     assert "2-5. Job details" not in quote_html
     assert '<p class="customerFlowLabel">Step ' not in quote_html
-    for label in ["Job details", "3. Access and location", "4. Special or heavy items", "5. Photos can help"]:
+    for label in ["Job details", "Access and location", "Special or heavy items"]:
         assert f'<p class="customerFlowLabel">{label}</p>' in quote_html
+    assert '<p class="customerFlowLabel">5. Photos can help</p>' not in quote_html
 
     assert "admin dashboard" not in index_html.lower()
     assert "Bay Delivery confirms before scheduling." in index_html

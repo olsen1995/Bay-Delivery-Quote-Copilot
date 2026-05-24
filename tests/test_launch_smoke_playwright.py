@@ -151,7 +151,8 @@ async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page,
     await page.locator("#customer_phone").fill("705-555-0101")
     await page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
     await page.locator("#description").fill("Launch smoke validation for quote flow")
-    await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
+    await expect(page.locator("#serviceDetailsPanel")).not_to_have_attribute("open", "")
+    await page.locator("#serviceDetailsSummary").click()
     await page.locator("#trailer_fill_estimate").select_option("under_quarter")
     await page.locator("#btnCalc").click()
 
@@ -214,18 +215,18 @@ async def test_quote_estimate_breakdown_and_decline_path(page: Page, live_server
     await page.goto(f"{live_server}/quote", wait_until="networkidle")
     await expect(page.locator("#quoteForm")).to_be_visible()
     await expect(page.locator("#serviceDetailsPanel")).to_be_visible()
-    await expect(page.locator("#loadCountRow")).to_be_visible()
-    await expect(page.locator("#denseMaterialsGroup")).to_be_visible()
-    await expect(page.locator(".photoHelpGroup")).to_be_visible()
 
     await page.locator("#customer_name").fill("Playwright Decline Smoke")
     await page.locator("#customer_phone").fill("705-555-0112")
     await page.locator("#job_address").fill("456 Coverage Ave, North Bay")
     await page.locator("#description").fill("Verify estimate transparency details and decline flow")
 
-    await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
-    assert await page.locator("#serviceDetailsPanel").evaluate("node => node.open") is True
+    await expect(page.locator("#serviceDetailsPanel")).not_to_have_attribute("open", "")
+    assert await page.locator("#serviceDetailsPanel").evaluate("node => node.open") is False
 
+    await page.locator("#serviceDetailsSummary").click()
+    await expect(page.locator("#loadCountRow")).to_be_visible()
+    await expect(page.locator("#denseMaterialsGroup")).to_be_visible()
     await page.locator("#access_difficulty").select_option("difficult")
     await page.locator("#has_dense_materials").check()
     await page.locator("#garbage_bag_count").fill("3")
