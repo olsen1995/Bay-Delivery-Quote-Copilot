@@ -168,6 +168,17 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
 
     assert "Start with a simple estimate." in quote_html
     assert "Quick answers now. Bay Delivery confirms final booking details" in quote_html
+    assert "Share job details" in quote_html
+    assert "Review your estimate" in quote_html
+    assert "Accept or decline" in quote_html
+    assert "Send a booking request" in quote_html
+    assert "Add optional photos" in quote_html
+    assert "1. Choose a service" in quote_html
+    assert "2. Tell us about the job" in quote_html
+    assert "3. Access and location" in quote_html
+    assert "4. Special or heavy items" in quote_html
+    assert "5. Photos can help" in quote_html
+    assert "6. Your contact details" in quote_html
     assert 'id="serviceDetailsSummary"' in quote_html
     assert 'id="serviceDetailsLead"' in quote_html
     assert 'id="serviceDetailsPanel" class="detailPanel" open' in quote_html
@@ -271,7 +282,7 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
 
     assert "2-5. Job details" not in quote_html
     assert '<p class="customerFlowLabel">Step ' not in quote_html
-    for label in ["Load details", "Access details", "Special items", "Photo guidance"]:
+    for label in ["Job details", "3. Access and location", "4. Special or heavy items", "5. Photos can help"]:
         assert f'<p class="customerFlowLabel">{label}</p>' in quote_html
 
     assert "admin dashboard" not in index_html.lower()
