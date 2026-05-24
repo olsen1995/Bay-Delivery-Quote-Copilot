@@ -1,7 +1,7 @@
 # Bay Delivery Quote Copilot - Roadmap & Architecture Plan
 
 Prepared: May 10, 2026
-Updated: May 23, 2026
+Updated: May 24, 2026
 Prepared for: Austin / Bay Delivery
 
 ## Executive Principle
@@ -12,7 +12,7 @@ The system should stay boring, stable, and profitable. New features should make 
 
 ## May 23 Update Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #307 and the manual GPT Builder/live action verification that followed.
+This update refreshes the May 10 roadmap with actual completed work through PR #309 and the launch-readiness/current-state audit verification that followed.
 
 Key updates:
 
@@ -20,23 +20,25 @@ Key updates:
 - Added current verified production state after redeploy and Production Live-Safe Smoke.
 - Added real completed-job calibration evidence already entered into admin.
 - Marked the GPT Admin Notes pipeline complete: backend/storage/API, desktop admin display, GPT Action schema/docs/grounding, Builder compatibility cleanup, Custom GPT refresh, `getGptQuote` action retest, and live fake `createGptAdminNote` action/admin display verification.
-- Re-ranked the next practical tasks: launch-readiness/current-state audit after this roadmap sync first, then booking notification failure/skipped-send visibility planning as a later candidate, then later pricing/category improvements.
+- Recorded completed launch-readiness/current-state audit findings: launch-ready with notes, no P1 blockers, and one corrected docs drift item.
+- Re-ranked the next practical tasks: live Render /health version+commit parity verification and production live-safe smoke first, then booking notification failure/skipped-send visibility planning as a later candidate, then later pricing/category improvements.
 - Preserved all hard boundaries: one pricing engine, SQLite as source of truth, admin-only internal risk, no customer-facing GPT pricing path.
 
 ## Current Verified Repo / GPT State
 
-As of May 23, 2026:
+As of May 24, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #307 |
-| Latest verified main commit | `83f58e5 create GPT action builder compatibility cleanup (#307)` |
-| Version parity | Passed: `0.11.0` |
+| Main verification | Verified through PR #309 |
+| Latest verified main commit | `7386ccc create version 0.12.0 bump (#309)` |
+| Latest verified main commit (full SHA) | `7386cccd233a213716a80869ee3220da8ff0a948` |
+| Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
-| Focused GPT/admin/static tests | `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed; `tests/test_static_assets.py` 36 passed |
+| Focused GPT/admin/static tests | `tests/test_static_assets.py` 36 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed; `tests/test_launch_smoke_playwright.py` 4 passed |
 | Full pytest | Passed: 711 |
-| Protected no-go diff after PR #307 | No output |
+| Protected no-go diff after PR #309 | No output |
 | Custom GPT Knowledge | Updated from `dist/gpt_grounding_pack` after PR #307 |
 | Custom GPT Actions schema | Updated from `docs/gpt/GPT_ACTIONS_OPENAPI.yaml` after PR #307 |
 | GPT Builder | Updated and saved |
@@ -44,7 +46,10 @@ As of May 23, 2026:
 | Manual live fake admin-note action test | Passed through Custom GPT -> Render endpoint -> SQLite -> desktop admin GPT Notes display |
 | Observed fake GPT Admin Note id | `f39e3b09-ff31-4449-a431-dadda7daab6b` |
 | Manual completed-job calibration entries | Entered |
-| Current blockers | No known P1/P2 blockers |
+| Launch-readiness/current-state audit | Complete; verdict: launch-ready with notes |
+| P1 blockers | None found |
+| Outstanding non-code verification | Live Render /health version+commit parity and production live-safe smoke remain unverified in this network-off audit |
+| Current blockers | No P1 blockers; roadmap/current-state docs drift corrected in this refresh |
 
 ## Recommended Repo Save Location
 
@@ -147,13 +152,13 @@ These entries are now useful evidence for future pricing review, but they do not
 
 | Item | Status | Recommended Handling |
 | --- | --- | --- |
-| Production Observability and Launch Monitoring Plan | Not complete | Recommended next task; plan-only first. |
+| Production Observability and Launch Monitoring Plan | Not complete | Recommended after live Render parity verification and production live-safe smoke. |
 | Better Stack uptime/page monitoring | Not configured | External setup first; repo changes only if needed. |
 | Sentry backend error tracking | Not implemented | Future privacy-safe PR only after plan. |
 | Microsoft Clarity public-page UX tracking | Not implemented | Future public-pages-only, admin-excluded setup. |
 | Google Search Console | Not confirmed complete | External setup; repo change only if verification/sitemap needs it. |
 | Customer launch SMTP configuration | Not authorized/configured | Keep env vars unset until launch authorization and controlled test. |
-| Booking notification failure/skipped-send admin visibility | Not implemented | Later candidate after launch-readiness/current-state audit; plan first before admin/runtime work. |
+| Booking notification failure/skipped-send admin visibility | Not implemented | Later candidate after live Render parity verification; plan first before admin/runtime work. |
 | Internal customer notes | Not implemented | Future admin-only feature. |
 | Job difficulty score | Not implemented | Future risk/triage feature. |
 | Full missing-info detector | Not complete | Future admin guidance feature. |
@@ -181,9 +186,9 @@ These entries are now useful evidence for future pricing review, but they do not
 | 8 | Lead Source + Repeat Customer Tracking | Capture lead source and show customer history in admin. | Complete no-schema v1 |
 | 9 | Manual Completed Job Calibration Log | Capture real non-public-quote completed jobs for owner review. | Complete and in use |
 | 10 | GPT Admin Notes | Let GPT send internal admin-visible advisory notes for review. | Complete current v1 |
-| 11 | Launch-Readiness / Current-State Audit | Re-check repo, GPT Builder, Render/live state, docs parity, and launch blockers after this roadmap sync. | Recommended next task |
-| 12 | Production Observability and Launch Monitoring | Better uptime, error, UX, search, and backup visibility. | Later plan candidate |
-| 13 | Booking Notification Failure Visibility | Show failed/skipped booking notification attempts clearly in desktop admin before launch. | Later plan candidate |
+| 11 | Launch-Readiness / Current-State Audit | Re-check repo, GPT Builder, Render/live state, docs parity, and launch blockers after this roadmap sync. | Complete: launch-ready with notes; no P1 blockers |
+| 12 | Production Observability and Launch Monitoring | Better uptime, error, UX, search, and backup visibility. | Recommended next task after live Render parity verification |
+| 13 | Booking Notification Failure Visibility | Show failed/skipped booking notification attempts clearly in desktop admin before launch. | Deferred until after live verification |
 | 14 | Job Closeout + Internal Notes + Difficulty Scoring | More complete post-job and customer history intelligence. | Future |
 | 15 | Pricing PRs by Service Category | Deliberate category pricing changes after evidence review. | Future/deferred |
 | 16 | Photo Evidence / Photo Assistant | Advisory image notes; no auto-pricing. | Future/deferred |
