@@ -500,10 +500,12 @@ function renderQuoteResult(data, quoteResponse) {
 
 function clearForm() {
   el("quoteForm").reset();
-  const servicePanel = el("serviceDetailsPanel");
-  if (servicePanel) servicePanel.open = true;
   syncRouteFields();
   syncServiceFields();
+  const servicePanel = el("serviceDetailsPanel");
+  if (servicePanel) {
+    servicePanel.open = requiresRouteFields(el("service_type").value);
+  }
   hideBox("resultBox");
   hideBox("uploadStatus");
   hideBox("decisionStatus");
@@ -616,7 +618,7 @@ function syncServiceFields() {
   if (showScrap) {
     help.textContent = "Scrap pickup is usually quick to quote. Tell us whether the scrap is curbside or inside/on-property.";
     detailsSummary.textContent = "Details for your scrap pickup quote";
-    detailsLead.textContent = "Answer what you can. Not sure is okay. Photos are optional later if helpful.";
+    detailsLead.textContent = "Answer what you can. Not sure is okay. Open this section if scrap location or access details would help.";
   } else if (showRoute) {
     help.textContent = "For moves and deliveries, add both pickup and dropoff addresses so we can quote the route.";
     detailsSummary.textContent = "Pickup and dropoff details";
@@ -624,11 +626,11 @@ function syncServiceFields() {
   } else if (showLoadCounts) {
     help.textContent = "Use rough counts, location/access details, and special-item notes. Best estimates are fine.";
     detailsSummary.textContent = "Load, access, and item details";
-    detailsLead.textContent = "Add the closest counts and access details. For loose junk, use regular bags or choose the closest space estimate.";
+    detailsLead.textContent = "Add the closest counts, access details, and service-specific items like mattresses or box springs. For loose junk, use regular bags or choose the closest space estimate.";
   } else {
     help.textContent = "Pick the closest match. We will only show the details needed for that job.";
     detailsSummary.textContent = "Job details for your estimate";
-    detailsLead.textContent = "Fill in the details that help Bay Delivery prepare an accurate estimate.";
+    detailsLead.textContent = "Open this section for location, access, and item details that help Bay Delivery prepare an accurate estimate.";
   }
 
   syncBagCountNudge();
@@ -668,6 +670,9 @@ function syncRouteFields() {
     setInvalidState(dropoff, false);
     pickup.value = "";
     dropoff.value = "";
+    if (servicePanel) {
+      servicePanel.open = false;
+    }
   }
 }
 
