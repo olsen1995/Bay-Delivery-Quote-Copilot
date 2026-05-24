@@ -79,6 +79,13 @@ If the change starts touching backend, pricing, schema, auth, tokens, deployment
 - report the scope expansion
 - do not continue without explicit approval
 
+## Austin tool-routing preference
+
+- Use VS Code agents to save Codex tokens for lower-risk docs, version, verification, static/frontend polish, and straightforward repo hygiene.
+- For VS Code agents, use plan-first for everything except docs-only, version-only, and read-only verification.
+- Use Codex for higher-risk backend, security, auth, storage/schema, GPT Actions, pricing-adjacent, deployment/workflow, dependency/security, and broad cross-file implementation.
+- If VS Code implementation starts touching backend, pricing, payloads, auth, schema, GPT, Render/workflows, dependencies, or version files unexpectedly, stop and report.
+
 ## Frontend architecture rules
 
 - HTML pages live in `static/`.
@@ -149,7 +156,15 @@ Allowed quote-page improvements:
 - button label clarity
 - mobile readability improvements
 
+For customer quote simplification, prefer hiding/collapsing advanced fields over deleting fields.
+
+Keep pricing-protective fields available.
+
 Progressive disclosure is allowed only if existing fields still submit through the same payload flow.
+
+Preserve payload compatibility, field IDs, field names, enum values, data-step values, selectors, and quote flow behavior unless explicitly approved.
+
+Hidden fields must still submit through the existing payload path.
 
 Do not remove, rename, disable, or stop reading compatibility-sensitive fields unless the task explicitly allows it.
 

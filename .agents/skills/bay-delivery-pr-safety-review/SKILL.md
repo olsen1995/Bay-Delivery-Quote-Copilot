@@ -65,10 +65,18 @@ Any task touching pricing, quote totals, quote risk, customer quote payloads, or
 ## Current Baseline Notes
 
 Recent completed work includes:
-- PR #298 Launch UI Mobile Polish.
-- PR #299 Booking Request Notification Alerts.
-- PR #301 idna security lock refresh.
-- PR #300 GPT current-state refresh for booking alerts.
+- PR #309 create version 0.12.0 bump.
+- PR #310 create launch readiness current state docs refresh.
+- PR #311 create booking notification status visibility.
+- PR #312 create quote page step heading clarity polish.
+
+Current verified baseline:
+- Main is verified through PR #312.
+- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Current version: `0.12.0`.
+- GPT grounding parity passed previously.
+- Full pytest passed previously: 716 passed.
+- Production live-safe smoke passed previously.
 
 Booking notification infrastructure exists but remains disabled until Austin authorizes customer launch.
 
