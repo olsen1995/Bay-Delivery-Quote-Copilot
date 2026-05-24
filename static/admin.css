@@ -608,6 +608,19 @@ label {
 	border-color: rgba(52, 211, 153, 0.36);
 }
 
+.bookingNotificationStatus {
+	margin-top: 8px;
+	padding-top: 7px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	line-height: 1.35;
+}
+
+.bookingNotificationMeta {
+	margin-top: 2px;
+	color: var(--ink-muted);
+	font-size: 0.82rem;
+}
+
 .followupHelperGrid {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -281,6 +281,67 @@ def _cap_admin_list_limit(limit: int) -> int:
     return min(int(limit), _admin_list_limit_cap)
 
 
+def _operator_safe_notification_error(status: Any, last_error: Any) -> Optional[str]:
+    if last_error is None:
+        return None
+    text = str(last_error).strip()
+    if not text:
+        return None
+
+    normalized_status = str(status or "").lower()
+    if normalized_status == "failed":
+        return "send failed"
+
+    sensitive_patterns = (
+        r"bearer\s+",
+        r"password",
+        r"secret",
+        r"token",
+        r"sk-[A-Za-z0-9_-]+",
+        r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+    )
+    if any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in sensitive_patterns):
+        return "notification details unavailable"
+
+    return text[:160]
+
+
+def _booking_notification_summary(request_id: Any) -> dict[str, Any]:
+    if not request_id:
+        return {
+            "status": "unavailable",
+            "channel": None,
+            "attempt_count": 0,
+            "updated_at": None,
+            "sent_at": None,
+            "last_error": None,
+        }
+
+    attempt = storage.get_notification_attempt(
+        str(request_id),
+        booking_notification_service.BOOKING_SUBMITTED_EVENT_TYPE,
+    )
+    if not attempt:
+        return {
+            "status": "unavailable",
+            "channel": None,
+            "attempt_count": 0,
+            "updated_at": None,
+            "sent_at": None,
+            "last_error": None,
+        }
+
+    status = attempt.get("status") or "unavailable"
+    return {
+        "status": status,
+        "channel": attempt.get("channel"),
+        "attempt_count": int(attempt.get("attempt_count") or 0),
+        "updated_at": attempt.get("updated_at"),
+        "sent_at": attempt.get("sent_at"),
+        "last_error": _operator_safe_notification_error(status, attempt.get("last_error")),
+    }
+
+
 def _parse_basic_auth_credentials(header: str) -> tuple[str, str] | None:
     if not header.lower().startswith("basic "):
         return None
@@ -1949,7 +2010,12 @@ def admin_expire_quote(request: Request, quote_id: str, background_tasks: Backgr
 @app.get("/admin/api/quote-requests")
 def admin_list_quote_requests(request: Request, limit: int = 50):
     _require_admin(request)
-    return {"items": list_quote_requests(limit=_cap_admin_list_limit(limit), include_followup_status=True)}
+    items = []
+    for item in list_quote_requests(limit=_cap_admin_list_limit(limit), include_followup_status=True):
+        enriched = dict(item)
+        enriched["booking_notification"] = _booking_notification_summary(enriched.get("request_id"))
+        items.append(enriched)
+    return {"items": items}
 
 
 @app.get("/admin/api/ops-queue")

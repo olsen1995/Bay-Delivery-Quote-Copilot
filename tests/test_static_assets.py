@@ -1013,6 +1013,43 @@ def test_desktop_admin_includes_quote_request_followup_status_controls_only() ->
     assert "followupQuickActions" not in mobile_js
 
 
+def test_desktop_admin_includes_booking_notification_status_visibility_only() -> None:
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    assert "function createBookingNotificationStatus(item)" in admin_js
+    assert "item.booking_notification || {}" in admin_js
+    assert "Internal alert sent" in admin_js
+    assert "Internal alert pending" in admin_js
+    assert "Internal alert not sent" in admin_js
+    assert "Internal alert failed" in admin_js
+    assert "Internal alert not recorded" in admin_js
+    assert "Setup/off" in admin_js
+    assert "Config needed" in admin_js
+    assert "Review manually" in admin_js
+    assert "tdTotals.append(stWrap, cash, emt, createBookingNotificationStatus(r));" in admin_js
+    assert ".bookingNotificationStatus" in admin_css
+    assert ".bookingNotificationMeta" in admin_css
+
+    for forbidden in [
+        "createBookingNotificationStatus",
+        "booking_notification",
+        "Internal alert",
+        "notification_attempt",
+    ]:
+        assert forbidden not in mobile_html
+        assert forbidden not in mobile_js
+        assert forbidden not in quote_html
+        assert forbidden not in quote_js
+
+    for forbidden_endpoint in ["/sms", "/email", "/messages"]:
+        assert forbidden_endpoint not in admin_js
+
+
 def test_desktop_admin_includes_followup_message_helper_only() -> None:
     admin_html = Path("static/admin.html").read_text(encoding="utf-8")
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")

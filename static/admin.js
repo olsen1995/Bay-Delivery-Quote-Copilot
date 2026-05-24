@@ -2243,6 +2243,45 @@ function actionCell(item) {
   return td;
 }
 
+function createBookingNotificationStatus(item) {
+  const notification = item.booking_notification || {};
+  const status = (notification.status || "unavailable").toLowerCase();
+  const labels = {
+    sent: "Internal alert sent",
+    pending: "Internal alert pending",
+    skipped: "Internal alert not sent",
+    failed: "Internal alert failed",
+    unavailable: "Internal alert not recorded"
+  };
+  const helperLabels = {
+    sent: notification.sent_at || notification.updated_at || "",
+    pending: "Trying now",
+    skipped: (notification.last_error || "").includes("missing notification config") ? "Config needed" : "Setup/off",
+    failed: "Review manually",
+    unavailable: "No attempt found"
+  };
+
+  const wrap = document.createElement("div");
+  wrap.className = "bookingNotificationStatus small";
+
+  const label = document.createElement("div");
+  label.textContent = labels[status] || labels.unavailable;
+  wrap.appendChild(label);
+
+  const metaParts = [];
+  const helper = helperLabels[status] || "";
+  if (helper) metaParts.push(helper);
+  if (notification.channel) metaParts.push(String(notification.channel).toUpperCase());
+  if (Number(notification.attempt_count || 0) > 0) metaParts.push("Attempts: " + notification.attempt_count);
+
+  const meta = document.createElement("div");
+  meta.className = "bookingNotificationMeta";
+  meta.textContent = metaParts.join(" / ");
+  wrap.appendChild(meta);
+
+  return wrap;
+}
+
 function renderRequests(items) {
   const box = document.getElementById("requestsBox");
   currentRequestItems = items || [];
@@ -2305,7 +2344,7 @@ function renderRequests(items) {
     emt.className = "small";
     emt.textContent = "EMT: " + money(r.emt_total_cad);
 
-    tdTotals.append(stWrap, cash, emt);
+    tdTotals.append(stWrap, cash, emt, createBookingNotificationStatus(r));
 
     tr.append(tdReq, tdCustomer, tdJob, tdRequested, tdFollowup, tdTotals, actionCell(r));
     tbody.appendChild(tr);
