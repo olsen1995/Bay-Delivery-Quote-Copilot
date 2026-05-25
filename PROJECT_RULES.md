@@ -287,8 +287,8 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Main is verified through PR #312.
-- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
+- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
 - Current version: `0.12.0`.
 
 Current active roadmap/current-state sequence:

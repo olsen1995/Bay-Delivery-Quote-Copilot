@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Bay Delivery Internal GPT Actions
-  version: 0.11.0
+  version: 0.12.0
   description: Source schema for internal Bay Delivery GPT Builder quote and advisory admin note actions.
 servers:
   - url: https://bay-delivery-quote-copilot.onrender.com

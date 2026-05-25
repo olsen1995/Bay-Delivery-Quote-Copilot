@@ -44,8 +44,8 @@ The app has moved beyond a basic quote calculator. It now supports a stronger op
 
 Current verified baseline markers:
 
-- Main is verified through PR #312.
-- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
+- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
 - Current repo version: `0.12.0`.
 
 Recent roadmap work completed:
@@ -81,6 +81,12 @@ Recent roadmap work completed:
 
 8. **Quote Page Step Heading Clarity Polish**
    - Customer quote-step heading clarity was improved while preserving payload compatibility and quote-flow behavior.
+
+9. **Quote First-View Simplification Polish**
+   - Customer quote first-view clarity was improved while preserving the public quote contract.
+
+10. **Admin POST Origin Fail-Closed Hardening**
+   - Admin POST origin enforcement was hardened to fail closed, with regression coverage updated.
 
 Current repo version:
 

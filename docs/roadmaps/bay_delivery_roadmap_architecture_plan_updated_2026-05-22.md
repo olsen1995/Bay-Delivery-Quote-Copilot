@@ -1,7 +1,7 @@
 # Bay Delivery Quote Copilot - Roadmap & Architecture Plan
 
 Prepared: May 10, 2026
-Updated: May 24, 2026
+Updated: May 25, 2026
 Prepared for: Austin / Bay Delivery
 
 ## Executive Principle
@@ -10,9 +10,9 @@ Customer side stays simple. Admin side tells Austin and Dan what needs attention
 
 The system should stay boring, stable, and profitable. New features should make Bay Delivery easier to operate, not create a second pricing brain, a public chatbot, or a fragile CRM clone.
 
-## May 23 Update Summary
+## May 25 Baseline Refresh Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #312 and the launch-readiness/current-state audit verification that followed.
+This update refreshes the May 10 roadmap with actual completed work through PR #316 and the current main baseline at `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
 
 Key updates:
 
@@ -20,25 +20,25 @@ Key updates:
 - Added current verified production state after redeploy and Production Live-Safe Smoke.
 - Added real completed-job calibration evidence already entered into admin.
 - Marked the GPT Admin Notes pipeline complete: backend/storage/API, desktop admin display, GPT Action schema/docs/grounding, Builder compatibility cleanup, Custom GPT refresh, `getGptQuote` action retest, and live fake `createGptAdminNote` action/admin display verification.
-- Recorded completed launch-readiness/current-state audit findings: launch-ready with notes, no P1 blockers, and one corrected docs drift item.
-- Re-ranked the next practical tasks: live Render /health version+commit parity verification and production live-safe smoke first, then booking notification failure/skipped-send visibility planning as a later candidate, then later pricing/category improvements.
+- Recorded completed launch-readiness/current-state audit findings and the later full repo audit verdict: Yellow 91/100, no P1 blockers, with stale current-state/docs/GPT metadata as the main P2 item addressed by this refresh.
+- Re-ranked the next practical task to keep current-state docs and grounding metadata aligned before new broad feature work.
 - Preserved all hard boundaries: one pricing engine, SQLite as source of truth, admin-only internal risk, no customer-facing GPT pricing path.
 
 ## Current Verified Repo / GPT State
 
-As of May 24, 2026:
+As of May 25, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #312 |
-| Latest verified main commit | `d420dfc create quote page step heading clarity polish (#312)` |
-| Latest verified main commit (full SHA) | `d420dfca57906830bcf4e623c5229697d5cde149` |
+| Main verification | Verified through PR #316 and current main docs/notes commit |
+| Latest verified main commit | `0451187 Refine documentation formatting in agent template usefulness notes, commands cheat sheet, and skill progression recommendations for improved clarity and consistency.` |
+| Latest verified main commit (full SHA) | `04511871e1c2e194f6a743f61a297bd4b3d1aa63` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
-| Focused GPT/admin/static tests | `tests/test_static_assets.py` 36 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed; `tests/test_launch_smoke_playwright.py` 4 passed |
-| Full pytest | Passed: 716 |
-| Protected no-go diff after PR #312 | No output |
+| Focused GPT/admin/static tests | `tests/test_env_and_dependencies.py` 23 passed; `tests/test_abuse_controls.py` 16 passed; `tests/test_static_assets.py` 37 passed; `tests/test_quote_structured_intake_fields.py` 25 passed; `tests/test_launch_smoke_playwright.py` 4 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed |
+| Full pytest | Passed: 719 |
+| Protected no-go diff after current baseline | No output |
 | Custom GPT Knowledge | Updated from `dist/gpt_grounding_pack` after PR #307 |
 | Custom GPT Actions schema | Updated from `docs/gpt/GPT_ACTIONS_OPENAPI.yaml` after PR #307 |
 | GPT Builder | Updated and saved |
@@ -47,8 +47,9 @@ As of May 24, 2026:
 | Observed fake GPT Admin Note id | `f39e3b09-ff31-4449-a431-dadda7daab6b` |
 | Manual completed-job calibration entries | Entered |
 | Launch-readiness/current-state audit | Complete; verdict: launch-ready with notes |
+| Full repo audit | Complete; verdict: Yellow 91/100; no P1 blockers |
 | P1 blockers | None found |
-| Outstanding non-code verification | None for this docs/instruction refresh scope |
+| Main P2 issue | Stale current-state/docs/GPT metadata; addressed by this refresh |
 | Current blockers | No P1 blockers for this scope |
 
 ## Recommended Repo Save Location
@@ -136,6 +137,8 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 | Manual Custom GPT Builder refresh after PR #307 | Complete | Knowledge files and Actions schema were updated from repo-generated sources; Builder was saved. |
 | Manual GPT action verification after PR #307 | Complete | `getGptQuote` passed after Builder schema cleanup, and a live fake `createGptAdminNote` action wrote through Render to SQLite and appeared in desktop admin GPT Notes (Advisory). |
 | Production redeploy + live-safe smoke | Complete | Smoke run passed at head SHA `65187325cbdbc21897579078207ea2adba4de46b`. |
+| PR #315 - create quote first-view simplification polish | Complete | Public quote first-view clarity improved while preserving field IDs, option values, payload compatibility, and `/quote/calculate` behavior. |
+| PR #316 - create admin post origin fail closed hardening | Complete | Admin POST origin enforcement hardened to fail closed, with regression coverage updated. |
 | Live visual audit | Complete | No P1/P2 issues; only minor P3 polish. |
 | Manual calibration entries | Complete | $1,200 old shed removal and $600 backyard tarp/fence teardown entered. |
 
@@ -187,8 +190,8 @@ These entries are now useful evidence for future pricing review, but they do not
 | 9 | Manual Completed Job Calibration Log | Capture real non-public-quote completed jobs for owner review. | Complete and in use |
 | 10 | GPT Admin Notes | Let GPT send internal admin-visible advisory notes for review. | Complete current v1 |
 | 11 | Launch-Readiness / Current-State Audit | Re-check repo, GPT Builder, Render/live state, docs parity, and launch blockers after this roadmap sync. | Complete: launch-ready with notes; no P1 blockers |
-| 12 | Production Observability and Launch Monitoring | Better uptime, error, UX, search, and backup visibility. | Recommended next task after live Render parity verification |
-| 13 | Booking Notification Failure Visibility | Show failed/skipped booking notification attempts clearly in desktop admin before launch. | Deferred until after live verification |
+| 12 | Production Observability and Launch Monitoring | Better uptime, error, UX, search, and backup visibility. | Later candidate; do not displace current docs/GPT metadata parity |
+| 13 | Booking Notification Failure Visibility | Show failed/skipped booking notification attempts clearly in desktop admin before launch. | Recommended next feature candidate after current-state metadata refresh |
 | 14 | Job Closeout + Internal Notes + Difficulty Scoring | More complete post-job and customer history intelligence. | Future |
 | 15 | Pricing PRs by Service Category | Deliberate category pricing changes after evidence review. | Future/deferred |
 | 16 | Photo Evidence / Photo Assistant | Advisory image notes; no auto-pricing. | Future/deferred |
@@ -386,26 +389,7 @@ Pricing changes should wait until admin risk summaries, completed-job reporting,
 
 ## Updated Next Task Recommendation
 
-### Recommended next task
-
-```text
-launch-readiness/current-state audit after roadmap sync
-```
-
-Mode:
-
-```text
-Read-only audit. Do not mutate production data.
-```
-
-Why this comes next:
-
-- Main is verified through PR #307, and GPT Builder/live action verification has completed.
-- Roadmap/current-state docs need to be treated as freshly synced before the next launch decision.
-- A launch-readiness pass should re-check repo state, GPT grounding/current-state parity, live Render health/version/commit, public quote/admin entry points, and any remaining launch blockers before new feature work.
-- This protects production and avoids choosing the next feature from stale docs.
-
-### Recommended next feature candidate after launch-readiness audit
+### Recommended next task after current-state metadata refresh
 
 ```text
 show booking notification failures/skipped sends in desktop admin before launch
@@ -414,14 +398,15 @@ show booking notification failures/skipped sends in desktop admin before launch
 Mode:
 
 ```text
-Plan first. Implement only as a narrow follow-up PR if launch-readiness audit is clear.
+Plan first. Implement only as a narrow follow-up PR if launch-readiness and current-state metadata remain clear.
 ```
 
-Why:
+Why this comes next:
 
 - Booking notification infrastructure exists but remains disabled until launch authorization.
 - Failed/skipped notification attempts are tracked internally but are not yet operator-visible in desktop admin.
-- This is useful before launch, but it should not displace the immediate launch-readiness/current-state audit.
+- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`, with no P1 blockers in the latest audit.
+- This is useful before launch, but it should not displace current-state metadata parity or broaden into launch monitoring.
 
 ## Codex / Agent Usage Rules
 
