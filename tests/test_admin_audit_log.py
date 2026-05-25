@@ -47,7 +47,7 @@ def setup_audit_log(isolated_db: None) -> None:
 
 def make_basic_auth(username: str, password: str) -> dict[str, str]:
     token = base64.b64encode(f"{username}:{password}".encode()).decode()
-    return {"Authorization": f"Basic {token}"}
+    return {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
 
 
 def latest_audit_entry() -> dict[str, object]:

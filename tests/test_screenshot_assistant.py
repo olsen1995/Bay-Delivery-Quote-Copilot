@@ -29,7 +29,7 @@ def client() -> TestClient:
 
 def admin_headers() -> dict[str, str]:
     token = base64.b64encode(b"admin:secret").decode("utf-8")
-    return {"Authorization": f"Basic {token}"}
+    return {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
 
 
 def configure_upload_mocks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -690,7 +690,6 @@ def test_screenshot_assistant_minimum_safe_respects_active_engine_floors(client:
     protected_floor = artifacts["engine_quote"]["_internal"]["item_delivery_protected_base_floor_cad"]
     assert protected_floor > 0
     assert guidance["range"]["minimum_safe_cash_cad"] >= protected_floor
-
 
 
 

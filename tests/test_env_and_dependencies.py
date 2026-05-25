@@ -185,6 +185,29 @@ def _admin_basic_header() -> str:
     return f"Basic {token}"
 
 
+_DRIVE_RESTORE_PAYLOAD = {"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"}
+
+_PUBLIC_QUOTE_PAYLOAD = {
+    "customer_name": "Origin Tester",
+    "customer_phone": "705-555-0100",
+    "job_address": "123 Main St",
+    "job_description_customer": "desc",
+    "description": "desc",
+    "service_type": "haul_away",
+    "payment_method": "cash",
+    "pickup_address": "1 Pickup Rd",
+    "dropoff_address": "2 Dropoff Ave",
+    "estimated_hours": 1.0,
+    "crew_size": 1,
+    "garbage_bag_count": 0,
+    "trailer_fill_estimate": "under_quarter",
+    "mattresses_count": 0,
+    "box_springs_count": 0,
+    "scrap_pickup_location": "curbside",
+    "travel_zone": "in_town",
+}
+
+
 def test_admin_post_allows_matching_origin(monkeypatch):
     main = _reload_main_with_env(
         {
@@ -202,7 +225,7 @@ def test_admin_post_allows_matching_origin(monkeypatch):
                 "Authorization": _admin_basic_header(),
                 "Origin": "https://admin.example.com",
             },
-            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+            json=_DRIVE_RESTORE_PAYLOAD,
         )
 
     assert resp.status_code == 501
@@ -225,14 +248,34 @@ def test_admin_post_rejects_mismatched_origin(monkeypatch):
                 "Authorization": _admin_basic_header(),
                 "Origin": "https://evil.example.com",
             },
-            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+            json=_DRIVE_RESTORE_PAYLOAD,
         )
 
     assert resp.status_code == 403
     assert resp.json()["detail"] == "Origin not allowed for admin POST request."
 
 
-def test_admin_post_allows_missing_origin_for_compatibility(monkeypatch):
+def test_admin_post_rejects_missing_all_browser_provenance_headers(monkeypatch):
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD": "secret",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers={"Authorization": _admin_basic_header()},
+            json=_DRIVE_RESTORE_PAYLOAD,
+        )
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Origin not allowed for admin POST request."
+
+
+def test_admin_post_allows_missing_origin_with_matching_referer(monkeypatch):
     main = _reload_main_with_env(
         {
             "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
@@ -245,8 +288,11 @@ def test_admin_post_allows_missing_origin_for_compatibility(monkeypatch):
     with TestClient(main.app) as client:
         resp = client.post(
             "/admin/api/drive/restore",
-            headers={"Authorization": _admin_basic_header()},
-            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+            headers={
+                "Authorization": _admin_basic_header(),
+                "Referer": "https://admin.example.com/admin",
+            },
+            json=_DRIVE_RESTORE_PAYLOAD,
         )
 
     assert resp.status_code == 501
@@ -270,7 +316,7 @@ def test_admin_post_allows_missing_origin_with_same_origin_browser_context(monke
                 "Authorization": _admin_basic_header(),
                 "Sec-Fetch-Site": "same-origin",
             },
-            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+            json=_DRIVE_RESTORE_PAYLOAD,
         )
 
     assert resp.status_code == 501
@@ -293,7 +339,7 @@ def test_admin_post_rejects_missing_origin_with_cross_site_browser_context(monke
                 "Authorization": _admin_basic_header(),
                 "Sec-Fetch-Site": "cross-site",
             },
-            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+            json=_DRIVE_RESTORE_PAYLOAD,
         )
 
     assert resp.status_code == 403
@@ -316,11 +362,44 @@ def test_admin_post_rejects_missing_origin_with_hostile_referer(monkeypatch):
                 "Authorization": _admin_basic_header(),
                 "Referer": "https://evil.example.com/admin",
             },
-            json={"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"},
+            json=_DRIVE_RESTORE_PAYLOAD,
         )
 
     assert resp.status_code == 403
     assert resp.json()["detail"] == "Origin not allowed for admin POST request."
+
+
+def test_admin_get_read_endpoint_is_not_subject_to_post_origin_gate(monkeypatch):
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD": "secret",
+        }
+    )
+    monkeypatch.setattr(main, "_drive_enabled", lambda: False)
+
+    with TestClient(main.app) as client:
+        resp = client.get("/admin/api/drive/status", headers={"Authorization": _admin_basic_header()})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "drive_configured": False}
+
+
+def test_public_quote_calculate_is_not_subject_to_admin_post_origin_gate():
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://admin.example.com",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD": "secret",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.post("/quote/calculate", json=_PUBLIC_QUOTE_PAYLOAD)
+
+    assert resp.status_code == 200
+    assert resp.json()["request"]["service_type"] == "haul_away"
 
 
 def test_google_drive_libs_optional(monkeypatch):

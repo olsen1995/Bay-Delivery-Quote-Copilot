@@ -29,7 +29,7 @@ def setup_audit_log(isolated_db: None) -> None:
 
 def _admin_headers() -> dict[str, str]:
     token = base64.b64encode(b"admin:secret").decode("utf-8")
-    return {"Authorization": f"Basic {token}"}
+    return {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
 
 
 def latest_audit_entry() -> dict[str, object]:

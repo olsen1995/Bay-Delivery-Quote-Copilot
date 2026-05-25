@@ -34,7 +34,7 @@ def client(monkeypatch: pytest.MonkeyPatch, isolated_db: Path) -> TestClient:
 @pytest.fixture
 def admin_headers() -> dict[str, str]:
     token = base64.b64encode(b"admin:secret").decode("utf-8")
-    return {"Authorization": f"Basic {token}"}
+    return {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
 
 
 def _seed_job(
