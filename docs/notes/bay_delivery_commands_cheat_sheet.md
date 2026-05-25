@@ -10,7 +10,7 @@ Use PowerShell unless a command says otherwise.
 ## 1. Start Here — Repo Location
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Go to Bay Delivery repo | `cd C:\Repos\Bay-Delivery-Quote-Copilot` | Before running repo commands | Run this first. |
 | Check current folder | `pwd` | When unsure where PowerShell is | Should show the repo path. |
 | List files | `dir` | Quick folder check | Useful if you feel lost. |
@@ -20,7 +20,7 @@ Use PowerShell unless a command says otherwise.
 ## 2. Git Status / Sync Commands
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check repo status | `git status --short --branch` | Before/after any task | Clean should look like `## main...origin/main`. |
 | Check recent commits | `git log --oneline -5` | After pull/merge | Confirms latest PR commit is present. |
 | Switch to main | `git checkout main` | Before verification or new task | Do not do this with dirty files unless you know why. |
@@ -36,7 +36,7 @@ Use PowerShell unless a command says otherwise.
 ## 3. Safe Post-Merge Verification
 
 | Use | Command | When to use | Expected |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Sync main | `git checkout main; git pull origin main` | After merging a PR | main should update cleanly. |
 | Check status/log | `git status --short --branch; git log --oneline -5` | After pull | Confirms current main. |
 | Version parity | `.\.venv\Scripts\python.exe tools\check_version_parity.py` | Every verification | `Version markers aligned: 0.12.0` |
@@ -49,7 +49,7 @@ Use PowerShell unless a command says otherwise.
 ## 4. Focused Test Commands
 
 | Area | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Static/frontend assets | `.\.venv\Scripts\python.exe -m pytest -q tests\test_static_assets.py` | Quote/admin static changes | Fast frontend safety check. |
 | Quote structured intake | `.\.venv\Scripts\python.exe -m pytest -q tests\test_quote_structured_intake_fields.py` | Quote form/payload changes | Protects IDs/fields/payload expectations. |
 | Playwright smoke | `.\.venv\Scripts\python.exe -m pytest -q tests\test_launch_smoke_playwright.py` | Quote/homepage UI changes | Browser-style smoke test. |
@@ -94,7 +94,7 @@ Expected: **no output**.
 ## 6. Production Live-Safe Smoke
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Trigger smoke | `gh workflow run production_live_safe_smoke.yml --ref main` | After public/customer/admin-safe changes merge | Does live-safe checks. |
 | List smoke runs | `gh run list --workflow production_live_safe_smoke.yml --limit 5` | After triggering | Get newest run ID/status. |
 | Open newest run in browser | `gh run view --web` | Quick visual check | Opens GitHub Actions page. |
@@ -105,7 +105,7 @@ Expected: **no output**.
 ## 7. Health / Live Checks
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check live health in browser | `https://bay-delivery-quote-copilot.onrender.com/health` | After deploy/smoke | Should show version/commit. |
 | PowerShell health check | `Invoke-RestMethod https://bay-delivery-quote-copilot.onrender.com/health` | Quick terminal check | Shows JSON object. |
 | Homepage | `https://bay-delivery-quote-copilot.onrender.com/` | Visual check | Customer-facing homepage. |
@@ -118,7 +118,7 @@ Expected: **no output**.
 ## 8. GitHub CLI Commands
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check GitHub CLI version | `gh --version` | Update/check tooling | Confirms installed version. |
 | Login status | `gh auth status` | If GitHub commands fail | Confirms auth. |
 | View PR list | `gh pr list` | Check open PRs | Use in repo. |
@@ -134,7 +134,7 @@ Expected: **no output**.
 Use Source Control UI if preferred. These are here when terminal is easier.
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Create branch | `git checkout -b create/example-branch-name` | New PR work | Branch should start with `create/`. |
 | Stage specific file | `git add path\to\file.py` | Before commit | Prefer specific files over `git add .`. |
 | Commit | `git commit -m "create short headline" -m "Longer description here."` | After validation | Commit headline should start with `create` for repo convention. |
@@ -146,7 +146,7 @@ Use Source Control UI if preferred. These are here when terminal is easier.
 ## 10. Cleaning Local Junk Safely
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check dirty files | `git status --short --branch` | Before cleanup | See what is dirty/untracked. |
 | Remove Playwright MCP artifact | `Remove-Item -Recurse -Force .playwright-mcp` | If only `.playwright-mcp/` is untracked | Safe local artifact cleanup. |
 | Remove Playwright output folder | `Remove-Item -Recurse -Force output\playwright` | Only if local QA output | Do not remove tracked files. |
@@ -160,7 +160,7 @@ Use Source Control UI if preferred. These are here when terminal is easier.
 ## 11. Python / Virtual Environment
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check venv Python | `.\.venv\Scripts\python.exe --version` | Verify Python | Repo expects Python 3.11. |
 | Activate venv | `.\.venv\Scripts\Activate.ps1` | Optional convenience | Direct `.venv\Scripts\python.exe` works without activation. |
 | Install dependencies | `.\.venv\Scripts\python.exe -m pip install -r requirements.txt` | Initial setup/basic install | Prefer lock file if available. |
@@ -174,7 +174,7 @@ Use Source Control UI if preferred. These are here when terminal is easier.
 ## 12. Node / npm / Codex
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check Node | `node --version` | Tooling check | Codex uses Node/npm if installed through npm. |
 | Check npm | `npm --version` | Tooling check | Global package manager. |
 | Check Codex | `codex --version` | Before/after update | Confirms Codex CLI. |
@@ -187,7 +187,7 @@ Use Source Control UI if preferred. These are here when terminal is easier.
 ## 13. Winget / App Updates
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check winget version | `winget --version` | Tooling check | Windows Package Manager. |
 | List available updates | `winget upgrade` | See updates | Review before upgrading. |
 | Update GitHub CLI | `winget upgrade --id GitHub.cli -e` | Keep GH CLI current | Safe generally. |
@@ -239,7 +239,7 @@ npm --version
 ## 15. Render / Deployment Checks
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Check Render CLI | `C:\Tools\render\render.exe --version` | If using Render CLI | Optional. |
 | Live health | `Invoke-RestMethod https://bay-delivery-quote-copilot.onrender.com/health` | After deploy | Confirms live version/commit. |
 | Production smoke | `gh workflow run production_live_safe_smoke.yml --ref main` | After important merge | Preferred Render/live check path. |
@@ -249,12 +249,12 @@ npm --version
 ## 16. Search Commands
 
 | Use | Command | When to use | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Search text | `rg -n "search text" app static tests docs` | Find code/docs | Fast if ripgrep installed. |
-| Search unsafe JS patterns | `rg -n "innerHTML|outerHTML|insertAdjacentHTML|eval\(|Function\(" static app tests` | Frontend/security audit | Should usually be empty or intentional. |
-| Search secrets words | `rg -n "password|secret|token|SMTP|Bearer|Authorization" app static tests docs .github` | Security audit | Review results carefully. |
-| Search TODOs | `rg -n "TODO|FIXME|SECURITY|HACK|temporary|unsafe|debug" app static tests scripts tools docs .github` | Audit cleanup | Useful before release. |
-| Search route decorators | `rg -n "@app\.(get|post|put|delete|patch)\(" app/main.py` | Route audit | Shows API surface. |
+| Search unsafe JS patterns | `rg -n "innerHTML\|outerHTML\|insertAdjacentHTML\|eval\(\|Function\(" static app tests` | Frontend/security audit | Should usually be empty or intentional. |
+| Search secrets words | `rg -n "password\|secret\|token\|SMTP\|Bearer\|Authorization" app static tests docs .github` | Security audit | Review results carefully. |
+| Search TODOs | `rg -n "TODO\|FIXME\|SECURITY\|HACK\|temporary\|unsafe\|debug" app static tests scripts tools docs .github` | Audit cleanup | Useful before release. |
+| Search route decorators | `rg -n "@app\.(get\|post\|put\|delete\|patch)\(" app/main.py` | Route audit | Shows API surface. |
 
 ---
 
@@ -309,7 +309,7 @@ git diff --check
 ## 18. What Not To Do Casually
 
 | Do not casually run | Why |
-|---|---|
+| --- | --- |
 | `git reset --hard` | Deletes local changes. Only use when explicitly approved. |
 | `git clean -fd` | Deletes untracked files. Preview first with `git clean -fdn`. |
 | `winget upgrade --all` | Can update Python/Node/Build Tools all at once. |
@@ -341,7 +341,7 @@ If those pass and `git status` is clean, the repo is usually in good shape.
 ## 20. Current Bay Delivery Guardrails Reminder
 
 | Guardrail | Reminder |
-|---|---|
+| --- | --- |
 | Pricing authority | Only `app/quote_engine.py`. Do not create a second pricing engine. |
 | Cash/EMT | Cash no HST. EMT/e-transfer +13% HST. |
 | Admin | Internal operations only. |

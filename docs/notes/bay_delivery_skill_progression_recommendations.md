@@ -20,13 +20,13 @@ Use it when a pattern repeats enough that it deserves a checklist, agent skill, 
 
 ## Ranked Priority
 
-| Rank | Skill | Recommendation |
-|---:|---|---|
-| 1 | Small-PR evidence discipline | Most useful immediately. Keep using this in every PR review. |
-| 2 | Protected-surface frontend contract review | Very useful for quote-page/customer-facing polish. |
-| 3 | Docs and current-state traceability audit | Useful for version, SHA, roadmap, and grounding-pack accuracy. |
-| 4 | Internal-only boundary review for admin, GPT, and notification work | Important before future GPT/admin/notification expansion. |
-| 5 | SQLite mutation-safety review for operator tools | Use when touching data cleanup, backup/import/export, or persisted admin tools. |
+| Rank | Skill                                                               | Recommendation                                                                  |
+| ---: | ------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+|    1 | Small-PR evidence discipline                                        | Most useful immediately. Keep using this in every PR review.                    |
+|    2 | Protected-surface frontend contract review                          | Very useful for quote-page/customer-facing polish.                              |
+|    3 | Docs and current-state traceability audit                           | Useful for version, SHA, roadmap, and grounding-pack accuracy.                  |
+|    4 | Internal-only boundary review for admin, GPT, and notification work | Important before future GPT/admin/notification expansion.                       |
+|    5 | SQLite mutation-safety review for operator tools                    | Use when touching data cleanup, backup/import/export, or persisted admin tools. |
 
 ---
 

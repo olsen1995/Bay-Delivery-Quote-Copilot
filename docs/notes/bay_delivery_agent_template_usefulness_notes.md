@@ -15,6 +15,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### 1. Scan outdated dependencies; propose safe upgrades with minimal changes
 
 **Use when:**
+
 - Planning a dependency/security review.
 - Checking `requirements.txt` and `requirements.lock.txt`.
 - Reviewing `pip-audit` results.
@@ -31,6 +32,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### 2. Summarize CI failures and flaky tests from the last CI window
 
 **Use when:**
+
 - GitHub Actions fails.
 - CI has flaky tests.
 - We need a quick root-cause summary before writing a fix prompt.
@@ -44,6 +46,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### 3. Check CI failures; group by likely root cause and suggest minimal fixes
 
 **Use when:**
+
 - CI fails and we need a practical action plan.
 - Multiple tests fail and the cause is not obvious.
 
@@ -56,6 +59,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### 4. Audit performance regressions and propose highest-leverage fixes
 
 **Use when:**
+
 - The live app feels slow.
 - Admin pages become heavy.
 - Real traffic or database size creates noticeable latency.
@@ -71,6 +75,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### 5. Before tagging, verify changelog, migrations, feature flags, and tests
 
 **Use when:**
+
 - Preparing a formal release/tag.
 - Verifying a launch milestone.
 - Checking that changelog/release notes, migrations, feature flags, and tests are aligned.
@@ -86,6 +91,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### Draft weekly release notes from merged PRs
 
 **Use when:**
+
 - Creating a weekly project summary.
 - Preparing a handoff.
 - Recording what changed for business/ops history.
@@ -97,6 +103,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### Synthesize this week’s PRs, rollouts, incidents, and reviews into a weekly update
 
 **Use when:**
+
 - Creating a weekly operational update.
 - Summarizing progress for future handoffs.
 
@@ -107,6 +114,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### Update AGENTS.md with newly discovered workflows and commands
 
 **Use when:**
+
 - `AGENTS.md` is confirmed active and stale.
 - A workflow discovery should be preserved for future agents.
 
@@ -119,6 +127,7 @@ Bay Delivery Quote Copilot is production infrastructure. Use these templates onl
 ### Identify untested paths from recent changes; add focused tests
 
 **Use when:**
+
 - A PR touched behavior and coverage feels thin.
 - Review comments suggest missing tests.
 - A bug reveals an untested edge case.
@@ -145,13 +154,13 @@ These are not bad templates; they are just not aligned with current Bay Delivery
 
 ## Practical use order
 
-| Situation | Useful template |
-|---|---|
-| CI fails | Summarize CI failures / Check CI failures |
-| Dependency/security review | Scan outdated dependencies |
+| Situation                     | Useful template                                         |
+| ----------------------------- | ------------------------------------------------------- |
+| CI fails                      | Summarize CI failures / Check CI failures               |
+| Dependency/security review    | Scan outdated dependencies                              |
 | Before version tag or release | Before tagging, verify changelog/migrations/flags/tests |
-| Weekly handoff/update | Draft weekly release notes / Synthesize weekly update |
-| Coverage concern after PR | Identify untested paths |
+| Weekly handoff/update         | Draft weekly release notes / Synthesize weekly update   |
+| Coverage concern after PR     | Identify untested paths                                 |
 
 ---
 
