@@ -594,6 +594,11 @@ def _enforce_admin_post_origin(request: Request) -> None:
             raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
         return
 
+    if sec_fetch_site == "same-origin":
+        return
+
+    raise HTTPException(status_code=403, detail="Origin not allowed for admin POST request.")
+
 
 def _origin_from_referer(referer: str) -> str | None:
     try:

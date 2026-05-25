@@ -17,7 +17,7 @@ from app.services.quote_risk_scoring import build_quote_risk_advisory, build_quo
 
 def _admin_headers() -> dict[str, str]:
     token = base64.b64encode(b"admin:secret").decode("utf-8")
-    return {"Authorization": f"Basic {token}"}
+    return {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
 
 
 def _base_payload(**overrides: Any) -> dict[str, Any]:

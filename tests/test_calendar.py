@@ -24,7 +24,7 @@ class CalendarIntegrationTests(unittest.TestCase):
         os.environ["ADMIN_PASSWORD"] = "secret"
 
         token = base64.b64encode(b"admin:secret").decode("utf-8")
-        self._admin_headers = {"Authorization": f"Basic {token}"}
+        self._admin_headers = {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
         self.client = TestClient(app)
         self.client.__enter__()
 
