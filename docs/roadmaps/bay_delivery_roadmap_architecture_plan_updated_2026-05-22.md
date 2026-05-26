@@ -12,7 +12,7 @@ The system should stay boring, stable, and profitable. New features should make 
 
 ## May 25 Baseline Refresh Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #316 and the current main baseline at `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
+This update refreshes the May 10 roadmap with actual completed work through PR #318 and the current main baseline at `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
 
 Key updates:
 
@@ -30,9 +30,9 @@ As of May 25, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #316 and current main docs/notes commit |
-| Latest verified main commit | `0451187 Refine documentation formatting in agent template usefulness notes, commands cheat sheet, and skill progression recommendations for improved clarity and consistency.` |
-| Latest verified main commit (full SHA) | `04511871e1c2e194f6a743f61a297bd4b3d1aa63` |
+| Main verification | Verified through PR #318 and current main commit |
+| Latest verified main commit | `ef56910 create demolition pricing readiness plan (#318)` |
+| Latest verified main commit (full SHA) | `ef569102df5f12a4f92acbc8054cf645aeffe2e5` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
@@ -139,6 +139,7 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 | Production redeploy + live-safe smoke | Complete | Smoke run passed at head SHA `65187325cbdbc21897579078207ea2adba4de46b`. |
 | PR #315 - create quote first-view simplification polish | Complete | Public quote first-view clarity improved while preserving field IDs, option values, payload compatibility, and `/quote/calculate` behavior. |
 | PR #316 - create admin post origin fail closed hardening | Complete | Admin POST origin enforcement hardened to fail closed, with regression coverage updated. |
+| PR #318 - create demolition pricing readiness plan | Complete | Docs-only readiness plan for future owner-approved demolition pricing work; no runtime, pricing, schema, auth, Render, workflow, GPT runtime, dependency, or version changes. |
 | Live visual audit | Complete | No P1/P2 issues; only minor P3 polish. |
 | Manual calibration entries | Complete | $1,200 old shed removal and $600 backyard tarp/fence teardown entered. |
 
@@ -405,7 +406,7 @@ Why this comes next:
 
 - Booking notification infrastructure exists but remains disabled until launch authorization.
 - Failed/skipped notification attempts are tracked internally but are not yet operator-visible in desktop admin.
-- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`, with no P1 blockers in the latest audit.
+- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`, with no P1 blockers in the latest audit.
 - This is useful before launch, but it should not displace current-state metadata parity or broaden into launch monitoring.
 
 ## Codex / Agent Usage Rules

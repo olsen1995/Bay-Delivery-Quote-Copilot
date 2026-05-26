@@ -71,14 +71,15 @@ Recent completed work includes:
 - PR #312 create quote page step heading clarity polish.
 - PR #315 create quote first-view simplification polish.
 - PR #316 create admin post origin fail closed hardening.
+- PR #318 create demolition pricing readiness plan.
 
 Current verified baseline:
-- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
-- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
+- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
+- Latest verified main context: PR #318 `create demolition pricing readiness plan`.
 - Current version: `0.12.0`.
 - GPT grounding parity passed previously.
 - Full pytest passed previously: 719 passed.
-- Production live-safe smoke passed after PR #316.
+- Render parity verified at version `0.12.0` with commit `ef569102df5f`.
 
 Booking notification infrastructure exists but remains disabled until Austin authorizes customer launch.
 

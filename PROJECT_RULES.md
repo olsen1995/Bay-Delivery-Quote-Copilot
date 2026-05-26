@@ -287,9 +287,13 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
-- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
+- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
+- Latest verified main context: PR #318 `create demolition pricing readiness plan`.
 - Current version: `0.12.0`.
+
+Instruction hierarchy:
+
+- Use `docs/instruction_hierarchy.md` when repo instructions, templates, skills, memory, or current-state docs appear to conflict.
 
 Current active roadmap/current-state sequence:
 
