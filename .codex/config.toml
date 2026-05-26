@@ -77,7 +77,7 @@ enabled = true
 
 [features]
 memories = true
-hooks = false
+hooks = true
 workspace_dependencies = true
 js_repl = false
 
