@@ -69,14 +69,16 @@ Recent completed work includes:
 - PR #310 create launch readiness current state docs refresh.
 - PR #311 create booking notification status visibility.
 - PR #312 create quote page step heading clarity polish.
+- PR #315 create quote first-view simplification polish.
+- PR #316 create admin post origin fail closed hardening.
 
 Current verified baseline:
-- Main is verified through PR #312.
-- Latest verified main commit: `d420dfc create quote page step heading clarity polish (#312)`.
+- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
+- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
 - Current version: `0.12.0`.
 - GPT grounding parity passed previously.
-- Full pytest passed previously: 716 passed.
-- Production live-safe smoke passed previously.
+- Full pytest passed previously: 719 passed.
+- Production live-safe smoke passed after PR #316.
 
 Booking notification infrastructure exists but remains disabled until Austin authorizes customer launch.
 
