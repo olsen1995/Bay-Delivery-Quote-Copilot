@@ -293,7 +293,7 @@ Current verified baseline:
 
 Instruction hierarchy:
 
-- Use `docs/instruction_hierarchy.md` when repo instructions, templates, skills, memory, or current-state docs appear to conflict.
+- Use `docs/instruction_hierarchy.md` when repo instructions, templates, skills, memory, or current-state docs appear to conflict. In the exported GPT grounding pack, this file is shipped as `instruction_hierarchy.md`.
 
 Current active roadmap/current-state sequence:
 

@@ -38,7 +38,12 @@
     {
       "file": "PROJECT_RULES.md",
       "output": "PROJECT_RULES.md",
-      "sha256": "78eafe127f06f7d4722cb7ddb0413407755d5bcecd5e6d1d918513dcc1198e70"
+      "sha256": "04c5e659156c29fe12898bee3c265bb43d9203c8a2ae8a4861d1d82d68438555"
+    },
+    {
+      "file": "docs/instruction_hierarchy.md",
+      "output": "instruction_hierarchy.md",
+      "sha256": "c03c6f874908dbae9da400031ad79802e376ed5cec8aaec87be5ad926fbdb23d"
     }
   ]
 }
