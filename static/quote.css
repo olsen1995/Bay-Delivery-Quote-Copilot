@@ -290,7 +290,7 @@ body.quotePage {
   border-radius: 14px;
   background: rgba(11, 18, 30, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--quote-muted);
+  color: rgba(229, 237, 247, 0.9);
 }
 
 .bookingContactInfo {
@@ -300,6 +300,7 @@ body.quotePage {
   border-radius: 14px;
   background: rgba(12, 20, 34, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(245, 248, 253, 0.94);
 }
 
 .bookingPreferenceHelper {
@@ -313,6 +314,7 @@ body.quotePage {
   margin-bottom: 14px;
   background: linear-gradient(180deg, rgba(20, 24, 36, 0.96), rgba(15, 18, 28, 0.98));
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  color: #f5f8fd;
 }
 
 .formSectionTitle {
@@ -323,7 +325,7 @@ body.quotePage {
 .firstStepHint,
 .startIntro {
   margin: 6px 0 0;
-  color: var(--ink-muted);
+  color: rgba(213, 222, 235, 0.86);
   font-size: 0.95em;
   max-width: 60ch;
   line-height: 1.5;
@@ -355,6 +357,7 @@ body.quotePage {
   padding: 18px;
   background: rgba(12, 18, 29, 0.78);
   margin-top: 14px;
+  color: #f5f8fd;
 }
 
 .detailPanel summary {
@@ -426,7 +429,7 @@ body.quotePage {
 
 .customerFlowGroup h4 {
   margin: 0 0 12px;
-  color: var(--quote-text);
+  color: #f5f8fd;
   font-size: 1rem;
   line-height: 1.35;
 }
@@ -437,7 +440,7 @@ body.quotePage {
 
 .panelLead {
   margin: 0 0 12px;
-  color: var(--quote-muted);
+  color: rgba(213, 222, 235, 0.86);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -445,7 +448,7 @@ body.quotePage {
 .helperText {
   margin-top: 7px;
   font-size: 0.84em;
-  color: var(--quote-muted);
+  color: rgba(213, 222, 235, 0.86);
   line-height: 1.45;
 }
 
@@ -467,19 +470,20 @@ body.quotePage {
 .quotePage textarea {
   background: rgba(9, 12, 20, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--quote-text);
+  color: #f5f8fd;
 }
 
 .quotePage input::placeholder,
 .quotePage textarea::placeholder {
-  color: rgba(188, 199, 215, 0.8);
+  color: rgba(213, 222, 235, 0.86);
 }
 
 .quotePage input:focus,
 .quotePage select:focus,
 .quotePage textarea:focus {
-  outline: 3px solid rgba(193, 44, 39, 0.22);
-  border-color: rgba(193, 44, 39, 0.62);
+  outline: 3px solid rgba(217, 45, 39, 0.3);
+  border-color: rgba(244, 114, 105, 0.78);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .quotePage input[aria-invalid="true"],
@@ -500,7 +504,7 @@ body.quotePage {
   gap: 10px;
   align-items: start;
   font-weight: 600;
-  color: var(--ink-strong);
+  color: #f5f8fd;
 }
 
 .checkboxLabel input[type="checkbox"] {
@@ -518,6 +522,7 @@ body.quotePage {
   border-radius: 14px;
   background: rgba(12, 19, 32, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f5f8fd;
 }
 
 .trustCueRow {
@@ -584,7 +589,7 @@ body.quotePage {
 
 .stepHelper {
   margin: 10px 0 0;
-  color: var(--quote-muted);
+  color: rgba(213, 222, 235, 0.86);
   font-size: 0.86rem;
   line-height: 1.55;
 }
@@ -642,7 +647,8 @@ body.quotePage {
 .quoteResultIncluded,
 .estimateDetails,
 .quoteResultNote {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(16, 32, 51, 0.12);
+  color: var(--quote-text);
 }
 
 .quoteResultHeader {
@@ -669,8 +675,8 @@ body.quotePage {
   font-size: 0.92rem;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(9, 13, 22, 0.74);
+  border: 1px solid rgba(16, 32, 51, 0.12);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .quoteAmountGrid {
@@ -682,8 +688,8 @@ body.quotePage {
 .quoteAmountCard {
   padding: 16px 18px;
   border-radius: 16px;
-  background: rgba(11, 16, 27, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(16, 32, 51, 0.12);
 }
 
 .quoteAmountCard span {
@@ -696,23 +702,23 @@ body.quotePage {
 .quoteAmountCard strong {
   font-size: 1.5rem;
   line-height: 1.1;
-  color: #f5f8fd;
+  color: var(--quote-text);
 }
 
 .quoteAmountCard.highlight {
-  border-color: rgba(193, 44, 39, 0.24);
-  background: linear-gradient(180deg, rgba(122, 16, 32, 0.46), rgba(24, 14, 20, 0.92));
-  box-shadow: 0 12px 20px rgba(122, 16, 32, 0.28);
+  border-color: rgba(217, 45, 39, 0.24);
+  background: rgba(217, 45, 39, 0.08);
+  box-shadow: 0 12px 20px rgba(217, 45, 39, 0.12);
 }
 
 .quoteAmountCard.cashOption {
   border-color: rgba(33, 110, 74, 0.22);
-  background: linear-gradient(180deg, rgba(33, 110, 74, 0.36), rgba(12, 25, 18, 0.92));
-  box-shadow: 0 12px 20px rgba(33, 110, 74, 0.24);
+  background: rgba(33, 110, 74, 0.08);
+  box-shadow: 0 12px 20px rgba(33, 110, 74, 0.1);
 }
 
 .quoteAmountCard.emtOption {
-  background: rgba(14, 19, 31, 0.92);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .quoteAmountHint {
@@ -730,8 +736,8 @@ body.quotePage {
 .quoteInfoCard {
   padding: 16px 18px;
   border-radius: 16px;
-  background: rgba(11, 18, 30, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(16, 32, 51, 0.12);
 }
 
 .quoteInfoCard h3 {
@@ -746,14 +752,15 @@ body.quotePage {
 .quoteResultNote {
   padding: 16px 18px;
   border-radius: 16px;
-  background: rgba(11, 18, 30, 0.74);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(16, 32, 51, 0.12);
 }
 
 .nextStepCallout {
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid rgba(193, 44, 39, 0.22);
-  background: rgba(122, 16, 32, 0.28);
+  background: rgba(217, 45, 39, 0.08);
   color: var(--quote-text);
   font-weight: 600;
   line-height: 1.48;
@@ -762,8 +769,8 @@ body.quotePage {
 .estimateDetails {
   padding: 16px 18px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(11, 18, 30, 0.78);
+  border: 1px solid rgba(16, 32, 51, 0.12);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .estimateDetails h3 {
@@ -791,8 +798,8 @@ body.quotePage {
 .estimateSummaryItem {
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(12, 20, 34, 0.76);
+  border: 1px solid rgba(16, 32, 51, 0.12);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .estimateSummaryItem span {

@@ -1,4 +1,5 @@
 import re
+import struct
 from pathlib import Path
 
 
@@ -42,6 +43,39 @@ def test_homepage_premium_polish_stays_local_service_first() -> None:
     assert "overflow-x: hidden;" in site_css
     assert "--quote-accent: #d92d27;" in quote_css
     assert "--brand-red: #d92d27;" in admin_css
+
+
+def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+    hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
+
+    width, height = struct.unpack(">II", hero_asset.read_bytes()[16:24])
+    assert width <= 960
+    assert height <= 540
+    assert "object-position: center;" in site_css
+    assert "Minimum 4 hours. Minimum crew 2." in index_html
+    assert "Pickup and drop-off jobs for homes, apartments, cottages, and bulky-item moves. Minimum 4 hours. Minimum crew 2." in index_html
+
+    assert "color: #f5f8fd;" in re.search(
+        r"\.quotePage input,\s*\.quotePage select,\s*\.quotePage textarea\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert "color: rgba(213, 222, 235, 0.86);" in re.search(
+        r"\.quotePage input::placeholder,\s*\.quotePage textarea::placeholder\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert "background: rgba(255, 255, 255, 0.96);" in quote_css
+    assert "color: var(--quote-text);" in re.search(
+        r"\.quoteAmountCard strong\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert ".quoteResultBreakdown," in quote_css
+    assert ".estimateDetails" in quote_css
 
 def test_static_pages_reference_shared_favicon() -> None:
     """Ensure routed HTML pages avoid browser fallback requests for /favicon.ico."""
