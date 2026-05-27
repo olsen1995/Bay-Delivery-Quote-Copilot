@@ -33,6 +33,7 @@ UPLOAD_SET = [
     "docs/gpt/GPT_BUILDER_INSTRUCTIONS.md",
     "docs/gpt/GPT_ACCEPTANCE_TESTS.md",
     "PROJECT_RULES.md",
+    "docs/instruction_hierarchy.md",
 ]
 
 

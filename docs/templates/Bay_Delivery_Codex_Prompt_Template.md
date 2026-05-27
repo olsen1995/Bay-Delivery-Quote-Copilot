@@ -72,8 +72,8 @@ Protected no-go files unless explicitly required:
 - static/admin_mobile.html
 - static/admin_mobile.js
 
-Note: dist/gpt_grounding_pack/ is a generated export artifact (not committed to the repo).
-Do not list it as a protected committed path or include it in protected-diff commands.
+Note: `dist/gpt_grounding_pack/` is a generated export artifact and is tracked when intentionally refreshed for GPT Builder upload parity.
+For PRs that edit `docs/gpt/*` or another grounding-pack source, regenerate and stage the matching `dist/gpt_grounding_pack/` output. For unrelated PRs, leave it untouched unless explicitly scoped.
 
 Implementation requirements:
 1. Inspect relevant files first.
