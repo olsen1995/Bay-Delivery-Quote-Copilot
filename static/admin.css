@@ -1,8 +1,8 @@
 :root {
-	--brand-red: #c12c27;
-	--brand-red-deep: #7a1020;
-	--brand-red-bright: #d42a3f;
-	--admin-bg: #0b0b10;
+	--brand-red: #d92d27;
+	--brand-red-deep: #a92824;
+	--brand-red-bright: #e13a33;
+	--admin-bg: #071827;
 	--admin-panel: #12121a;
 	--admin-card: #171722;
 	--admin-card-soft: #1f2434;
@@ -23,8 +23,7 @@ body {
 	margin: 0 auto;
 	padding: 28px 16px 40px;
 	background:
-		radial-gradient(1200px 680px at 18% -10%, rgba(122, 16, 32, 0.34), transparent 62%),
-		radial-gradient(880px 520px at 82% 8%, rgba(193, 44, 39, 0.18), transparent 64%),
+		linear-gradient(180deg, rgba(9, 36, 58, 0.78), transparent 340px),
 		var(--admin-bg);
 	min-height: 100vh;
 }
@@ -445,14 +444,15 @@ label {
 }
 
 .loginCard {
-	border-color: rgba(193, 44, 39, 0.26);
-	background: linear-gradient(135deg, rgba(15, 17, 24, 0.98), rgba(32, 19, 30, 0.97));
+	border-color: rgba(217, 45, 39, 0.26);
+	background: linear-gradient(135deg, rgba(7, 24, 39, 0.98), rgba(18, 31, 44, 0.97));
+	box-shadow: 0 22px 44px rgba(0, 0, 0, 0.34);
 }
 
 .loginHint {
 	padding: 12px 14px;
 	border-radius: 14px;
-	background: rgba(255, 255, 255, 0.07);
+	background: rgba(255, 255, 255, 0.08);
 	border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -730,15 +730,14 @@ button {
 	font-weight: 700;
 	border: 1px solid rgba(255, 255, 255, 0.18);
 	border-radius: 12px;
-	background: linear-gradient(135deg, var(--brand-red-deep), var(--brand-red));
+	background: var(--brand-red);
 	color: #ffffff;
-	transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
-	box-shadow: 0 10px 22px rgba(122, 16, 32, 0.24);
+	transition: background 0.18s ease, box-shadow 0.18s ease;
+	box-shadow: 0 10px 22px rgba(217, 45, 39, 0.22);
 }
 
 button:hover {
-	background: linear-gradient(135deg, #68101c, var(--brand-red-bright));
-	transform: translateY(-1px);
+	background: var(--brand-red-bright);
 }
 
 button:disabled {
@@ -1007,8 +1006,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-	outline: 3px solid rgba(212, 42, 63, 0.24);
-	border-color: rgba(212, 42, 63, 0.72);
+	outline: 3px solid rgba(217, 45, 39, 0.24);
+	border-color: rgba(217, 45, 39, 0.72);
 }
 
 ::placeholder {

@@ -1,15 +1,17 @@
 .quotePage {
-  --quote-bg: #0b0b10;
-  --quote-surface: #141722;
-  --quote-surface-alt: #191d2b;
-  --quote-surface-soft: #1f2434;
+  --quote-bg: #eef3f7;
+  --quote-surface: #ffffff;
+  --quote-surface-alt: #f7f9fb;
+  --quote-surface-soft: #eef3f7;
   --quote-border: rgba(255, 255, 255, 0.16);
-  --quote-text: #f3f6fb;
-  --quote-muted: #bbc6d6;
-  --quote-shadow: 0 18px 34px rgba(0, 0, 0, 0.34);
-  --ink-strong: var(--quote-text);
-  --ink-muted: var(--quote-muted);
-  --line-soft: var(--quote-border);
+  --quote-text: #102033;
+  --quote-muted: #5d6875;
+  --quote-accent: #d92d27;
+  --quote-navy: #071827;
+  --quote-shadow: 0 16px 32px rgba(7, 24, 39, 0.12);
+  --ink-strong: #102033;
+  --ink-muted: #5d6875;
+  --line-soft: rgba(16, 32, 51, 0.12);
 }
 
 .quotePage,
@@ -22,14 +24,13 @@
 body.quotePage {
   color: var(--quote-text);
   background:
-    radial-gradient(1200px 680px at 18% -10%, rgba(122, 16, 32, 0.35), transparent 62%),
-    radial-gradient(880px 520px at 82% 10%, rgba(168, 22, 44, 0.2), transparent 64%),
+    linear-gradient(180deg, rgba(7, 24, 39, 0.08), transparent 260px),
     var(--quote-bg);
 }
 
 .quotePage .card {
-  border: 1px solid var(--quote-border);
-  background: linear-gradient(180deg, rgba(26, 30, 43, 0.96), rgba(20, 23, 34, 0.98));
+  border: 1px solid var(--line-soft);
+  background: var(--quote-surface);
   box-shadow: var(--quote-shadow);
 }
 
@@ -41,9 +42,9 @@ body.quotePage {
 .quotePage .topbar {
   padding: 14px 16px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #0f1118, #1a1e27);
-  border: 1px solid rgba(193, 44, 39, 0.28);
-  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.16);
+  background: var(--quote-navy);
+  border: 1px solid rgba(217, 45, 39, 0.24);
+  box-shadow: 0 16px 30px rgba(7, 24, 39, 0.18);
 }
 
 .quotePage .brandLogo {
@@ -53,7 +54,7 @@ body.quotePage {
   object-fit: contain;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: 0 8px 16px rgba(193, 44, 39, 0.2);
+  box-shadow: 0 8px 16px rgba(7, 24, 39, 0.18);
   padding: 4px;
 }
 
@@ -73,7 +74,7 @@ body.quotePage {
 }
 
 .quotePage .topbar .badgeLink:hover {
-  background: rgba(193, 44, 39, 0.24);
+  background: rgba(217, 45, 39, 0.24);
 }
 
 .quoteTrustStrip {
@@ -82,9 +83,9 @@ body.quotePage {
   gap: 10px;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(193, 44, 39, 0.18);
-  background: linear-gradient(135deg, rgba(15, 17, 24, 0.96), rgba(122, 16, 32, 0.92));
-  box-shadow: 0 12px 22px rgba(122, 16, 32, 0.16);
+  border: 1px solid rgba(217, 45, 39, 0.18);
+  background: #ffffff;
+  box-shadow: 0 12px 22px rgba(7, 24, 39, 0.08);
 }
 
 .quoteTrustBadge {
@@ -94,9 +95,9 @@ body.quotePage {
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #f7f9fc;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--quote-navy);
+  border: 1px solid rgba(217, 45, 39, 0.18);
+  background: rgba(217, 45, 39, 0.08);
 }
 
 .quotePage .heroCard {
@@ -104,11 +105,10 @@ body.quotePage {
 }
 
 .quoteHeroShell {
-  border: 1px solid rgba(193, 44, 39, 0.34);
+  border: 1px solid rgba(217, 45, 39, 0.28);
   background:
-    linear-gradient(155deg, rgba(18, 22, 31, 0.96), rgba(122, 16, 32, 0.9)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 251, 0.98));
-  box-shadow: 0 20px 34px rgba(15, 23, 42, 0.16);
+    linear-gradient(145deg, rgba(7, 24, 39, 0.97), rgba(11, 34, 54, 0.94));
+  box-shadow: 0 20px 34px rgba(7, 24, 39, 0.16);
 }
 
 .quoteHeroShell h1 {
@@ -133,7 +133,7 @@ body.quotePage {
   letter-spacing: 0.14em;
   font-size: 0.76rem;
   font-weight: 700;
-  color: var(--brand-red);
+  color: var(--quote-accent);
 }
 
 .quotePage h1 {
@@ -185,9 +185,9 @@ body.quotePage {
   gap: 9px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(9, 13, 22, 0.78);
-  color: rgba(188, 199, 215, 0.92);
+  border: 1px solid rgba(16, 32, 51, 0.12);
+  background: var(--quote-surface-alt);
+  color: #566574;
   font-size: 0.88rem;
   font-weight: 700;
 }
@@ -210,9 +210,9 @@ body.quotePage {
 
 .flowStep.is-active {
   color: #ffffff;
-  border-color: rgba(193, 44, 39, 0.42);
-  background: linear-gradient(180deg, rgba(122, 16, 32, 0.66), rgba(42, 17, 28, 0.92));
-  box-shadow: 0 12px 20px rgba(122, 16, 32, 0.3);
+  border-color: rgba(217, 45, 39, 0.42);
+  background: var(--quote-accent);
+  box-shadow: 0 12px 20px rgba(217, 45, 39, 0.24);
   transform: translateY(-1px);
 }
 
@@ -251,13 +251,13 @@ body.quotePage {
 }
 
 .quotePage .btn {
-  background: linear-gradient(135deg, #7a1020, #a8162c);
-  box-shadow: 0 12px 24px rgba(122, 16, 32, 0.28);
+  background: var(--quote-accent);
+  box-shadow: 0 12px 24px rgba(217, 45, 39, 0.22);
   font-weight: 800;
 }
 
 .quotePage .btn:hover {
-  box-shadow: 0 16px 30px rgba(122, 16, 32, 0.36);
+  box-shadow: 0 16px 30px rgba(217, 45, 39, 0.28);
 }
 
 .quotePage .btn.secondary {
