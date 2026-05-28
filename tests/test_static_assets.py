@@ -68,6 +68,11 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
         quote_css,
         re.S,
     ).group("body")
+    assert "color: #f5f8fd;" in re.search(
+        r"\.quotePage \.formSection label,\s*\.quotePage \.detailPanel label,\s*\.quotePage \.customerFlowGroup label\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
     assert "background: rgba(255, 255, 255, 0.96);" in quote_css
     assert "color: var(--quote-text);" in re.search(
         r"\.quoteAmountCard strong\s*\{(?P<body>.*?)\n\}",

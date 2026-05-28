@@ -460,6 +460,12 @@ body.quotePage {
   line-height: 1.5;
 }
 
+.quotePage .formSection label,
+.quotePage .detailPanel label,
+.quotePage .customerFlowGroup label {
+  color: #f5f8fd;
+}
+
 #serviceHelp,
 .stepHelper {
   max-width: 64ch;
