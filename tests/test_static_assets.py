@@ -52,11 +52,12 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
     hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
 
     width, height = struct.unpack(">II", hero_asset.read_bytes()[16:24])
-    assert width <= 960
-    assert height <= 540
+    assert width <= 840
+    assert height <= 360
     assert "object-position: center;" in site_css
     assert "Minimum 4 hours. Minimum crew 2." in index_html
     assert "Pickup and drop-off jobs for homes, apartments, cottages, and bulky-item moves. Minimum 4 hours. Minimum crew 2." in index_html
+    assert 'class="stickyMobileCall"' not in index_html
 
     assert "color: #f5f8fd;" in re.search(
         r"\.quotePage input,\s*\.quotePage select,\s*\.quotePage textarea\s*\{(?P<body>.*?)\n\}",
