@@ -1,4 +1,5 @@
 import re
+import struct
 from pathlib import Path
 
 
@@ -20,6 +21,67 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
     assert 'src="/static/images/logo.jpg"' in index_html
     assert 'alt="Bay Delivery"' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
+
+
+def test_homepage_premium_polish_stays_local_service_first() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
+
+    assert hero_asset.exists()
+    assert 'src="/static/assets/bay-delivery-premium-hero.png"' in index_html
+    assert "Local North Bay hauling, moving, cleanouts, and light demolition" in index_html
+    assert "Real local service, clear estimates, no booking pressure" in index_html
+    assert "2019 Ram 1500 Classic Warlock with enclosed trailer" in index_html
+    assert 'class="premiumServiceGrid"' in index_html
+    assert 'class="localProofStrip"' in index_html
+    assert "--candy-red: #d92d27;" in site_css
+    assert ".premiumHeroMedia" in site_css
+    assert ".localProofStrip" in site_css
+    assert "overflow-x: hidden;" in site_css
+    assert "--quote-accent: #d92d27;" in quote_css
+    assert "--brand-red: #d92d27;" in admin_css
+
+
+def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+    hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
+
+    width, height = struct.unpack(">II", hero_asset.read_bytes()[16:24])
+    assert width <= 840
+    assert height <= 360
+    assert "object-position: center;" in site_css
+    assert "Minimum 4 hours. Minimum crew 2." in index_html
+    assert "Pickup and drop-off jobs for homes, apartments, cottages, and bulky-item moves. Minimum 4 hours. Minimum crew 2." in index_html
+    assert 'class="stickyMobileCall"' not in index_html
+
+    assert "color: #f5f8fd;" in re.search(
+        r"\.quotePage input,\s*\.quotePage select,\s*\.quotePage textarea\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert "color: rgba(213, 222, 235, 0.86);" in re.search(
+        r"\.quotePage input::placeholder,\s*\.quotePage textarea::placeholder\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert "color: #f5f8fd;" in re.search(
+        r"\.quotePage \.formSection label,\s*\.quotePage \.detailPanel label,\s*\.quotePage \.customerFlowGroup label\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert "background: rgba(255, 255, 255, 0.96);" in quote_css
+    assert "color: var(--quote-text);" in re.search(
+        r"\.quoteAmountCard strong\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    ).group("body")
+    assert ".quoteResultBreakdown," in quote_css
+    assert ".estimateDetails" in quote_css
 
 def test_static_pages_reference_shared_favicon() -> None:
     """Ensure routed HTML pages avoid browser fallback requests for /favicon.ico."""
@@ -310,7 +372,8 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
 
     mobile_site_css = site_css[site_css.index("@media (max-width: 720px)") :]
     assert re.search(r"\.container\s*\{[^}]*padding-bottom:\s*96px;", mobile_site_css, re.S)
-    assert re.search(r"\.hero \.heroCard:first-child\s*\{[^}]*padding-bottom:\s*88px;", mobile_site_css, re.S)
+    assert re.search(r"\.premiumHeroContent\s*\{[^}]*padding:\s*24px 18px;", mobile_site_css, re.S)
+    assert re.search(r"\.premiumHeroMedia,\s*\.premiumHeroMedia img\s*\{[^}]*min-height:\s*280px;", mobile_site_css, re.S)
     assert re.search(r"\.stickyMobileCall\s*\{[^}]*bottom:\s*calc\(18px \+ env\(safe-area-inset-bottom\)\);", mobile_site_css, re.S)
 
 
@@ -474,11 +537,12 @@ def test_desktop_admin_uses_branded_dark_theme_tokens() -> None:
     admin_css = Path("static/admin.css").read_text(encoding="utf-8")
 
     for expected in [
-        "--admin-bg: #0b0b10;",
-        "--brand-red-deep: #7a1020;",
-        "radial-gradient(1200px 680px at 18% -10%, rgba(122, 16, 32, 0.34), transparent 62%)",
-        "linear-gradient(155deg, rgba(18, 22, 31, 0.96), rgba(122, 16, 32, 0.9))",
-        "linear-gradient(135deg, var(--brand-red-deep), var(--brand-red))",
+        "--admin-bg: #071827;",
+        "--brand-red: #d92d27;",
+        "--brand-red-deep: #a92824;",
+        "linear-gradient(180deg, rgba(9, 36, 58, 0.78), transparent 340px)",
+        "linear-gradient(135deg, rgba(7, 24, 39, 0.98), rgba(18, 31, 44, 0.97))",
+        "background: var(--brand-red);",
         ".status-expired",
         "::placeholder",
     ]:
