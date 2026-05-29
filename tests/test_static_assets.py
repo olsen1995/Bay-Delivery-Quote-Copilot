@@ -17,10 +17,24 @@ def test_homepage_images_exist():
 
 def test_homepage_logo_and_primary_cta_are_present() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
+    logo_asset = Path("static/images/bay-delivery-logo.png")
 
-    assert 'src="/static/images/logo.jpg"' in index_html
-    assert 'alt="Bay Delivery"' in index_html
+    assert logo_asset.exists()
+    width, height = struct.unpack(">II", logo_asset.read_bytes()[16:24])
+    assert width == 710
+    assert height == 694
+    assert 'src="/static/images/bay-delivery-logo.png"' in index_html
+    assert 'alt="Bay Delivery truck and trailer logo"' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
+    assert 'href="/quote">Get a Quote<' in index_html
+    assert 'href="tel:+17053034409">Call 705-303-4409<' in index_html
+
+
+def test_quote_page_keeps_existing_logo_asset() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert 'src="/static/images/logo.jpg"' in quote_html
+    assert 'src="/static/images/bay-delivery-logo.png"' not in quote_html
 
 
 def test_homepage_premium_polish_stays_local_service_first() -> None:
