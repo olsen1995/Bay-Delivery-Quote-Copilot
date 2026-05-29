@@ -21,8 +21,9 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
 
     assert logo_asset.exists()
     width, height = struct.unpack(">II", logo_asset.read_bytes()[16:24])
-    assert width == 710
-    assert height == 694
+    assert width == 256
+    assert height == 250
+    assert logo_asset.stat().st_size < 100_000
     assert 'src="/static/images/bay-delivery-logo.png"' in index_html
     assert 'alt="Bay Delivery truck and trailer logo"' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
