@@ -1,7 +1,7 @@
 # Bay Delivery Quote Copilot - Roadmap & Architecture Plan
 
 Prepared: May 10, 2026
-Updated: May 25, 2026
+Updated: May 29, 2026
 Prepared for: Austin / Bay Delivery
 
 ## Executive Principle
@@ -10,9 +10,9 @@ Customer side stays simple. Admin side tells Austin and Dan what needs attention
 
 The system should stay boring, stable, and profitable. New features should make Bay Delivery easier to operate, not create a second pricing brain, a public chatbot, or a fragile CRM clone.
 
-## May 25 Baseline Refresh Summary
+## May 29 Baseline Refresh Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #323 and the current main baseline at `15b9d7b`.
+This May 29 update refreshes the May 10 roadmap with actual completed work through PR #323 and the current main baseline at `15b9d7b` (short SHA).
 
 Key updates:
 
@@ -26,14 +26,14 @@ Key updates:
 
 ## Current Verified Repo / GPT State
 
-As of May 25, 2026:
+As of May 29, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #323 plus follow-up cSpell commit `15b9d7b` |
+| Main verification | Verified through PR #323 plus follow-up cSpell commit `15b9d7b` (short SHA) |
 | Latest completed PR baseline | PR #323 `create desktop admin collapsible section polish` |
-| Latest verified main commit | `15b9d7b add "Avenir" to cSpell custom words list` |
-| Latest verified main commit (full SHA) | `15b9d7b35a22` |
+| Latest verified main commit (short SHA) | `15b9d7b add "Avenir" to cSpell custom words list` |
+| Latest verified main commit (full SHA) | `15b9d7b35a22aef982772f729cdad05829991418` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
@@ -412,7 +412,7 @@ Why this comes next:
 
 - Booking notification infrastructure exists but remains disabled until launch authorization.
 - Failed/skipped notification attempts are tracked internally but are not yet operator-visible in desktop admin.
-- Main is verified through PR #323 plus follow-up cSpell commit `15b9d7b`, with no P1 blockers in the latest audit.
+- Main is verified through PR #323 plus follow-up cSpell commit `15b9d7b` (short SHA), with no P1 blockers in the latest audit.
 - PR #323 is `create desktop admin collapsible section polish`; `15b9d7b` is `add "Avenir" to cSpell custom words list`, the latest main commit after PR #323.
 - This is useful before launch, but it should not displace current-state metadata parity or broaden into launch monitoring.
 

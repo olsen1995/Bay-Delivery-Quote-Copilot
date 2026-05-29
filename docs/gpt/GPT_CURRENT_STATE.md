@@ -57,7 +57,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - PR #321 Public Brand Hero Colour Alignment is complete.
 - PR #322 Homepage Logo Replacement is complete: desktop/mobile homepage logo updated without runtime/pricing/schema/workflow/dependency/version changes.
 - PR #323 Desktop Admin Collapsible Section Polish is complete: admin collapsible section polish without runtime/pricing/schema/workflow/dependency/version changes.
-- Current verified baseline after PR #323 plus follow-up cSpell commit `15b9d7b35a22` (`add "Avenir" to cSpell custom words list`): version is `0.12.0`, version parity passed, GPT grounding parity passed, full pytest passed with 723 tests, and Render parity was verified at version `0.12.0` with commit `15b9d7b35a22`.
+- Current verified baseline after PR #323 plus follow-up cSpell commit `15b9d7b` (short SHA; full SHA `15b9d7b35a22aef982772f729cdad05829991418`, `add "Avenir" to cSpell custom words list`): version is `0.12.0`, version parity passed, GPT grounding parity passed, full pytest passed with 723 tests, and Render parity was verified at version `0.12.0` with commit prefix `15b9d7b35a22`.
 
 ## Notification Policy
 
