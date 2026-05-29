@@ -287,8 +287,8 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
-- Latest verified main context: PR #318 `create demolition pricing readiness plan`.
+- Main is verified through PR #323 and current main commit `15b9d7b`.
+- Latest verified main context: PR #323 `add "Avenir" to cSpell custom words list`.
 - Current version: `0.12.0`.
 
 Instruction hierarchy:

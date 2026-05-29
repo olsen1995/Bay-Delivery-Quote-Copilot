@@ -12,7 +12,7 @@ The system should stay boring, stable, and profitable. New features should make 
 
 ## May 25 Baseline Refresh Summary
 
-This update refreshes the May 10 roadmap with actual completed work through PR #318 and the current main baseline at `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
+This update refreshes the May 10 roadmap with actual completed work through PR #323 and the current main baseline at `15b9d7b`.
 
 Key updates:
 
@@ -30,14 +30,14 @@ As of May 25, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #318 and current main commit |
-| Latest verified main commit | `ef56910 create demolition pricing readiness plan (#318)` |
-| Latest verified main commit (full SHA) | `ef569102df5f12a4f92acbc8054cf645aeffe2e5` |
+| Main verification | Verified through PR #323 and current main commit |
+| Latest verified main commit | `15b9d7b add "Avenir" to cSpell custom words list (#323)` |
+| Latest verified main commit (full SHA) | `15b9d7b35a22` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
 | Focused GPT/admin/static tests | `tests/test_env_and_dependencies.py` 23 passed; `tests/test_abuse_controls.py` 16 passed; `tests/test_static_assets.py` 37 passed; `tests/test_quote_structured_intake_fields.py` 25 passed; `tests/test_launch_smoke_playwright.py` 4 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed |
-| Full pytest | Passed: 719 |
+| Full pytest | Passed: 723 |
 | Protected no-go diff after current baseline | No output |
 | Custom GPT Knowledge | Updated from `dist/gpt_grounding_pack` after PR #307 |
 | Custom GPT Actions schema | Updated from `docs/gpt/GPT_ACTIONS_OPENAPI.yaml` after PR #307 |
@@ -140,7 +140,9 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 | PR #315 - create quote first-view simplification polish | Complete | Public quote first-view clarity improved while preserving field IDs, option values, payload compatibility, and `/quote/calculate` behavior. |
 | PR #316 - create admin post origin fail closed hardening | Complete | Admin POST origin enforcement hardened to fail closed, with regression coverage updated. |
 | PR #318 - create demolition pricing readiness plan | Complete | Docs-only readiness plan for future owner-approved demolition pricing work; no runtime, pricing, schema, auth, Render, workflow, GPT runtime, dependency, or version changes. |
-| Live visual audit | Complete | No P1/P2 issues; only minor P3 polish. |
+| PR #322 - create homepage logo replacement | Complete | Desktop/mobile homepage logo updated without runtime/pricing/schema/workflow/dependency/version changes. |
+| PR #323 - create desktop admin collapsible section polish | Complete | Admin collapsible section polish without runtime/pricing/schema/workflow/dependency/version changes. |
+| Live visual audit | Complete | Visual QA passed for: homepage desktop/mobile, quote page desktop/mobile, admin pre-auth shell, mobile admin. No P1/P2 visual issues found. Explicit note: admin post-auth visual inspection was NOT checked. |
 | Manual calibration entries | Complete | $1,200 old shed removal and $600 backyard tarp/fence teardown entered. |
 
 ## Real Completed-Job Calibration Evidence Already Captured
@@ -406,7 +408,7 @@ Why this comes next:
 
 - Booking notification infrastructure exists but remains disabled until launch authorization.
 - Failed/skipped notification attempts are tracked internally but are not yet operator-visible in desktop admin.
-- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`, with no P1 blockers in the latest audit.
+- Main is verified through PR #323 and current main commit `15b9d7b`, with no P1 blockers in the latest audit.
 - This is useful before launch, but it should not displace current-state metadata parity or broaden into launch monitoring.
 
 ## Codex / Agent Usage Rules
