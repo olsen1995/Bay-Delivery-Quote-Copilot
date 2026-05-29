@@ -48,14 +48,15 @@ body.quotePage {
 }
 
 .quotePage .brandLogo {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 58px;
+  height: 58px;
+  border-radius: 13px;
   object-fit: contain;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  border: 2px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 8px 16px rgba(7, 24, 39, 0.18);
-  padding: 4px;
+  padding: 5px;
+  filter: saturate(1.08) contrast(1.08);
 }
 
 .quotePage .topbar .brandTitle strong {
@@ -104,11 +105,12 @@ body.quotePage {
   padding: 28px;
 }
 
-.quoteHeroShell {
+.quotePage .quoteHeroShell {
   border: 1px solid rgba(217, 45, 39, 0.28);
   background:
     linear-gradient(145deg, rgba(7, 24, 39, 0.97), rgba(11, 34, 54, 0.94));
   box-shadow: 0 20px 34px rgba(7, 24, 39, 0.16);
+  color: #f8fbff;
 }
 
 .quoteHeroShell h1 {

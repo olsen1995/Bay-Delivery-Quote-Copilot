@@ -62,12 +62,13 @@ a:hover { opacity: 0.92; }
   width: clamp(82px, 12vw, 132px);
   height: auto;
   max-width: 100%;
-  border-radius: 16px;
+  border-radius: 14px;
   object-fit: contain;
-  background: #ffffff;
-  padding: 8px;
-  border: 1px solid rgba(16,32,51,0.12);
-  box-shadow: 0 12px 26px rgba(7,24,39,0.12);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  padding: 7px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 10px 22px rgba(7,24,39,0.14);
+  filter: saturate(1.08) contrast(1.08);
 }
 
 .brandTitle{
@@ -239,7 +240,7 @@ a:hover { opacity: 0.92; }
   height: 100%;
   min-height: 500px;
   object-fit: cover;
-  object-position: center;
+  object-position: 56% center;
 }
 
 .premiumHeroMedia::after{
@@ -692,7 +693,7 @@ a:hover { opacity: 0.92; }
   }
 
   .premiumHeroMedia img{
-    object-position: center top;
+    object-position: 52% center;
   }
 
   .vehicleNote{

@@ -34,7 +34,8 @@ def test_homepage_premium_polish_stays_local_service_first() -> None:
     assert 'src="/static/assets/bay-delivery-premium-hero.png"' in index_html
     assert "Local North Bay hauling, moving, cleanouts, and light demolition" in index_html
     assert "Real local service, clear estimates, no booking pressure" in index_html
-    assert "2019 Ram 1500 Classic Warlock with enclosed trailer" in index_html
+    assert "Red Bay Delivery truck with enclosed trailer near the North Bay waterfront" in index_html
+    assert "Truck and trailer service." in index_html
     assert 'class="premiumServiceGrid"' in index_html
     assert 'class="localProofStrip"' in index_html
     assert "--candy-red: #d92d27;" in site_css
@@ -52,12 +53,15 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
     hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
 
     width, height = struct.unpack(">II", hero_asset.read_bytes()[16:24])
-    assert width <= 840
-    assert height <= 360
-    assert "object-position: center;" in site_css
+    assert width == 1200
+    assert height == 675
+    assert "object-position: 56% center;" in site_css
+    assert "object-position: 52% center;" in site_css
+    assert "GET A QUOTE" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
     assert "Minimum 4 hours. Minimum crew 2." in index_html
     assert "Pickup and drop-off jobs for homes, apartments, cottages, and bulky-item moves. Minimum 4 hours. Minimum crew 2." in index_html
     assert 'class="stickyMobileCall"' not in index_html
+    assert ".quotePage .quoteHeroShell" in quote_css
 
     assert "color: #f5f8fd;" in re.search(
         r"\.quotePage input,\s*\.quotePage select,\s*\.quotePage textarea\s*\{(?P<body>.*?)\n\}",
