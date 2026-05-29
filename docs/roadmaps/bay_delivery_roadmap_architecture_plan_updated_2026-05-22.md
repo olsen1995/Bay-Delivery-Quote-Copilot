@@ -37,7 +37,7 @@ As of May 29, 2026:
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
 | Compileall | Passed |
-| Focused GPT/admin/static tests | `tests/test_env_and_dependencies.py` 23 passed; `tests/test_abuse_controls.py` 16 passed; `tests/test_static_assets.py` 37 passed; `tests/test_quote_structured_intake_fields.py` 25 passed; `tests/test_launch_smoke_playwright.py` 4 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed |
+| Focused GPT/admin/static tests | `tests/test_env_and_dependencies.py` 23 passed; `tests/test_abuse_controls.py` 16 passed; `tests/test_static_assets.py` 41 passed; `tests/test_quote_structured_intake_fields.py` 25 passed; `tests/test_launch_smoke_playwright.py` 4 passed; `tests/test_gpt_admin_notes.py` 28 passed; `tests/test_gpt_quote_endpoint.py` 12 passed |
 | Full pytest | Passed: 723 |
 | Protected no-go diff after current baseline | No output |
 | Custom GPT Knowledge | Updated from `dist/gpt_grounding_pack` after PR #307 |
