@@ -287,8 +287,9 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Main is verified through PR #323 and current main commit `15b9d7b`.
-- Latest verified main context: PR #323 `add "Avenir" to cSpell custom words list`.
+- Main is verified through PR #323 plus follow-up cSpell commit `15b9d7b`.
+- Latest completed PR baseline: PR #323 `create desktop admin collapsible section polish`.
+- Latest verified main commit after PR #323: `15b9d7b add "Avenir" to cSpell custom words list`.
 - Current version: `0.12.0`.
 
 Instruction hierarchy:

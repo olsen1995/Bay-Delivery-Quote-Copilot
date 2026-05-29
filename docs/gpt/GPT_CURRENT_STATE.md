@@ -52,9 +52,12 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - PR #315 Quote First-View Simplification Polish is complete: public quote first-view clarity was tightened while preserving field IDs, option values, payload compatibility, and the existing `/quote/calculate` path.
 - PR #316 Admin POST Origin Fail-Closed Hardening is complete: admin POST origin enforcement now fails closed, with focused regression coverage updated. This did not change pricing, schema, customer quote behavior, GPT actions, Render config, dependencies, or `VERSION`.
 - PR #318 Demolition Pricing Readiness Plan is complete: the repo now has a docs-only demolition pricing readiness plan for future owner-approved pricing work. It did not change runtime behavior, pricing logic, schema/storage, auth, Render config, workflows, GPT runtime behavior, dependencies, or `VERSION`.
+- PR #319 Launch Readiness Consolidation Cleanup is complete.
+- PR #320 Premium Homepage Visual Polish is complete.
+- PR #321 Public Brand Hero Colour Alignment is complete.
 - PR #322 Homepage Logo Replacement is complete: desktop/mobile homepage logo updated without runtime/pricing/schema/workflow/dependency/version changes.
 - PR #323 Desktop Admin Collapsible Section Polish is complete: admin collapsible section polish without runtime/pricing/schema/workflow/dependency/version changes.
-- Current verified baseline after PR #323 and current main commit `15b9d7b35a22`: version is `0.12.0`, version parity passed, GPT grounding parity passed, full pytest passed with 723 tests, pip-audit was clean, and Render parity was verified at version `0.12.0` with commit `15b9d7b35a22`.
+- Current verified baseline after PR #323 plus follow-up cSpell commit `15b9d7b35a22` (`add "Avenir" to cSpell custom words list`): version is `0.12.0`, version parity passed, GPT grounding parity passed, full pytest passed with 723 tests, and Render parity was verified at version `0.12.0` with commit `15b9d7b35a22`.
 
 ## Notification Policy
 

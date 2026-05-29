@@ -30,8 +30,9 @@ As of May 25, 2026:
 
 | Area | Status |
 | --- | --- |
-| Main verification | Verified through PR #323 and current main commit |
-| Latest verified main commit | `15b9d7b add "Avenir" to cSpell custom words list (#323)` |
+| Main verification | Verified through PR #323 plus follow-up cSpell commit `15b9d7b` |
+| Latest completed PR baseline | PR #323 `create desktop admin collapsible section polish` |
+| Latest verified main commit | `15b9d7b add "Avenir" to cSpell custom words list` |
 | Latest verified main commit (full SHA) | `15b9d7b35a22` |
 | Version parity | Passed: `0.12.0` |
 | GPT grounding pack parity | Passed |
@@ -140,6 +141,9 @@ docs/roadmaps/bay_delivery_system_roadmap_architecture_plan_2026-05-22.md
 | PR #315 - create quote first-view simplification polish | Complete | Public quote first-view clarity improved while preserving field IDs, option values, payload compatibility, and `/quote/calculate` behavior. |
 | PR #316 - create admin post origin fail closed hardening | Complete | Admin POST origin enforcement hardened to fail closed, with regression coverage updated. |
 | PR #318 - create demolition pricing readiness plan | Complete | Docs-only readiness plan for future owner-approved demolition pricing work; no runtime, pricing, schema, auth, Render, workflow, GPT runtime, dependency, or version changes. |
+| PR #319 - create launch readiness consolidation cleanup | Complete | Launch-readiness cleanup completed. |
+| PR #320 - create premium homepage visual polish | Complete | Premium homepage visual polish completed. |
+| PR #321 - create public brand hero colour alignment | Complete | Public brand hero colour alignment completed. |
 | PR #322 - create homepage logo replacement | Complete | Desktop/mobile homepage logo updated without runtime/pricing/schema/workflow/dependency/version changes. |
 | PR #323 - create desktop admin collapsible section polish | Complete | Admin collapsible section polish without runtime/pricing/schema/workflow/dependency/version changes. |
 | Live visual audit | Complete | Visual QA passed for: homepage desktop/mobile, quote page desktop/mobile, admin pre-auth shell, mobile admin. No P1/P2 visual issues found. Explicit note: admin post-auth visual inspection was NOT checked. |
@@ -408,7 +412,8 @@ Why this comes next:
 
 - Booking notification infrastructure exists but remains disabled until launch authorization.
 - Failed/skipped notification attempts are tracked internally but are not yet operator-visible in desktop admin.
-- Main is verified through PR #323 and current main commit `15b9d7b`, with no P1 blockers in the latest audit.
+- Main is verified through PR #323 plus follow-up cSpell commit `15b9d7b`, with no P1 blockers in the latest audit.
+- PR #323 is `create desktop admin collapsible section polish`; `15b9d7b` is `add "Avenir" to cSpell custom words list`, the latest main commit after PR #323.
 - This is useful before launch, but it should not displace current-state metadata parity or broaden into launch monitoring.
 
 ## Codex / Agent Usage Rules
