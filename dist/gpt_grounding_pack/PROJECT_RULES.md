@@ -287,8 +287,9 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
-- Latest verified main context: PR #318 `create demolition pricing readiness plan`.
+- Main is verified through PR #323 plus follow-up cSpell commit `15b9d7b` (short SHA).
+- Latest completed PR baseline: PR #323 `create desktop admin collapsible section polish`.
+- Latest verified main commit after PR #323 (full SHA): `15b9d7b35a22aef982772f729cdad05829991418 add "Avenir" to cSpell custom words list`.
 - Current version: `0.12.0`.
 
 Instruction hierarchy:
