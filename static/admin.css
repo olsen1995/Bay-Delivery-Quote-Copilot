@@ -196,6 +196,31 @@ label {
 	margin-bottom: 10px;
 }
 
+.adminSectionDetails {
+	min-width: 0;
+}
+
+.adminSectionSummary {
+	display: list-item;
+	cursor: pointer;
+	color: var(--ink-strong);
+}
+
+.adminSectionSummary > div {
+	display: grid;
+	gap: 2px;
+	padding-left: 2px;
+}
+
+.adminSectionDetails:not([open]) > .adminSectionSummary {
+	margin-bottom: 0;
+}
+
+.adminSectionDetails[open] > .adminSectionSummary {
+	padding-bottom: 2px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .sectionLead {
 	max-width: 46ch;
 	margin: 0;

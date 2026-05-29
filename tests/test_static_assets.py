@@ -1367,6 +1367,62 @@ def test_desktop_admin_includes_daily_ops_board_only() -> None:
     assert "opsQueueShortcut" not in mobile_js
 
 
+def test_desktop_admin_collapsible_section_contract() -> None:
+    admin_html = Path("static/admin.html").read_text(encoding="utf-8")
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+    admin_css = Path("static/admin.css").read_text(encoding="utf-8")
+    mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
+    mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")
+
+    expected_sections = {
+        "adminQuotesSection": ("Recent Estimates", "quotesBox", True),
+        "adminRequestsSection": ("Booking Requests", "requestsBox", True),
+        "adminJobsSection": ("Jobs", "jobsBox", True),
+        "adminFollowupHelperSection": ("Follow-Up Message Helper", "followupMessageDraft", False),
+        "adminProfitReportSection": ("Completed Job Profit Review", "profitReportBox", False),
+    }
+    for section_id, (heading, render_target, should_default_open) in expected_sections.items():
+        assert admin_html.count(f'id="{section_id}"') == 1
+        section_match = re.search(
+            rf'<details id="{section_id}"(?P<attrs>[^>]*)>\s*<summary class="sectionHeader compact adminSectionSummary">(?P<summary>.*?)</summary>',
+            admin_html,
+            re.S,
+        )
+        assert section_match is not None
+        attrs = section_match.group("attrs")
+        summary = section_match.group("summary")
+        assert "adminSectionDetails" in attrs
+        assert f"<h3>{heading}</h3>" in summary
+        assert (re.search(r"\sopen(?:\s|>|$)", attrs) is not None) is should_default_open
+        assert admin_html.count(f'id="{render_target}"') == 1
+
+    for section_id in ["adminFollowupHelperSection", "adminJobsSection", "adminProfitReportSection"]:
+        section_start = admin_html.index(f'id="{section_id}"')
+        section_tag = admin_html[admin_html.rfind("<details", 0, section_start):admin_html.index(">", section_start)]
+        assert 'data-admin-protected="true"' in section_tag
+        assert 'hidden aria-hidden="true"' in section_tag
+
+    for always_visible in ["adminOpsBoardSection", "acceptedNotBookedQueueSection"]:
+        assert f'<div id="{always_visible}"' in admin_html
+        assert f'<details id="{always_visible}"' not in admin_html
+
+    assert "function openAdminSectionForFocus(target)" in admin_js
+    focus_body = re.search(
+        r"function focusAdminSection\(targetId, label\) \{(?P<body>.*?)\n\}\n\nfunction createOpsQueueShortcutButton",
+        admin_js,
+        re.S,
+    )
+    assert focus_body is not None
+    assert "openAdminSectionForFocus(target);" in focus_body.group("body")
+    assert ".open = true;" in admin_js
+    assert ".adminSectionDetails" in admin_css
+    assert ".adminSectionSummary" in admin_css
+
+    for marker in ["adminSectionDetails", "adminSectionSummary", "Follow-Up Message Helper", "Completed Job Profit Review"]:
+        assert marker not in mobile_html
+        assert marker not in mobile_js
+
+
 def test_desktop_admin_includes_pending_estimate_cleanup_controls_only() -> None:
     admin_js = Path("static/admin.js").read_text(encoding="utf-8")
     mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")

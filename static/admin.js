@@ -827,6 +827,12 @@ const opsBoardShortcutsByKey = {
   ]
 };
 
+function openAdminSectionForFocus(target) {
+  if (!target) return;
+  const section = target.matches("details") ? target : target.closest("details");
+  if (section && !section.open) section.open = true;
+}
+
 function focusAdminSection(targetId, label) {
   const target = document.getElementById(targetId);
   if (!target) {
@@ -834,6 +840,7 @@ function focusAdminSection(targetId, label) {
     return;
   }
 
+  openAdminSectionForFocus(target);
   if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
   target.scrollIntoView({ behavior: "smooth", block: "start" });
   target.focus({ preventScroll: true });
