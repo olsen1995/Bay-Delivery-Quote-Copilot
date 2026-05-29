@@ -77,25 +77,25 @@
     </div>
 
     <div class="dashboardGrid adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
-      <div id="adminQuotesSection" class="card dataCard">
-        <div class="sectionHeader compact">
+      <details id="adminQuotesSection" class="card dataCard adminSectionDetails" open>
+        <summary class="sectionHeader compact adminSectionSummary">
           <div>
             <h3>Recent Estimates</h3>
             <div class="muted">Latest stored quotes for operations review. Open a quote to review internal ops-only detail, including risk flags when available.</div>
           </div>
-        </div>
+        </summary>
         <div id="quotesBox"></div>
-      </div>
+      </details>
 
-      <div id="adminRequestsSection" class="card dataCard">
-        <div class="sectionHeader compact">
+      <details id="adminRequestsSection" class="card dataCard adminSectionDetails" open>
+        <summary class="sectionHeader compact adminSectionSummary">
           <div>
             <h3>Booking Requests</h3>
             <div class="muted">Review customer-accepted requests and the booking preferences they submitted. Approve to create a job, or reject to close.</div>
           </div>
-        </div>
+        </summary>
         <div id="requestsBox"></div>
-      </div>
+      </details>
 
       <details class="adminReferenceDetails assistantCard">
         <summary>Screenshot Intake Guidance (Read-Only)</summary>
@@ -119,13 +119,13 @@
       </details>
     </div>
 
-    <div id="adminFollowupHelperSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
-      <div class="sectionHeader compact">
+    <details id="adminFollowupHelperSection" class="card dataCard mt18 adminProtectedSection adminSectionDetails" data-admin-protected="true" hidden aria-hidden="true">
+      <summary class="sectionHeader compact adminSectionSummary">
         <div>
           <h3>Follow-Up Message Helper</h3>
           <div class="muted">Copy-only helper for common follow-up drafts. It does not send messages or update follow-up status.</div>
         </div>
-      </div>
+      </summary>
       <div class="followupHelperGrid">
         <label class="followupHelperField" for="followupMessageScenario">
           <span>Scenario</span>
@@ -150,27 +150,27 @@
         <div id="followupMessageStatusLine" class="statusNotice muted" role="status" aria-live="polite">Copy-only helper. Review the draft before using it.</div>
       </div>
       <div class="small muted followupHelperNote">This helper is for draft copy only. It does not send messages, save drafts, or update follow-up status.</div>
-    </div>
+    </details>
 
-    <div id="adminJobsSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
-      <div class="sectionHeader compact">
+    <details id="adminJobsSection" class="card dataCard mt18 adminProtectedSection adminSectionDetails" data-admin-protected="true" hidden aria-hidden="true" open>
+      <summary class="sectionHeader compact adminSectionSummary">
         <div>
           <h3>Jobs</h3>
             <div class="muted">Active jobs — schedule, update status, monitor calendar sync, and record completed-job costing feedback.</div>
         </div>
-      </div>
+      </summary>
       <div id="jobsBox"></div>
-    </div>
+    </details>
 
-    <div id="adminProfitReportSection" class="card dataCard mt18 adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
-      <div class="sectionHeader compact">
+    <details id="adminProfitReportSection" class="card dataCard mt18 adminProtectedSection adminSectionDetails" data-admin-protected="true" hidden aria-hidden="true">
+      <summary class="sectionHeader compact adminSectionSummary">
         <div>
           <h3>Completed Job Profit Review</h3>
           <div class="muted">Internal report only. Completed-job data helps owner review and future pricing calibration. It does not change quote prices.</div>
         </div>
-      </div>
+      </summary>
       <div id="profitReportBox"></div>
-    </div>
+    </details>
 
     <details id="manualCompletedJobsSection" class="card dataCard mt18 adminProtectedSection manualCompletedJobsSection" data-admin-protected="true" hidden aria-hidden="true">
       <summary>Manual Completed Job Calibration Log</summary>
