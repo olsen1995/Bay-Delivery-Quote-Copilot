@@ -1054,7 +1054,7 @@ textarea:focus {
 }
 
 .modal {
-	display: none;
+	display: block;
 	position: fixed;
 	z-index: 20;
 	left: 0;
@@ -1064,6 +1064,10 @@ textarea:focus {
 	padding: 24px;
 	box-sizing: border-box;
 	background-color: rgba(2, 6, 13, 0.72);
+}
+
+.modal[hidden] {
+	display: none;
 }
 
 .modal-content {
