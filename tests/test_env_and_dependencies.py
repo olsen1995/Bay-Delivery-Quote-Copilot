@@ -7,6 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+_RENDER_ENV_MARKERS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
+
+
 # helpers for reloading main with fresh environment
 
 def _reload_main_with_env(env_vars: dict[str, str]) -> object:
@@ -17,6 +20,7 @@ def _reload_main_with_env(env_vars: dict[str, str]) -> object:
         "LOCAL_TIMEZONE",
         "BAYDELIVERY_COMMIT_SHA",
         "RENDER_GIT_COMMIT",
+        *_RENDER_ENV_MARKERS,
     ):
         os.environ.pop(var, None)
     os.environ.update(env_vars)
@@ -89,6 +93,44 @@ def test_cors_default(monkeypatch):
     with TestClient(main.app) as client:
         resp = client.get("/", headers={"Origin": "http://localhost:3000"})
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_api_docs_remain_available_without_render_markers() -> None:
+    main = _reload_main_with_env({"BAYDELIVERY_CORS_ORIGINS": "https://foo"})
+
+    with TestClient(main.app) as client:
+        assert client.get("/docs").status_code == 200
+        assert client.get("/redoc").status_code == 200
+        assert client.get("/openapi.json").status_code == 200
+
+
+@pytest.mark.parametrize("render_marker", _RENDER_ENV_MARKERS)
+def test_api_docs_are_disabled_when_render_marker_is_present(render_marker: str) -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            render_marker: "render-test",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        assert client.get("/docs").status_code == 404
+        assert client.get("/redoc").status_code == 404
+        assert client.get("/openapi.json").status_code == 404
+
+
+def test_health_remains_available_when_render_marker_is_present() -> None:
+    main = _reload_main_with_env(
+        {
+            "BAYDELIVERY_CORS_ORIGINS": "https://foo",
+            "RENDER_SERVICE_ID": "srv-test",
+        }
+    )
+
+    with TestClient(main.app) as client:
+        resp = client.get("/health")
+
+    assert resp.status_code == 200
 
 
 def test_health_commit_is_null_when_commit_envs_missing() -> None:
