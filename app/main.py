@@ -97,6 +97,7 @@ _DEFAULT_LOCAL_TIMEZONE = "UTC"
 _DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8000"
 _DEPLOY_COMMIT_ENV_VARS = ("BAYDELIVERY_COMMIT_SHA", "RENDER_GIT_COMMIT")
 _DEPLOY_COMMIT_HEX_RE = re.compile(r"^[0-9a-fA-F]{12,64}$")
+_RENDER_ENV_MARKERS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
 
 # Initialize audit table at startup
 init_audit_table()
@@ -451,6 +452,16 @@ def ensure_schedulable(job: Job) -> None:
         )
 
 
+def _is_render_production() -> bool:
+    return any(os.getenv(name) for name in _RENDER_ENV_MARKERS)
+
+
+def _api_docs_kwargs() -> dict[str, str | None]:
+    if not _is_render_production():
+        return {}
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
@@ -462,6 +473,7 @@ app = FastAPI(
     version=APP_VERSION,
     description="Backend for Bay Delivery Quotes & Ops: quote calculator + job tracking.",
     lifespan=lifespan,
+    **_api_docs_kwargs(),
 )
 
 JSON_SIZE_CAP_BYTES = 256 * 1024
