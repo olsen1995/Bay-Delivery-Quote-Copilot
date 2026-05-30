@@ -15,7 +15,7 @@ def _post_deploy_responses(path: str) -> object:
         "/admin": (
             '<html><h2>Admin Access</h2><input id="adminUsername" />'
             '<input id="adminPassword" /><button id="refreshBtn"></button>'
-            '<div id="adminProtectedDashboard" hidden aria-hidden="true" style="display:none"></div></html>'
+            '<div id="adminProtectedDashboard" hidden aria-hidden="true"></div></html>'
         ),
         "/admin/mobile": (
             '<html><h2>Mobile Login</h2><input id="mobileAdminUsername" />'

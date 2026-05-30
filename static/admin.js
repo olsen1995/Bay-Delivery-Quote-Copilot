@@ -627,11 +627,9 @@ function setProtectedDashboardVisible(isVisible) {
   setAdminAuthenticated(isVisible);
   if (adminProtectedDashboard) {
     if (isVisible) {
-      adminProtectedDashboard.style.display = "";
       adminProtectedDashboard.removeAttribute("hidden");
       adminProtectedDashboard.setAttribute("aria-hidden", "false");
     } else {
-      adminProtectedDashboard.style.display = "none";
       adminProtectedDashboard.setAttribute("hidden", "");
       adminProtectedDashboard.setAttribute("aria-hidden", "true");
     }
@@ -2784,9 +2782,12 @@ function showScheduleModal(jobId, isReschedule) {
     setLine(statusLine, "bad", "Authenticate and click Refresh before scheduling jobs.");
     return;
   }
+  const modal = document.getElementById("scheduleModal");
+  if (!modal) return;
   renderScheduleContext(currentJobsById[jobId] || null);
   document.getElementById("scheduleTitle").textContent = isReschedule ? "Reschedule Job" : "Schedule Job";
-  document.getElementById("scheduleModal").style.display = "block";
+  modal.removeAttribute("hidden");
+  modal.setAttribute("aria-hidden", "false");
   const form = document.getElementById("scheduleForm");
   form.onsubmit = (e) => {
     e.preventDefault();
@@ -2804,7 +2805,8 @@ function closeScheduleModal() {
   const modal = document.getElementById("scheduleModal");
   const form = document.getElementById("scheduleForm");
   if (!modal || !form) return;
-  modal.style.display = "none";
+  modal.setAttribute("hidden", "");
+  modal.setAttribute("aria-hidden", "true");
   form.reset();
   form.onsubmit = null;
   renderScheduleContext(null);
@@ -2813,7 +2815,7 @@ function closeScheduleModal() {
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   const modal = document.getElementById("scheduleModal");
-  if (modal && modal.style.display === "block") closeScheduleModal();
+  if (modal && !modal.hidden) closeScheduleModal();
 });
 
 document.addEventListener("click", (e) => {

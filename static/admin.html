@@ -41,7 +41,7 @@
     <div class="statusNotice muted" id="statusLine" role="status" aria-live="polite"></div>
   </div>
 
-  <div id="adminProtectedDashboard" class="protectedDashboard" hidden aria-hidden="true" style="display:none">
+  <div id="adminProtectedDashboard" class="protectedDashboard" hidden aria-hidden="true">
     <div class="card adminHero adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">
       <div>
         <p class="eyebrow">Bay Delivery</p>
@@ -287,7 +287,7 @@
 <script src="/static/admin.js" defer></script>
 
 <!-- Schedule Modal -->
-<div id="scheduleModal" class="modal">
+<div id="scheduleModal" class="modal" hidden aria-hidden="true">
   <div class="modal-content">
     <button type="button" class="close" id="scheduleCloseBtn" aria-label="Close schedule modal">&times;</button>
     <h3 id="scheduleTitle">Schedule Job</h3>
