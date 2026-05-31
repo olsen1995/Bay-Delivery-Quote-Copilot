@@ -408,6 +408,10 @@ def test_quote_page_mobile_polish_preserves_one_form_flow() -> None:
     assert ".progressCard" in quote_css
     assert "overflow-x: auto;" in quote_css
     assert "scroll-snap-type: x proximity;" in quote_css
+    mobile_quote_css = quote_css[quote_css.index("@media (max-width: 720px)") :]
+    mobile_body_match = re.search(r"body\.quotePage\s*\{(?P<body>.*?)\n\s*\}", mobile_quote_css, re.S)
+    assert mobile_body_match is not None
+    assert "padding-bottom: 92px;" in mobile_body_match.group("body")
     assert "#quoteForm > .btnRow" in quote_css
     assert "position: sticky;" in quote_css
     assert "env(safe-area-inset-bottom)" in quote_css

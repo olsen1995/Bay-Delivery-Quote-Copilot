@@ -948,7 +948,7 @@ body.quotePage {
 }
 
 @media (max-width: 720px) {
-  .quotePage {
+  body.quotePage {
     padding-bottom: 92px;
   }
 
