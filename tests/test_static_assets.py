@@ -38,6 +38,42 @@ def test_quote_page_keeps_existing_logo_asset() -> None:
     assert 'src="/static/images/bay-delivery-logo.png"' not in quote_html
 
 
+def test_quote_page_owns_public_stylesheet_boundary() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    assert '<link rel="stylesheet" href="/static/quote.css" />' in quote_html
+    assert '<link rel="stylesheet" href="/static/admin.css" />' not in quote_html
+
+    for selector in [
+        "body.quotePage",
+        ".quotePage h1",
+        ".quotePage h2",
+        ".quotePage h3",
+        ".quotePage label",
+        ".quotePage .muted",
+        ".quotePage .row",
+        ".quotePage .card",
+        ".quotePage .btn",
+        ".quotePage .btn:hover",
+        ".quotePage .btn:disabled",
+        ".quotePage input",
+        ".quotePage select",
+        ".quotePage textarea",
+        ".quotePage input:focus",
+        ".quotePage select:focus",
+        ".quotePage textarea:focus",
+        ".quotePage input::placeholder",
+        ".quotePage textarea::placeholder",
+    ]:
+        assert selector in quote_css
+
+    if "var(--brand-red)" in quote_css:
+        quote_scope = re.search(r"\.quotePage\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+        assert quote_scope is not None
+        assert "--brand-red: var(--quote-accent);" in quote_scope.group("body")
+
+
 def test_homepage_premium_polish_stays_local_service_first() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     site_css = Path("static/site.css").read_text(encoding="utf-8")
