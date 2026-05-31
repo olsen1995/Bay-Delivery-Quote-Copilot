@@ -9,9 +9,13 @@
   --quote-accent: #d92d27;
   --quote-navy: #071827;
   --quote-shadow: 0 16px 32px rgba(7, 24, 39, 0.12);
+  --brand-red: var(--quote-accent);
+  --brand-red-bright: #e13a33;
   --ink-strong: #102033;
   --ink-muted: #5d6875;
   --line-soft: rgba(16, 32, 51, 0.12);
+  --radius-card: 18px;
+  --radius-control: 12px;
 }
 
 .quotePage,
@@ -22,14 +26,66 @@
 }
 
 body.quotePage {
+  font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
   color: var(--quote-text);
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 16px 40px;
   background:
     linear-gradient(180deg, rgba(7, 24, 39, 0.08), transparent 260px),
     var(--quote-bg);
+  min-height: 100vh;
+}
+
+.quotePage h1,
+.quotePage h2,
+.quotePage h3 {
+  margin: 0;
+  color: var(--quote-text);
+  line-height: 1.15;
+}
+
+.quotePage h1 {
+  font-size: 2.35rem;
+}
+
+.quotePage h2 {
+  font-size: 1.35rem;
+}
+
+.quotePage h3 {
+  font-size: 1.08rem;
+}
+
+.quotePage label {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--quote-text);
+}
+
+.quotePage .muted {
+  color: var(--quote-muted);
+  font-size: 0.95em;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.quotePage .row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.quotePage .row.hidden {
+  display: none;
 }
 
 .quotePage .card {
   border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
   background: var(--quote-surface);
   box-shadow: var(--quote-shadow);
 }
@@ -253,13 +309,26 @@ body.quotePage {
 }
 
 .quotePage .btn {
+  padding: 10px 14px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-control);
+  color: #ffffff;
   background: var(--quote-accent);
+  transition: background 0.18s ease, box-shadow 0.18s ease;
   box-shadow: 0 12px 24px rgba(217, 45, 39, 0.22);
   font-weight: 800;
 }
 
 .quotePage .btn:hover {
+  background: var(--brand-red-bright);
   box-shadow: 0 16px 30px rgba(217, 45, 39, 0.28);
+}
+
+.quotePage .btn:disabled {
+  cursor: wait;
+  opacity: 0.75;
+  transform: none;
 }
 
 .quotePage .btn.secondary {
@@ -322,6 +391,10 @@ body.quotePage {
 .formSectionTitle {
   margin: 0;
   font-size: 1.02rem;
+}
+
+.quotePage .formSectionTitle {
+  color: #f5f8fd;
 }
 
 .firstStepHint,
@@ -458,6 +531,12 @@ body.quotePage {
   max-width: 62ch;
 }
 
+.quotePage .formSection .sectionLead,
+.quotePage .detailPanel .sectionLead,
+.quotePage .customerFlowGroup .muted {
+  color: rgba(213, 222, 235, 0.86);
+}
+
 .quotePage .formSection .hint {
   line-height: 1.5;
 }
@@ -476,9 +555,14 @@ body.quotePage {
 .quotePage input,
 .quotePage select,
 .quotePage textarea {
+  padding: 11px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--radius-control);
   background: rgba(9, 12, 20, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #f5f8fd;
+  font: inherit;
 }
 
 .quotePage input::placeholder,
@@ -506,7 +590,7 @@ body.quotePage {
   width: 100%;
 }
 
-.checkboxLabel {
+.quotePage .checkboxLabel {
   display: grid;
   grid-template-columns: 18px 1fr;
   gap: 10px;
@@ -515,7 +599,8 @@ body.quotePage {
   color: #f5f8fd;
 }
 
-.checkboxLabel input[type="checkbox"] {
+.quotePage .checkboxLabel input[type="checkbox"] {
+  width: auto;
   margin-top: 3px;
 }
 
@@ -837,6 +922,12 @@ body.quotePage {
   }
 }
 
+@media (max-width: 980px) {
+  .quotePage .row {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 880px) {
   .sectionHeader,
   .quoteResultHeader {
@@ -857,7 +948,7 @@ body.quotePage {
 }
 
 @media (max-width: 720px) {
-  .quotePage {
+  body.quotePage {
     padding-bottom: 92px;
   }
 
