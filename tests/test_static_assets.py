@@ -31,11 +31,13 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
     assert 'href="tel:+17053034409">Call 705-303-4409<' in index_html
 
 
-def test_quote_page_keeps_existing_logo_asset() -> None:
+def test_quote_page_uses_current_logo_asset() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    logo_asset = Path("static/images/bay-delivery-logo.png")
 
-    assert 'src="/static/images/logo.jpg"' in quote_html
-    assert 'src="/static/images/bay-delivery-logo.png"' not in quote_html
+    assert logo_asset.exists()
+    assert 'src="/static/images/bay-delivery-logo.png"' in quote_html
+    assert 'src="/static/images/logo.jpg"' not in quote_html
 
 
 def test_quote_page_owns_public_stylesheet_boundary() -> None:
@@ -72,6 +74,45 @@ def test_quote_page_owns_public_stylesheet_boundary() -> None:
         quote_scope = re.search(r"\.quotePage\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
         assert quote_scope is not None
         assert "--brand-red: var(--quote-accent);" in quote_scope.group("body")
+
+
+def test_quote_page_review_followup_layout_guards() -> None:
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    checkbox_match = re.search(r"\.quotePage \.checkboxLabel\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert checkbox_match is not None
+    checkbox_body = checkbox_match.group("body")
+    assert "display: grid;" in checkbox_body
+    assert "grid-template-columns: 18px 1fr;" in checkbox_body
+    assert "align-items: start;" in checkbox_body
+
+    hidden_row_match = re.search(r"\.quotePage \.row\.hidden\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert hidden_row_match is not None
+    assert "display: none;" in hidden_row_match.group("body")
+
+    assert "@media (max-width: 980px)" in quote_css
+    mobile_css = quote_css[quote_css.index("@media (max-width: 980px)") :]
+    assert re.search(r"\.quotePage \.row\s*\{(?P<body>.*?)\n\s*\}", mobile_css, re.S)
+    mobile_row_body = re.search(r"\.quotePage \.row\s*\{(?P<body>.*?)\n\s*\}", mobile_css, re.S).group("body")
+    assert "grid-template-columns: 1fr;" in mobile_row_body
+
+
+def test_quote_page_dark_panel_text_contrast_is_scoped() -> None:
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    form_title_match = re.search(r"\.quotePage \.formSectionTitle\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert form_title_match is not None
+    assert "color: #f5f8fd;" in form_title_match.group("body")
+
+    dark_lead_match = re.search(
+        r"\.quotePage \.formSection \.sectionLead,\s*"
+        r"\.quotePage \.detailPanel \.sectionLead,\s*"
+        r"\.quotePage \.customerFlowGroup \.muted\s*\{(?P<body>.*?)\n\}",
+        quote_css,
+        re.S,
+    )
+    assert dark_lead_match is not None
+    assert "color: rgba(213, 222, 235, 0.86);" in dark_lead_match.group("body")
 
 
 def test_homepage_premium_polish_stays_local_service_first() -> None:

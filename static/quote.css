@@ -79,6 +79,10 @@ body.quotePage {
   margin-top: 18px;
 }
 
+.quotePage .row.hidden {
+  display: none;
+}
+
 .quotePage .card {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
@@ -389,6 +393,10 @@ body.quotePage {
   font-size: 1.02rem;
 }
 
+.quotePage .formSectionTitle {
+  color: #f5f8fd;
+}
+
 .firstStepHint,
 .startIntro {
   margin: 6px 0 0;
@@ -523,6 +531,12 @@ body.quotePage {
   max-width: 62ch;
 }
 
+.quotePage .formSection .sectionLead,
+.quotePage .detailPanel .sectionLead,
+.quotePage .customerFlowGroup .muted {
+  color: rgba(213, 222, 235, 0.86);
+}
+
 .quotePage .formSection .hint {
   line-height: 1.5;
 }
@@ -576,7 +590,7 @@ body.quotePage {
   width: 100%;
 }
 
-.checkboxLabel {
+.quotePage .checkboxLabel {
   display: grid;
   grid-template-columns: 18px 1fr;
   gap: 10px;
@@ -585,7 +599,8 @@ body.quotePage {
   color: #f5f8fd;
 }
 
-.checkboxLabel input[type="checkbox"] {
+.quotePage .checkboxLabel input[type="checkbox"] {
+  width: auto;
   margin-top: 3px;
 }
 
@@ -904,6 +919,12 @@ body.quotePage {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 980px) {
+  .quotePage .row {
+    grid-template-columns: 1fr;
   }
 }
 
