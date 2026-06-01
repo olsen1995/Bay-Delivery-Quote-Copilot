@@ -54,6 +54,14 @@ _STRUCTURED_INTAKE_FIELDS = (
     "weather_protection_required",
 )
 _STRUCTURED_INTAKE_SUPPLIED_KEY = "_structured_intake_fields_supplied"
+_DEMOLITION_PRICING_CONTEXT_FIELDS = (
+    "stairs_count",
+    "floor_count",
+    "basement_or_inside_removal",
+    "demolition_ripout",
+    "construction_debris_type",
+    "dense_material_type",
+)
 LEAD_SOURCE_LABELS = {
     "facebook": "Facebook",
     "google": "Google",
@@ -213,7 +221,7 @@ def _quote_engine_inputs(
     service_type: str,
     load_mode: str,
 ) -> dict[str, Any]:
-    return {
+    inputs = {
         "service_type": service_type,
         "hours": float(request_payload.get("estimated_hours", 0.0)),
         "crew_size": int(request_payload.get("crew_size", 1)),
@@ -233,6 +241,11 @@ def _quote_engine_inputs(
         "pickup_address": request_payload.get("pickup_address"),
         "dropoff_address": request_payload.get("dropoff_address"),
     }
+    if str(service_type or "").strip().lower() == "demolition":
+        for field in _DEMOLITION_PRICING_CONTEXT_FIELDS:
+            if field in request_payload:
+                inputs[field] = request_payload.get(field)
+    return inputs
 
 
 def _structured_intake_values(request_payload: dict[str, Any]) -> dict[str, Any]:

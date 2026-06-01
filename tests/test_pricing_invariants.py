@@ -836,8 +836,8 @@ def test_global_minimum_overrides_legacy_50_service_minimum(monkeypatch: pytest.
     assert float(result["total_cash_cad"]) == 60.0
 
 
-def test_demolition_minimum_75_remains_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Higher service minimums must remain intact under the global floor."""
+def test_small_controlled_demolition_uses_margin_protective_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even a tiny demolition job must not fall back to the generic service minimum."""
     config = quote_engine.load_config()
     demolition = config["services"]["demolition"]
     demolition["minimum_total"] = 75
@@ -853,8 +853,132 @@ def test_demolition_minimum_75_remains_unchanged(monkeypatch: pytest.MonkeyPatch
         crew_size=1,
         travel_zone="in_town",
         access_difficulty="normal",
+        description="Small controlled demolition cleanup with light debris.",
     )
-    assert float(result["total_cash_cad"]) == 75.0
+    assert float(result["total_cash_cad"]) == 500.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "controlled"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 500.0
+
+
+@pytest.mark.parametrize(
+    ("description", "expected_min_cash", "expected_tier"),
+    [
+        (
+            "16x10 wood shed teardown and dismantle in the backyard with demo debris.",
+            1000.0,
+            "structure",
+        ),
+        (
+            "Small drywall demolition and plaster rip-out from one room.",
+            650.0,
+            "medium_material",
+        ),
+        (
+            "Brick fireplace and masonry wall demolition from the basement with rubble.",
+            1500.0,
+            "heavy_access",
+        ),
+        (
+            "Bathroom ceramic tile and floor tile rip-out with mortar debris.",
+            1200.0,
+            "heavy_material",
+        ),
+        (
+            "Wet roof shingles and asphalt shingles tear-off debris.",
+            1200.0,
+            "heavy_material",
+        ),
+        (
+            "Laminate flooring, carpet, subfloor, underlayment, baseboards and trim rip-out.",
+            650.0,
+            "medium_material",
+        ),
+    ],
+)
+def test_demolition_material_and_access_safeguards(description: str, expected_min_cash: float, expected_tier: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        2.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= expected_min_cash
+    assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
+    assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
+
+
+def test_non_demolition_reference_totals_stay_unchanged() -> None:
+    cases = [
+        (
+            "light_dump",
+            calculate_quote(
+                "haul_away",
+                1.0,
+                crew_size=1,
+                garbage_bag_count=1,
+                trailer_fill_estimate="under_quarter",
+                travel_zone="in_town",
+                access_difficulty="normal",
+                has_dense_materials=False,
+                description="One small bag curbside.",
+            ),
+            80.0,
+        ),
+        (
+            "small_move",
+            calculate_quote(
+                "small_move",
+                2.0,
+                crew_size=2,
+                travel_zone="in_town",
+                access_difficulty="normal",
+                pickup_address="1 Pickup Rd",
+                dropoff_address="2 Dropoff Ave",
+            ),
+            330.0,
+        ),
+        ("scrap_curbside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="curbside"), 60.0),
+        ("scrap_inside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="inside"), 60.0),
+        (
+            "mattress_boxspring",
+            calculate_quote(
+                "haul_away",
+                0.0,
+                crew_size=1,
+                garbage_bag_count=1,
+                mattresses_count=1,
+                box_springs_count=1,
+                trailer_fill_estimate="under_quarter",
+                travel_zone="in_town",
+                access_difficulty="normal",
+                has_dense_materials=False,
+                description="Mattress and box spring outside.",
+            ),
+            180.0,
+        ),
+        (
+            "full_trailer",
+            calculate_quote(
+                "haul_away",
+                2.0,
+                crew_size=2,
+                garbage_bag_count=24,
+                trailer_fill_estimate="full",
+                travel_zone="in_town",
+                access_difficulty="normal",
+                has_dense_materials=False,
+            ),
+            500.0,
+        ),
+    ]
+
+    for label, quote, expected_cash in cases:
+        assert float(quote["total_cash_cad"]) == expected_cash, label
+        assert float(quote["total_emt_cad"]) == round(expected_cash * 1.13, 2), label
 
 
 def test_emt_total_still_correct_when_global_floor_applies() -> None:
@@ -1866,8 +1990,8 @@ def test_risk_margin_protection_keeps_rounding_tax_and_disclaimer_structure() ->
     )
 
     assert buffered["_internal"]["cash_before_round_cad"] == baseline["_internal"]["cash_before_round_cad"] + 50.0
-    assert buffered["total_cash_cad"] == 160.0
-    assert buffered["total_emt_cad"] == 180.8
+    assert buffered["total_cash_cad"] == 550.0
+    assert buffered["total_emt_cad"] == 621.5
     assert buffered["disclaimer"] == baseline["disclaimer"]
 
 

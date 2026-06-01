@@ -85,7 +85,97 @@ RISK_MARGIN_PROTECTION_STRONG_FLAGS = frozenset(
     }
 )
 
+DEMOLITION_CONTROLLED_FLOOR_CAD = 500.0
+DEMOLITION_NORMAL_FLOOR_CAD = 650.0
+DEMOLITION_ACCESS_RISK_FLOOR_CAD = 750.0
+DEMOLITION_STRUCTURE_FLOOR_CAD = 1000.0
+DEMOLITION_HEAVY_MATERIAL_FLOOR_CAD = 1200.0
+DEMOLITION_HEAVY_ACCESS_FLOOR_CAD = 1500.0
+
 _TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
+_DEMOLITION_CONTROLLED_PHRASES = (
+    "small controlled",
+    "controlled demolition",
+    "controlled demo",
+    "light demolition",
+    "light demo",
+)
+_DEMOLITION_GENERIC_PHRASES = (
+    "demolition",
+    "demolish",
+    "demo",
+    "rip out",
+    "ripout",
+    "rip off",
+    "tear out",
+)
+_DEMOLITION_STRUCTURE_PHRASES = (
+    "shed",
+    "deck",
+    "fence",
+    "gazebo",
+    "teardown",
+    "tear down",
+    "dismantle",
+    "structure",
+    "outbuilding",
+)
+_DEMOLITION_HEAVY_MATERIAL_PHRASES = (
+    "brick",
+    "concrete",
+    "block",
+    "stone",
+    "masonry",
+    "fireplace",
+    "chimney",
+    "mortar",
+    "rubble",
+    "tile",
+    "ceramic tile",
+    "floor tile",
+    "bathroom tile",
+    "roof shingles",
+    "asphalt shingles",
+    "wet shingles",
+    "shingles",
+    "lath and plaster",
+)
+_DEMOLITION_MEDIUM_MATERIAL_PHRASES = (
+    "drywall",
+    "plaster",
+    "flooring",
+    "laminate flooring",
+    "vinyl flooring",
+    "carpet",
+    "subfloor",
+    "underlayment",
+    "baseboards",
+    "trim",
+    "cabinets",
+    "vanity",
+    "paneling",
+)
+_DEMOLITION_ACCESS_RISK_PHRASES = (
+    "basement",
+    "stairs",
+    "stair",
+    "downstairs",
+    "inside removal",
+    "long carry",
+    "tight access",
+    "backyard",
+    "back yard",
+    "no driveway access",
+    "heavy awkward debris",
+    "awkward debris",
+)
+_DEMOLITION_UNKNOWN_SCOPE_PHRASES = (
+    "unknown disposal volume",
+    "unknown volume",
+    "no photos",
+    "no photo",
+    "without photos",
+)
 _FIXED_BULKY_PHRASES = (
     "mattress",
     "mattresses",
@@ -594,6 +684,96 @@ def _count_matched_phrases(text: str, phrases: tuple[str, ...]) -> int:
     return matched
 
 
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    normalized = str(value).strip().lower()
+    return normalized in {"1", "true", "yes", "y", "on"}
+
+
+def _coerce_non_negative_int(value: Any) -> int:
+    try:
+        return max(int(value), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _demolition_safeguard(
+    *,
+    text: str,
+    access_difficulty: str,
+    has_dense_materials: bool,
+    stairs_count: Any = None,
+    floor_count: Any = None,
+    basement_or_inside_removal: Any = None,
+    demolition_ripout: Any = None,
+    construction_debris_type: Any = None,
+    dense_material_type: Any = None,
+) -> dict[str, Any]:
+    safeguard_text = _normalized_signal_text(text, construction_debris_type, dense_material_type)
+    has_controlled_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_CONTROLLED_PHRASES)
+    has_generic_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_GENERIC_PHRASES)
+    has_medium_material = _contains_any_phrase(safeguard_text, _DEMOLITION_MEDIUM_MATERIAL_PHRASES)
+    has_structure = _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_PHRASES)
+    has_heavy_material = bool(has_dense_materials) or _contains_any_phrase(
+        safeguard_text,
+        _DEMOLITION_HEAVY_MATERIAL_PHRASES,
+    )
+    has_access_risk = (
+        str(access_difficulty or "normal").strip().lower() != "normal"
+        or _coerce_bool(basement_or_inside_removal)
+        or _coerce_non_negative_int(stairs_count) > 0
+        or _coerce_non_negative_int(floor_count) > 1
+        or _contains_any_phrase(safeguard_text, _DEMOLITION_ACCESS_RISK_PHRASES)
+    )
+    has_unknown_scope = _contains_any_phrase(safeguard_text, _DEMOLITION_UNKNOWN_SCOPE_PHRASES)
+    has_demolition_scope = _coerce_bool(demolition_ripout) or has_generic_signal
+
+    floor = DEMOLITION_CONTROLLED_FLOOR_CAD
+    tier = "controlled"
+    if has_demolition_scope and not has_controlled_signal:
+        floor = DEMOLITION_NORMAL_FLOOR_CAD
+        tier = "normal"
+    if has_medium_material:
+        floor = max(floor, DEMOLITION_NORMAL_FLOOR_CAD)
+        tier = "medium_material"
+    if (has_access_risk or has_unknown_scope) and floor < DEMOLITION_ACCESS_RISK_FLOOR_CAD:
+        floor = DEMOLITION_ACCESS_RISK_FLOOR_CAD
+        tier = "access_risk"
+    if has_structure:
+        floor = max(floor, DEMOLITION_STRUCTURE_FLOOR_CAD)
+        tier = "structure"
+    if has_heavy_material:
+        floor = max(floor, DEMOLITION_HEAVY_MATERIAL_FLOOR_CAD)
+        tier = "heavy_material"
+    if has_heavy_material and has_access_risk:
+        floor = max(floor, DEMOLITION_HEAVY_ACCESS_FLOOR_CAD)
+        tier = "heavy_access"
+
+    flags: list[str] = []
+    if has_demolition_scope:
+        flags.append("demolition_scope")
+    if has_medium_material:
+        flags.append("medium_material")
+    if has_structure:
+        flags.append("structure_teardown")
+    if has_heavy_material:
+        flags.append("heavy_material")
+    if has_access_risk:
+        flags.append("access_risk")
+    if has_unknown_scope:
+        flags.append("unknown_scope")
+
+    return {
+        "floor_cad": floor,
+        "tier": tier,
+        "flags": flags,
+        "owner_review_recommended": floor >= DEMOLITION_STRUCTURE_FLOOR_CAD or has_access_risk or has_unknown_scope,
+    }
+
+
 def _has_fixed_bulky_item_signal(text: str, mattresses_count: int, box_springs_count: int) -> bool:
     if mattresses_count > 0 or box_springs_count > 0:
         return True
@@ -721,6 +901,12 @@ def calculate_quote(
     job_description_customer: str | None = None,
     pickup_address: str | None = None,
     dropoff_address: str | None = None,
+    stairs_count: int | None = None,
+    floor_count: int | None = None,
+    basement_or_inside_removal: bool | None = None,
+    demolition_ripout: bool | None = None,
+    construction_debris_type: str | None = None,
+    dense_material_type: str | None = None,
 ) -> Dict[str, Any]:
     """
     Customer-safe output:
@@ -901,6 +1087,28 @@ def calculate_quote(
     min_total = _get_min_total(svc)
     cash_before_round = max(raw_cash, min_total, GLOBAL_MIN_TOTAL_CAD)
 
+    demolition_safeguard_floor = 0.0
+    demolition_safeguard_tier = ""
+    demolition_safeguard_flags: list[str] = []
+    demolition_owner_review_recommended = False
+    if normalized == "demolition":
+        demolition_safeguard = _demolition_safeguard(
+            text=signal_text,
+            access_difficulty=_ad,
+            has_dense_materials=bool(has_dense_materials),
+            stairs_count=stairs_count,
+            floor_count=floor_count,
+            basement_or_inside_removal=basement_or_inside_removal,
+            demolition_ripout=demolition_ripout,
+            construction_debris_type=construction_debris_type,
+            dense_material_type=dense_material_type,
+        )
+        demolition_safeguard_floor = float(demolition_safeguard["floor_cad"])
+        demolition_safeguard_tier = str(demolition_safeguard["tier"])
+        demolition_safeguard_flags = list(demolition_safeguard["flags"])
+        demolition_owner_review_recommended = bool(demolition_safeguard["owner_review_recommended"])
+        cash_before_round = max(cash_before_round, demolition_safeguard_floor)
+
     bag_type_floor = 0.0
     trailer_fill_floor = 0.0
     awkward_small_load_floor = 0.0
@@ -1030,6 +1238,10 @@ def calculate_quote(
             "trailer_fill_floor_cad": round(float(trailer_fill_floor), 2),
             "awkward_small_load_floor_cad": round(float(awkward_small_load_floor), 2),
             "fixed_bulky_floor_cad": round(float(fixed_bulky_floor), 2),
+            "demolition_safeguard_floor_cad": round(float(demolition_safeguard_floor), 2),
+            "demolition_safeguard_tier": demolition_safeguard_tier,
+            "demolition_safeguard_flags": demolition_safeguard_flags,
+            "demolition_owner_review_recommended": demolition_owner_review_recommended,
             "access_difficulty": _ad,
             "access_difficulty_adder_cad": round(float(access_adder), 2),
             "multi_stop_complexity_adder_cad": round(float(multi_stop_complexity_adder), 2),
