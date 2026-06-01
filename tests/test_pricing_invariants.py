@@ -911,6 +911,60 @@ def test_demolition_material_and_access_safeguards(description: str, expected_mi
     assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
 
 
+def test_demolition_structured_soil_counts_as_heavy_material_without_dense_checkbox() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition debris from yard removal.",
+        dense_material_type="soil",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_material"
+    assert "heavy_material" in result["_internal"]["demolition_safeguard_flags"]
+
+
+def test_demolition_structured_soil_with_access_risk_uses_heavy_access_floor() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition debris from basement.",
+        dense_material_type="soil",
+        basement_or_inside_removal=True,
+    )
+
+    assert float(result["total_cash_cad"]) >= 1500.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_access"
+    assert {"heavy_material", "access_risk"}.issubset(result["_internal"]["demolition_safeguard_flags"])
+
+
+@pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
+def test_demolition_structured_other_material_counts_as_unknown_scope(material_field: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition rip-out debris.",
+        **{material_field: "other"},
+    )
+
+    assert float(result["total_cash_cad"]) >= 750.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "unknown_scope"
+    assert "unknown_scope" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
 def test_non_demolition_reference_totals_stay_unchanged() -> None:
     cases = [
         (

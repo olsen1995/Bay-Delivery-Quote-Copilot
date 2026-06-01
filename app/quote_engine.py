@@ -139,6 +139,7 @@ _DEMOLITION_HEAVY_MATERIAL_PHRASES = (
     "wet shingles",
     "shingles",
     "lath and plaster",
+    "soil",
 )
 _DEMOLITION_MEDIUM_MATERIAL_PHRASES = (
     "drywall",
@@ -713,6 +714,8 @@ def _demolition_safeguard(
     dense_material_type: Any = None,
 ) -> dict[str, Any]:
     safeguard_text = _normalized_signal_text(text, construction_debris_type, dense_material_type)
+    construction_debris_value = _normalized_signal_text(construction_debris_type)
+    dense_material_value = _normalized_signal_text(dense_material_type)
     has_controlled_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_CONTROLLED_PHRASES)
     has_generic_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_GENERIC_PHRASES)
     has_medium_material = _contains_any_phrase(safeguard_text, _DEMOLITION_MEDIUM_MATERIAL_PHRASES)
@@ -728,7 +731,11 @@ def _demolition_safeguard(
         or _coerce_non_negative_int(floor_count) > 1
         or _contains_any_phrase(safeguard_text, _DEMOLITION_ACCESS_RISK_PHRASES)
     )
-    has_unknown_scope = _contains_any_phrase(safeguard_text, _DEMOLITION_UNKNOWN_SCOPE_PHRASES)
+    has_unknown_scope = (
+        construction_debris_value == "other"
+        or dense_material_value == "other"
+        or _contains_any_phrase(safeguard_text, _DEMOLITION_UNKNOWN_SCOPE_PHRASES)
+    )
     has_demolition_scope = _coerce_bool(demolition_ripout) or has_generic_signal
 
     floor = DEMOLITION_CONTROLLED_FLOOR_CAD
@@ -739,7 +746,10 @@ def _demolition_safeguard(
     if has_medium_material:
         floor = max(floor, DEMOLITION_NORMAL_FLOOR_CAD)
         tier = "medium_material"
-    if (has_access_risk or has_unknown_scope) and floor < DEMOLITION_ACCESS_RISK_FLOOR_CAD:
+    if has_unknown_scope and floor < DEMOLITION_ACCESS_RISK_FLOOR_CAD:
+        floor = DEMOLITION_ACCESS_RISK_FLOOR_CAD
+        tier = "unknown_scope"
+    if has_access_risk and floor < DEMOLITION_ACCESS_RISK_FLOOR_CAD:
         floor = DEMOLITION_ACCESS_RISK_FLOOR_CAD
         tier = "access_risk"
     if has_structure:

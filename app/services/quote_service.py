@@ -307,7 +307,6 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         normalized_request=normalized_request,
         engine_quote=baseline_engine_quote,
     )
-    quote_risk_advisory = build_quote_risk_advisory(normalized_request)
     engine_quote = calculate_quote(
         **_quote_engine_inputs(
             normalized_request,
@@ -315,6 +314,12 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
             load_mode=normalized_request["load_mode"],
         ),
         internal_risk_assessment=internal_risk_assessment,
+    )
+    quote_risk_advisory = build_quote_risk_advisory(
+        {
+            **normalized_request,
+            "_engine_internal": engine_quote.get("_internal"),
+        }
     )
     response = {
         "cash_total_cad": float(engine_quote["total_cash_cad"]),
