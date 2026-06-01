@@ -3,6 +3,41 @@ import struct
 from pathlib import Path
 
 
+def _jpeg_dimensions(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    assert data.startswith(b"\xff\xd8"), f"{path} is not a JPEG file"
+    offset = 2
+    while offset < len(data):
+        while offset < len(data) and data[offset] == 0xFF:
+            offset += 1
+        marker = data[offset]
+        offset += 1
+        if marker in {0xD8, 0xD9}:
+            continue
+        if offset + 2 > len(data):
+            break
+        segment_length = struct.unpack(">H", data[offset : offset + 2])[0]
+        if marker in {
+            0xC0,
+            0xC1,
+            0xC2,
+            0xC3,
+            0xC5,
+            0xC6,
+            0xC7,
+            0xC9,
+            0xCA,
+            0xCB,
+            0xCD,
+            0xCE,
+            0xCF,
+        }:
+            height, width = struct.unpack(">HH", data[offset + 3 : offset + 7])
+            return width, height
+        offset += segment_length
+    raise AssertionError(f"Could not read JPEG dimensions for {path}")
+
+
 def test_homepage_images_exist():
     """Validate that all images referenced in the homepage HTML exist on disk."""
     index_path = Path("static/index.html")
@@ -120,10 +155,13 @@ def test_homepage_premium_polish_stays_local_service_first() -> None:
     site_css = Path("static/site.css").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
     admin_css = Path("static/admin.css").read_text(encoding="utf-8")
-    hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
+    hero_asset = Path("static/images/homepage-hero-full.jpg")
 
     assert hero_asset.exists()
-    assert 'src="/static/assets/bay-delivery-premium-hero.png"' in index_html
+    assert 'src="/static/images/homepage-hero-full.jpg"' in index_html
+    assert 'src="/static/assets/bay-delivery-premium-hero.png"' not in index_html
+    assert "working_assets/" not in index_html
+    assert "working_assets/" not in site_css
     assert "Local North Bay hauling, moving, cleanouts, and light demolition" in index_html
     assert "Real local service, clear estimates, no booking pressure" in index_html
     assert "Red Bay Delivery truck with enclosed trailer near the North Bay waterfront" in index_html
@@ -142,13 +180,15 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     site_css = Path("static/site.css").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
-    hero_asset = Path("static/assets/bay-delivery-premium-hero.png")
+    hero_asset = Path("static/images/homepage-hero-full.jpg")
 
-    width, height = struct.unpack(">II", hero_asset.read_bytes()[16:24])
-    assert width == 1200
-    assert height == 675
-    assert "object-position: 56% center;" in site_css
-    assert "object-position: 52% center;" in site_css
+    width, height = _jpeg_dimensions(hero_asset)
+    assert width == 1727
+    assert height == 911
+    assert 100_000 < hero_asset.stat().st_size < 450_000
+    assert "image/jpeg" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
+    assert "object-fit: contain;" in site_css
+    assert "aspect-ratio: 1727 / 911;" in site_css
     assert "GET A QUOTE" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
     assert "Minimum 4 hours. Minimum crew 2." in index_html
     assert "Pickup and drop-off jobs for homes, apartments, cottages, and bulky-item moves. Minimum 4 hours. Minimum crew 2." in index_html
@@ -473,7 +513,10 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
     mobile_site_css = site_css[site_css.index("@media (max-width: 720px)") :]
     assert re.search(r"\.container\s*\{[^}]*padding-bottom:\s*96px;", mobile_site_css, re.S)
     assert re.search(r"\.premiumHeroContent\s*\{[^}]*padding:\s*24px 18px;", mobile_site_css, re.S)
-    assert re.search(r"\.premiumHeroMedia,\s*\.premiumHeroMedia img\s*\{[^}]*min-height:\s*280px;", mobile_site_css, re.S)
+    assert re.search(r"\.toplinks\s*\{[^}]*grid-template-columns:\s*1fr 1fr;", mobile_site_css, re.S)
+    assert re.search(r"\.primaryNavLink,\s*\.callNavLink\s*\{[^}]*grid-column:\s*1 / -1;", mobile_site_css, re.S)
+    assert re.search(r"\.premiumHeroMedia,\s*\.premiumHeroMedia img\s*\{[^}]*min-height:\s*0;", mobile_site_css, re.S)
+    assert re.search(r"\.sectionIntro\s*\{[^}]*margin-bottom:\s*22px;", mobile_site_css, re.S)
     assert re.search(r"\.stickyMobileCall\s*\{[^}]*bottom:\s*calc\(18px \+ env\(safe-area-inset-bottom\)\);", mobile_site_css, re.S)
 
 
