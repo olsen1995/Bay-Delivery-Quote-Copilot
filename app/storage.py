@@ -1496,6 +1496,73 @@ def _json_text_in(column: str, field_name: str, values: Tuple[str, ...]) -> str:
     )
 
 
+_DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
+    "apartment",
+    "apartments",
+    "apartment building",
+    "basement",
+    "brick",
+    "bricks",
+    "chimney",
+    "chimneys",
+    "concrete",
+    "condo",
+    "condos",
+    "deck",
+    "decks",
+    "dismantle",
+    "elevator",
+    "elevators",
+    "fence",
+    "fences",
+    "fireplace",
+    "fireplaces",
+    "gazebo",
+    "gazebos",
+    "heavy awkward debris",
+    "hidden debris",
+    "hidden material",
+    "high rise",
+    "long carry",
+    "masonry",
+    "masonry debris",
+    "mortar",
+    "mortars",
+    "no driveway access",
+    "not sure what material",
+    "rubble",
+    "shed",
+    "sheds",
+    "soil",
+    "stairs",
+    "stone",
+    "stones",
+    "structure",
+    "structures",
+    "tear down",
+    "teardown",
+    "tile",
+    "tiles",
+    "tight access",
+    "unknown debris",
+    "unknown material",
+    "unknown materials",
+    "unit",
+    "upstairs unit",
+)
+
+
+def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
+    clauses = []
+    for value in values:
+        escaped_value = value.replace("'", "''").lower()
+        clauses.append(
+            f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), '')) "
+            f"LIKE '%{escaped_value}%'"
+        )
+    return f"({' OR '.join(clauses)})"
+
+
 def _owner_review_manual_signal_filter(alias: str) -> str:
     request_json = f"{alias}.request_json"
     return f"""
@@ -1513,6 +1580,9 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                       OR ({_json_truthy(request_json, "basement_or_inside_removal")}
                           AND {_json_int(request_json, "stairs_count")} >= 1)
                       OR {_json_truthy(request_json, "demolition_ripout")}
+                      OR ({_json_text_in(request_json, "service_type", ("demolition",))}
+                          AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
+                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}))
                     THEN 1
                     ELSE 0
                 END
