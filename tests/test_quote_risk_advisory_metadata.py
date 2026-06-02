@@ -608,8 +608,19 @@ def test_text_derived_premium_demolition_surfaces_internal_owner_review_advisory
     assert admin_body["quote_risk_summary"]["risk_level"] == "owner_review"
 
 
-def test_gpt_quote_response_excludes_advisory_metadata() -> None:
-    response = quote_service.build_gpt_quote_response(_base_payload())
+def test_gpt_quote_response_includes_internal_owner_review_advisory_metadata() -> None:
+    response = quote_service.build_gpt_quote_response(
+        _base_payload(
+            service_type="demolition",
+            description="16x10 shed teardown",
+            job_description_customer="16x10 shed teardown",
+        )
+    )
 
-    assert "quote_risk_advisory" not in response
-    assert "quote_risk_summary" not in response
+    assert response["quote_risk_advisory"]["customer_visible"] is False
+    assert response["quote_risk_advisory"]["pricing_effect"] == "none"
+    assert response["quote_risk_advisory"]["manual_review_recommended"] is True
+    assert "DEMOLITION_OWNER_REVIEW_RECOMMENDED" in _codes(response["quote_risk_advisory"])
+    assert response["quote_risk_summary"]["customer_visible"] is False
+    assert response["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert response["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"

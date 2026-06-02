@@ -1533,6 +1533,8 @@ _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
     "rubble",
     "shed",
     "sheds",
+    "shingle",
+    "shingles",
     "soil",
     "stairs",
     "stone",
@@ -1543,6 +1545,9 @@ _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
     "teardown",
     "tile",
     "tiles",
+    "roof shingles",
+    "asphalt shingles",
+    "wet shingles",
     "tight access",
     "unknown debris",
     "unknown material",
@@ -1580,6 +1585,13 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                       OR ({_json_truthy(request_json, "basement_or_inside_removal")}
                           AND {_json_int(request_json, "stairs_count")} >= 1)
                       OR {_json_truthy(request_json, "demolition_ripout")}
+                      OR ({_json_text_in(request_json, "service_type", ("demolition",))}
+                          AND ({_json_text_in(request_json, "construction_debris_type", ("other",))}
+                               OR {_json_text_in(request_json, "dense_material_type", ("other",))}
+                               OR (LOWER(TRIM(CAST(json_extract({request_json}, '$.access_difficulty') AS TEXT))) NOT IN ('', 'normal'))
+                               OR {_json_int(request_json, "floor_count")} >= 2
+                               OR {_json_truthy(request_json, "basement_or_inside_removal")}
+                               OR {_json_int(request_json, "stairs_count")} > 0))
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
                           AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
                                OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}))

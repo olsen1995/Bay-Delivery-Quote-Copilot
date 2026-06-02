@@ -101,6 +101,8 @@ def test_gpt_quote_returns_engine_backed_totals_without_persistence(client: Test
         "normalized_service_type",
         "confidence_level",
         "risk_flags",
+        "quote_risk_advisory",
+        "quote_risk_summary",
     }
     assert "quote_id" not in body
     assert "accept_token" not in body
@@ -112,6 +114,9 @@ def test_gpt_quote_returns_engine_backed_totals_without_persistence(client: Test
     assert body["normalized_service_type"] == artifacts["normalized_request"]["service_type"]
     assert body["confidence_level"] == artifacts["internal_risk_assessment"]["confidence_level"]
     assert body["risk_flags"] == artifacts["internal_risk_assessment"]["risk_flags"]
+    assert body["quote_risk_advisory"] == artifacts["quote_risk_advisory"]
+    assert body["quote_risk_summary"]["customer_visible"] is False
+    assert body["quote_risk_summary"]["pricing_effect"] == "none"
     assert storage.list_quotes() == []
     events = storage.list_gpt_quote_observability(limit=10)
     assert len(events) == 1
@@ -128,6 +133,31 @@ def test_gpt_quote_returns_engine_backed_totals_without_persistence(client: Test
     assert event["latency_ms"] >= 0
     assert event["server_grounding_revision"] is None
     assert event["caller_grounding_revision"] is None
+
+
+def test_gpt_quote_surfaces_demolition_owner_review_internal_cue(client: TestClient) -> None:
+    payload = _base_payload(service_type="demolition")
+    payload["description"] = "16x10 shed teardown"
+
+    response = client.post("/api/gpt/quote", headers=_headers(), json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    advisory = body["quote_risk_advisory"]
+    assert advisory["customer_visible"] is False
+    assert advisory["manual_review_recommended"] is True
+    assert any(
+        flag["code"] == "DEMOLITION_OWNER_REVIEW_RECOMMENDED"
+        for flag in advisory["risk_flags"]
+    )
+    summary = body["quote_risk_summary"]
+    assert summary["customer_visible"] is False
+    assert summary["pricing_effect"] == "none"
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+    assert "owner_review_recommended" in summary["reasons"]
+    assert "quote_id" not in body
+    assert "accept_token" not in body
 
 
 def test_gpt_quote_invalid_enum_returns_400(client: TestClient) -> None:

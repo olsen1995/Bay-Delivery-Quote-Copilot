@@ -652,6 +652,110 @@ def test_owner_review_counts_text_derived_demolition_without_pricing_or_advisory
     assert resp.json()["counts"]["owner_review"] == 1
 
 
+@pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
+def test_owner_review_counts_structured_unknown_demolition_materials_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    material_field: str,
+) -> None:
+    _seed_quote(
+        f"q-owner-demo-other-{material_field}",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Small controlled cleanup",
+            "job_description_customer": "Small controlled cleanup",
+            material_field: "other",
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+@pytest.mark.parametrize(
+    "request_overrides",
+    [
+        {"access_difficulty": "difficult"},
+        {"floor_count": 2},
+        {"basement_or_inside_removal": True},
+        {"stairs_count": 1},
+    ],
+)
+def test_owner_review_counts_structured_demolition_access_risk_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request_overrides: dict[str, Any],
+) -> None:
+    _seed_quote(
+        "q-owner-demo-access",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Small controlled cleanup",
+            "job_description_customer": "Small controlled cleanup",
+            **request_overrides,
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+def test_owner_review_counts_shingle_demolition_text_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-shingles",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Wet roof shingles tear-off",
+            "job_description_customer": "Wet roof shingles tear-off",
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
 def test_completed_job_with_partial_core_costing_still_appears(
     client: TestClient,
     admin_headers: dict[str, str],

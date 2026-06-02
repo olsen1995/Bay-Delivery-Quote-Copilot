@@ -362,6 +362,12 @@ def _gpt_request_to_quote_payload(request_payload: dict[str, Any]) -> dict[str, 
 def build_gpt_quote_response(request_payload: dict[str, Any]) -> dict[str, Any]:
     quote_artifacts = build_quote_artifacts(_gpt_request_to_quote_payload(request_payload))
     assessment = quote_artifacts.get("internal_risk_assessment") or {}
+    advisory = quote_artifacts.get("quote_risk_advisory")
+    summary = build_quote_risk_summary(
+        quote_artifacts["normalized_request"],
+        advisory if isinstance(advisory, dict) else None,
+        assessment if isinstance(assessment, dict) else None,
+    )
     response = quote_artifacts["response"]
     risk_flags_raw = assessment.get("risk_flags")
     risk_flags = [str(flag) for flag in risk_flags_raw] if isinstance(risk_flags_raw, list) else []
@@ -373,6 +379,8 @@ def build_gpt_quote_response(request_payload: dict[str, Any]) -> dict[str, Any]:
         "normalized_service_type": str(quote_artifacts["normalized_request"]["service_type"]),
         "confidence_level": str(assessment.get("confidence_level") or ""),
         "risk_flags": risk_flags,
+        "quote_risk_advisory": advisory,
+        "quote_risk_summary": summary,
     }
 
 
