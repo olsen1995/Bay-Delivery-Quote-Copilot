@@ -705,6 +705,48 @@ def test_owner_review_counts_engine_demolition_text_signals_without_recompute(
     assert resp.json()["counts"]["owner_review"] == 1
 
 
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Tight-access demolition cleanup.",
+        "No-photo demolition debris.",
+        "Back-yard demolition cleanup.",
+        "No-driveway-access demolition debris.",
+        "Long-carry demolition debris.",
+        "Inside-removal demolition cleanup.",
+    ],
+)
+def test_owner_review_counts_punctuation_normalized_demolition_text_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-punctuation",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
 @pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
 def test_owner_review_counts_structured_unknown_demolition_materials_without_recompute(
     client: TestClient,
@@ -720,6 +762,79 @@ def test_owner_review_counts_structured_unknown_demolition_materials_without_rec
             "description": "Small controlled cleanup",
             "job_description_customer": "Small controlled cleanup",
             material_field: "other",
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+@pytest.mark.parametrize(
+    ("material_field", "material_value"),
+    [
+        ("construction_debris_type", "tile"),
+        ("construction_debris_type", "shingles"),
+        ("dense_material_type", "tile"),
+        ("dense_material_type", "shingles"),
+    ],
+)
+def test_owner_review_counts_structured_tile_shingle_demolition_materials_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    material_field: str,
+    material_value: str,
+) -> None:
+    _seed_quote(
+        f"q-owner-demo-{material_field}-{material_value}",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Small controlled cleanup",
+            "job_description_customer": "Small controlled cleanup",
+            material_field: material_value,
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+def test_owner_review_counts_demolition_dense_material_checkbox_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-dense-checkbox",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Small controlled cleanup",
+            "job_description_customer": "Small controlled cleanup",
+            "has_dense_materials": True,
         },
     )
 

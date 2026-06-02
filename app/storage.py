@@ -1580,16 +1580,37 @@ _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
     "upstairs unit",
     "without photos",
 )
+_DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES: Tuple[str, ...] = (
+    "concrete",
+    "other",
+    "shingles",
+    "tile",
+)
+_DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES: Tuple[str, ...] = (
+    "brick",
+    "concrete",
+    "other",
+    "shingles",
+    "soil",
+    "stone",
+    "tile",
+)
+
+
+def _owner_review_like_patterns(value: str) -> Tuple[str, ...]:
+    normalized_value = value.replace("'", "''").lower()
+    words = tuple(part for part in normalized_value.split() if part)
+    if len(words) <= 1:
+        return (f"%{normalized_value}%",)
+    return tuple(f"%{separator.join(words)}%" for separator in (" ", "-", "_", "/", "."))
 
 
 def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
+    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
     clauses = []
     for value in values:
-        escaped_value = value.replace("'", "''").lower()
-        clauses.append(
-            f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), '')) "
-            f"LIKE '%{escaped_value}%'"
-        )
+        for pattern in _owner_review_like_patterns(value):
+            clauses.append(f"{text_expr} LIKE '{pattern}'")
     return f"({' OR '.join(clauses)})"
 
 
@@ -1611,8 +1632,9 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                           AND {_json_int(request_json, "stairs_count")} >= 1)
                       OR {_json_truthy(request_json, "demolition_ripout")}
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
-                          AND ({_json_text_in(request_json, "construction_debris_type", ("other",))}
-                               OR {_json_text_in(request_json, "dense_material_type", ("other",))}
+                          AND ({_json_text_in(request_json, "construction_debris_type", _DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES)}
+                               OR {_json_text_in(request_json, "dense_material_type", _DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES)}
+                               OR {_json_truthy(request_json, "has_dense_materials")}
                                OR (LOWER(TRIM(CAST(json_extract({request_json}, '$.access_difficulty') AS TEXT))) NOT IN ('', 'normal'))
                                OR {_json_int(request_json, "floor_count")} >= 2
                                OR {_json_truthy(request_json, "basement_or_inside_removal")}
