@@ -51,6 +51,12 @@ def _translated_payload(payload: dict) -> dict:
         "access_difficulty": payload.get("access_difficulty", "normal"),
         "has_dense_materials": payload.get("has_dense_materials", False),
         "load_mode": payload.get("load_mode", "standard"),
+        "stairs_count": payload.get("stairs_count"),
+        "floor_count": payload.get("floor_count"),
+        "basement_or_inside_removal": payload.get("basement_or_inside_removal"),
+        "demolition_ripout": payload.get("demolition_ripout"),
+        "construction_debris_type": payload.get("construction_debris_type"),
+        "dense_material_type": payload.get("dense_material_type"),
     }
 
 
@@ -158,6 +164,56 @@ def test_gpt_quote_surfaces_demolition_owner_review_internal_cue(client: TestCli
     assert "owner_review_recommended" in summary["reasons"]
     assert "quote_id" not in body
     assert "accept_token" not in body
+
+
+def test_gpt_quote_accepts_structured_demolition_dense_material_field(client: TestClient) -> None:
+    payload = _base_payload(service_type="demolition")
+    payload["description"] = "Demolition debris from yard removal."
+    payload["dense_material_type"] = "soil"
+
+    response = client.post("/api/gpt/quote", headers=_headers(), json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    artifacts = build_quote_artifacts(_translated_payload(payload))
+    assert body["cash_total_cad"] == artifacts["response"]["cash_total_cad"]
+    assert body["emt_total_cad"] == artifacts["response"]["emt_total_cad"]
+    assert body["cash_total_cad"] >= 1200.0
+    assert body["quote_risk_summary"]["customer_visible"] is False
+
+
+def test_gpt_quote_accepts_structured_demolition_access_field(client: TestClient) -> None:
+    payload = _base_payload(service_type="demolition")
+    payload["description"] = "Small controlled demolition cleanup."
+    payload["basement_or_inside_removal"] = True
+
+    response = client.post("/api/gpt/quote", headers=_headers(), json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    artifacts = build_quote_artifacts(_translated_payload(payload))
+    assert body["cash_total_cad"] == artifacts["response"]["cash_total_cad"]
+    assert body["emt_total_cad"] == artifacts["response"]["emt_total_cad"]
+    assert body["cash_total_cad"] >= 750.0
+    assert body["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert body["quote_risk_summary"]["customer_visible"] is False
+
+
+def test_gpt_action_schema_documents_structured_demolition_and_advisory_fields() -> None:
+    schema_text = Path("docs/gpt/GPT_ACTIONS_OPENAPI.yaml").read_text(encoding="utf-8")
+
+    for field_name in (
+        "stairs_count",
+        "floor_count",
+        "basement_or_inside_removal",
+        "demolition_ripout",
+        "construction_debris_type",
+        "dense_material_type",
+    ):
+        assert f"        {field_name}:" in schema_text
+
+    assert "        quote_risk_advisory:" in schema_text
+    assert "        quote_risk_summary:" in schema_text
 
 
 def test_gpt_quote_invalid_enum_returns_400(client: TestClient) -> None:

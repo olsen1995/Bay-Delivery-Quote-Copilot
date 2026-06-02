@@ -1287,6 +1287,12 @@ class GptQuoteRequestPayload(BaseModel):
     access_difficulty: str = Field("normal", max_length=50)
     has_dense_materials: bool = Field(False)
     load_mode: Optional[str] = Field("standard", max_length=20)
+    stairs_count: Optional[int] = Field(None, ge=0)
+    floor_count: Optional[int] = Field(None, ge=0)
+    basement_or_inside_removal: Optional[bool] = Field(None)
+    demolition_ripout: Optional[bool] = Field(None)
+    construction_debris_type: Optional[Literal["drywall", "wood", "tile", "concrete", "shingles", "mixed", "other"]] = Field(None)
+    dense_material_type: Optional[Literal["drywall", "tile", "concrete", "shingles", "soil", "brick", "stone", "mixed", "other"]] = Field(None)
 
     @field_validator(
         "service_type",
@@ -1308,6 +1314,20 @@ class GptQuoteRequestPayload(BaseModel):
             return None
         if isinstance(v, str):
             return v.strip()
+        return v
+
+    @field_validator(
+        "construction_debris_type",
+        "dense_material_type",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_select(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            value = v.strip().lower()
+            return value or None
         return v
 
 

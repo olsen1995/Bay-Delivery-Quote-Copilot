@@ -356,6 +356,12 @@ def _gpt_request_to_quote_payload(request_payload: dict[str, Any]) -> dict[str, 
         "access_difficulty": request_payload.get("access_difficulty", "normal"),
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
         "load_mode": request_payload.get("load_mode", "standard"),
+        "stairs_count": request_payload.get("stairs_count"),
+        "floor_count": request_payload.get("floor_count"),
+        "basement_or_inside_removal": request_payload.get("basement_or_inside_removal"),
+        "demolition_ripout": request_payload.get("demolition_ripout"),
+        "construction_debris_type": request_payload.get("construction_debris_type"),
+        "dense_material_type": request_payload.get("dense_material_type"),
     }
 
 

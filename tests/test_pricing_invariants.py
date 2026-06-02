@@ -860,6 +860,31 @@ def test_small_controlled_demolition_uses_margin_protective_floor(monkeypatch: p
     assert result["_internal"]["demolition_safeguard_floor_cad"] == 500.0
 
 
+def test_unclassified_demolition_defaults_to_normal_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unclassified demolition should not be discounted into the controlled-demo floor."""
+    config = quote_engine.load_config()
+    demolition = config["services"]["demolition"]
+    demolition["minimum_total"] = 75
+    demolition["minimum_hours"] = 0
+    demolition["hourly_rate_primary"] = 0
+    demolition["hourly_rate_helper"] = 0
+    config["minimum_charges"] = {"gas": 0, "wear_and_tear": 0}
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "demolition",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Remove an interior wall.",
+    )
+
+    assert float(result["total_cash_cad"]) == 650.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "normal"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 650.0
+
+
 @pytest.mark.parametrize(
     ("description", "expected_min_cash", "expected_tier"),
     [
@@ -2178,8 +2203,8 @@ def test_risk_margin_protection_keeps_rounding_tax_and_disclaimer_structure() ->
     )
 
     assert buffered["_internal"]["cash_before_round_cad"] == baseline["_internal"]["cash_before_round_cad"] + 50.0
-    assert buffered["total_cash_cad"] == 550.0
-    assert buffered["total_emt_cad"] == 621.5
+    assert buffered["total_cash_cad"] == 700.0
+    assert buffered["total_emt_cad"] == 791.0
     assert buffered["disclaimer"] == baseline["disclaimer"]
 
 

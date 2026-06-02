@@ -775,11 +775,8 @@ def _demolition_safeguard(
     )
     has_demolition_scope = _coerce_bool(demolition_ripout) or has_generic_signal
 
-    floor = DEMOLITION_CONTROLLED_FLOOR_CAD
-    tier = "controlled"
-    if has_demolition_scope and not has_controlled_signal:
-        floor = DEMOLITION_NORMAL_FLOOR_CAD
-        tier = "normal"
+    floor = DEMOLITION_CONTROLLED_FLOOR_CAD if has_controlled_signal else DEMOLITION_NORMAL_FLOOR_CAD
+    tier = "controlled" if has_controlled_signal else "normal"
     if has_medium_material:
         floor = max(floor, DEMOLITION_NORMAL_FLOOR_CAD)
         tier = "medium_material"

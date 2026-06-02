@@ -206,6 +206,58 @@ components:
             - null
           default: standard
           description: Use space_fill only for haul_away trailer-space style estimates.
+        stairs_count:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          description: Optional demolition access context. Used only by backend quote safeguards.
+        floor_count:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          description: Optional demolition access context. Used only by backend quote safeguards.
+        basement_or_inside_removal:
+          type:
+            - boolean
+            - "null"
+          description: Optional demolition access context. Used only by backend quote safeguards.
+        demolition_ripout:
+          type:
+            - boolean
+            - "null"
+          description: Optional demolition/rip-out context. Used only by backend quote safeguards.
+        construction_debris_type:
+          type:
+            - string
+            - "null"
+          enum:
+            - drywall
+            - wood
+            - tile
+            - concrete
+            - shingles
+            - mixed
+            - other
+            - null
+          description: Optional demolition material context. Used only by backend quote safeguards.
+        dense_material_type:
+          type:
+            - string
+            - "null"
+          enum:
+            - drywall
+            - tile
+            - concrete
+            - shingles
+            - soil
+            - brick
+            - stone
+            - mixed
+            - other
+            - null
+          description: Optional dense demolition material context. Used only by backend quote safeguards.
     GptQuoteResponse:
       type: object
       additionalProperties: false
@@ -216,6 +268,8 @@ components:
         - normalized_service_type
         - confidence_level
         - risk_flags
+        - quote_risk_advisory
+        - quote_risk_summary
       properties:
         cash_total_cad:
           type: number
@@ -243,6 +297,136 @@ components:
           items:
             type: string
           description: Internal risk flags from backend risk assessment.
+        quote_risk_advisory:
+          anyOf:
+            - $ref: "#/components/schemas/GptQuoteRiskAdvisory"
+            - type: "null"
+          description: Internal-only advisory metadata for Austin and Dan. Not customer-visible and does not change pricing.
+        quote_risk_summary:
+          $ref: "#/components/schemas/GptQuoteRiskSummary"
+          description: Internal-only normalized risk summary. Not customer-visible and does not change pricing.
+    GptQuoteRiskAdvisoryFlag:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - severity
+        - label
+        - operator_note
+      properties:
+        code:
+          type: string
+          description: Internal advisory flag code.
+        severity:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+          description: Internal severity for admin review.
+        label:
+          type: string
+          description: Short internal flag label.
+        operator_note:
+          type: string
+          description: Internal operator note for Austin or Dan.
+    GptQuoteRiskAdvisory:
+      type: object
+      additionalProperties: false
+      required:
+        - manual_review_recommended
+        - risk_level
+        - risk_flags
+        - suggested_actions
+        - pricing_effect
+        - customer_visible
+      properties:
+        manual_review_recommended:
+          type: boolean
+          description: True when owner review is recommended before approval.
+        risk_level:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+          description: Internal advisory risk level.
+        risk_flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/GptQuoteRiskAdvisoryFlag"
+          description: Internal structured advisory flags.
+        suggested_actions:
+          type: array
+          items:
+            type: string
+          description: Internal admin follow-up suggestions.
+        pricing_effect:
+          type: string
+          enum:
+            - none
+          description: Advisory metadata only; pricing is unchanged.
+        customer_visible:
+          type: boolean
+          enum:
+            - false
+          description: Always false. Internal GPT advisory metadata is not customer-visible.
+        recommended_trailer:
+          type:
+            - string
+            - "null"
+          description: Optional internal trailer recommendation when risk context suggests one.
+    GptQuoteRiskSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - risk_level
+        - reasons
+        - missing_info
+        - suggested_action
+        - crew_suggestion
+        - trailer_suggestion
+        - pricing_caution
+        - customer_visible
+        - pricing_effect
+      properties:
+        risk_level:
+          type: string
+          description: Internal summary level, including owner_review when applicable.
+        reasons:
+          type: array
+          items:
+            type: string
+          description: Internal normalized reason slugs.
+        missing_info:
+          type: array
+          items:
+            type: string
+          description: Internal follow-up fields that may improve review confidence.
+        suggested_action:
+          type: string
+          description: Internal suggested next action for admin or GPT follow-up.
+        crew_suggestion:
+          type: string
+          description: Internal crew sizing suggestion.
+        trailer_suggestion:
+          type: string
+          description: Internal trailer suggestion.
+        pricing_caution:
+          type: string
+          enum:
+            - internal_advisory_only_no_price_change
+          description: Advisory metadata does not change backend pricing.
+        customer_visible:
+          type: boolean
+          enum:
+            - false
+          description: Always false. Internal GPT advisory metadata is not customer-visible.
+        pricing_effect:
+          type: string
+          enum:
+            - none
+          description: Advisory metadata only; pricing is unchanged.
     GptAdminNoteRequest:
       type: object
       additionalProperties: false
