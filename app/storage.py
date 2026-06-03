@@ -1496,6 +1496,132 @@ def _json_text_in(column: str, field_name: str, values: Tuple[str, ...]) -> str:
     )
 
 
+_DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
+    "apartment",
+    "apartments",
+    "apartment building",
+    "asbestos",
+    "awkward debris",
+    "backyard",
+    "back yard",
+    "basement",
+    "block",
+    "blocks",
+    "brick",
+    "bricks",
+    "bathroom tile",
+    "bathroom tiles",
+    "ceramic tile",
+    "ceramic tiles",
+    "chimney",
+    "chimneys",
+    "concrete",
+    "condo",
+    "condos",
+    "deck",
+    "decks",
+    "dismantle",
+    "downstairs",
+    "dirt",
+    "elevator",
+    "elevators",
+    "fence",
+    "fences",
+    "fireplace",
+    "fireplaces",
+    "floor tile",
+    "floor tiles",
+    "gazebo",
+    "gazebos",
+    "hazardous material",
+    "hazardous materials",
+    "heavy awkward debris",
+    "hidden debris",
+    "hidden material",
+    "hidden material behind wall",
+    "hidden rubble",
+    "high rise",
+    "inside removal",
+    "lath and plaster",
+    "liability sensitive",
+    "long carry",
+    "masonry",
+    "masonry debris",
+    "mortar",
+    "mortars",
+    "no photo",
+    "no photos",
+    "no driveway access",
+    "not sure what material",
+    "outbuilding",
+    "outbuildings",
+    "permit required",
+    "permit sensitive",
+    "regulated material",
+    "regulated materials",
+    "rubble",
+    "shed",
+    "sheds",
+    "shingle",
+    "shingles",
+    "soil",
+    "stairs",
+    "stair",
+    "stone",
+    "stones",
+    "structure",
+    "structures",
+    "tear down",
+    "teardown",
+    "tile",
+    "tiles",
+    "roof shingles",
+    "asphalt shingles",
+    "wet shingles",
+    "tight access",
+    "unclear material",
+    "unknown debris",
+    "unknown disposal volume",
+    "unknown material",
+    "unknown materials",
+    "unknown volume",
+    "upstairs unit",
+    "without photos",
+)
+_DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES: Tuple[str, ...] = (
+    "concrete",
+    "other",
+    "shingles",
+    "tile",
+)
+_DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES: Tuple[str, ...] = (
+    "brick",
+    "concrete",
+    "other",
+    "shingles",
+    "soil",
+    "stone",
+    "tile",
+)
+
+
+def _owner_review_like_patterns(value: str) -> Tuple[str, ...]:
+    normalized_value = value.replace("'", "''").lower()
+    words = tuple(part for part in normalized_value.split() if part)
+    if len(words) <= 1:
+        return (f"%{normalized_value}%",)
+    return tuple(f"%{separator.join(words)}%" for separator in (" ", "-", "_", "/", "."))
+
+
+def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
+    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
+    clauses = []
+    for value in values:
+        for pattern in _owner_review_like_patterns(value):
+            clauses.append(f"{text_expr} LIKE '{pattern}'")
+    return f"({' OR '.join(clauses)})"
+
+
 def _owner_review_manual_signal_filter(alias: str) -> str:
     request_json = f"{alias}.request_json"
     return f"""
@@ -1513,6 +1639,17 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                       OR ({_json_truthy(request_json, "basement_or_inside_removal")}
                           AND {_json_int(request_json, "stairs_count")} >= 1)
                       OR {_json_truthy(request_json, "demolition_ripout")}
+                      OR ({_json_text_in(request_json, "service_type", ("demolition",))}
+                          AND ({_json_text_in(request_json, "construction_debris_type", _DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES)}
+                               OR {_json_text_in(request_json, "dense_material_type", _DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES)}
+                               OR {_json_truthy(request_json, "has_dense_materials")}
+                               OR (LOWER(TRIM(CAST(json_extract({request_json}, '$.access_difficulty') AS TEXT))) NOT IN ('', 'normal'))
+                               OR {_json_int(request_json, "floor_count")} >= 2
+                               OR {_json_truthy(request_json, "basement_or_inside_removal")}
+                               OR {_json_int(request_json, "stairs_count")} > 0))
+                      OR ({_json_text_in(request_json, "service_type", ("demolition",))}
+                          AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
+                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}))
                     THEN 1
                     ELSE 0
                 END

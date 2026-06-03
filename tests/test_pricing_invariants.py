@@ -836,8 +836,8 @@ def test_global_minimum_overrides_legacy_50_service_minimum(monkeypatch: pytest.
     assert float(result["total_cash_cad"]) == 60.0
 
 
-def test_demolition_minimum_75_remains_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Higher service minimums must remain intact under the global floor."""
+def test_small_controlled_demolition_uses_margin_protective_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even a tiny demolition job must not fall back to the generic service minimum."""
     config = quote_engine.load_config()
     demolition = config["services"]["demolition"]
     demolition["minimum_total"] = 75
@@ -853,8 +853,424 @@ def test_demolition_minimum_75_remains_unchanged(monkeypatch: pytest.MonkeyPatch
         crew_size=1,
         travel_zone="in_town",
         access_difficulty="normal",
+        description="Small controlled demolition cleanup with light debris.",
     )
-    assert float(result["total_cash_cad"]) == 75.0
+    assert float(result["total_cash_cad"]) == 500.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "controlled"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 500.0
+
+
+def test_unclassified_demolition_defaults_to_normal_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unclassified demolition should not be discounted into the controlled-demo floor."""
+    config = quote_engine.load_config()
+    demolition = config["services"]["demolition"]
+    demolition["minimum_total"] = 75
+    demolition["minimum_hours"] = 0
+    demolition["hourly_rate_primary"] = 0
+    demolition["hourly_rate_helper"] = 0
+    config["minimum_charges"] = {"gas": 0, "wear_and_tear": 0}
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "demolition",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        description="Remove an interior wall.",
+    )
+
+    assert float(result["total_cash_cad"]) == 650.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "normal"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 650.0
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Remove a kitchen unit.",
+        "Demolition of a wall unit.",
+    ],
+)
+def test_bare_unit_demolition_text_does_not_create_access_risk(
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    config = quote_engine.load_config()
+    demolition = config["services"]["demolition"]
+    demolition["minimum_total"] = 75
+    demolition["minimum_hours"] = 0
+    demolition["hourly_rate_primary"] = 0
+    demolition["hourly_rate_helper"] = 0
+    config["minimum_charges"] = {"gas": 0, "wear_and_tear": 0}
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "demolition",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == 650.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "normal"
+    assert "access_risk" not in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is False
+
+
+@pytest.mark.parametrize(
+    ("description", "expected_min_cash", "expected_tier"),
+    [
+        (
+            "16x10 wood shed teardown and dismantle in the backyard with demo debris.",
+            1000.0,
+            "structure",
+        ),
+        (
+            "Small drywall demolition and plaster rip-out from one room.",
+            650.0,
+            "medium_material",
+        ),
+        (
+            "Brick fireplace and masonry wall demolition from the basement with rubble.",
+            1500.0,
+            "heavy_access",
+        ),
+        (
+            "Bathroom ceramic tile and floor tile rip-out with mortar debris.",
+            1200.0,
+            "heavy_material",
+        ),
+        (
+            "Wet roof shingles and asphalt shingles tear-off debris.",
+            1200.0,
+            "heavy_material",
+        ),
+        (
+            "Laminate flooring, carpet, subfloor, underlayment, baseboards and trim rip-out.",
+            650.0,
+            "medium_material",
+        ),
+    ],
+)
+def test_demolition_material_and_access_safeguards(description: str, expected_min_cash: float, expected_tier: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        2.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= expected_min_cash
+    assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
+    assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
+
+
+def test_demolition_structured_soil_counts_as_heavy_material_without_dense_checkbox() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition debris from yard removal.",
+        dense_material_type="soil",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_material"
+    assert "heavy_material" in result["_internal"]["demolition_safeguard_flags"]
+
+
+def test_demolition_dirt_wording_counts_as_heavy_material() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Dirt from demolition cleanup.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_material"
+    assert "heavy_material" in result["_internal"]["demolition_safeguard_flags"]
+
+
+def test_demolition_structured_soil_with_access_risk_uses_heavy_access_floor() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition debris from basement.",
+        dense_material_type="soil",
+        basement_or_inside_removal=True,
+    )
+
+    assert float(result["total_cash_cad"]) >= 1500.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_access"
+    assert {"heavy_material", "access_risk"}.issubset(result["_internal"]["demolition_safeguard_flags"])
+
+
+@pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
+def test_demolition_structured_other_material_counts_as_unknown_scope(material_field: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition rip-out debris.",
+        **{material_field: "other"},
+    )
+
+    assert float(result["total_cash_cad"]) >= 750.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "unknown_scope"
+    assert "unknown_scope" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
+def test_demolition_structured_mixed_material_counts_as_material_risk(material_field: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Small controlled demolition cleanup.",
+        **{material_field: "mixed"},
+    )
+
+    assert float(result["total_cash_cad"]) >= 650.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "medium_material"
+    assert "medium_material" in result["_internal"]["demolition_safeguard_flags"]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Demolition rip-out with unknown material.",
+        "Demolition rip-out with unknown materials.",
+        "Demolition rip-out with hidden debris.",
+        "Demolition rip-out with hidden material.",
+        "Demolition rip-out with unknown debris.",
+        "Demolition rip-out with unclear material.",
+        "Demolition rip-out, not sure what material.",
+        "Demolition rip-out with hidden rubble.",
+        "Demolition rip-out with hidden material behind wall.",
+    ],
+)
+def test_demolition_unknown_material_text_counts_as_unknown_scope(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= 750.0
+    assert "unknown_scope" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Possible asbestos insulation removal.",
+        "Hazardous material demolition.",
+        "Regulated materials demolition.",
+        "Permit-sensitive demolition scope.",
+        "Liability-sensitive demolition scope.",
+    ],
+)
+def test_demolition_hazardous_or_regulated_text_counts_as_unknown_scope(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= 750.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "unknown_scope"
+    assert "unknown_scope" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Demolition/removal of two sheds.",
+        "Demolition/removal of old decks.",
+        "Demolition/removal of fences.",
+        "Demolition/removal of gazebos.",
+        "Demolition/removal of small structures.",
+        "Demolition/removal of outbuildings.",
+    ],
+)
+def test_demolition_plural_structure_terms_use_structure_floor(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= 1000.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Demolition in apartment with elevator.",
+        "Demolition in apartments with elevators.",
+        "Demolition in condo unit.",
+        "Demolition in condos with tight parking.",
+        "Demolition in high-rise apartment.",
+        "Demolition in high rise condo.",
+        "Demolition in upstairs unit.",
+        "Demolition in apartment building.",
+    ],
+)
+def test_demolition_apartment_and_elevator_text_counts_as_access_risk(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= 750.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "access_risk"
+    assert "access_risk" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Demolition of bathroom tiles.",
+        "Demolition of bricks from a wall.",
+        "Demolition cleanup with concrete blocks.",
+        "Demolition cleanup with stones.",
+        "Demolition of two fireplaces.",
+        "Demolition of chimneys.",
+        "Demolition cleanup with mortars.",
+        "Demolition cleanup with masonry debris.",
+    ],
+)
+def test_demolition_plural_heavy_material_text_uses_heavy_floor(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_material"
+    assert "heavy_material" in result["_internal"]["demolition_safeguard_flags"]
+
+
+def test_non_demolition_reference_totals_stay_unchanged() -> None:
+    cases = [
+        (
+            "light_dump",
+            calculate_quote(
+                "haul_away",
+                1.0,
+                crew_size=1,
+                garbage_bag_count=1,
+                trailer_fill_estimate="under_quarter",
+                travel_zone="in_town",
+                access_difficulty="normal",
+                has_dense_materials=False,
+                description="One small bag curbside.",
+            ),
+            80.0,
+        ),
+        (
+            "small_move",
+            calculate_quote(
+                "small_move",
+                2.0,
+                crew_size=2,
+                travel_zone="in_town",
+                access_difficulty="normal",
+                pickup_address="1 Pickup Rd",
+                dropoff_address="2 Dropoff Ave",
+            ),
+            330.0,
+        ),
+        ("scrap_curbside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="curbside"), 60.0),
+        ("scrap_inside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="inside"), 60.0),
+        (
+            "mattress_boxspring",
+            calculate_quote(
+                "haul_away",
+                0.0,
+                crew_size=1,
+                garbage_bag_count=1,
+                mattresses_count=1,
+                box_springs_count=1,
+                trailer_fill_estimate="under_quarter",
+                travel_zone="in_town",
+                access_difficulty="normal",
+                has_dense_materials=False,
+                description="Mattress and box spring outside.",
+            ),
+            180.0,
+        ),
+        (
+            "full_trailer",
+            calculate_quote(
+                "haul_away",
+                2.0,
+                crew_size=2,
+                garbage_bag_count=24,
+                trailer_fill_estimate="full",
+                travel_zone="in_town",
+                access_difficulty="normal",
+                has_dense_materials=False,
+            ),
+            500.0,
+        ),
+    ]
+
+    for label, quote, expected_cash in cases:
+        assert float(quote["total_cash_cad"]) == expected_cash, label
+        assert float(quote["total_emt_cad"]) == round(expected_cash * 1.13, 2), label
 
 
 def test_emt_total_still_correct_when_global_floor_applies() -> None:
@@ -1866,8 +2282,8 @@ def test_risk_margin_protection_keeps_rounding_tax_and_disclaimer_structure() ->
     )
 
     assert buffered["_internal"]["cash_before_round_cad"] == baseline["_internal"]["cash_before_round_cad"] + 50.0
-    assert buffered["total_cash_cad"] == 160.0
-    assert buffered["total_emt_cad"] == 180.8
+    assert buffered["total_cash_cad"] == 700.0
+    assert buffered["total_emt_cad"] == 791.0
     assert buffered["disclaimer"] == baseline["disclaimer"]
 
 

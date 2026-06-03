@@ -59,6 +59,16 @@ This file documents current Bay Delivery business and pricing rules as grounded 
 - Item delivery enforces a protected pre-access floor before access adjustments.
 - Item delivery remains within the single pricing engine path.
 
+## Demolition Safeguards
+
+- Demolition pricing safeguards live only in `app/quote_engine.py`.
+- Controlled/light demolition has a protected runtime floor.
+- Normal demolition, mixed demolition materials, unknown/hidden material wording, apartment/elevator/access wording, structure teardown wording, heavy material wording, and heavy-plus-access combinations use higher runtime floor protection to avoid undercharging.
+- Soil, concrete, brick, stone, masonry, rubble, tile, shingles, fireplace/chimney, and similar heavy demolition material wording must stay margin-protective.
+- Structure teardown wording such as sheds, decks, fences, gazebos, structures, outbuildings, teardown, tear down, or dismantle must stay owner-review eligible.
+- Unknown or hidden demolition material scope must stay owner-review eligible.
+- GPT may explain the safeguards and flag owner-review concerns, but it must not calculate demolition pricing outside `app/quote_engine.py`.
+
 ## Margin-Protection Philosophy
 
 - Bay Delivery is not tuned to be the cheapest option.

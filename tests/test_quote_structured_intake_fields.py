@@ -211,6 +211,43 @@ def test_structured_intake_fields_are_not_quote_engine_inputs(monkeypatch: pytes
         assert "lead_source" not in kwargs
 
 
+def test_demolition_structured_risk_fields_reach_quote_engine_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_calculate_quote = quote_service.calculate_quote
+    seen_kwargs: list[dict[str, Any]] = []
+
+    def capture_calculate_quote(**kwargs: Any) -> dict[str, Any]:
+        seen_kwargs.append(dict(kwargs))
+        return original_calculate_quote(**kwargs)
+
+    monkeypatch.setattr(quote_service, "calculate_quote", capture_calculate_quote)
+
+    artifacts = quote_service.build_quote_artifacts(
+        _base_payload(
+            service_type="demolition",
+            description="Brick demolition from basement with tight access.",
+            **_structured_fields(),
+        )
+    )
+
+    assert artifacts["response"]["cash_total_cad"] >= 1500.0
+    assert len(seen_kwargs) == 2
+    pricing_fields = {
+        "stairs_count",
+        "floor_count",
+        "basement_or_inside_removal",
+        "demolition_ripout",
+        "construction_debris_type",
+        "dense_material_type",
+    }
+    non_pricing_fields = set(_structured_fields()) - pricing_fields
+    for kwargs in seen_kwargs:
+        for field in pricing_fields:
+            assert field in kwargs
+        for field in non_pricing_fields:
+            assert field not in kwargs
+        assert "lead_source" not in kwargs
+
+
 def test_structured_intake_fields_are_stored_in_quote_request_json(client: TestClient) -> None:
     quote_response = client.post("/quote/calculate", json=_base_payload(**_structured_fields()))
     assert quote_response.status_code == 200

@@ -27,6 +27,7 @@ _ADVISORY_FLAG_ORDER = (
     "REFRIGERANT_APPLIANCE_RISK",
     "ACCESS_LABOUR_RISK",
     "DEMOLITION_SCOPE_RISK",
+    "DEMOLITION_OWNER_REVIEW_RECOMMENDED",
     "WEATHER_PROTECTION_RISK",
 )
 _ADVISORY_SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3}
@@ -322,6 +323,20 @@ def build_quote_risk_advisory(normalized_request: dict[str, Any]) -> dict[str, A
             ),
         )
 
+    engine_internal = request.get("_engine_internal")
+    if isinstance(engine_internal, dict) and _as_bool(engine_internal.get("demolition_owner_review_recommended")):
+        add_flag(
+            code="DEMOLITION_OWNER_REVIEW_RECOMMENDED",
+            severity="high",
+            label="Demolition owner review recommended",
+            operator_note="Premium demolition safeguard recommends owner review before approval.",
+            manual_review=True,
+            actions=(
+                "Ask for photos before approving.",
+                "Confirm demolition scope, access, and disposal material before approving.",
+            ),
+        )
+
     weather_protection_required = _as_bool(request.get("weather_protection_required"))
     if weather_protection_required:
         add_flag(
@@ -341,8 +356,9 @@ def build_quote_risk_advisory(normalized_request: dict[str, Any]) -> dict[str, A
 
     recommended_trailer = None
     if any(
-        flag["code"] == "DEMOLITION_SCOPE_RISK"
-        or (flag["code"] == "DENSE_MATERIAL_RISK" and flag["severity"] == "high")
+            flag["code"] == "DEMOLITION_SCOPE_RISK"
+            or flag["code"] == "DEMOLITION_OWNER_REVIEW_RECOMMENDED"
+            or (flag["code"] == "DENSE_MATERIAL_RISK" and flag["severity"] == "high")
         for flag in ordered_flags
     ):
         recommended_trailer = "double_axle_open_aluminum"

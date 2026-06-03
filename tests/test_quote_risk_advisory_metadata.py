@@ -553,8 +553,74 @@ def test_admin_quote_detail_includes_recomputed_advisory_metadata(client: TestCl
     }.issubset(_codes(advisory))
 
 
-def test_gpt_quote_response_excludes_advisory_metadata() -> None:
-    response = quote_service.build_gpt_quote_response(_base_payload())
+@pytest.mark.parametrize(
+    "description",
+    [
+        "16x10 shed teardown and dismantle in the backyard.",
+        "Brick fireplace and masonry wall demolition from the basement.",
+    ],
+)
+def test_text_derived_premium_demolition_surfaces_internal_owner_review_advisory(
+    client: TestClient,
+    description: str,
+) -> None:
+    payload = _base_payload(
+        service_type="demolition",
+        description=description,
+        job_description_customer=description,
+        estimated_hours=2.0,
+        crew_size=1,
+        has_dense_materials=False,
+    )
 
-    assert "quote_risk_advisory" not in response
-    assert "quote_risk_summary" not in response
+    artifacts = quote_service.build_quote_artifacts(payload)
+    advisory = artifacts["quote_risk_advisory"]
+    summary = build_quote_risk_summary(
+        artifacts["normalized_request"],
+        advisory,
+        artifacts["internal_risk_assessment"],
+    )
+
+    assert artifacts["engine_quote"]["_internal"]["demolition_owner_review_recommended"] is True
+    assert advisory is not None
+    assert advisory["customer_visible"] is False
+    assert advisory["pricing_effect"] == "none"
+    assert advisory["manual_review_recommended"] is True
+    assert "DEMOLITION_OWNER_REVIEW_RECOMMENDED" in _codes(advisory)
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+
+    quote_response = client.post("/quote/calculate", json=payload)
+
+    assert quote_response.status_code == 200
+    quote_body = quote_response.json()
+    assert "quote_risk_advisory" not in quote_body
+    assert "quote_risk_summary" not in quote_body
+    assert "demolition_owner_review_recommended" not in quote_body["response"]
+    assert "demolition_owner_review_recommended" not in quote_body["request"]
+
+    admin_response = client.get(f"/admin/api/quotes/{quote_body['quote_id']}", headers=_admin_headers())
+
+    assert admin_response.status_code == 200
+    admin_body = admin_response.json()
+    assert admin_body["quote_risk_advisory"]["manual_review_recommended"] is True
+    assert "DEMOLITION_OWNER_REVIEW_RECOMMENDED" in _codes(admin_body["quote_risk_advisory"])
+    assert admin_body["quote_risk_summary"]["risk_level"] == "owner_review"
+
+
+def test_gpt_quote_response_includes_internal_owner_review_advisory_metadata() -> None:
+    response = quote_service.build_gpt_quote_response(
+        _base_payload(
+            service_type="demolition",
+            description="16x10 shed teardown",
+            job_description_customer="16x10 shed teardown",
+        )
+    )
+
+    assert response["quote_risk_advisory"]["customer_visible"] is False
+    assert response["quote_risk_advisory"]["pricing_effect"] == "none"
+    assert response["quote_risk_advisory"]["manual_review_recommended"] is True
+    assert "DEMOLITION_OWNER_REVIEW_RECOMMENDED" in _codes(response["quote_risk_advisory"])
+    assert response["quote_risk_summary"]["customer_visible"] is False
+    assert response["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert response["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"

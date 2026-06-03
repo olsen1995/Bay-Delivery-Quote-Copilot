@@ -54,6 +54,14 @@ _STRUCTURED_INTAKE_FIELDS = (
     "weather_protection_required",
 )
 _STRUCTURED_INTAKE_SUPPLIED_KEY = "_structured_intake_fields_supplied"
+_DEMOLITION_PRICING_CONTEXT_FIELDS = (
+    "stairs_count",
+    "floor_count",
+    "basement_or_inside_removal",
+    "demolition_ripout",
+    "construction_debris_type",
+    "dense_material_type",
+)
 LEAD_SOURCE_LABELS = {
     "facebook": "Facebook",
     "google": "Google",
@@ -213,7 +221,7 @@ def _quote_engine_inputs(
     service_type: str,
     load_mode: str,
 ) -> dict[str, Any]:
-    return {
+    inputs = {
         "service_type": service_type,
         "hours": float(request_payload.get("estimated_hours", 0.0)),
         "crew_size": int(request_payload.get("crew_size", 1)),
@@ -233,6 +241,11 @@ def _quote_engine_inputs(
         "pickup_address": request_payload.get("pickup_address"),
         "dropoff_address": request_payload.get("dropoff_address"),
     }
+    if str(service_type or "").strip().lower() == "demolition":
+        for field in _DEMOLITION_PRICING_CONTEXT_FIELDS:
+            if field in request_payload:
+                inputs[field] = request_payload.get(field)
+    return inputs
 
 
 def _structured_intake_values(request_payload: dict[str, Any]) -> dict[str, Any]:
@@ -294,7 +307,6 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         normalized_request=normalized_request,
         engine_quote=baseline_engine_quote,
     )
-    quote_risk_advisory = build_quote_risk_advisory(normalized_request)
     engine_quote = calculate_quote(
         **_quote_engine_inputs(
             normalized_request,
@@ -302,6 +314,12 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
             load_mode=normalized_request["load_mode"],
         ),
         internal_risk_assessment=internal_risk_assessment,
+    )
+    quote_risk_advisory = build_quote_risk_advisory(
+        {
+            **normalized_request,
+            "_engine_internal": engine_quote.get("_internal"),
+        }
     )
     response = {
         "cash_total_cad": float(engine_quote["total_cash_cad"]),
@@ -338,12 +356,24 @@ def _gpt_request_to_quote_payload(request_payload: dict[str, Any]) -> dict[str, 
         "access_difficulty": request_payload.get("access_difficulty", "normal"),
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
         "load_mode": request_payload.get("load_mode", "standard"),
+        "stairs_count": request_payload.get("stairs_count"),
+        "floor_count": request_payload.get("floor_count"),
+        "basement_or_inside_removal": request_payload.get("basement_or_inside_removal"),
+        "demolition_ripout": request_payload.get("demolition_ripout"),
+        "construction_debris_type": request_payload.get("construction_debris_type"),
+        "dense_material_type": request_payload.get("dense_material_type"),
     }
 
 
 def build_gpt_quote_response(request_payload: dict[str, Any]) -> dict[str, Any]:
     quote_artifacts = build_quote_artifacts(_gpt_request_to_quote_payload(request_payload))
     assessment = quote_artifacts.get("internal_risk_assessment") or {}
+    advisory = quote_artifacts.get("quote_risk_advisory")
+    summary = build_quote_risk_summary(
+        quote_artifacts["normalized_request"],
+        advisory if isinstance(advisory, dict) else None,
+        assessment if isinstance(assessment, dict) else None,
+    )
     response = quote_artifacts["response"]
     risk_flags_raw = assessment.get("risk_flags")
     risk_flags = [str(flag) for flag in risk_flags_raw] if isinstance(risk_flags_raw, list) else []
@@ -355,6 +385,8 @@ def build_gpt_quote_response(request_payload: dict[str, Any]) -> dict[str, Any]:
         "normalized_service_type": str(quote_artifacts["normalized_request"]["service_type"]),
         "confidence_level": str(assessment.get("confidence_level") or ""),
         "risk_flags": risk_flags,
+        "quote_risk_advisory": advisory,
+        "quote_risk_summary": summary,
     }
 
 
