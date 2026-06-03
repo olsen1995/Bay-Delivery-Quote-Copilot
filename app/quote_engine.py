@@ -157,6 +157,7 @@ _DEMOLITION_HEAVY_MATERIAL_PHRASES = (
     "shingles",
     "lath and plaster",
     "soil",
+    "dirt",
 )
 _DEMOLITION_MEDIUM_MATERIAL_PHRASES = (
     "drywall",
@@ -195,7 +196,6 @@ _DEMOLITION_ACCESS_RISK_PHRASES = (
     "no driveway access",
     "heavy awkward debris",
     "awkward debris",
-    "unit",
     "upstairs unit",
 )
 _DEMOLITION_UNKNOWN_SCOPE_PHRASES = (
@@ -213,6 +213,14 @@ _DEMOLITION_UNKNOWN_SCOPE_PHRASES = (
     "no photos",
     "no photo",
     "without photos",
+    "hazardous material",
+    "hazardous materials",
+    "regulated material",
+    "regulated materials",
+    "asbestos",
+    "permit sensitive",
+    "permit required",
+    "liability sensitive",
 )
 _FIXED_BULKY_PHRASES = (
     "mattress",

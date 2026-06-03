@@ -886,6 +886,42 @@ def test_unclassified_demolition_defaults_to_normal_floor(monkeypatch: pytest.Mo
 
 
 @pytest.mark.parametrize(
+    "description",
+    [
+        "Remove a kitchen unit.",
+        "Demolition of a wall unit.",
+    ],
+)
+def test_bare_unit_demolition_text_does_not_create_access_risk(
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    config = quote_engine.load_config()
+    demolition = config["services"]["demolition"]
+    demolition["minimum_total"] = 75
+    demolition["minimum_hours"] = 0
+    demolition["hourly_rate_primary"] = 0
+    demolition["hourly_rate_helper"] = 0
+    config["minimum_charges"] = {"gas": 0, "wear_and_tear": 0}
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "demolition",
+        0.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == 650.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "normal"
+    assert "access_risk" not in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is False
+
+
+@pytest.mark.parametrize(
     ("description", "expected_min_cash", "expected_tier"),
     [
         (
@@ -946,6 +982,22 @@ def test_demolition_structured_soil_counts_as_heavy_material_without_dense_check
         has_dense_materials=False,
         description="Demolition debris from yard removal.",
         dense_material_type="soil",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_material"
+    assert "heavy_material" in result["_internal"]["demolition_safeguard_flags"]
+
+
+def test_demolition_dirt_wording_counts_as_heavy_material() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Dirt from demolition cleanup.",
     )
 
     assert float(result["total_cash_cad"]) >= 1200.0
@@ -1034,6 +1086,33 @@ def test_demolition_unknown_material_text_counts_as_unknown_scope(description: s
     )
 
     assert float(result["total_cash_cad"]) >= 750.0
+    assert "unknown_scope" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Possible asbestos insulation removal.",
+        "Hazardous material demolition.",
+        "Regulated materials demolition.",
+        "Permit-sensitive demolition scope.",
+        "Liability-sensitive demolition scope.",
+    ],
+)
+def test_demolition_hazardous_or_regulated_text_counts_as_unknown_scope(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) >= 750.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "unknown_scope"
     assert "unknown_scope" in result["_internal"]["demolition_safeguard_flags"]
     assert result["_internal"]["demolition_owner_review_recommended"] is True
 

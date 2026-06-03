@@ -666,6 +666,83 @@ def test_demolition_owner_review_text_signals_match_engine_owner_review_phrases(
 @pytest.mark.parametrize(
     "description",
     [
+        "Possible asbestos insulation removal.",
+        "Hazardous material demolition.",
+        "Dirt from demolition cleanup.",
+    ],
+)
+def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-hazard-dirt",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Remove a kitchen unit.",
+        "Demolition of a wall unit.",
+    ],
+)
+def test_owner_review_does_not_count_bare_unit_demolition_text_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-bare-unit",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 0
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
         "Backyard demolition debris with no driveway access.",
         "Back yard shed rip-out with no photos.",
         "Inside removal from downstairs with a long carry.",
