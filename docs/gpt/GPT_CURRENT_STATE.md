@@ -58,7 +58,7 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - PR #321 Public Brand Hero Colour Alignment is complete.
 - PR #322 Homepage Logo Replacement is complete: desktop/mobile homepage logo updated without runtime/pricing/schema/workflow/dependency/version changes.
 - PR #323 Desktop Admin Collapsible Section Polish is complete: admin collapsible section polish without runtime/pricing/schema/workflow/dependency/version changes.
-- Current verified baseline after PR #323 plus follow-up cSpell commit `15b9d7b` (short SHA; full SHA `15b9d7b35a22aef982772f729cdad05829991418`, `add "Avenir" to cSpell custom words list`): version is `0.12.0`, version parity passed, GPT grounding parity passed, full pytest passed with 723 tests, and Render parity was verified at version `0.12.0` with commit prefix `15b9d7b35a22`.
+- Current verified baseline after PR #329 Demolition Pricing Safeguards merge commit `5a5b4dcbbafb12405c2c32366288e13279763de4`: version is `0.12.0`, version parity passed, GPT grounding parity passed, local/internal demolition acceptance retest passed, full pytest passed with 822 tests, Render `/health` was verified at version `0.12.0` with commit prefix `5a5b4dcbbafb`, and live `/`, `/quote`, `/admin`, and `/admin/mobile` returned 200.
 
 ## Notification Policy
 
@@ -85,7 +85,7 @@ When Austin authorizes launch, configure these on Render following `DEPLOYMENT_N
 
 - Internal customer notes, job difficulty score, full missing-info detector, job closeout checklist, and review request tracking remain future work.
 - Customer-facing GPT/chatbot, automatic SMS/email sending, and auto-calendar scheduling remain future work.
-- Pricing PRs by service category have not started.
+- Demolition pricing safeguards are live through PR #329. Future pricing calibration for other service categories and any later heavy-category refinements remains separate future work and must not be treated as complete.
 - Internal GPT current v1 is live for the bounded quote action and the consequential advisory `createGptAdminNote` write action after the PR #307 Builder refresh and manual live fake action verification.
 - Photo Evidence / Photo Assistant remains future advisory-only work.
 - Customer launch SMTP configuration and controlled live notification test are pending Austin authorization.
@@ -105,11 +105,11 @@ When Austin authorizes launch, configure these on Render following `DEPLOYMENT_N
 - Keep Internal Quote Risk Summary advisory-only and separate from pricing authority; `customer_visible` remains false and `pricing_effect` remains `none`.
 - Keep GPT Admin Notes advisory-only and separate from pricing authority; the GPT may create notes only through `createGptAdminNote`, and notes must remain internal-only, admin-visible only, `customer_visible=false`, and `pricing_effect=none`.
 - Keep prelaunch cleanup execution backup-first, allowlisted, and operator-run through `scripts/create_prelaunch_test_data_cleanup.py`; do not improvise ad hoc cleanup steps.
-- Keep pricing changes deferred to later category-specific PRs after evidence review.
+- Keep future pricing calibration beyond the live PR #329 demolition safeguards deferred to later category-specific PRs after evidence review; do not imply all pricing work is complete.
 - PR #291 lead source + repeat customer tracking is complete (no-schema v1): optional public `lead_source` intake is accepted by `/quote/calculate`, blank/missing maps to `unknown`, invalid nonblank values reject with 422, and lead source persists through existing `request_json` flow into quotes, quote_requests, and jobs.
 - Desktop admin quote detail now renders Lead & Customer History while `customer_history` remains admin-only and read-only from normalized 10-digit phone history; customer/public quote and review responses do not expose `customer_history`.
 - Phone-history lookup now aligns SQL matching with Python-backed normalization and uncommon separator handling; `last_seen` ordering uses parsed datetimes.
-- No pricing influence, no schema migration, no mobile-admin changes, and `app/quote_engine.py` remains untouched.
+- No pricing influence, no schema migration, and no mobile-admin changes came from PR #291 lead source + repeat customer tracking. `app/quote_engine.py` is now touched only by the separate live PR #329 demolition safeguards and remains the only pricing authority.
 - Do not configure Render SMTP/env vars for booking notifications until Austin explicitly authorizes customer launch.
 - When Austin authorizes launch, follow `DEPLOYMENT_NOTES.md` Render setup steps and perform a controlled live notification test before treating notifications as active.
 
