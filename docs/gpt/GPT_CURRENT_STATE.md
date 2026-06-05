@@ -53,12 +53,12 @@ The project is in a hardening / controlled-expansion phase focused on drift prev
 - PR #316 Admin POST Origin Fail-Closed Hardening is complete: admin POST origin enforcement now fails closed, with focused regression coverage updated. This did not change pricing, schema, customer quote behavior, GPT actions, Render config, dependencies, or `VERSION`.
 - PR #318 Demolition Pricing Readiness Plan is complete: the repo now has a docs-only demolition pricing readiness plan for future owner-approved pricing work. It did not change runtime behavior, pricing logic, schema/storage, auth, Render config, workflows, GPT runtime behavior, dependencies, or `VERSION`.
 - PR #329 Demolition Pricing Safeguards is merged, live on Render, and production-verified: `/health` reports version `0.12.0` and commit prefix `5a5b4dcbbafb`. Demolition safeguards are runtime pricing behavior in `app/quote_engine.py`, not docs-only readiness. Demolition floors now include controlled demolition around $500, normal demolition around $650+, access-risk demolition around $750+, structure teardown around $1000+, heavy material demolition around $1200+, and heavy + access demolition around $1500+. Owner-review and advisory behavior remains internal/admin-only. GPT does not override pricing, and `app/quote_engine.py` remains the only pricing authority. Local/internal acceptance retest passed for a 16x10 shed teardown at the structure floor, brick/fireplace basement demo at the heavy-access floor, wet shingles and dirt/soil cleanup as heavy material, hazardous/asbestos wording owner-review, and bare kitchen/wall unit wording not falsely triggering access risk.
+- PR #330 "create GPT current state refresh after demolition safeguards" is post-merge verified on main at commit `37ecc3e` and version `0.12.0`. This is the latest verified baseline for the GPT grounding source.
 - PR #319 Launch Readiness Consolidation Cleanup is complete.
 - PR #320 Premium Homepage Visual Polish is complete.
 - PR #321 Public Brand Hero Colour Alignment is complete.
 - PR #322 Homepage Logo Replacement is complete: desktop/mobile homepage logo updated without runtime/pricing/schema/workflow/dependency/version changes.
 - PR #323 Desktop Admin Collapsible Section Polish is complete: admin collapsible section polish without runtime/pricing/schema/workflow/dependency/version changes.
-- Current verified baseline after PR #329 Demolition Pricing Safeguards merge commit `5a5b4dcbbafb12405c2c32366288e13279763de4`: version is `0.12.0`, version parity passed, GPT grounding parity passed, local/internal demolition acceptance retest passed, full pytest passed with 822 tests, Render `/health` was verified at version `0.12.0` with commit prefix `5a5b4dcbbafb`, and live `/`, `/quote`, `/admin`, and `/admin/mobile` returned 200.
 
 ## Notification Policy
 
@@ -134,6 +134,10 @@ It is not a customer-facing product behavior change.
 The purpose is to improve consistency and reduce drift while preserving existing production flows.
 
 Pricing authority remains unchanged in `app/quote_engine.py`.
+
+GPT must not override prices.
+
+Custom GPT Knowledge should use the generated grounding pack files from `dist/gpt_grounding_pack`; do not upload `manifest.json` as GPT Knowledge.
 
 An internal-only `POST /api/gpt/quote` endpoint now exists as a non-persistent interface into that pricing authority.
 
