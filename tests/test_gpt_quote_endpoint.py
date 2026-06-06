@@ -199,6 +199,30 @@ def test_gpt_quote_accepts_structured_demolition_access_field(client: TestClient
     assert body["quote_risk_summary"]["customer_visible"] is False
 
 
+def test_gpt_quote_surfaces_utility_adjacent_demolition_owner_review(client: TestClient) -> None:
+    payload = _base_payload(service_type="demolition")
+    payload["description"] = (
+        "Interior bulkhead and wall selective demolition around ceiling openings, "
+        "utilities, HVAC, and plumbing."
+    )
+    payload["estimated_hours"] = 8.0
+    payload["crew_size"] = 2
+
+    response = client.post("/api/gpt/quote", headers=_headers(), json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    artifacts = build_quote_artifacts(_translated_payload(payload))
+    assert body["cash_total_cad"] == artifacts["response"]["cash_total_cad"]
+    assert body["emt_total_cad"] == artifacts["response"]["emt_total_cad"]
+    assert body["cash_total_cad"] >= 1200.0
+    assert body["quote_risk_advisory"]["customer_visible"] is False
+    assert body["quote_risk_advisory"]["pricing_effect"] == "none"
+    assert body["quote_risk_advisory"]["manual_review_recommended"] is True
+    assert body["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert body["quote_risk_summary"]["customer_visible"] is False
+
+
 def test_gpt_action_schema_documents_structured_demolition_and_advisory_fields() -> None:
     schema_text = Path("docs/gpt/GPT_ACTIONS_OPENAPI.yaml").read_text(encoding="utf-8")
 

@@ -91,6 +91,9 @@ DEMOLITION_ACCESS_RISK_FLOOR_CAD = 750.0
 DEMOLITION_STRUCTURE_FLOOR_CAD = 1000.0
 DEMOLITION_HEAVY_MATERIAL_FLOOR_CAD = 1200.0
 DEMOLITION_HEAVY_ACCESS_FLOOR_CAD = 1500.0
+DEMOLITION_UTILITY_ADJACENT_FLOOR_CAD = 1200.0
+DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD = 1500.0
+DEMOLITION_STRUCTURE_HEAVY_FLOOR_CAD = 1500.0
 
 _TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 _DEMOLITION_CONTROLLED_PHRASES = (
@@ -221,6 +224,44 @@ _DEMOLITION_UNKNOWN_SCOPE_PHRASES = (
     "permit sensitive",
     "permit required",
     "liability sensitive",
+)
+_DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES = (
+    "roofing",
+    "roofing material",
+    "roof debris",
+    "roof tear off",
+    "roof tear-off",
+    "shingle debris",
+    "mixed debris",
+    "mixed yard cleanup",
+    "yard cleanup",
+    "yard clean up",
+)
+_DEMOLITION_SELECTIVE_INTERIOR_PHRASES = (
+    "bulkhead",
+    "bulkheads",
+    "ceiling opening",
+    "ceiling openings",
+    "selective demolition",
+    "selective demo",
+    "interior wall",
+    "interior walls",
+    "wall",
+    "walls",
+)
+_DEMOLITION_UTILITY_ADJACENT_PHRASES = (
+    "utility",
+    "utilities",
+    "hvac",
+    "plumbing",
+    "pipe",
+    "pipes",
+    "furnace",
+    "water heater",
+    "water heaters",
+    "duct",
+    "ducting",
+    "ductwork",
 )
 _FIXED_BULKY_PHRASES = (
     "mattress",
@@ -749,6 +790,8 @@ def _coerce_non_negative_int(value: Any) -> int:
 def _demolition_safeguard(
     *,
     text: str,
+    hours: float,
+    crew_size: int,
     access_difficulty: str,
     has_dense_materials: bool,
     stairs_count: Any = None,
@@ -782,6 +825,15 @@ def _demolition_safeguard(
         or _contains_any_phrase(safeguard_text, _DEMOLITION_UNKNOWN_SCOPE_PHRASES)
     )
     has_demolition_scope = _coerce_bool(demolition_ripout) or has_generic_signal
+    has_large_structure_scope = has_structure and (float(hours) >= 6.0 or int(crew_size) >= 4)
+    has_structure_heavy_context = has_structure and (
+        has_heavy_material
+        or _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES)
+    )
+    has_utility_adjacent_selective_demo = _contains_any_phrase(
+        safeguard_text,
+        _DEMOLITION_SELECTIVE_INTERIOR_PHRASES,
+    ) and _contains_any_phrase(safeguard_text, _DEMOLITION_UTILITY_ADJACENT_PHRASES)
 
     floor = DEMOLITION_CONTROLLED_FLOOR_CAD if has_controlled_signal else DEMOLITION_NORMAL_FLOOR_CAD
     tier = "controlled" if has_controlled_signal else "normal"
@@ -803,6 +855,15 @@ def _demolition_safeguard(
     if has_heavy_material and has_access_risk:
         floor = max(floor, DEMOLITION_HEAVY_ACCESS_FLOOR_CAD)
         tier = "heavy_access"
+    if has_structure_heavy_context and not has_access_risk:
+        floor = max(floor, DEMOLITION_STRUCTURE_HEAVY_FLOOR_CAD)
+        tier = "structure_heavy"
+    elif has_large_structure_scope:
+        floor = max(floor, DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD)
+        tier = "large_structure"
+    if has_utility_adjacent_selective_demo and floor < DEMOLITION_UTILITY_ADJACENT_FLOOR_CAD:
+        floor = DEMOLITION_UTILITY_ADJACENT_FLOOR_CAD
+        tier = "utility_adjacent"
 
     flags: list[str] = []
     if has_demolition_scope:
@@ -817,6 +878,12 @@ def _demolition_safeguard(
         flags.append("access_risk")
     if has_unknown_scope:
         flags.append("unknown_scope")
+    if has_structure_heavy_context and not has_access_risk:
+        flags.append("structure_heavy")
+    if has_large_structure_scope:
+        flags.append("large_structure")
+    if has_utility_adjacent_selective_demo:
+        flags.append("utility_adjacent")
 
     return {
         "floor_cad": floor,
@@ -1146,6 +1213,8 @@ def calculate_quote(
     if normalized == "demolition":
         demolition_safeguard = _demolition_safeguard(
             text=signal_text,
+            hours=float(billable_hours),
+            crew_size=int(crew_size),
             access_difficulty=_ad,
             has_dense_materials=bool(has_dense_materials),
             stairs_count=stairs_count,

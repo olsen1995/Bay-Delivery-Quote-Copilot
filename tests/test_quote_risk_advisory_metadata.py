@@ -624,3 +624,49 @@ def test_gpt_quote_response_includes_internal_owner_review_advisory_metadata() -
     assert response["quote_risk_summary"]["customer_visible"] is False
     assert response["quote_risk_summary"]["risk_level"] == "owner_review"
     assert response["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"
+
+
+def test_utility_adjacent_demolition_owner_review_advisory_stays_internal_only(
+    client: TestClient,
+) -> None:
+    description = (
+        "Interior bulkhead and wall selective demolition around ceiling openings, "
+        "utilities, HVAC, and plumbing."
+    )
+    payload = _base_payload(
+        service_type="demolition",
+        description=description,
+        job_description_customer=description,
+        estimated_hours=8.0,
+        crew_size=2,
+        has_dense_materials=False,
+    )
+
+    artifacts = quote_service.build_quote_artifacts(payload)
+    advisory = artifacts["quote_risk_advisory"]
+    summary = build_quote_risk_summary(
+        artifacts["normalized_request"],
+        advisory,
+        artifacts["internal_risk_assessment"],
+    )
+
+    assert artifacts["response"]["cash_total_cad"] >= 1200.0
+    assert artifacts["engine_quote"]["_internal"]["demolition_owner_review_recommended"] is True
+    assert artifacts["engine_quote"]["_internal"]["demolition_safeguard_tier"] == "utility_adjacent"
+    assert advisory is not None
+    assert advisory["customer_visible"] is False
+    assert advisory["pricing_effect"] == "none"
+    assert advisory["manual_review_recommended"] is True
+    assert "DEMOLITION_OWNER_REVIEW_RECOMMENDED" in _codes(advisory)
+    assert summary["customer_visible"] is False
+    assert summary["pricing_effect"] == "none"
+    assert summary["risk_level"] == "owner_review"
+
+    quote_response = client.post("/quote/calculate", json=payload)
+
+    assert quote_response.status_code == 200
+    quote_body = quote_response.json()
+    assert "quote_risk_advisory" not in quote_body
+    assert "quote_risk_summary" not in quote_body
+    assert "demolition_owner_review_recommended" not in quote_body["response"]
+    assert "demolition_safeguard_tier" not in quote_body["response"]

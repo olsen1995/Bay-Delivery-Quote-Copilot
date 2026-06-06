@@ -972,6 +972,87 @@ def test_demolition_material_and_access_safeguards(description: str, expected_mi
     assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
 
 
+@pytest.mark.parametrize("crew_size", [4, 5])
+def test_large_long_duration_deck_teardown_uses_large_structure_floor(crew_size: int) -> None:
+    result = calculate_quote(
+        "demolition",
+        7.0,
+        crew_size=crew_size,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Large residential deck teardown and removal.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1500.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "large_structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "large_structure" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+def test_structure_teardown_with_roofing_and_yard_cleanup_uses_structure_heavy_floor() -> None:
+    result = calculate_quote(
+        "demolition",
+        7.0,
+        crew_size=3,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Exterior deck structure teardown with shingles roofing material mixed debris and yard cleanup.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1500.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert {"structure_teardown", "heavy_material", "structure_heavy"}.issubset(
+        result["_internal"]["demolition_safeguard_flags"]
+    )
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+def test_utility_adjacent_interior_selective_demo_uses_higher_floor_and_owner_review() -> None:
+    result = calculate_quote(
+        "demolition",
+        8.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=(
+            "Interior bulkhead and wall selective demolition around ceiling openings, "
+            "utilities, HVAC, and plumbing."
+        ),
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "utility_adjacent"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1200.0
+    assert "utility_adjacent" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+def test_generic_interior_wall_demo_does_not_trigger_utility_adjacent_floor() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Remove interior wall.",
+    )
+
+    assert float(result["total_cash_cad"]) == 650.0
+    assert float(result["total_emt_cad"]) == 734.5
+    assert result["_internal"]["demolition_safeguard_tier"] == "normal"
+    assert "utility_adjacent" not in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is False
+
+
 def test_demolition_structured_soil_counts_as_heavy_material_without_dense_checkbox() -> None:
     result = calculate_quote(
         "demolition",
