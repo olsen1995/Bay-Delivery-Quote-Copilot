@@ -861,7 +861,7 @@ def _demolition_safeguard(
         has_heavy_material
         or _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES)
     )
-    has_roof_heavy_context = has_demolition_scope and _contains_any_phrase(
+    has_roof_heavy_context = _contains_any_phrase(
         safeguard_text,
         _DEMOLITION_ROOF_HEAVY_CONTEXT_PHRASES,
     )

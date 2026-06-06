@@ -705,6 +705,44 @@ def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recomput
 @pytest.mark.parametrize(
     "description",
     [
+        "Roofing material demolition.",
+        "Roof tear-off demolition with roof debris.",
+    ],
+)
+def test_owner_review_counts_roof_heavy_demolition_text_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-roof-heavy",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
         "Interior bulkhead selective demolition near utilities, HVAC, and plumbing.",
         "Ceiling opening demolition around furnace ducting and water heater plumbing.",
         "Remove wall around plumbing.",

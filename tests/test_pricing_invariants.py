@@ -1095,6 +1095,25 @@ def test_roof_tearoff_with_shingle_debris_uses_structure_heavy_floor_without_ext
     assert result["_internal"]["demolition_owner_review_recommended"] is True
 
 
+def test_roof_tearoff_service_type_uses_structure_heavy_floor_without_demolition_wording() -> None:
+    result = calculate_quote(
+        "demolition",
+        2.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Roof tear-off with shingle debris.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1500.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "structure_heavy" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
 def test_utility_adjacent_interior_selective_demo_uses_higher_floor_and_owner_review() -> None:
     result = calculate_quote(
         "demolition",
