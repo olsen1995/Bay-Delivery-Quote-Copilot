@@ -1588,6 +1588,30 @@ _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
     "upstairs unit",
     "without photos",
 )
+_DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS: Tuple[str, ...] = (
+    "bulkhead",
+    "bulkheads",
+    "ceiling opening",
+    "ceiling openings",
+    "interior wall",
+    "interior walls",
+    "selective demolition",
+    "selective demo",
+)
+_DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS: Tuple[str, ...] = (
+    "duct",
+    "ducting",
+    "ductwork",
+    "furnace",
+    "hvac",
+    "pipe",
+    "pipes",
+    "plumbing",
+    "utilities",
+    "utility",
+    "water heater",
+    "water heaters",
+)
 _DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES: Tuple[str, ...] = (
     "concrete",
     "other",
@@ -1622,6 +1646,18 @@ def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -
     return f"({' OR '.join(clauses)})"
 
 
+def _json_text_like_all_groups(
+    column: str,
+    field_name: str,
+    first_values: Tuple[str, ...],
+    second_values: Tuple[str, ...],
+) -> str:
+    return (
+        f"({_json_text_like_any(column, field_name, first_values)} "
+        f"AND {_json_text_like_any(column, field_name, second_values)})"
+    )
+
+
 def _owner_review_manual_signal_filter(alias: str) -> str:
     request_json = f"{alias}.request_json"
     return f"""
@@ -1649,7 +1685,9 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                                OR {_json_int(request_json, "stairs_count")} > 0))
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
                           AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
-                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}))
+                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
+                               OR {_json_text_like_all_groups(request_json, "description", _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}
+                               OR {_json_text_like_all_groups(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}))
                     THEN 1
                     ELSE 0
                 END

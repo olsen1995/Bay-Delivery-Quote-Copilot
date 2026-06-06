@@ -237,6 +237,19 @@ _DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES = (
     "yard cleanup",
     "yard clean up",
 )
+_DEMOLITION_LARGE_STRUCTURE_SIZE_PHRASES = (
+    "large",
+    "big",
+    "full",
+)
+_DEMOLITION_STRUCTURE_ACTION_PHRASES = (
+    "removal",
+    "remove",
+    "tear down",
+    "teardown",
+    "dismantle",
+    "dismantling",
+)
 _DEMOLITION_SELECTIVE_INTERIOR_PHRASES = (
     "bulkhead",
     "bulkheads",
@@ -825,7 +838,14 @@ def _demolition_safeguard(
         or _contains_any_phrase(safeguard_text, _DEMOLITION_UNKNOWN_SCOPE_PHRASES)
     )
     has_demolition_scope = _coerce_bool(demolition_ripout) or has_generic_signal
-    has_large_structure_scope = has_structure and (float(hours) >= 6.0 or int(crew_size) >= 4)
+    has_large_structure_text = (
+        has_structure
+        and _contains_any_phrase(safeguard_text, _DEMOLITION_LARGE_STRUCTURE_SIZE_PHRASES)
+        and _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_ACTION_PHRASES)
+    )
+    has_large_structure_scope = has_structure and (
+        float(hours) >= 6.0 or int(crew_size) >= 4 or has_large_structure_text
+    )
     has_structure_heavy_context = has_structure and (
         has_heavy_material
         or _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES)
@@ -855,9 +875,10 @@ def _demolition_safeguard(
     if has_heavy_material and has_access_risk:
         floor = max(floor, DEMOLITION_HEAVY_ACCESS_FLOOR_CAD)
         tier = "heavy_access"
-    if has_structure_heavy_context and not has_access_risk:
+    if has_structure_heavy_context:
         floor = max(floor, DEMOLITION_STRUCTURE_HEAVY_FLOOR_CAD)
-        tier = "structure_heavy"
+        if tier != "heavy_access":
+            tier = "structure_heavy"
     elif has_large_structure_scope:
         floor = max(floor, DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD)
         tier = "large_structure"
@@ -878,7 +899,7 @@ def _demolition_safeguard(
         flags.append("access_risk")
     if has_unknown_scope:
         flags.append("unknown_scope")
-    if has_structure_heavy_context and not has_access_risk:
+    if has_structure_heavy_context:
         flags.append("structure_heavy")
     if has_large_structure_scope:
         flags.append("large_structure")
