@@ -708,6 +708,7 @@ def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recomput
         "Interior bulkhead selective demolition near utilities, HVAC, and plumbing.",
         "Ceiling opening demolition around furnace ducting and water heater plumbing.",
         "Remove wall around plumbing.",
+        "Remove wall near utility line.",
     ],
 )
 def test_owner_review_counts_utility_adjacent_demolition_text_without_recompute(
@@ -808,6 +809,7 @@ def test_owner_review_does_not_count_split_field_utility_room_near_miss_without_
         "Demolition of a wall unit.",
         "Remove interior wall.",
         "Small controlled drywall and plaster demo.",
+        "Small controlled drywall demo around plumbing.",
     ],
 )
 def test_owner_review_does_not_count_bare_unit_demolition_text_without_recompute(

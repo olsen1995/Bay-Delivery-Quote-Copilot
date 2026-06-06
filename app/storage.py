@@ -1610,6 +1610,8 @@ _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS: Tuple[str, ...] = (
     "pipes",
     "plumbing",
     "utilities",
+    "utility line",
+    "utility lines",
     "water heater",
     "water heaters",
 )
@@ -1646,12 +1648,28 @@ def _text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
     return f"({' OR '.join(clauses)})"
 
 
+def _sql_normalized_text_expr(text_expr: str) -> str:
+    normalized_expr = f"LOWER({text_expr})"
+    for old in ("-", "_", "/", ".", ",", ";", ":", "(", ")", "[", "]"):
+        normalized_expr = f"REPLACE({normalized_expr}, '{old}', ' ')"
+    return f"(' ' || {normalized_expr} || ' ')"
+
+
+def _normalized_text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
+    normalized_expr = _sql_normalized_text_expr(text_expr)
+    clauses = []
+    for value in values:
+        normalized_value = " ".join(value.replace("'", "''").lower().split())
+        clauses.append(f"{normalized_expr} LIKE '% {normalized_value} %'")
+    return f"({' OR '.join(clauses)})"
+
+
 def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
     text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
     return _text_expr_like_any(text_expr, values)
 
 
-def _json_combined_text_like_any(
+def _json_combined_normalized_text_like_any(
     column: str,
     field_names: Tuple[str, ...],
     values: Tuple[str, ...],
@@ -1660,7 +1678,7 @@ def _json_combined_text_like_any(
         f"COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), '')"
         for field_name in field_names
     )
-    return _text_expr_like_any(f"LOWER({text_parts})", values)
+    return _normalized_text_expr_like_any(text_parts, values)
 
 
 def _json_combined_text_like_all_groups(
@@ -1670,8 +1688,8 @@ def _json_combined_text_like_all_groups(
     second_values: Tuple[str, ...],
 ) -> str:
     return (
-        f"({_json_combined_text_like_any(column, field_names, first_values)} "
-        f"AND {_json_combined_text_like_any(column, field_names, second_values)})"
+        f"({_json_combined_normalized_text_like_any(column, field_names, first_values)} "
+        f"AND {_json_combined_normalized_text_like_any(column, field_names, second_values)})"
     )
 
 
