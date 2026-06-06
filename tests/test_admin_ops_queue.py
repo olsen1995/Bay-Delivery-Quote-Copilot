@@ -707,6 +707,7 @@ def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recomput
     [
         "Interior bulkhead selective demolition near utilities, HVAC, and plumbing.",
         "Ceiling opening demolition around furnace ducting and water heater plumbing.",
+        "Remove wall around plumbing.",
     ],
 )
 def test_owner_review_counts_utility_adjacent_demolition_text_without_recompute(
@@ -738,6 +739,66 @@ def test_owner_review_counts_utility_adjacent_demolition_text_without_recompute(
 
     assert resp.status_code == 200
     assert resp.json()["counts"]["owner_review"] == 1
+
+
+def test_owner_review_counts_split_field_utility_adjacent_demolition_text_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-utility-adjacent-split",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Interior bulkhead selective demolition.",
+            "job_description_customer": "Near HVAC and plumbing.",
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 1
+
+
+def test_owner_review_does_not_count_split_field_utility_room_near_miss_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-utility-room-near-miss",
+        request_overrides={
+            "service_type": "demolition",
+            "description": "Interior wall removal.",
+            "job_description_customer": "Customer has a utility room nearby.",
+        },
+    )
+
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 0
 
 
 @pytest.mark.parametrize(

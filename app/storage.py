@@ -1597,6 +1597,8 @@ _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS: Tuple[str, ...] = (
     "interior walls",
     "selective demolition",
     "selective demo",
+    "wall",
+    "walls",
 )
 _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS: Tuple[str, ...] = (
     "duct",
@@ -1608,7 +1610,6 @@ _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS: Tuple[str, ...] = (
     "pipes",
     "plumbing",
     "utilities",
-    "utility",
     "water heater",
     "water heaters",
 )
@@ -1637,8 +1638,7 @@ def _owner_review_like_patterns(value: str) -> Tuple[str, ...]:
     return tuple(f"%{separator.join(words)}%" for separator in (" ", "-", "_", "/", "."))
 
 
-def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
-    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
+def _text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
     clauses = []
     for value in values:
         for pattern in _owner_review_like_patterns(value):
@@ -1646,15 +1646,32 @@ def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -
     return f"({' OR '.join(clauses)})"
 
 
-def _json_text_like_all_groups(
+def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
+    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
+    return _text_expr_like_any(text_expr, values)
+
+
+def _json_combined_text_like_any(
     column: str,
-    field_name: str,
+    field_names: Tuple[str, ...],
+    values: Tuple[str, ...],
+) -> str:
+    text_parts = " || ' ' || ".join(
+        f"COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), '')"
+        for field_name in field_names
+    )
+    return _text_expr_like_any(f"LOWER({text_parts})", values)
+
+
+def _json_combined_text_like_all_groups(
+    column: str,
+    field_names: Tuple[str, ...],
     first_values: Tuple[str, ...],
     second_values: Tuple[str, ...],
 ) -> str:
     return (
-        f"({_json_text_like_any(column, field_name, first_values)} "
-        f"AND {_json_text_like_any(column, field_name, second_values)})"
+        f"({_json_combined_text_like_any(column, field_names, first_values)} "
+        f"AND {_json_combined_text_like_any(column, field_names, second_values)})"
     )
 
 
@@ -1686,8 +1703,7 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
                           AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
                                OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
-                               OR {_json_text_like_all_groups(request_json, "description", _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}
-                               OR {_json_text_like_all_groups(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}))
+                               OR {_json_combined_text_like_all_groups(request_json, ("description", "job_description_customer"), _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}))
                     THEN 1
                     ELSE 0
                 END
