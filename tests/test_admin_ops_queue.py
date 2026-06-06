@@ -709,6 +709,7 @@ def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recomput
         "Ceiling opening demolition around furnace ducting and water heater plumbing.",
         "Remove wall around plumbing.",
         "Remove wall near utility line.",
+        "Remove wall\naround plumbing.",
     ],
 )
 def test_owner_review_counts_utility_adjacent_demolition_text_without_recompute(

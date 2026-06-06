@@ -1650,6 +1650,8 @@ def _text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
 
 def _sql_normalized_text_expr(text_expr: str) -> str:
     normalized_expr = f"LOWER({text_expr})"
+    for codepoint in (9, 10, 13):
+        normalized_expr = f"REPLACE({normalized_expr}, CHAR({codepoint}), ' ')"
     for old in ("-", "_", "/", ".", ",", ";", ":", "(", ")", "[", "]"):
         normalized_expr = f"REPLACE({normalized_expr}, '{old}', ' ')"
     return f"(' ' || {normalized_expr} || ' ')"
