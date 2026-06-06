@@ -237,6 +237,14 @@ _DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES = (
     "yard cleanup",
     "yard clean up",
 )
+_DEMOLITION_ROOF_HEAVY_CONTEXT_PHRASES = (
+    "roofing",
+    "roofing material",
+    "roof debris",
+    "roof tear off",
+    "roof tear-off",
+    "shingle debris",
+)
 _DEMOLITION_LARGE_STRUCTURE_SIZE_PHRASES = (
     "large",
     "big",
@@ -249,6 +257,8 @@ _DEMOLITION_STRUCTURE_ACTION_PHRASES = (
     "teardown",
     "dismantle",
     "dismantling",
+    "demolition",
+    "demo",
 )
 _DEMOLITION_SELECTIVE_INTERIOR_PHRASES = (
     "bulkhead",
@@ -263,8 +273,9 @@ _DEMOLITION_SELECTIVE_INTERIOR_PHRASES = (
     "walls",
 )
 _DEMOLITION_UTILITY_ADJACENT_PHRASES = (
-    "utility",
     "utilities",
+    "utility line",
+    "utility lines",
     "hvac",
     "plumbing",
     "pipe",
@@ -850,6 +861,11 @@ def _demolition_safeguard(
         has_heavy_material
         or _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_HEAVY_CONTEXT_PHRASES)
     )
+    has_roof_heavy_context = has_demolition_scope and _contains_any_phrase(
+        safeguard_text,
+        _DEMOLITION_ROOF_HEAVY_CONTEXT_PHRASES,
+    )
+    has_structure_heavy_context = has_structure_heavy_context or has_roof_heavy_context
     has_utility_adjacent_selective_demo = _contains_any_phrase(
         safeguard_text,
         _DEMOLITION_SELECTIVE_INTERIOR_PHRASES,

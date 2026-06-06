@@ -1050,6 +1050,9 @@ def test_structure_heavy_access_risk_does_not_bypass_structure_heavy_floor() -> 
         "Large shed teardown.",
         "Big deck removal.",
         "Full deck teardown.",
+        "Large deck demolition.",
+        "Large shed demolition.",
+        "Big deck demo.",
     ],
 )
 def test_large_structure_text_uses_large_structure_floor_with_default_hours_and_crew(
@@ -1070,6 +1073,25 @@ def test_large_structure_text_uses_large_structure_floor_with_default_hours_and_
     assert result["_internal"]["demolition_safeguard_tier"] == "large_structure"
     assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
     assert "large_structure" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+def test_roof_tearoff_with_shingle_debris_uses_structure_heavy_floor_without_extra_structure_word() -> None:
+    result = calculate_quote(
+        "demolition",
+        2.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Roof tear-off demolition with shingle debris.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1500.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "structure_heavy" in result["_internal"]["demolition_safeguard_flags"]
     assert result["_internal"]["demolition_owner_review_recommended"] is True
 
 
@@ -1095,6 +1117,25 @@ def test_utility_adjacent_interior_selective_demo_uses_higher_floor_and_owner_re
     assert result["_internal"]["demolition_owner_review_recommended"] is True
 
 
+def test_wall_near_utility_line_uses_utility_adjacent_floor_and_owner_review() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Remove wall near utility line.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "utility_adjacent"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1200.0
+    assert "utility_adjacent" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
 def test_generic_interior_wall_demo_does_not_trigger_utility_adjacent_floor() -> None:
     result = calculate_quote(
         "demolition",
@@ -1104,6 +1145,25 @@ def test_generic_interior_wall_demo_does_not_trigger_utility_adjacent_floor() ->
         access_difficulty="normal",
         has_dense_materials=False,
         description="Remove interior wall.",
+    )
+
+    assert float(result["total_cash_cad"]) == 650.0
+    assert float(result["total_emt_cad"]) == 734.5
+    assert result["_internal"]["demolition_safeguard_tier"] == "normal"
+    assert "utility_adjacent" not in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is False
+
+
+def test_utility_room_nearby_does_not_trigger_utility_adjacent_floor_or_owner_review() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Interior wall removal.",
+        job_description_customer="Customer has a utility room nearby.",
     )
 
     assert float(result["total_cash_cad"]) == 650.0
