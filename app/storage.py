@@ -1559,11 +1559,6 @@ _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
     "permit sensitive",
     "regulated material",
     "regulated materials",
-    "roof debris",
-    "roof tear off",
-    "roof tear-off",
-    "roofing",
-    "roofing material",
     "rubble",
     "shed",
     "sheds",
@@ -1619,6 +1614,13 @@ _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS: Tuple[str, ...] = (
     "utility lines",
     "water heater",
     "water heaters",
+)
+_DEMOLITION_OWNER_REVIEW_ROOF_HEAVY_TEXT_SIGNALS: Tuple[str, ...] = (
+    "roof debris",
+    "roof tear off",
+    "roof tear-off",
+    "roofing",
+    "roofing material",
 )
 _DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES: Tuple[str, ...] = (
     "concrete",
@@ -1728,6 +1730,7 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
                           AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
                                OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
+                               OR {_json_combined_normalized_text_like_any(request_json, ("description", "job_description_customer"), _DEMOLITION_OWNER_REVIEW_ROOF_HEAVY_TEXT_SIGNALS)}
                                OR {_json_combined_text_like_all_groups(request_json, ("description", "job_description_customer"), _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}))
                     THEN 1
                     ELSE 0
