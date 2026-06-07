@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import product
 import json
 import logging
 import os
@@ -1664,12 +1665,26 @@ def _sql_normalized_text_expr(text_expr: str) -> str:
     return f"(' ' || {normalized_expr} || ' ')"
 
 
+def _normalized_owner_review_patterns(value: str) -> Tuple[str, ...]:
+    normalized_value = " ".join(value.replace("'", "''").lower().split())
+    words = tuple(part for part in normalized_value.split() if part)
+    if len(words) <= 1:
+        return (f"% {normalized_value} %",)
+    patterns = []
+    for widths in product((1, 2, 3), repeat=len(words) - 1):
+        phrase = words[0]
+        for width, word in zip(widths, words[1:]):
+            phrase += (" " * width) + word
+        patterns.append(f"% {phrase} %")
+    return tuple(patterns)
+
+
 def _normalized_text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
     normalized_expr = _sql_normalized_text_expr(text_expr)
     clauses = []
     for value in values:
-        normalized_value = " ".join(value.replace("'", "''").lower().split())
-        clauses.append(f"{normalized_expr} LIKE '% {normalized_value} %'")
+        for pattern in _normalized_owner_review_patterns(value):
+            clauses.append(f"{normalized_expr} LIKE '{pattern}'")
     return f"({' OR '.join(clauses)})"
 
 

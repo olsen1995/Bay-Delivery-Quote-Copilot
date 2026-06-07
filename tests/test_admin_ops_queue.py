@@ -708,6 +708,8 @@ def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recomput
         "Roofing material demolition.",
         "Roof tear-off demolition with roof debris.",
         "Roof tear\noff demolition.",
+        "Roof--debris removal.",
+        "Roof\t\tdebris removal.",
     ],
 )
 def test_owner_review_counts_roof_heavy_demolition_text_without_recompute(
