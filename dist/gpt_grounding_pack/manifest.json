@@ -8,12 +8,12 @@
     {
       "file": "docs/gpt/GPT_BUSINESS_RULES.md",
       "output": "GPT_BUSINESS_RULES.md",
-      "sha256": "e86f528b097c43f2a959c2fc023d2a20faf15a4346045614853e81b4d30cf770"
+      "sha256": "cd4a662d37dbb2d62b17aeb607cde4c858fa2006dd4fcf6275069ceab51dd7a4"
     },
     {
       "file": "docs/gpt/GPT_CURRENT_STATE.md",
       "output": "GPT_CURRENT_STATE.md",
-      "sha256": "8900a5c693f4ca03e803c306900c398e7a284e8015bb6e12dbc1f288fd0eb752"
+      "sha256": "b0e6b811b81f459dafd5a7d7f7e3c03aaa89951a877b92b1ca216e70bd3f9759"
     },
     {
       "file": "docs/gpt/GPT_SYSTEM_BOUNDARIES.md",

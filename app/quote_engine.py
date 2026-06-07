@@ -247,6 +247,9 @@ _DEMOLITION_ROOF_HEAVY_CONTEXT_PHRASES = (
     "roof shingles demolition",
     "asphalt shingles demolition",
     "wet shingles demolition",
+    "roof shingles",
+    "asphalt shingles",
+    "wet shingles",
 )
 _DEMOLITION_LARGE_STRUCTURE_SIZE_PHRASES = (
     "large",
@@ -260,6 +263,7 @@ _DEMOLITION_STRUCTURE_ACTION_PHRASES = (
     "teardown",
     "dismantle",
     "dismantling",
+    "demolish",
     "demolition",
     "demo",
 )
@@ -287,6 +291,7 @@ _DEMOLITION_UTILITY_ADJACENT_PHRASES = (
     "water heater",
     "water heaters",
     "duct",
+    "ducts",
     "ducting",
     "ductwork",
 )

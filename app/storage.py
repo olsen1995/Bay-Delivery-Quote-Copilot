@@ -495,7 +495,6 @@ KNOWN_TABLES = [
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
 _PHONE_DIGITS_RE = re.compile(r"\D+")
-_OWNER_REVIEW_TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 def _validate_table_name(table_name: str) -> str:
@@ -513,7 +512,6 @@ def _connect() -> sqlite3.Connection:
     # seconds was occasionally insufficient during spike tests.
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
-    conn.create_function("normalize_owner_review_text", 1, _normalize_owner_review_signal_text)
     # WAL mode improves concurrency by allowing readers and writers to operate
     # simultaneously; this mirrors recommendations from the audit.
     try:
@@ -1590,40 +1588,6 @@ _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
     "upstairs unit",
     "without photos",
 )
-_DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS: Tuple[str, ...] = (
-    "bulkhead",
-    "bulkheads",
-    "ceiling opening",
-    "ceiling openings",
-    "interior wall",
-    "interior walls",
-    "selective demolition",
-    "selective demo",
-    "wall",
-    "walls",
-)
-_DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS: Tuple[str, ...] = (
-    "duct",
-    "ducting",
-    "ductwork",
-    "furnace",
-    "hvac",
-    "pipe",
-    "pipes",
-    "plumbing",
-    "utilities",
-    "utility line",
-    "utility lines",
-    "water heater",
-    "water heaters",
-)
-_DEMOLITION_OWNER_REVIEW_ROOF_HEAVY_TEXT_SIGNALS: Tuple[str, ...] = (
-    "roof debris",
-    "roof tear off",
-    "roof tear-off",
-    "roofing",
-    "roofing material",
-)
 _DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES: Tuple[str, ...] = (
     "concrete",
     "other",
@@ -1649,64 +1613,13 @@ def _owner_review_like_patterns(value: str) -> Tuple[str, ...]:
     return tuple(f"%{separator.join(words)}%" for separator in (" ", "-", "_", "/", "."))
 
 
-def _text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
+def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
+    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
     clauses = []
     for value in values:
         for pattern in _owner_review_like_patterns(value):
             clauses.append(f"{text_expr} LIKE '{pattern}'")
     return f"({' OR '.join(clauses)})"
-
-
-def _sql_normalized_text_expr(text_expr: str) -> str:
-    return f"(' ' || normalize_owner_review_text({text_expr}) || ' ')"
-
-
-def _normalize_owner_review_signal_text(value: Any) -> str:
-    normalized = _OWNER_REVIEW_TEXT_NORMALIZE_RE.sub(" ", str(value or "").lower())
-    return " ".join(normalized.split())
-
-
-def _normalized_owner_review_patterns(value: str) -> Tuple[str, ...]:
-    normalized_value = _normalize_owner_review_signal_text(value).replace("'", "''")
-    return (f"% {normalized_value} %",)
-
-
-def _normalized_text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
-    normalized_expr = _sql_normalized_text_expr(text_expr)
-    clauses = []
-    for value in values:
-        for pattern in _normalized_owner_review_patterns(value):
-            clauses.append(f"{normalized_expr} LIKE '{pattern}'")
-    return f"({' OR '.join(clauses)})"
-
-
-def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
-    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
-    return _text_expr_like_any(text_expr, values)
-
-
-def _json_combined_normalized_text_like_any(
-    column: str,
-    field_names: Tuple[str, ...],
-    values: Tuple[str, ...],
-) -> str:
-    text_parts = " || ' ' || ".join(
-        f"COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), '')"
-        for field_name in field_names
-    )
-    return _normalized_text_expr_like_any(text_parts, values)
-
-
-def _json_combined_text_like_all_groups(
-    column: str,
-    field_names: Tuple[str, ...],
-    first_values: Tuple[str, ...],
-    second_values: Tuple[str, ...],
-) -> str:
-    return (
-        f"({_json_combined_normalized_text_like_any(column, field_names, first_values)} "
-        f"AND {_json_combined_normalized_text_like_any(column, field_names, second_values)})"
-    )
 
 
 def _owner_review_manual_signal_filter(alias: str) -> str:
@@ -1736,9 +1649,7 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                                OR {_json_int(request_json, "stairs_count")} > 0))
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
                           AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
-                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
-                               OR {_json_combined_normalized_text_like_any(request_json, ("description", "job_description_customer"), _DEMOLITION_OWNER_REVIEW_ROOF_HEAVY_TEXT_SIGNALS)}
-                               OR {_json_combined_text_like_all_groups(request_json, ("description", "job_description_customer"), _DEMOLITION_OWNER_REVIEW_UTILITY_CONTEXT_TEXT_SIGNALS, _DEMOLITION_OWNER_REVIEW_UTILITY_ADJACENT_TEXT_SIGNALS)}))
+                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}))
                     THEN 1
                     ELSE 0
                 END

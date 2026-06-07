@@ -946,8 +946,8 @@ def test_bare_unit_demolition_text_does_not_create_access_risk(
         ),
         (
             "Wet roof shingles and asphalt shingles tear-off debris.",
-            1200.0,
-            "heavy_material",
+            1500.0,
+            "structure_heavy",
         ),
         (
             "Laminate flooring, carpet, subfloor, underlayment, baseboards and trim rip-out.",
@@ -1053,6 +1053,8 @@ def test_structure_heavy_access_risk_does_not_bypass_structure_heavy_floor() -> 
         "Large deck demolition.",
         "Large shed demolition.",
         "Big deck demo.",
+        "Demolish large deck.",
+        "Demolish large shed.",
     ],
 )
 def test_large_structure_text_uses_large_structure_floor_with_default_hours_and_crew(
@@ -1120,6 +1122,9 @@ def test_roof_tearoff_service_type_uses_structure_heavy_floor_without_demolition
         "Roof shingles demolition.",
         "Asphalt shingles demolition.",
         "Wet shingles demolition.",
+        "Roof shingles.",
+        "Asphalt shingles.",
+        "Wet shingles.",
     ],
 )
 def test_common_roof_shingle_demolition_wording_uses_structure_heavy_floor(description: str) -> None:
@@ -1196,6 +1201,25 @@ def test_wall_near_utility_line_uses_utility_adjacent_floor_and_owner_review() -
         access_difficulty="normal",
         has_dense_materials=False,
         description="Remove wall near utility line.",
+    )
+
+    assert float(result["total_cash_cad"]) >= 1200.0
+    assert float(result["total_emt_cad"]) == round(float(result["total_cash_cad"]) * 1.13, 2)
+    assert result["_internal"]["demolition_safeguard_tier"] == "utility_adjacent"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1200.0
+    assert "utility_adjacent" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+def test_wall_near_ducts_uses_utility_adjacent_floor_and_owner_review() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Remove wall near ducts.",
     )
 
     assert float(result["total_cash_cad"]) >= 1200.0
