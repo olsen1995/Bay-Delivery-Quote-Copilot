@@ -708,6 +708,7 @@ def test_owner_review_counts_hazardous_and_dirt_demolition_text_without_recomput
         "Roofing material demolition.",
         "Roof tear-off demolition with roof debris.",
         "Roof tear\noff demolition.",
+        "Roof+debris removal.",
         "Roof--debris removal.",
         "Roof\t\tdebris removal.",
     ],
@@ -789,6 +790,7 @@ def test_owner_review_does_not_count_roofing_substring_false_positives_without_r
         "Remove wall around plumbing.",
         "Remove wall near utility line.",
         "Remove wall\naround plumbing.",
+        "Remove wall+plumbing.",
     ],
 )
 def test_owner_review_counts_utility_adjacent_demolition_text_without_recompute(

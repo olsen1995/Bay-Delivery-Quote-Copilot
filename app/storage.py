@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from itertools import product
 import json
 import logging
 import os
@@ -496,6 +495,7 @@ KNOWN_TABLES = [
 # Cache table columns to support forward-compatible schemas (ex: quotes.job_type)
 _TABLE_COL_CACHE: Dict[str, Tuple[str, ...]] = {}
 _PHONE_DIGITS_RE = re.compile(r"\D+")
+_OWNER_REVIEW_TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 def _validate_table_name(table_name: str) -> str:
@@ -513,6 +513,7 @@ def _connect() -> sqlite3.Connection:
     # seconds was occasionally insufficient during spike tests.
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.create_function("normalize_owner_review_text", 1, _normalize_owner_review_signal_text)
     # WAL mode improves concurrency by allowing readers and writers to operate
     # simultaneously; this mirrors recommendations from the audit.
     try:
@@ -1657,26 +1658,17 @@ def _text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
 
 
 def _sql_normalized_text_expr(text_expr: str) -> str:
-    normalized_expr = f"LOWER({text_expr})"
-    for codepoint in (9, 10, 13):
-        normalized_expr = f"REPLACE({normalized_expr}, CHAR({codepoint}), ' ')"
-    for old in ("-", "_", "/", ".", ",", ";", ":", "(", ")", "[", "]"):
-        normalized_expr = f"REPLACE({normalized_expr}, '{old}', ' ')"
-    return f"(' ' || {normalized_expr} || ' ')"
+    return f"(' ' || normalize_owner_review_text({text_expr}) || ' ')"
+
+
+def _normalize_owner_review_signal_text(value: Any) -> str:
+    normalized = _OWNER_REVIEW_TEXT_NORMALIZE_RE.sub(" ", str(value or "").lower())
+    return " ".join(normalized.split())
 
 
 def _normalized_owner_review_patterns(value: str) -> Tuple[str, ...]:
-    normalized_value = " ".join(value.replace("'", "''").lower().split())
-    words = tuple(part for part in normalized_value.split() if part)
-    if len(words) <= 1:
-        return (f"% {normalized_value} %",)
-    patterns = []
-    for widths in product((1, 2, 3), repeat=len(words) - 1):
-        phrase = words[0]
-        for width, word in zip(widths, words[1:]):
-            phrase += (" " * width) + word
-        patterns.append(f"% {phrase} %")
-    return tuple(patterns)
+    normalized_value = _normalize_owner_review_signal_text(value).replace("'", "''")
+    return (f"% {normalized_value} %",)
 
 
 def _normalized_text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:

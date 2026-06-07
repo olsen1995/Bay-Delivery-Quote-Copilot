@@ -244,6 +244,9 @@ _DEMOLITION_ROOF_HEAVY_CONTEXT_PHRASES = (
     "roof tear off",
     "roof tear-off",
     "shingle debris",
+    "roof shingles demolition",
+    "asphalt shingles demolition",
+    "wet shingles demolition",
 )
 _DEMOLITION_LARGE_STRUCTURE_SIZE_PHRASES = (
     "large",
