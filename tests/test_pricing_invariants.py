@@ -983,6 +983,8 @@ def test_demolition_material_and_access_safeguards(description: str, expected_mi
         "Full deck teardown",
         "Full shed removal",
         "Large structure teardown",
+        "large 16x20 wooden deck demolition",
+        "full old wooden deck teardown",
     ],
 )
 def test_clear_large_structure_demolition_uses_large_structure_floor(description: str) -> None:
@@ -1016,6 +1018,9 @@ def test_clear_large_structure_demolition_uses_large_structure_floor(description
         "Roof shingles",
         "Asphalt shingles",
         "Wet shingles",
+        "roofing tear-off",
+        "roof shingle removal",
+        "shingle tear-off debris",
     ],
 )
 def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -> None:
@@ -1046,6 +1051,10 @@ def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -
         "Ceiling opening near ductwork",
         "Wall demolition near furnace ducts",
         "Interior wall removal near electrical panel",
+        "Interior wall removal near breaker panel",
+        "Wall demolition near service panel",
+        "Wall demolition near electrical service panel",
+        "Remove wall near utility panel",
     ],
 )
 def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(description: str) -> None:
@@ -1075,7 +1084,12 @@ def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(descr
         ("Bathroom tile demo with fence access", 1200.0, "heavy_material"),
         ("Small fence panel removal and yard cleanup", 650.0, "normal"),
         ("Remove interior wall", 650.0, "normal"),
+        ("Remove wall panel", 650.0, "normal"),
+        ("Remove wall, deck is access route", 650.0, "normal"),
+        ("Need to cross deck to remove interior wall", 650.0, "normal"),
         ("Small controlled drywall demo around plumbing", 650.0, "medium_material"),
+        ("Dismantle old wooden shelving", 650.0, "normal"),
+        ("Teardown old wooden shelf", 650.0, "normal"),
         ("Waterproofing material demo", 650.0, "normal"),
         ("Proofing demolition", 650.0, "normal"),
         ("Generic tile demo", 1200.0, "heavy_material"),
@@ -1115,6 +1129,8 @@ def test_demolition_safeguard_false_positives_stay_lower_tier(
         ("Wet shingles", 1500.0, 1695.0, "roof_heavy", True),
         ("Asbestos demolition", 750.0, 847.5, "unknown_scope", True),
         ("Apartment demolition with elevator", 750.0, 847.5, "access_risk", True),
+        ("Remove deck", 1000.0, 1130.0, "structure", True),
+        ("teardown and dismantle old wooden carport", 1000.0, 1130.0, "structure", True),
     ],
 )
 def test_demolition_pr329_acceptance_examples_stay_directionally_stable(

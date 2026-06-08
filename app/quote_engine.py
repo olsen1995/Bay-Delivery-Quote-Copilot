@@ -234,9 +234,14 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "asphalt shingles",
     "wet shingles",
     "shingle debris",
+    "roofing tear off",
+    "roof shingle removal",
+    "shingle tear off debris",
 )
 _DEMOLITION_STRUCTURE_TARGET_TERMS = frozenset(
     {
+        "carport",
+        "carports",
         "shed",
         "sheds",
         "deck",
@@ -274,10 +279,10 @@ _DEMOLITION_UTILITY_TERMS = frozenset(
         "hvac",
         "wiring",
         "electrical",
-        "panel",
         "furnace",
     }
 )
+_DEMOLITION_UTILITY_PANEL_QUALIFIER_TERMS = frozenset({"electrical", "breaker", "service", "utility"})
 _FIXED_BULKY_PHRASES = (
     "mattress",
     "mattresses",
@@ -790,9 +795,17 @@ def _has_nearby_teardown_phrase(tokens: list[str], index: int, window: int) -> b
 
 
 def _is_access_context_target(tokens: list[str], index: int) -> bool:
-    return (index + 1 < len(tokens) and tokens[index + 1] == "access") or (
+    if (index + 1 < len(tokens) and tokens[index + 1] == "access") or (
         index > 0 and tokens[index - 1] == "access"
-    )
+    ):
+        return True
+    if index + 3 < len(tokens) and tokens[index + 1] == "is" and tokens[index + 2] == "access":
+        return tokens[index + 3] in {"route", "path", "way"}
+    if index > 0 and tokens[index - 1] in {"cross", "through"}:
+        return True
+    if index > 1 and tokens[index - 2] == "access" and tokens[index - 1] == "through":
+        return True
+    return False
 
 
 def _is_small_fence_panel_context(tokens: list[str], index: int) -> bool:
@@ -838,9 +851,25 @@ def _has_large_structure_demolition_signal(text: str) -> bool:
             continue
         if _is_access_context_target(tokens, index):
             continue
-        if not _has_nearby_token(tokens, index, _DEMOLITION_LARGE_STRUCTURE_MODIFIER_TERMS, 2):
+        if not any(
+            tokens[i] in _DEMOLITION_LARGE_STRUCTURE_MODIFIER_TERMS
+            for i in range(max(0, index - 4), index)
+        ):
             continue
         if _has_structure_action_near(tokens, index):
+            return True
+    return False
+
+
+def _has_utility_signal_near(tokens: list[str], index: int) -> bool:
+    if _has_nearby_token(tokens, index, _DEMOLITION_UTILITY_TERMS, 5):
+        return True
+    start = max(0, index - 5)
+    end = min(len(tokens), index + 6)
+    for panel_index in range(start, end):
+        if tokens[panel_index] != "panel":
+            continue
+        if _has_nearby_token(tokens, panel_index, _DEMOLITION_UTILITY_PANEL_QUALIFIER_TERMS, 2):
             return True
     return False
 
@@ -862,7 +891,7 @@ def _has_utility_adjacent_demolition_signal(text: str) -> bool:
             continue
         if not (has_ceiling_opening or _has_structure_action_near(tokens, index)):
             continue
-        if _has_nearby_token(tokens, index, _DEMOLITION_UTILITY_TERMS, 5):
+        if _has_utility_signal_near(tokens, index):
             return True
     return False
 
