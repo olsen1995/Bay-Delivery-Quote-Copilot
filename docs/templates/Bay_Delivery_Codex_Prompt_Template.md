@@ -8,6 +8,21 @@ Default workflow:
 Plan -> Implement -> Validate -> Branch -> PR -> Summarize -> STOP
 ```
 
+Default Bay Delivery implementation overlays:
+
+```text
+Active defaults:
+- bay-delivery-pr-safety-review
+- receiving-code-review style PR follow-up
+- verification-before-completion style final report evidence
+
+Trigger-only overlays:
+- CI triage for CI/parity/workflow/smoke failures only
+- browser/Playwright verification for UI/static/customer/admin visual changes only
+- systematic debugging for Windows/sandbox/SQLite/setup friction only
+- TDD emphasis for pricing/protected-surface behavior changes only
+```
+
 ---
 
 ## Copy/Paste Codex Prompt
@@ -23,6 +38,10 @@ C:\Repos\Bay-Delivery-Quote-Copilot
 
 Context:
 [Explain current baseline, latest merged PR, and why this task exists.]
+
+Primary repo safety skill:
+- .agents/skills/bay-delivery-pr-safety-review/SKILL.md is the main Bay Delivery source of truth.
+- Keep this prompt concise and follow the skill for protected surfaces, stop conditions, and report discipline.
 
 Goal:
 [Define the exact desired outcome.]
@@ -54,6 +73,13 @@ Scope rules:
 - Do not change quote payload behaviour unless required and explained.
 - Do not touch production data.
 - Stop and report if protected files must be touched unexpectedly.
+
+Codex Fix Button guardrails:
+- Review context/Fix button is allowed to load reviewer feedback.
+- It is not permission to auto-commit or auto-push.
+- Pre-commit reviewer simulation is still required before commit.
+- Pricing-sensitive fixes still require pricing red-team review before commit.
+- Do not broaden scope just because review comments mention deferred follow-up areas.
 
 Expected files to change:
 - [file 1]
@@ -109,6 +135,62 @@ Conditional checks (run only when relevant to this task):
 Additional focused validation:
 [Add task-specific commands here, e.g., a specific test module or calibration script.]
 
+Pre-commit reviewer simulation:
+Before committing or pushing, review the actual diff as if you are the GitHub reviewer trying to block the PR.
+
+Must check:
+- false positives
+- false negatives
+- customer wording variants
+- access/location confusion
+- substring traps
+- plural/singular variants
+- verb variants
+- tier ordering
+- cash/EMT/HST preservation
+- customer/internal boundary
+- forbidden file changes
+- protected no-go diff
+- task expansion beyond prompt scope
+
+If any issue is found:
+- fix before committing
+- add/update focused tests if applicable
+- rerun validation
+- rerun protected no-go diff
+
+Pricing red-team review before commit:
+Required when touching:
+- app/quote_engine.py
+- quote logic
+- customer totals
+- cash/EMT/HST
+- advisory metadata
+- demolition safeguards
+- business-rule pricing
+
+Must check:
+- intended high-risk jobs that should trigger protection
+- similar normal jobs that must not trigger
+- access/location wording that must not become target
+- plural/singular variants
+- verb variants
+- substring traps
+- old acceptance examples
+- non-demolition baseline
+- customer-facing response shape
+- cash/EMT/HST totals
+
+Near-miss examples:
+- deck access is not deck demolition
+- fence access is not fence demolition
+- wall-to-wall carpet is not wall demolition
+- drywall is not wall
+- waterproofing/proofing is not roofing
+- wall panel is not electrical panel
+- utility room is not utility-line risk
+- yard cleanup alone is not heavy mixed debris
+
 Protected no-go diff:
 git diff main...HEAD -- app/quote_engine.py app/services/quote_service.py config/business_profile.json render.yaml .github/workflows docs/gpt requirements.txt requirements.lock.txt static/admin_mobile.html static/admin_mobile.js
 
@@ -139,9 +221,12 @@ Final report must include:
 - Exact commands run
 - Validation results
 - Protected no-go diff result
+- Pre-commit reviewer simulation results
+- Pricing red-team review results when applicable
+- P1/P2/P3 self-review
 - Commit hash
 - PR link
-- Whether safe to merge
+- Confirmation PR opened but not merged unless explicitly requested
 
 STOP after opening/updating the PR and providing the final report.
 ```
@@ -199,5 +284,7 @@ Before merge, confirm:
 - Customer flow unchanged unless intended.
 - Admin/mobile unaffected unless intended.
 - README/docs match actual commands.
+- Pre-commit reviewer simulation was run on the actual diff.
+- Pricing red-team review was run before commit when pricing-sensitive.
 
 ```

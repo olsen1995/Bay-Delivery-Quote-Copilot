@@ -11,6 +11,25 @@ Use this skill when working in the Bay Delivery Quote Copilot repository.
 
 Bay Delivery Quote Copilot is production business infrastructure for Bay Delivery in North Bay, Ontario. It is a real quoting and operations backend, not a sandbox.
 
+## When to Use
+
+Use this skill for:
+- Bay Delivery implementation prompts.
+- PR review and review-comment follow-up.
+- Docs/template/skill updates that change repo workflow expectations.
+- Pricing-adjacent analysis or guardrail design.
+- Protected-surface validation and final report prep.
+- Release/smoke/verification tasks where evidence quality matters.
+
+## Do Not Use For
+
+Do not use this skill as permission to:
+- broaden a narrow task into a refactor
+- change pricing, auth, storage, workflows, or Render config without explicit scope
+- auto-commit or auto-push because a review tool or Fix button suggested a patch
+- mutate production data
+- invent a second process system outside the existing Bay Delivery repo structure
+
 ## Project Identity
 
 Technology stack:
@@ -138,6 +157,16 @@ For implementation guidance:
 - Avoid unrelated cleanup.
 - Do not mix docs, runtime, dependency, schema, workflow, and pricing changes in one PR unless explicitly approved.
 
+For implementation final reports:
+- Always include files changed.
+- Always include validation results.
+- Always include protected no-go diff result.
+- Always include pre-commit reviewer simulation results.
+- Include pricing red-team review results when applicable.
+- Always include P1/P2/P3 self-review.
+- Always include commit hash and PR link.
+- Always confirm whether the PR was left unmerged.
+
 ## Plan-Only Decision Rules
 
 Use plan-only first when the task changes a high-risk surface:
@@ -247,6 +276,23 @@ When improving visible UX:
 
 Use tests to prove the public quote contract stayed intact.
 
+## Active Defaults and Trigger-Only Overlays
+
+Keep the Bay Delivery workflow opinionated but not bloated.
+
+Active defaults for implementation work:
+- bay-delivery-pr-safety-review
+- receiving-code-review style PR follow-up rules
+- verification-before-completion style final report requirements
+
+Trigger-only overlays:
+- CI triage only for CI/parity/workflow/smoke failures
+- Playwright/browser verification only for UI/static/customer/admin visual changes
+- systematic debugging only for Windows/sandbox/SQLite/setup friction
+- TDD emphasis for pricing/protected-surface behavior changes
+
+Do not load every overlay for every task. Apply only the overlays the task actually triggers.
+
 ## Protected Surfaces
 
 Before implementation, identify protected surfaces.
@@ -271,6 +317,36 @@ Common protected files and areas:
 - cleanup tooling and production scripts
 
 Do not touch protected areas unless they are explicitly in scope.
+
+For pricing-sensitive work, protected surfaces also include:
+- customer totals
+- cash/EMT/HST behavior
+- advisory/risk metadata that can influence operator pricing judgment
+- business-rule wording that could widen or weaken a pricing safeguard
+
+## Required Evidence
+
+Every implementation task should leave a short evidence trail.
+
+Required evidence:
+- exact files changed
+- validation commands run and results
+- protected no-go diff result
+- pre-commit reviewer simulation result
+- P1/P2/P3 self-review
+- commit hash
+- PR link if opened
+
+Required when applicable:
+- pricing red-team review result for pricing/quote-engine/customer-total/business-rule tasks
+- focused test additions or updates for review-fix regressions
+- Render/live verification evidence for deployment-impacting checks
+
+Bay examples from recent review patterns:
+- PR review follow-ups can pass tests and still miss review-level issues before commit.
+- Public quote/page polish needs explicit proof that IDs, selectors, payload shape, and wording boundaries stayed stable.
+- Pricing safeguard work needs adversarial checks against near-miss wording, not just happy-path tests.
+- Docs/template/process changes should tighten evidence quality without creating a second workflow system.
 
 ## Required Validation
 
@@ -376,6 +452,11 @@ Always review with this structure:
    - PR body cleanup
    - non-blocking maintainability
 
+For self-review before commit:
+- P1 means merge-blocking correctness, security, pricing, auth, deploy, or customer-impact risk.
+- P2 means important workflow, validation, consistency, or UX issues that should be fixed before merge.
+- P3 means non-blocking polish, clarity, or follow-up notes.
+
 5. Required next action:
    - exact command or prompt
    - whether to use Codex, VS Code Agent, or manual terminal
@@ -408,6 +489,84 @@ git diff HEAD~1..HEAD -- <protected paths>
 
 Expected result depends on the PR scope.
 
+## Pre-Commit Reviewer Simulation
+
+Before committing or pushing, review the actual diff as if you are the GitHub reviewer trying to block the PR.
+
+Must check:
+- false positives
+- false negatives
+- customer wording variants
+- access/location confusion
+- substring traps
+- plural/singular variants
+- verb variants
+- tier ordering
+- cash/EMT/HST preservation
+- customer/internal boundary
+- forbidden file changes
+- protected no-go diff
+- task expansion beyond prompt scope
+
+If any issue is found:
+- fix before committing
+- add or update focused tests if applicable
+- rerun validation
+- rerun protected no-go diff
+
+For docs/template/skill-only tasks, explicitly confirm:
+- only allowed docs/template/skill files changed
+- no runtime code changed
+- no test files changed
+- no static UI changed
+- no workflow/config/dependency/version/data changes
+- guidance does not contradict pricing authority rules
+- no duplicated giant checklist where a skill reference is cleaner
+
+## Pricing Red-Team Review Before Commit
+
+This review is required when touching:
+- app/quote_engine.py
+- quote logic
+- customer totals
+- cash/EMT/HST
+- advisory metadata
+- demolition safeguards
+- business-rule pricing
+
+Must check:
+- intended high-risk jobs that should trigger protection
+- similar normal jobs that must not trigger
+- access/location wording that must not become target
+- plural/singular variants
+- verb variants
+- substring traps
+- old acceptance examples
+- non-demolition baseline
+- customer-facing response shape
+- cash/EMT/HST totals
+
+Near-miss examples to review explicitly:
+- deck access is not deck demolition
+- fence access is not fence demolition
+- wall-to-wall carpet is not wall demolition
+- drywall is not wall
+- waterproofing/proofing is not roofing
+- wall panel is not electrical panel
+- utility room is not utility-line risk
+- yard cleanup alone is not heavy mixed debris
+
+If a pricing-sensitive task cannot show this review clearly, stop before commit.
+
+## Codex Fix Button Guardrails
+
+When using Codex review comments or the Fix button:
+- review context loading is allowed
+- it is not permission to auto-commit or auto-push
+- pre-commit reviewer simulation is still required
+- pricing-sensitive fixes still require pricing red-team review
+- scope must not broaden just because review comments mention deferred follow-up areas
+
 ## Final Report Requirements
 
 Every implementation or review-fix final report should include:
@@ -421,9 +580,12 @@ Every implementation or review-fix final report should include:
 7. Exact behavior/docs/tests changed
 8. Validation results
 9. Protected diff result
-10. Any skipped validation
-11. Risks/limitations
-12. Clear next step
+10. Pre-commit reviewer simulation results
+11. Pricing red-team review results when applicable
+12. P1/P2/P3 self-review
+13. Any skipped validation
+14. Risks/limitations
+15. Clear next step
 
 ## Stop Conditions
 
@@ -437,6 +599,9 @@ Stop and report instead of guessing if:
 - GPT grounding parity fails after regeneration
 - GitHub checks are red
 - there are unresolved P1/P2 review threads
+- pre-commit reviewer simulation finds an unresolved blocker
+- a pricing-sensitive task cannot show pricing red-team review evidence
+- the prompt/template/skill update would duplicate a giant checklist instead of referencing the authoritative skill
 
 If Austin approval is required and unavailable, stop and wait for Austin's written approval instead of assuming approval or using a substitute approver.
 
