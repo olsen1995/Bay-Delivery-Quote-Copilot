@@ -91,6 +91,9 @@ DEMOLITION_ACCESS_RISK_FLOOR_CAD = 750.0
 DEMOLITION_STRUCTURE_FLOOR_CAD = 1000.0
 DEMOLITION_HEAVY_MATERIAL_FLOOR_CAD = 1200.0
 DEMOLITION_HEAVY_ACCESS_FLOOR_CAD = 1500.0
+DEMOLITION_UTILITY_ADJACENT_FLOOR_CAD = 1200.0
+DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD = 1500.0
+DEMOLITION_ROOF_HEAVY_FLOOR_CAD = 1500.0
 
 _TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 _DEMOLITION_CONTROLLED_PHRASES = (
@@ -191,8 +194,6 @@ _DEMOLITION_ACCESS_RISK_PHRASES = (
     "inside removal",
     "long carry",
     "tight access",
-    "backyard",
-    "back yard",
     "no driveway access",
     "heavy awkward debris",
     "awkward debris",
@@ -221,6 +222,61 @@ _DEMOLITION_UNKNOWN_SCOPE_PHRASES = (
     "permit sensitive",
     "permit required",
     "liability sensitive",
+)
+_DEMOLITION_ROOF_HEAVY_PHRASES = (
+    "roof tear off",
+    "roof tear off demolition",
+    "roofing material demolition",
+    "roof shingles demolition",
+    "asphalt shingles demolition",
+    "wet shingles demolition",
+    "roof shingles",
+    "asphalt shingles",
+    "wet shingles",
+    "shingle debris",
+)
+_DEMOLITION_STRUCTURE_TARGET_TERMS = frozenset(
+    {
+        "shed",
+        "sheds",
+        "deck",
+        "decks",
+        "gazebo",
+        "gazebos",
+        "structure",
+        "structures",
+        "outbuilding",
+        "outbuildings",
+    }
+)
+_DEMOLITION_FENCE_TARGET_TERMS = frozenset({"fence", "fences"})
+_DEMOLITION_LARGE_STRUCTURE_TARGET_TERMS = frozenset({"shed", "sheds", "deck", "decks", "structure", "structures"})
+_DEMOLITION_LARGE_STRUCTURE_MODIFIER_TERMS = frozenset({"large", "big", "full"})
+_DEMOLITION_STRUCTURE_ACTION_TERMS = frozenset(
+    {
+        "demolition",
+        "demolish",
+        "demo",
+        "teardown",
+        "remove",
+        "removal",
+        "dismantle",
+        "dismantling",
+    }
+)
+_DEMOLITION_UTILITY_TARGET_TERMS = frozenset({"wall", "walls", "bulkhead", "bulkheads", "ceiling", "ceilings"})
+_DEMOLITION_UTILITY_TERMS = frozenset(
+    {
+        "duct",
+        "ducts",
+        "ductwork",
+        "plumbing",
+        "hvac",
+        "wiring",
+        "electrical",
+        "panel",
+        "furnace",
+    }
 )
 _FIXED_BULKY_PHRASES = (
     "mattress",
@@ -718,6 +774,99 @@ def _contains_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
     return False
 
 
+def _has_nearby_token(tokens: list[str], index: int, terms: frozenset[str], window: int) -> bool:
+    start = max(0, index - window)
+    end = min(len(tokens), index + window + 1)
+    return any(tokens[i] in terms for i in range(start, end) if i != index)
+
+
+def _has_nearby_teardown_phrase(tokens: list[str], index: int, window: int) -> bool:
+    start = max(0, index - window)
+    end = min(len(tokens) - 1, index + window)
+    for i in range(start, end):
+        if tokens[i] == "tear" and tokens[i + 1] in {"down", "off", "out"}:
+            return True
+    return False
+
+
+def _is_access_context_target(tokens: list[str], index: int) -> bool:
+    return (index + 1 < len(tokens) and tokens[index + 1] == "access") or (
+        index > 0 and tokens[index - 1] == "access"
+    )
+
+
+def _is_small_fence_panel_context(tokens: list[str], index: int) -> bool:
+    if tokens[index] not in _DEMOLITION_FENCE_TARGET_TERMS:
+        return False
+    return _has_nearby_token(tokens, index, frozenset({"panel", "panels"}), 1)
+
+
+def _is_wall_to_wall_carpet_context(tokens: list[str], index: int) -> bool:
+    if tokens[index] not in {"wall", "walls"}:
+        return False
+    if index + 3 < len(tokens) and tokens[index + 1] == "to" and tokens[index + 2] == "wall":
+        return tokens[index + 3] in {"carpet", "carpets", "carpeting"}
+    if index >= 2 and tokens[index - 2] == "wall" and tokens[index - 1] == "to":
+        return index + 1 < len(tokens) and tokens[index + 1] in {"carpet", "carpets", "carpeting"}
+    return False
+
+
+def _has_structure_action_near(tokens: list[str], index: int) -> bool:
+    return _has_nearby_token(tokens, index, _DEMOLITION_STRUCTURE_ACTION_TERMS, 4) or _has_nearby_teardown_phrase(
+        tokens,
+        index,
+        4,
+    )
+
+
+def _has_demolition_structure_target(text: str) -> bool:
+    tokens = text.split()
+    for index, token in enumerate(tokens):
+        if token not in _DEMOLITION_STRUCTURE_TARGET_TERMS and token not in _DEMOLITION_FENCE_TARGET_TERMS:
+            continue
+        if _is_access_context_target(tokens, index) or _is_small_fence_panel_context(tokens, index):
+            continue
+        if _has_structure_action_near(tokens, index):
+            return True
+    return False
+
+
+def _has_large_structure_demolition_signal(text: str) -> bool:
+    tokens = text.split()
+    for index, token in enumerate(tokens):
+        if token not in _DEMOLITION_LARGE_STRUCTURE_TARGET_TERMS:
+            continue
+        if _is_access_context_target(tokens, index):
+            continue
+        if not _has_nearby_token(tokens, index, _DEMOLITION_LARGE_STRUCTURE_MODIFIER_TERMS, 2):
+            continue
+        if _has_structure_action_near(tokens, index):
+            return True
+    return False
+
+
+def _has_utility_adjacent_demolition_signal(text: str) -> bool:
+    tokens = text.split()
+    for index, token in enumerate(tokens):
+        if token not in _DEMOLITION_UTILITY_TARGET_TERMS:
+            continue
+        if _is_wall_to_wall_carpet_context(tokens, index):
+            continue
+        has_ceiling_opening = token in {"ceiling", "ceilings"} and _has_nearby_token(
+            tokens,
+            index,
+            frozenset({"opening", "openings"}),
+            2,
+        )
+        if token in {"ceiling", "ceilings"} and not has_ceiling_opening:
+            continue
+        if not (has_ceiling_opening or _has_structure_action_near(tokens, index)):
+            continue
+        if _has_nearby_token(tokens, index, _DEMOLITION_UTILITY_TERMS, 5):
+            return True
+    return False
+
+
 def _count_matched_phrases(text: str, phrases: tuple[str, ...]) -> int:
     if not text:
         return 0
@@ -764,7 +913,10 @@ def _demolition_safeguard(
     has_controlled_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_CONTROLLED_PHRASES)
     has_generic_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_GENERIC_PHRASES)
     has_medium_material = _contains_any_phrase(safeguard_text, _DEMOLITION_MEDIUM_MATERIAL_PHRASES)
-    has_structure = _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_PHRASES)
+    has_structure = _has_demolition_structure_target(safeguard_text)
+    has_large_structure = _has_large_structure_demolition_signal(safeguard_text)
+    has_roof_heavy = _contains_any_phrase(safeguard_text, _DEMOLITION_ROOF_HEAVY_PHRASES)
+    has_utility_adjacent = _has_utility_adjacent_demolition_signal(safeguard_text)
     has_heavy_material = bool(has_dense_materials) or _contains_any_phrase(
         safeguard_text,
         _DEMOLITION_HEAVY_MATERIAL_PHRASES,
@@ -803,6 +955,15 @@ def _demolition_safeguard(
     if has_heavy_material and has_access_risk:
         floor = max(floor, DEMOLITION_HEAVY_ACCESS_FLOOR_CAD)
         tier = "heavy_access"
+    if has_utility_adjacent:
+        floor = max(floor, DEMOLITION_UTILITY_ADJACENT_FLOOR_CAD)
+        tier = "utility_adjacent"
+    if has_large_structure:
+        floor = max(floor, DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD)
+        tier = "large_structure"
+    if has_roof_heavy:
+        floor = max(floor, DEMOLITION_ROOF_HEAVY_FLOOR_CAD)
+        tier = "roof_heavy"
 
     flags: list[str] = []
     if has_demolition_scope:
@@ -817,6 +978,12 @@ def _demolition_safeguard(
         flags.append("access_risk")
     if has_unknown_scope:
         flags.append("unknown_scope")
+    if has_utility_adjacent:
+        flags.append("utility_adjacent")
+    if has_large_structure:
+        flags.append("large_structure")
+    if has_roof_heavy:
+        flags.append("roof_heavy")
 
     return {
         "floor_cad": floor,

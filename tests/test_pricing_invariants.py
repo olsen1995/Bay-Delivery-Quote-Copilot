@@ -946,8 +946,8 @@ def test_bare_unit_demolition_text_does_not_create_access_risk(
         ),
         (
             "Wet roof shingles and asphalt shingles tear-off debris.",
-            1200.0,
-            "heavy_material",
+            1500.0,
+            "roof_heavy",
         ),
         (
             "Laminate flooring, carpet, subfloor, underlayment, baseboards and trim rip-out.",
@@ -970,6 +970,174 @@ def test_demolition_material_and_access_safeguards(description: str, expected_mi
     assert float(result["total_cash_cad"]) >= expected_min_cash
     assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
     assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Large deck demolition",
+        "Large shed demolition",
+        "Demolish large deck",
+        "Demolish large shed",
+        "Large deck teardown and removal",
+        "Full deck teardown",
+        "Full shed removal",
+        "Large structure teardown",
+    ],
+)
+def test_clear_large_structure_demolition_uses_large_structure_floor(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "large_structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "large_structure" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Roof tear-off with shingle debris",
+        "Roof tear-off demolition",
+        "Roofing material demolition",
+        "Roof shingles demolition",
+        "Asphalt shingles demolition",
+        "Wet shingles demolition",
+        "Roof shingles",
+        "Asphalt shingles",
+        "Wet shingles",
+    ],
+)
+def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "roof_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "roof_heavy" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Remove wall near ducts",
+        "Remove wall around plumbing",
+        "Interior bulkhead demolition near HVAC and plumbing",
+        "Ceiling opening near ductwork",
+        "Wall demolition near furnace ducts",
+        "Interior wall removal near electrical panel",
+    ],
+)
+def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(description: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == 1200.0
+    assert float(result["total_emt_cad"]) == 1356.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "utility_adjacent"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1200.0
+    assert "utility_adjacent" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    ("description", "expected_cash", "expected_tier"),
+    [
+        ("Wall-to-wall carpet removal around plumbing", 650.0, "medium_material"),
+        ("Full kitchen cabinet demo with deck access through backyard", 650.0, "normal"),
+        ("Bathroom tile demo with fence access", 1200.0, "heavy_material"),
+        ("Small fence panel removal and yard cleanup", 650.0, "normal"),
+        ("Remove interior wall", 650.0, "normal"),
+        ("Small controlled drywall demo around plumbing", 650.0, "medium_material"),
+        ("Waterproofing material demo", 650.0, "normal"),
+        ("Proofing demolition", 650.0, "normal"),
+        ("Generic tile demo", 1200.0, "heavy_material"),
+        ("Generic cabinet demo", 650.0, "normal"),
+    ],
+)
+def test_demolition_safeguard_false_positives_stay_lower_tier(
+    description: str,
+    expected_cash: float,
+    expected_tier: str,
+) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == expected_cash
+    assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
+    assert "large_structure" not in result["_internal"]["demolition_safeguard_flags"]
+    assert "roof_heavy" not in result["_internal"]["demolition_safeguard_flags"]
+    assert "utility_adjacent" not in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_safeguard_floor_cad"] < 1500.0
+
+
+@pytest.mark.parametrize(
+    ("description", "expected_cash", "expected_emt", "expected_tier", "expected_owner_review"),
+    [
+        ("16x10 shed teardown", 1000.0, 1130.0, "structure", True),
+        ("Small controlled drywall/plaster demo", 650.0, 734.5, "medium_material", False),
+        ("Remove interior wall", 650.0, 734.5, "normal", False),
+        ("Brick fireplace basement demolition", 1500.0, 1695.0, "heavy_access", True),
+        ("Wet shingles", 1500.0, 1695.0, "roof_heavy", True),
+        ("Asbestos demolition", 750.0, 847.5, "unknown_scope", True),
+        ("Apartment demolition with elevator", 750.0, 847.5, "access_risk", True),
+    ],
+)
+def test_demolition_pr329_acceptance_examples_stay_directionally_stable(
+    description: str,
+    expected_cash: float,
+    expected_emt: float,
+    expected_tier: str,
+    expected_owner_review: bool,
+) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    assert float(result["total_cash_cad"]) == expected_cash
+    assert float(result["total_emt_cad"]) == expected_emt
+    assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
+    assert result["_internal"]["demolition_owner_review_recommended"] is expected_owner_review
 
 
 def test_demolition_structured_soil_counts_as_heavy_material_without_dense_checkbox() -> None:

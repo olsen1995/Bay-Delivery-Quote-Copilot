@@ -624,3 +624,43 @@ def test_gpt_quote_response_includes_internal_owner_review_advisory_metadata() -
     assert response["quote_risk_summary"]["customer_visible"] is False
     assert response["quote_risk_summary"]["risk_level"] == "owner_review"
     assert response["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Large deck demolition",
+        "Roof tear-off with shingle debris",
+        "Interior bulkhead demolition near HVAC and plumbing",
+    ],
+)
+def test_new_demolition_safeguard_tiers_stay_out_of_customer_quote_response(
+    client: TestClient,
+    description: str,
+) -> None:
+    payload = _base_payload(
+        service_type="demolition",
+        description=description,
+        job_description_customer=description,
+    )
+
+    response = client.post("/quote/calculate", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    response_text = str(body["response"]).lower()
+    request_text = str(body["request"]).lower()
+    forbidden_terms = (
+        "quote_risk",
+        "owner_review",
+        "demolition_safeguard",
+        "large_structure",
+        "roof_heavy",
+        "utility_adjacent",
+        "margin",
+        "admin",
+    )
+    for term in forbidden_terms:
+        assert term not in body
+        assert term not in response_text
+        assert term not in request_text

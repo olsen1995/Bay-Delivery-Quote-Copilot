@@ -64,8 +64,9 @@ This file documents current Bay Delivery business and pricing rules as grounded 
 - Demolition pricing safeguards live only in `app/quote_engine.py`.
 - Controlled/light demolition has a protected runtime floor.
 - Normal demolition, mixed demolition materials, unknown/hidden material wording, apartment/elevator/access wording, structure teardown wording, heavy material wording, and heavy-plus-access combinations use higher runtime floor protection to avoid undercharging.
+- Clear large deck/shed/structure demolition or teardown wording, clear roof/shingle demolition or tear-off wording, and utility-adjacent selective interior demolition wording use additional narrow runtime safeguards.
 - Soil, concrete, brick, stone, masonry, rubble, tile, shingles, fireplace/chimney, and similar heavy demolition material wording must stay margin-protective.
-- Structure teardown wording such as sheds, decks, fences, gazebos, structures, outbuildings, teardown, tear down, or dismantle must stay owner-review eligible.
+- Structure teardown wording such as sheds, decks, fences, gazebos, structures, outbuildings, teardown, tear down, or dismantle must stay owner-review eligible, but access/location context such as deck access or fence access is not standalone structure demolition.
 - Unknown or hidden demolition material scope must stay owner-review eligible.
 - GPT may explain the safeguards and flag owner-review concerns, but it must not calculate demolition pricing outside `app/quote_engine.py`.
 
