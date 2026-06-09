@@ -240,6 +240,9 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "roof shingle demolition",
     "asphalt shingle removal",
     "shingle demolition",
+    "roof shingle tear off",
+    "shingle tear off",
+    "asphalt shingle tear off",
 )
 _DEMOLITION_BACKYARD_ACCESS_PHRASES = (
     "backyard",
@@ -264,6 +267,12 @@ _DEMOLITION_STRUCTURE_TARGET_TERMS = frozenset(
 _DEMOLITION_FENCE_TARGET_TERMS = frozenset({"fence", "fences"})
 _DEMOLITION_LARGE_STRUCTURE_TARGET_TERMS = frozenset({"shed", "sheds", "deck", "decks", "structure", "structures"})
 _DEMOLITION_LARGE_STRUCTURE_MODIFIER_TERMS = frozenset({"large", "big", "full"})
+_DEMOLITION_BARE_STRUCTURE_CONTEXT_TERMS = frozenset(
+    {"broken", "damaged", "old", "rotten", "wood", "wooden"}
+)
+_DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_TERMS = frozenset(
+    {"boards", "brush", "cleanup", "cleanout", "contents", "debris", "items", "junk", "scraps"}
+)
 _DEMOLITION_STRUCTURE_ACTION_TERMS = frozenset(
     {
         "demolition",
@@ -293,7 +302,7 @@ _DEMOLITION_UTILITY_TERMS = frozenset(
 )
 _DEMOLITION_UTILITY_PANEL_QUALIFIER_TERMS = frozenset({"electrical", "breaker", "service", "utility"})
 _DEMOLITION_UTILITY_LINE_TERMS = frozenset({"line", "lines"})
-_DEMOLITION_UTILITY_LINE_QUALIFIER_TERMS = frozenset({"gas", "sewer", "utility", "water"})
+_DEMOLITION_UTILITY_LINE_QUALIFIER_TERMS = frozenset({"electrical", "gas", "service", "sewer", "utility", "water"})
 _FIXED_BULKY_PHRASES = (
     "mattress",
     "mattresses",
@@ -796,6 +805,23 @@ def _has_nearby_token(tokens: list[str], index: int, terms: frozenset[str], wind
     return any(tokens[i] in terms for i in range(start, end) if i != index)
 
 
+def _has_nearby_numeric_token(tokens: list[str], index: int, window: int) -> bool:
+    start = max(0, index - window)
+    end = min(len(tokens), index + window + 1)
+    return any(any(char.isdigit() for char in tokens[i]) for i in range(start, end) if i != index)
+
+
+def _has_nearby_backyard_phrase(tokens: list[str], index: int, window: int) -> bool:
+    start = max(0, index - window)
+    end = min(len(tokens), index + window + 1)
+    if any(tokens[i] == "backyard" for i in range(start, end) if i != index):
+        return True
+    for i in range(start, max(start, end - 1)):
+        if tokens[i] == "back" and tokens[i + 1] == "yard":
+            return True
+    return False
+
+
 def _has_nearby_teardown_phrase(tokens: list[str], index: int, window: int) -> bool:
     start = max(0, index - window)
     end = min(len(tokens) - 1, index + window)
@@ -855,6 +881,16 @@ def _has_structure_action_near(tokens: list[str], index: int) -> bool:
     )
 
 
+def _has_bare_structure_target_context(tokens: list[str], index: int) -> bool:
+    if _has_nearby_token(tokens, index, _DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_TERMS, 4):
+        return False
+    return (
+        _has_nearby_token(tokens, index, _DEMOLITION_BARE_STRUCTURE_CONTEXT_TERMS, 4)
+        or _has_nearby_numeric_token(tokens, index, 4)
+        or _has_nearby_backyard_phrase(tokens, index, 4)
+    )
+
+
 def _has_demolition_structure_target(text: str) -> bool:
     tokens = text.split()
     for index, token in enumerate(tokens):
@@ -862,7 +898,7 @@ def _has_demolition_structure_target(text: str) -> bool:
             continue
         if _is_access_context_target(tokens, index) or _is_small_fence_panel_context(tokens, index):
             continue
-        if _has_structure_action_near(tokens, index):
+        if _has_structure_action_near(tokens, index) or _has_bare_structure_target_context(tokens, index):
             return True
     return False
 
@@ -897,7 +933,7 @@ def _has_utility_signal_near(tokens: list[str], index: int) -> bool:
     for line_index in range(start, end):
         if tokens[line_index] not in _DEMOLITION_UTILITY_LINE_TERMS:
             continue
-        if _has_nearby_token(tokens, line_index, _DEMOLITION_UTILITY_LINE_QUALIFIER_TERMS, 2):
+        if line_index > 0 and tokens[line_index - 1] in _DEMOLITION_UTILITY_LINE_QUALIFIER_TERMS:
             return True
     return False
 
