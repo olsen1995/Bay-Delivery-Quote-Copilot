@@ -237,6 +237,13 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "roofing tear off",
     "roof shingle removal",
     "shingle tear off debris",
+    "roof shingle demolition",
+    "asphalt shingle removal",
+    "shingle demolition",
+)
+_DEMOLITION_BACKYARD_ACCESS_PHRASES = (
+    "backyard",
+    "back yard",
 )
 _DEMOLITION_STRUCTURE_TARGET_TERMS = frozenset(
     {
@@ -280,9 +287,13 @@ _DEMOLITION_UTILITY_TERMS = frozenset(
         "wiring",
         "electrical",
         "furnace",
+        "pipe",
+        "pipes",
     }
 )
 _DEMOLITION_UTILITY_PANEL_QUALIFIER_TERMS = frozenset({"electrical", "breaker", "service", "utility"})
+_DEMOLITION_UTILITY_LINE_TERMS = frozenset({"line", "lines"})
+_DEMOLITION_UTILITY_LINE_QUALIFIER_TERMS = frozenset({"gas", "sewer", "utility", "water"})
 _FIXED_BULKY_PHRASES = (
     "mattress",
     "mattresses",
@@ -799,11 +810,19 @@ def _is_access_context_target(tokens: list[str], index: int) -> bool:
         index > 0 and tokens[index - 1] == "access"
     ):
         return True
+    if index + 2 < len(tokens) and tokens[index + 1] == "for" and tokens[index + 2] == "access":
+        return True
     if index + 3 < len(tokens) and tokens[index + 1] == "is" and tokens[index + 2] == "access":
         return tokens[index + 3] in {"route", "path", "way"}
     if index > 0 and tokens[index - 1] in {"cross", "through"}:
         return True
+    if index > 0 and tokens[index - 1] == "over":
+        return True
+    if index > 1 and tokens[index - 2] == "for" and tokens[index - 1] == "access":
+        return True
     if index > 1 and tokens[index - 2] == "access" and tokens[index - 1] == "through":
+        return True
+    if index > 1 and tokens[index - 2] == "access" and tokens[index - 1] == "over":
         return True
     return False
 
@@ -811,7 +830,11 @@ def _is_access_context_target(tokens: list[str], index: int) -> bool:
 def _is_small_fence_panel_context(tokens: list[str], index: int) -> bool:
     if tokens[index] not in _DEMOLITION_FENCE_TARGET_TERMS:
         return False
-    return _has_nearby_token(tokens, index, frozenset({"panel", "panels"}), 1)
+    if not _has_nearby_token(tokens, index, frozenset({"panel", "panels"}), 1):
+        return False
+    if _has_nearby_token(tokens, index, frozenset({"all", "demolish", "demolition", "full"}), 4):
+        return False
+    return _has_nearby_token(tokens, index, frozenset({"cleanup", "small", "routine", "yard"}), 4)
 
 
 def _is_wall_to_wall_carpet_context(tokens: list[str], index: int) -> bool:
@@ -871,6 +894,11 @@ def _has_utility_signal_near(tokens: list[str], index: int) -> bool:
             continue
         if _has_nearby_token(tokens, panel_index, _DEMOLITION_UTILITY_PANEL_QUALIFIER_TERMS, 2):
             return True
+    for line_index in range(start, end):
+        if tokens[line_index] not in _DEMOLITION_UTILITY_LINE_TERMS:
+            continue
+        if _has_nearby_token(tokens, line_index, _DEMOLITION_UTILITY_LINE_QUALIFIER_TERMS, 2):
+            return True
     return False
 
 
@@ -881,15 +909,17 @@ def _has_utility_adjacent_demolition_signal(text: str) -> bool:
             continue
         if _is_wall_to_wall_carpet_context(tokens, index):
             continue
-        has_ceiling_opening = token in {"ceiling", "ceilings"} and _has_nearby_token(
+        is_ceiling_target = token in {"ceiling", "ceilings"}
+        has_ceiling_opening = is_ceiling_target and _has_nearby_token(
             tokens,
             index,
             frozenset({"opening", "openings"}),
             2,
         )
-        if token in {"ceiling", "ceilings"} and not has_ceiling_opening:
+        has_ceiling_demolition_action = is_ceiling_target and _has_structure_action_near(tokens, index)
+        if is_ceiling_target and not (has_ceiling_opening or has_ceiling_demolition_action):
             continue
-        if not (has_ceiling_opening or _has_structure_action_near(tokens, index)):
+        if not (has_ceiling_opening or has_ceiling_demolition_action or _has_structure_action_near(tokens, index)):
             continue
         if _has_utility_signal_near(tokens, index):
             return True
@@ -950,12 +980,17 @@ def _demolition_safeguard(
         safeguard_text,
         _DEMOLITION_HEAVY_MATERIAL_PHRASES,
     )
+    has_backyard_heavy_access = has_heavy_material and _contains_any_phrase(
+        safeguard_text,
+        _DEMOLITION_BACKYARD_ACCESS_PHRASES,
+    )
     has_access_risk = (
         str(access_difficulty or "normal").strip().lower() != "normal"
         or _coerce_bool(basement_or_inside_removal)
         or _coerce_non_negative_int(stairs_count) > 0
         or _coerce_non_negative_int(floor_count) > 1
         or _contains_any_phrase(safeguard_text, _DEMOLITION_ACCESS_RISK_PHRASES)
+        or has_backyard_heavy_access
     )
     has_unknown_scope = (
         construction_debris_value == "other"

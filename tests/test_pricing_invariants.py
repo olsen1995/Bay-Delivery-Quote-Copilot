@@ -1021,6 +1021,9 @@ def test_clear_large_structure_demolition_uses_large_structure_floor(description
         "roofing tear-off",
         "roof shingle removal",
         "shingle tear-off debris",
+        "roof shingle demolition",
+        "asphalt shingle removal",
+        "shingle demolition",
     ],
 )
 def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -> None:
@@ -1055,6 +1058,11 @@ def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -
         "Wall demolition near service panel",
         "Wall demolition near electrical service panel",
         "Remove wall near utility panel",
+        "Ceiling demolition near ductwork",
+        "Remove ceiling near ducts",
+        "Remove wall around pipes",
+        "Wall demolition near gas line",
+        "Bulkhead removal around pipes",
     ],
 )
 def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(description: str) -> None:
@@ -1081,10 +1089,13 @@ def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(descr
     [
         ("Wall-to-wall carpet removal around plumbing", 650.0, "medium_material"),
         ("Full kitchen cabinet demo with deck access through backyard", 650.0, "normal"),
+        ("Use deck for access to remove cabinets", 650.0, "medium_material"),
+        ("Need access over deck to remove wall", 650.0, "normal"),
         ("Bathroom tile demo with fence access", 1200.0, "heavy_material"),
         ("Small fence panel removal and yard cleanup", 650.0, "normal"),
         ("Remove interior wall", 650.0, "normal"),
         ("Remove wall panel", 650.0, "normal"),
+        ("Remove wall near clothes line", 650.0, "normal"),
         ("Remove wall, deck is access route", 650.0, "normal"),
         ("Need to cross deck to remove interior wall", 650.0, "normal"),
         ("Small controlled drywall demo around plumbing", 650.0, "medium_material"),
@@ -1131,6 +1142,11 @@ def test_demolition_safeguard_false_positives_stay_lower_tier(
         ("Apartment demolition with elevator", 750.0, 847.5, "access_risk", True),
         ("Remove deck", 1000.0, 1130.0, "structure", True),
         ("teardown and dismantle old wooden carport", 1000.0, 1130.0, "structure", True),
+        ("Remove all fence panels", 1000.0, 1130.0, "structure", True),
+        ("Full fence panel removal", 1000.0, 1130.0, "structure", True),
+        ("Demolish fence panels", 1000.0, 1130.0, "structure", True),
+        ("Backyard concrete slab demolition", 1500.0, 1695.0, "heavy_access", True),
+        ("Back yard brick patio demo", 1500.0, 1695.0, "heavy_access", True),
     ],
 )
 def test_demolition_pr329_acceptance_examples_stay_directionally_stable(
