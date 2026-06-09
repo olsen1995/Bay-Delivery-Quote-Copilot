@@ -1068,6 +1068,8 @@ def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -
         "Wall demolition near service line",
         "Remove wall near electrical line",
         "Bulkhead removal around pipes",
+        "Remove old non load bearing wall near plumbing",
+        "Remove non load-bearing interior wall near furnace ducts",
     ],
 )
 def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(description: str) -> None:
@@ -1094,12 +1096,16 @@ def test_utility_adjacent_selective_interior_demolition_uses_utility_floor(descr
     [
         ("Wall-to-wall carpet removal around plumbing", 650.0, "medium_material"),
         ("Full kitchen cabinet demo with deck access through backyard", 650.0, "normal"),
+        ("Use access through the deck to remove cabinets", 650.0, "medium_material"),
+        ("Use access through deck to remove cabinets", 650.0, "medium_material"),
         ("Use deck for access to remove cabinets", 650.0, "medium_material"),
+        ("Need access over the deck to remove wall", 650.0, "normal"),
         ("Need access over deck to remove wall", 650.0, "normal"),
         ("Bathroom tile demo with fence access", 1200.0, "heavy_material"),
         ("Small fence panel removal and yard cleanup", 650.0, "normal"),
         ("Remove interior wall", 650.0, "normal"),
         ("Remove wall panel", 650.0, "normal"),
+        ("Remove wall panel near plumbing", 650.0, "normal"),
         ("Remove wall near clothes line", 650.0, "normal"),
         ("Remove wall, deck is access route", 650.0, "normal"),
         ("Need to cross deck to remove interior wall", 650.0, "normal"),

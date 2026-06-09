@@ -832,6 +832,8 @@ def _has_nearby_teardown_phrase(tokens: list[str], index: int, window: int) -> b
 
 
 def _is_access_context_target(tokens: list[str], index: int) -> bool:
+    access_route_terms = {"cross", "through", "over"}
+    article_terms = {"a", "an", "the"}
     if (index + 1 < len(tokens) and tokens[index + 1] == "access") or (
         index > 0 and tokens[index - 1] == "access"
     ):
@@ -840,15 +842,22 @@ def _is_access_context_target(tokens: list[str], index: int) -> bool:
         return True
     if index + 3 < len(tokens) and tokens[index + 1] == "is" and tokens[index + 2] == "access":
         return tokens[index + 3] in {"route", "path", "way"}
-    if index > 0 and tokens[index - 1] in {"cross", "through"}:
-        return True
-    if index > 0 and tokens[index - 1] == "over":
+    if index > 0 and tokens[index - 1] in access_route_terms:
         return True
     if index > 1 and tokens[index - 2] == "for" and tokens[index - 1] == "access":
         return True
     if index > 1 and tokens[index - 2] == "access" and tokens[index - 1] == "through":
         return True
     if index > 1 and tokens[index - 2] == "access" and tokens[index - 1] == "over":
+        return True
+    if index > 1 and tokens[index - 1] in article_terms and tokens[index - 2] in access_route_terms:
+        return True
+    if (
+        index > 2
+        and tokens[index - 1] in article_terms
+        and tokens[index - 3] == "access"
+        and tokens[index - 2] in {"through", "over"}
+    ):
         return True
     return False
 
@@ -873,11 +882,25 @@ def _is_wall_to_wall_carpet_context(tokens: list[str], index: int) -> bool:
     return False
 
 
+def _is_wall_panel_context(tokens: list[str], index: int) -> bool:
+    if tokens[index] not in {"wall", "walls"}:
+        return False
+    return index + 1 < len(tokens) and tokens[index + 1] in {"panel", "panels"}
+
+
 def _has_structure_action_near(tokens: list[str], index: int) -> bool:
     return _has_nearby_token(tokens, index, _DEMOLITION_STRUCTURE_ACTION_TERMS, 4) or _has_nearby_teardown_phrase(
         tokens,
         index,
         4,
+    )
+
+
+def _has_utility_demolition_action_near(tokens: list[str], index: int) -> bool:
+    return _has_nearby_token(tokens, index, _DEMOLITION_STRUCTURE_ACTION_TERMS, 6) or _has_nearby_teardown_phrase(
+        tokens,
+        index,
+        6,
     )
 
 
@@ -945,6 +968,8 @@ def _has_utility_adjacent_demolition_signal(text: str) -> bool:
             continue
         if _is_wall_to_wall_carpet_context(tokens, index):
             continue
+        if _is_wall_panel_context(tokens, index):
+            continue
         is_ceiling_target = token in {"ceiling", "ceilings"}
         has_ceiling_opening = is_ceiling_target and _has_nearby_token(
             tokens,
@@ -952,10 +977,11 @@ def _has_utility_adjacent_demolition_signal(text: str) -> bool:
             frozenset({"opening", "openings"}),
             2,
         )
-        has_ceiling_demolition_action = is_ceiling_target and _has_structure_action_near(tokens, index)
+        has_utility_demolition_action = _has_utility_demolition_action_near(tokens, index)
+        has_ceiling_demolition_action = is_ceiling_target and has_utility_demolition_action
         if is_ceiling_target and not (has_ceiling_opening or has_ceiling_demolition_action):
             continue
-        if not (has_ceiling_opening or has_ceiling_demolition_action or _has_structure_action_near(tokens, index)):
+        if not (has_ceiling_opening or has_ceiling_demolition_action or has_utility_demolition_action):
             continue
         if _has_utility_signal_near(tokens, index):
             return True
