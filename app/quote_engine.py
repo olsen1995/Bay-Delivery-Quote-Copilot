@@ -91,6 +91,8 @@ DEMOLITION_ACCESS_RISK_FLOOR_CAD = 750.0
 DEMOLITION_STRUCTURE_FLOOR_CAD = 1000.0
 DEMOLITION_HEAVY_MATERIAL_FLOOR_CAD = 1200.0
 DEMOLITION_HEAVY_ACCESS_FLOOR_CAD = 1500.0
+DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD = 1500.0
+DEMOLITION_ROOF_HEAVY_FLOOR_CAD = 1500.0
 
 _TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 _DEMOLITION_CONTROLLED_PHRASES = (
@@ -118,13 +120,56 @@ _DEMOLITION_STRUCTURE_PHRASES = (
     "fences",
     "gazebo",
     "gazebos",
-    "teardown",
-    "tear down",
-    "dismantle",
     "structure",
     "structures",
     "outbuilding",
     "outbuildings",
+)
+_DEMOLITION_STRUCTURE_ACTION_PHRASES = (
+    "demolition",
+    "demolish",
+    "demo",
+    "teardown",
+    "tear down",
+    "dismantle",
+)
+_DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES = (
+    "deck access",
+    "deck for access",
+    "access through the deck",
+    "access over the deck",
+    "fence access",
+)
+_DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES = (
+    "shed debris removal",
+    "shed cleanup and removal",
+    "fence boards cleanup",
+    "fence panel removal",
+    "yard cleanup",
+)
+_DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"\blarge(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds|fence|fences)\s+"
+        r"(?:demolition|demo|teardown|tear down)\b",
+        r"\bdemolish\s+large(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds|fence|fences)\b",
+        r"\bfull(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds)\s+(?:teardown|tear down)\b",
+        r"\bold\s+wooden\s+(?:carport|carports)\s+(?:teardown|tear down)\b",
+    )
+)
+_DEMOLITION_ROOF_HEAVY_PHRASES = (
+    "roof demolition",
+    "roof removal",
+    "roof demo",
+    "tear off roof",
+    "roofing tear off",
+    "roof shingle removal",
+    "roof shingle demolition",
+    "shingle demolition",
+    "shingle tear off",
+    "roof shingles",
+    "asphalt shingles",
+    "asphalt shingle removal",
 )
 _DEMOLITION_HEAVY_MATERIAL_PHRASES = (
     "brick",
@@ -730,6 +775,27 @@ def _count_matched_phrases(text: str, phrases: tuple[str, ...]) -> int:
     return matched
 
 
+def _matches_any_pattern(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+    return any(pattern.search(text) for pattern in patterns)
+
+
+def _has_demolition_structure_target(text: str) -> bool:
+    if not _contains_any_phrase(text, _DEMOLITION_STRUCTURE_PHRASES):
+        return False
+    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES):
+        return False
+    has_structure_action = _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ACTION_PHRASES)
+    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES) and not has_structure_action:
+        return False
+    return has_structure_action
+
+
+def _has_large_structure_demolition_signal(text: str) -> bool:
+    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES):
+        return False
+    return _matches_any_pattern(text, _DEMOLITION_LARGE_STRUCTURE_PATTERNS)
+
+
 def _coerce_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -764,7 +830,9 @@ def _demolition_safeguard(
     has_controlled_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_CONTROLLED_PHRASES)
     has_generic_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_GENERIC_PHRASES)
     has_medium_material = _contains_any_phrase(safeguard_text, _DEMOLITION_MEDIUM_MATERIAL_PHRASES)
-    has_structure = _contains_any_phrase(safeguard_text, _DEMOLITION_STRUCTURE_PHRASES)
+    has_structure = _has_demolition_structure_target(safeguard_text)
+    has_large_structure = _has_large_structure_demolition_signal(safeguard_text)
+    has_roof_heavy = _contains_any_phrase(safeguard_text, _DEMOLITION_ROOF_HEAVY_PHRASES)
     has_heavy_material = bool(has_dense_materials) or _contains_any_phrase(
         safeguard_text,
         _DEMOLITION_HEAVY_MATERIAL_PHRASES,
@@ -803,6 +871,12 @@ def _demolition_safeguard(
     if has_heavy_material and has_access_risk:
         floor = max(floor, DEMOLITION_HEAVY_ACCESS_FLOOR_CAD)
         tier = "heavy_access"
+    if has_large_structure:
+        floor = max(floor, DEMOLITION_LARGE_STRUCTURE_FLOOR_CAD)
+        tier = "large_structure"
+    if has_roof_heavy:
+        floor = max(floor, DEMOLITION_ROOF_HEAVY_FLOOR_CAD)
+        tier = "roof_heavy"
 
     flags: list[str] = []
     if has_demolition_scope:
@@ -817,6 +891,10 @@ def _demolition_safeguard(
         flags.append("access_risk")
     if has_unknown_scope:
         flags.append("unknown_scope")
+    if has_large_structure:
+        flags.append("large_structure")
+    if has_roof_heavy:
+        flags.append("roof_heavy")
 
     return {
         "floor_cad": floor,

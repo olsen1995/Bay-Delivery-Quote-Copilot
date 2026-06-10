@@ -946,8 +946,8 @@ def test_bare_unit_demolition_text_does_not_create_access_risk(
         ),
         (
             "Wet roof shingles and asphalt shingles tear-off debris.",
-            1200.0,
-            "heavy_material",
+            1500.0,
+            "roof_heavy",
         ),
         (
             "Laminate flooring, carpet, subfloor, underlayment, baseboards and trim rip-out.",
@@ -970,6 +970,156 @@ def test_demolition_material_and_access_safeguards(description: str, expected_mi
     assert float(result["total_cash_cad"]) >= expected_min_cash
     assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
     assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
+
+
+def _demolition_description_quote(description: str) -> dict:
+    return calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "large deck demolition",
+        "demolish large deck",
+        "large 16x20 wooden deck demolition",
+        "full old wooden deck teardown",
+        "large shed demolition",
+        "full shed teardown",
+        "large fence demolition",
+        "old wooden carport teardown",
+    ],
+)
+def test_clear_large_structure_demolition_uses_large_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "large_structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "large_structure" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "deck access to remove cabinets",
+        "use deck for access to remove cabinets",
+        "use access through the deck to remove cabinets",
+        "need access over the deck to remove wall",
+        "full shed debris removal",
+        "old wooden shed cleanup and removal",
+        "old fence boards cleanup and removal",
+        "small fence panel removal and yard cleanup",
+        "generic cabinet demo",
+        "generic tile demo",
+    ],
+)
+def test_large_structure_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "roof demolition",
+        "roof removal",
+        "roof demo",
+        "tear off roof",
+        "roofing tear-off",
+        "roof shingle removal",
+        "roof shingle demolition",
+        "shingle demolition",
+        "shingle tear-off",
+        "roof shingles",
+        "asphalt shingles",
+        "asphalt shingle removal",
+    ],
+)
+def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "roof_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "roof_heavy" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "waterproofing material demo",
+        "proofing demolition",
+        "generic demolition with no roof or shingle target",
+    ],
+)
+def test_roof_shingle_false_positives_do_not_use_roof_heavy_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] != "roof_heavy"
+    assert "roof_heavy" not in flags
+    assert result["_internal"]["demolition_safeguard_floor_cad"] < 1500.0
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Backyard concrete slab demolition",
+        "Back yard brick patio demo",
+        "backyard concrete demolition",
+        "backyard brick removal",
+    ],
+)
+def test_heavy_backyard_concrete_brick_slab_demolition_uses_heavy_access_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_access"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert {"heavy_material", "access_risk"}.issubset(result["_internal"]["demolition_safeguard_flags"])
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "backyard access to remove cabinets",
+        "deck access through backyard",
+        "backyard cleanup",
+        "backyard junk removal",
+        "backyard cabinet pickup",
+        "bathroom tile demo with fence access",
+        "full kitchen cabinet demo with deck access through backyard",
+    ],
+)
+def test_backyard_and_access_false_positives_do_not_use_heavy_backyard_or_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {
+        "heavy_access",
+        "structure",
+        "large_structure",
+    }
+    assert "large_structure" not in flags
+    assert "structure_teardown" not in flags
+    assert result["_internal"]["demolition_safeguard_floor_cad"] < 1500.0
 
 
 def test_demolition_structured_soil_counts_as_heavy_material_without_dense_checkbox() -> None:
