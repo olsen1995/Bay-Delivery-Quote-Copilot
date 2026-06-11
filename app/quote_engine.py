@@ -129,6 +129,7 @@ _DEMOLITION_STRUCTURE_ACTION_PHRASES = (
     "demolition",
     "demolish",
     "demo",
+    "removal",
     "teardown",
     "tear down",
     "dismantle",
@@ -150,9 +151,11 @@ _DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES = (
 _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
-        r"\blarge(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds|fence|fences)\s+"
+        r"\blarge(?:\s+[a-z0-9]+){0,3}\s+"
+        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|outbuilding|outbuildings)\s+"
         r"(?:demolition|demo|teardown|tear down)\b",
-        r"\bdemolish\s+large(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds|fence|fences)\b",
+        r"\bdemolish\s+large(?:\s+[a-z0-9]+){0,3}\s+"
+        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|outbuilding|outbuildings)\b",
         r"\bfull(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds)\s+(?:teardown|tear down)\b",
         r"\bold\s+wooden\s+(?:carport|carports)\s+(?:teardown|tear down)\b",
     )
@@ -162,6 +165,7 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "roof removal",
     "roof demo",
     "tear off roof",
+    "roof tear off",
     "roofing tear off",
     "roof shingle removal",
     "roof shingle demolition",
@@ -784,15 +788,13 @@ def _has_demolition_structure_target(text: str) -> bool:
         return False
     if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES):
         return False
-    has_structure_action = _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ACTION_PHRASES)
-    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES) and not has_structure_action:
+    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES):
         return False
+    has_structure_action = _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ACTION_PHRASES)
     return has_structure_action
 
 
 def _has_large_structure_demolition_signal(text: str) -> bool:
-    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES):
-        return False
     return _matches_any_pattern(text, _DEMOLITION_LARGE_STRUCTURE_PATTERNS)
 
 

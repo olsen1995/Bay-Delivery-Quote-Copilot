@@ -994,6 +994,10 @@ def _demolition_description_quote(description: str) -> dict:
         "large shed demolition",
         "full shed teardown",
         "large fence demolition",
+        "large deck demolition with deck access",
+        "large fence demolition with fence access",
+        "large gazebo demolition",
+        "large outbuilding demolition",
         "old wooden carport teardown",
     ],
 )
@@ -1035,10 +1039,30 @@ def test_large_structure_false_positives_do_not_use_structure_floor(description:
 @pytest.mark.parametrize(
     "description",
     [
+        "old shed removal",
+        "shed removal",
+    ],
+)
+def test_clear_structure_removal_uses_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1000.0
+    assert float(result["total_emt_cad"]) == 1130.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
         "roof demolition",
         "roof removal",
         "roof demo",
         "tear off roof",
+        "roof tear-off",
+        "roof tear off",
         "roofing tear-off",
         "roof shingle removal",
         "roof shingle demolition",
