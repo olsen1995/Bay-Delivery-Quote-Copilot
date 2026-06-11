@@ -125,39 +125,27 @@ _DEMOLITION_STRUCTURE_PHRASES = (
     "outbuilding",
     "outbuildings",
 )
-_DEMOLITION_STRUCTURE_ACTION_PHRASES = (
-    "demolition",
-    "demolish",
-    "demo",
-    "removal",
-    "teardown",
-    "tear down",
-    "dismantle",
-)
-_DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES = (
-    "deck access",
-    "deck for access",
-    "access through the deck",
-    "access over the deck",
-    "fence access",
-)
-_DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES = (
-    "shed debris removal",
-    "shed cleanup and removal",
-    "fence boards cleanup",
-    "fence panel removal",
-    "yard cleanup",
-)
 _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
         r"\blarge(?:\s+[a-z0-9]+){0,3}\s+"
         r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|outbuilding|outbuildings)\s+"
-        r"(?:demolition|demo|teardown|tear down)\b",
+        r"(?:demolition|demo|removal|teardown|tear down)\b",
         r"\bdemolish\s+large(?:\s+[a-z0-9]+){0,3}\s+"
         r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|outbuilding|outbuildings)\b",
         r"\bfull(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds)\s+(?:teardown|tear down)\b",
         r"\bold\s+wooden\s+(?:carport|carports)\s+(?:teardown|tear down)\b",
+    )
+)
+_DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"\b(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)\s+"
+        r"(?:demolition|demo|removal|teardown|tear down|tear out|rip out|dismantle)\b",
+        r"\b(?:demolish|remove|rip out|tear out|dismantle)\s+"
+        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)\b",
+        r"\b(?:demolition|demo|removal)\s+of(?:\s+[a-z0-9]+){0,3}\s+"
+        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)\b",
     )
 )
 _DEMOLITION_ROOF_HEAVY_PHRASES = (
@@ -786,12 +774,7 @@ def _matches_any_pattern(text: str, patterns: tuple[re.Pattern[str], ...]) -> bo
 def _has_demolition_structure_target(text: str) -> bool:
     if not _contains_any_phrase(text, _DEMOLITION_STRUCTURE_PHRASES):
         return False
-    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_PHRASES):
-        return False
-    if _contains_any_phrase(text, _DEMOLITION_STRUCTURE_CLEANUP_CONTEXT_PHRASES):
-        return False
-    has_structure_action = _contains_any_phrase(text, _DEMOLITION_STRUCTURE_ACTION_PHRASES)
-    return has_structure_action
+    return _matches_any_pattern(text, _DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS)
 
 
 def _has_large_structure_demolition_signal(text: str) -> bool:

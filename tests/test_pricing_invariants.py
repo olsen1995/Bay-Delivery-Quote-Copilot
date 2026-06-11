@@ -998,6 +998,9 @@ def _demolition_description_quote(description: str) -> dict:
         "large fence demolition with fence access",
         "large gazebo demolition",
         "large outbuilding demolition",
+        "large shed removal",
+        "large deck removal",
+        "large gazebo removal",
         "old wooden carport teardown",
     ],
 )
@@ -1023,6 +1026,8 @@ def test_clear_large_structure_demolition_uses_large_structure_floor(description
         "old wooden shed cleanup and removal",
         "old fence boards cleanup and removal",
         "small fence panel removal and yard cleanup",
+        "large shed debris removal",
+        "large deck access to remove cabinets",
         "generic cabinet demo",
         "generic tile demo",
     ],
@@ -1041,6 +1046,9 @@ def test_large_structure_false_positives_do_not_use_structure_floor(description:
     [
         "old shed removal",
         "shed removal",
+        "rip out shed",
+        "deck tear-out",
+        "remove deck",
     ],
 )
 def test_clear_structure_removal_uses_structure_floor(description: str) -> None:
@@ -1052,6 +1060,36 @@ def test_clear_structure_removal_uses_structure_floor(description: str) -> None:
     assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
     assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
     assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "shed demolition and yard cleanup",
+        "deck demolition and yard cleanup",
+    ],
+)
+def test_explicit_structure_demolition_with_yard_cleanup_uses_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) >= 1000.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "remove cabinets",
+        "generic junk removal",
+    ],
+)
+def test_non_structure_removal_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] != "structure"
+    assert "structure_teardown" not in flags
 
 
 @pytest.mark.parametrize(
