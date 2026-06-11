@@ -546,6 +546,35 @@ Must check:
 - customer-facing response shape
 - cash/EMT/HST totals
 
+For pricing-sensitive reviews, also require a semantic-combination review matrix before commit.
+
+The matrix must cover:
+- target-only positive
+- access-only false positive
+- target plus access combined
+- cleanup/debris/removal near miss
+- simple structure removal
+- word-order swaps
+- existing vocabulary preservation
+- substring traps
+- customer/internal boundary
+- payment math
+
+For every new pricing safeguard or phrase-matching rule, include at least:
+- one clean positive
+- one clean false positive
+- one positive mixed with access/location wording
+- one cleanup/debris near miss
+- one common alternate customer wording
+- one substring trap
+- one existing-vocabulary preservation check when the rule touches known target vocabularies
+
+Do not commit until this matrix is checked.
+
+Fix valid P1/P2 findings before commit.
+
+If the required fix would need forbidden files or broad matching, stop and report instead of expanding scope.
+
 Near-miss examples to review explicitly:
 - deck access is not deck demolition
 - fence access is not fence demolition
