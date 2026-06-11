@@ -125,27 +125,50 @@ _DEMOLITION_STRUCTURE_PHRASES = (
     "outbuilding",
     "outbuildings",
 )
+_DEMOLITION_STRUCTURE_TARGET_PATTERN = (
+    r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)"
+)
+_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN = (
+    r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings|"
+    r"carport|carports)"
+)
+_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN = r"(?:\s+[a-z0-9]+){0,3}"
+_DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
+    r"(?:demolish|remove|teardown|tear down|tear out|rip out|dismantle)"
+)
+_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN = (
+    r"(?:demolition|demo|removal|teardown|tear down|tear out|rip out|dismantle)"
+)
+_DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN = (
+    r"(?:needs removal|need removal|needs demolition|need demolition|"
+    r"requires removal|require removal|requires demolition|require demolition|"
+    r"needs to be removed|needs to be demolished|"
+    r"requires to be removed|requires to be demolished)"
+)
 _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
-        r"\blarge(?:\s+[a-z0-9]+){0,3}\s+"
-        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|outbuilding|outbuildings)\s+"
+        rf"\blarge{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\s+"
         r"(?:demolition|demo|removal|teardown|tear down)\b",
-        r"\bdemolish\s+large(?:\s+[a-z0-9]+){0,3}\s+"
-        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|outbuilding|outbuildings)\b",
-        r"\bfull(?:\s+[a-z0-9]+){0,3}\s+(?:deck|decks|shed|sheds)\s+(?:teardown|tear down)\b",
-        r"\bold\s+wooden\s+(?:carport|carports)\s+(?:teardown|tear down)\b",
+        rf"\bdemolish\s+large{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
+        rf"\bfull{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+(?:deck|decks|shed|sheds)\s+"
+        r"(?:teardown|tear down)\b",
+        r"\bold\s+wooden\s+(?:carport|carports)\s+(?:removal|teardown|tear down)\b",
     )
 )
 _DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
-        r"\b(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)\s+"
-        r"(?:demolition|demo|removal|teardown|tear down|tear out|rip out|dismantle)\b",
-        r"\b(?:demolish|remove|rip out|tear out|dismantle)\s+"
-        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)\b",
-        r"\b(?:demolition|demo|removal)\s+of(?:\s+[a-z0-9]+){0,3}\s+"
-        r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)\b",
+        rf"\b{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
+        rf"{_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
+        rf"\b{_DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}"
+        rf"{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\b",
+        rf"\b(?:demolition|demo|removal)\s+of{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\b",
+        rf"\b{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
+        rf"{_DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
     )
 )
 _DEMOLITION_ROOF_HEAVY_PHRASES = (
@@ -158,6 +181,8 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "roof shingle removal",
     "roof shingle demolition",
     "shingle demolition",
+    "shingle removal",
+    "shingles removal",
     "shingle tear off",
     "roof shingles",
     "asphalt shingles",
