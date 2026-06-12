@@ -133,6 +133,9 @@ _DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN = (
     r"carport|carports)"
 )
 _DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN = r"(?:\s+[a-z0-9]+){0,3}"
+_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN = (
+    r"(?:\s+(?!(?:from|through|on)\b)[a-z0-9]+){0,3}"
+)
 _DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
     r"(?:demolish|remove|teardown|tear down|tear out|rip out|dismantle)"
 )
@@ -149,18 +152,26 @@ _DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN = (
 _DEMOLITION_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
     r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
 )
+_DEMOLITION_LARGE_STRUCTURE_CONNECTOR_ACTION_PATTERN = (
+    r"(?:to be removed|to be demolished|needs removal|need removal|"
+    r"needs demolition|need demolition|requires removal|require removal|"
+    r"requires demolition|require demolition)"
+)
 _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
-        rf"\blarge{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"\blarge{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
         rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\s+"
         rf"{_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
         rf"\b{_DEMOLITION_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}\s+"
-        rf"large{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"large{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
         rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
-        rf"\b(?:demolition|demo|removal)\s+of\s+large{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"\b(?:demolition|demo|removal)\s+of\s+large{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
         rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
-        rf"\bfull{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
+        rf"\blarge{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
+        rf"\bfull{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         r"(?:teardown|tear down)\b",
         r"\bold\s+wooden\s+(?:carport|carports)\s+(?:removal|teardown|tear down)\b",
     )
@@ -171,8 +182,8 @@ _DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS = tuple(
         rf"\b{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         rf"{_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
         rf"\b{_DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}"
-        rf"{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\b",
-        rf"\b(?:demolition|demo|removal)\s+of{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\b",
+        rf"\b(?:demolition|demo|removal)\s+of{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
         rf"{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\b",
         rf"\b{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         rf"{_DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
@@ -193,6 +204,14 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "shingle tear off",
     "tear off shingles",
     "shingles tear off",
+    "remove shingles",
+    "remove old shingles",
+    "demo shingles",
+    "demolish shingles",
+    "remove roof",
+    "demolish roof",
+    "demo roof",
+    "roofing removal",
     "roof shingles",
     "asphalt shingles",
     "asphalt shingle removal",
