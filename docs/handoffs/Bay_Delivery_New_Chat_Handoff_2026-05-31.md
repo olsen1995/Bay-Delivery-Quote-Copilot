@@ -212,14 +212,13 @@ CURRENT VERIFIED STATE:
 ### Skills / workflow discussion
 Useful Bay Delivery skills/checklists narrowed:
 1. receiving-code-review
-2. browser/browser or vercel/agent-browser-verify
-3. superpowers/test-driven-development
+2. bay-delivery-pr-safety-review
+3. verification-before-completion
 
 Other skills should trigger only when relevant:
-- docs/current-state traceability audit for docs/GPT/version/roadmap/grounding work
-- internal-only boundary review for admin/GPT/notification/customer-data boundary work
-- SQLite mutation-safety review for schema/storage/import/export/cleanup/admin-data mutation work
-- protected-surface frontend contract review for quote/customer/public UI behavior changes
+- superpowers:test-driven-development for pricing, public quote, GPT/admin-boundary, storage/read-model, and customer-facing behavior changes
+- browser/Playwright verification for static/UI/public-page changes, with `/`, `/quote`, `/admin`, and `/admin/mobile` checked at desktop and mobile widths
+- codex-security:security-diff-scan for admin, auth, CSP, public-exposure, docs exposure, headers, origin/CORS/CSP, and customer-path boundary changes
 - small-PR evidence discipline is already default
 
 ### PR #324 — Current-state refresh for visual polish
@@ -427,8 +426,8 @@ Use only when triggered:
 - small-PR evidence discipline is default
 Core three useful skills:
 - receiving-code-review
-- browser/browser or vercel/agent-browser-verify
-- superpowers/test-driven-development
+- bay-delivery-pr-safety-review
+- verification-before-completion
 
 ## 10. Validation / Commands / Checks
 
