@@ -133,11 +133,12 @@ _DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN = (
     r"carport|carports)"
 )
 _DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN = r"(?:\s+[a-z0-9]+){0,3}"
+_DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN = r"(?:old|wooden|metal|large|small|two|[0-9]+x[0-9]+)"
 _DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN = (
-    r"(?:\s+(?!(?:from|through|on)\b)[a-z0-9]+){0,3}"
+    rf"(?:\s+{_DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN}){{0,3}}"
 )
 _DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
-    r"(?:demolish|remove|teardown|tear down|tear out|rip out|dismantle)"
+    r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
 )
 _DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN = (
     r"(?:demolition|demo|removal|teardown|tear down|tear out|rip out|dismantle)"
