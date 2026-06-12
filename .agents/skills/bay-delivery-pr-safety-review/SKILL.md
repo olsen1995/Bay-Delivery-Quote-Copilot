@@ -250,16 +250,16 @@ Prefer:
 
 Do not rely on ad hoc manual release checks when a repeatable script or workflow contract is possible.
 
-### 4. Docs and Generated-Artifact Publication Hygiene
+### 4. Docs and GPT Publication Unit
 
-When source docs feed generated artifacts, treat them as one publish unit.
+When source docs feed generated artifacts, treat `docs/gpt/*`, `dist/gpt_grounding_pack/*`, and manifest parity as one publish unit.
 
 If docs/gpt changes:
 - regenerate dist/gpt_grounding_pack
 - update manifest hashes
 - run GPT grounding parity
 - stage ignored generated files intentionally if required
-- verify source and exported files match
+- verify source docs, exported files, and manifest all match
 
 Do not merge docs/GPT changes with stale generated output.
 
@@ -280,16 +280,32 @@ Use tests to prove the public quote contract stayed intact.
 
 Keep the Bay Delivery workflow opinionated but not bloated.
 
-Active defaults for implementation work:
+Active defaults for normal Bay Delivery repo PR work:
+- superpowers:receiving-code-review
+  - classify review comments comment-by-comment as P1, P2, or P3
+  - for every accepted review comment that changes behavior, add at least one targeted regression test
+  - add a short gap-closed note before push
 - bay-delivery-pr-safety-review
-- receiving-code-review style PR follow-up rules
-- verification-before-completion style final report requirements
+  - treat this as the main Bay-specific safety gate
+  - pricing-sensitive work must include the pricing red-team pass
+  - docs/GPT work must include the docs/GPT publication pass as one publish unit
+- verification-before-completion
+  - require a clean working tree before completion
+  - require targeted tests plus relevant full-suite or grouped validation
+  - require protected no-go diff evidence
+  - require a final what changed and what did not change report
 
 Trigger-only overlays:
-- CI triage only for CI/parity/workflow/smoke failures
-- Playwright/browser verification only for UI/static/customer/admin visual changes
-- systematic debugging only for Windows/sandbox/SQLite/setup friction
-- TDD emphasis for pricing/protected-surface behavior changes
+- superpowers:test-driven-development only for pricing, public quote, GPT/admin-boundary, storage/read-model, and customer-facing behavior changes
+  - create or identify the failing or covering contract test first, then patch only the owning surface
+- Browser/Playwright verification only for static, UI, or public-page changes
+  - verify `/`, `/quote`, `/admin`, and `/admin/mobile` at desktop and mobile widths
+  - fail the overlay on overflow, weak CTA visibility, internal-language leakage, broken responsive layout, or oversized assets
+  - do not assume Vercel deployment behavior; Bay Delivery deploys on Render
+- codex-security:security-diff-scan only for admin, auth, CSP, public-exposure, docs exposure, headers, origin/CORS/CSP, or customer-path boundary changes
+  - check pre-auth admin surfaces, docs exposure, CSP behavior, and no customer-path drift
+
+Other specialized workflows like CI triage or systematic debugging still apply when the task is specifically a CI or environment failure, but they are not part of the default Bay Delivery repo-safety stack.
 
 Do not load every overlay for every task. Apply only the overlays the task actually triggers.
 
@@ -537,7 +553,10 @@ This review is required when touching:
 Must check:
 - intended high-risk jobs that should trigger protection
 - similar normal jobs that must not trigger
+- false positives caused by near-miss demolition wording
 - access/location wording that must not become target
+- debris wording that must not become target
+- cleanup wording that must not become target
 - plural/singular variants
 - verb variants
 - substring traps
@@ -545,6 +564,7 @@ Must check:
 - non-demolition baseline
 - customer-facing response shape
 - cash/EMT/HST totals
+- safeguarded and non-safeguarded totals preserve cash/EMT/HST behavior
 
 Near-miss examples to review explicitly:
 - deck access is not deck demolition

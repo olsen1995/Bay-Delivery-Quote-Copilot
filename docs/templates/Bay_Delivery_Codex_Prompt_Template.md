@@ -12,15 +12,27 @@ Default Bay Delivery implementation overlays:
 
 ```text
 Active defaults:
+- superpowers:receiving-code-review
+  - comment-by-comment P1/P2/P3 triage
+  - targeted regression test for each accepted behavior-changing review fix
+  - short gap-closed note before push
 - bay-delivery-pr-safety-review
-- receiving-code-review style PR follow-up
-- verification-before-completion style final report evidence
+  - main Bay-specific safety gate
+  - embedded pricing red-team pass for quote-engine and business-rule work
+  - embedded docs/GPT publication pass for `docs/gpt`, `dist/gpt_grounding_pack`, and manifest parity as one unit
+- verification-before-completion
+  - clean working tree
+  - targeted tests plus relevant full validation
+  - protected no-go diff
+  - final what changed / what did not change report
 
 Trigger-only overlays:
-- CI triage for CI/parity/workflow/smoke failures only
-- browser/Playwright verification for UI/static/customer/admin visual changes only
-- systematic debugging for Windows/sandbox/SQLite/setup friction only
-- TDD emphasis for pricing/protected-surface behavior changes only
+- superpowers:test-driven-development for pricing, public quote, GPT/admin-boundary, storage/read-model, and customer-facing behavior changes only
+- browser/Playwright verification for static/UI/public-page changes only
+  - verify `/`, `/quote`, `/admin`, and `/admin/mobile` at desktop and mobile widths
+  - fail on overflow, weak CTA visibility, internal-language leakage, broken responsive layout, or oversized assets
+  - do not assume Vercel deployment behavior; Bay Delivery deploys on Render
+- codex-security:security-diff-scan for admin, auth, CSP, public-exposure, docs exposure, headers, origin/CORS/CSP, and customer-path boundary changes only
 ```
 
 ---
