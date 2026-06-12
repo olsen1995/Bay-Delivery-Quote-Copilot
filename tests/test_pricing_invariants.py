@@ -1007,6 +1007,15 @@ def _demolition_description_quote(description: str) -> dict:
         "large gazebo removal",
         "old wooden carport teardown",
         "old wooden carport removal",
+        "large deck tear-out",
+        "large shed rip out",
+        "large gazebo dismantle",
+        "remove large deck",
+        "demo large deck",
+        "demolition of large gazebo",
+        "full gazebo teardown",
+        "full fence teardown",
+        "full outbuilding teardown",
     ],
 )
 def test_clear_large_structure_demolition_uses_large_structure_floor(description: str) -> None:
@@ -1043,6 +1052,14 @@ def test_clear_large_structure_demolition_uses_large_structure_floor(description
         "teardown tile",
         "backyard cleanup",
         "backyard junk removal",
+        "full cabinet removal",
+        "full tile removal",
+        "full junk removal",
+        "full carpet removal",
+        "remove large cabinet",
+        "demo large tile",
+        "large cabinet dismantle",
+        "large junk rip out",
         "generic cabinet demo",
         "generic tile demo",
     ],
@@ -1073,6 +1090,9 @@ def test_large_structure_false_positives_do_not_use_structure_floor(description:
         "shed needs removal",
         "deck needs demolition",
         "fence requires removal",
+        "shed to be removed",
+        "deck to be demolished",
+        "fence to be removed",
     ],
 )
 def test_clear_structure_removal_uses_structure_floor(description: str) -> None:
@@ -1106,6 +1126,11 @@ def test_explicit_structure_demolition_with_yard_cleanup_uses_structure_floor(de
     [
         "remove cabinets",
         "generic junk removal",
+        "cabinet to be removed",
+        "cabinets to be removed",
+        "tile to be removed",
+        "junk to be removed",
+        "carpet to be removed",
     ],
 )
 def test_non_structure_removal_false_positives_do_not_use_structure_floor(description: str) -> None:
@@ -1132,6 +1157,8 @@ def test_non_structure_removal_false_positives_do_not_use_structure_floor(descri
         "shingle removal",
         "shingles removal",
         "shingle tear-off",
+        "tear off shingles",
+        "shingles tear off",
         "roof shingles",
         "asphalt shingles",
         "asphalt shingle removal",
@@ -1155,6 +1182,8 @@ def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -
         "proofing removal",
         "waterproofing material demo",
         "proofing demolition",
+        "waterproofing tear off",
+        "proofing tear off",
         "generic demolition with no roof or shingle target",
     ],
 )
@@ -1165,6 +1194,26 @@ def test_roof_shingle_false_positives_do_not_use_roof_heavy_floor(description: s
     assert result["_internal"]["demolition_safeguard_tier"] != "roof_heavy"
     assert "roof_heavy" not in flags
     assert result["_internal"]["demolition_safeguard_floor_cad"] < 1500.0
+
+
+@pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
+def test_demolition_structured_shingles_use_roof_heavy_floor(material_field: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition material removal.",
+        **{material_field: "shingles"},
+    )
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "roof_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "roof_heavy" in result["_internal"]["demolition_safeguard_flags"]
 
 
 @pytest.mark.parametrize(

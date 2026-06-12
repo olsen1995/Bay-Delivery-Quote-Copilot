@@ -143,17 +143,24 @@ _DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN = (
     r"(?:needs removal|need removal|needs demolition|need demolition|"
     r"requires removal|require removal|requires demolition|require demolition|"
     r"needs to be removed|needs to be demolished|"
-    r"requires to be removed|requires to be demolished)"
+    r"requires to be removed|requires to be demolished|"
+    r"to be removed|to be demolished)"
+)
+_DEMOLITION_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
+    r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
 )
 _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
         rf"\blarge{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
         rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\s+"
-        r"(?:demolition|demo|removal|teardown|tear down)\b",
-        rf"\bdemolish\s+large{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
+        rf"\b{_DEMOLITION_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}\s+"
+        rf"large{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
         rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
-        rf"\bfull{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+(?:deck|decks|shed|sheds)\s+"
+        rf"\b(?:demolition|demo|removal)\s+of\s+large{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
+        rf"\bfull{_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         r"(?:teardown|tear down)\b",
         r"\bold\s+wooden\s+(?:carport|carports)\s+(?:removal|teardown|tear down)\b",
     )
@@ -184,6 +191,8 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "shingle removal",
     "shingles removal",
     "shingle tear off",
+    "tear off shingles",
+    "shingles tear off",
     "roof shingles",
     "asphalt shingles",
     "asphalt shingle removal",
@@ -842,7 +851,11 @@ def _demolition_safeguard(
     has_medium_material = _contains_any_phrase(safeguard_text, _DEMOLITION_MEDIUM_MATERIAL_PHRASES)
     has_structure = _has_demolition_structure_target(safeguard_text)
     has_large_structure = _has_large_structure_demolition_signal(safeguard_text)
-    has_roof_heavy = _contains_any_phrase(safeguard_text, _DEMOLITION_ROOF_HEAVY_PHRASES)
+    has_roof_heavy = (
+        _contains_any_phrase(safeguard_text, _DEMOLITION_ROOF_HEAVY_PHRASES)
+        or construction_debris_value == "shingles"
+        or dense_material_value == "shingles"
+    )
     has_heavy_material = bool(has_dense_materials) or _contains_any_phrase(
         safeguard_text,
         _DEMOLITION_HEAVY_MATERIAL_PHRASES,
