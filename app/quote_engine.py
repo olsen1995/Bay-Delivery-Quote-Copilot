@@ -142,6 +142,13 @@ _DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN = r"(?:old|wooden|metal|large|sma
 _DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN = (
     rf"(?:\s+{_DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN}){{0,3}}"
 )
+_DEMOLITION_STRUCTURE_TARGET_ONLY_DESCRIPTOR_PATTERN = r"(?:old|wooden|wood|metal|large|small|full|whole|[0-9]+x[0-9]+)"
+_DEMOLITION_STRUCTURE_TARGET_ONLY_PATTERNS = (
+    re.compile(
+        rf"^(?:{_DEMOLITION_STRUCTURE_TARGET_ONLY_DESCRIPTOR_PATTERN}\s+)?"
+        rf"{_DEMOLITION_STRUCTURE_TARGET_PATTERN}$"
+    ),
+)
 _DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
     r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
 )
@@ -841,6 +848,8 @@ def _matches_any_pattern(text: str, patterns: tuple[re.Pattern[str], ...]) -> bo
 
 def _has_demolition_structure_target(text: str) -> bool:
     if _matches_any_pattern(text, _DEMOLITION_TEARDOWN_ONLY_STRUCTURE_PATTERNS):
+        return True
+    if _matches_any_pattern(text, _DEMOLITION_STRUCTURE_TARGET_ONLY_PATTERNS):
         return True
     if not _contains_any_phrase(text, _DEMOLITION_STRUCTURE_PHRASES):
         return False

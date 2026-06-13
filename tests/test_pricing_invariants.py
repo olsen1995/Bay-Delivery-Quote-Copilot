@@ -1119,6 +1119,21 @@ def test_large_structure_component_false_positives_do_not_use_large_structure_fl
     [
         "old shed removal",
         "shed removal",
+        "shed",
+        "deck",
+        "fence",
+        "gazebo",
+        "outbuilding",
+        "structure",
+        "16x10 shed",
+        "12x12 deck",
+        "wooden deck",
+        "old shed",
+        "metal shed",
+        "large deck",
+        "small shed",
+        "full shed",
+        "whole deck",
         "remove old shed",
         "remove wooden fence",
         "demolish old shed",
@@ -1205,6 +1220,37 @@ def test_non_structure_removal_false_positives_do_not_use_structure_floor(descri
 
     assert result["_internal"]["demolition_safeguard_tier"] != "structure"
     assert "structure_teardown" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "cabinet",
+        "cabinets",
+        "tile",
+        "junk",
+        "carpet",
+        "debris",
+        "roof rack",
+        "roof vent",
+        "deck boards",
+        "fence boards",
+        "shed door",
+        "deck access",
+        "fence access",
+        "backyard access",
+        "remove cabinets from deck",
+        "remove debris near fence",
+        "remove junk behind shed",
+    ],
+)
+def test_structure_only_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
 
 
 @pytest.mark.parametrize(
