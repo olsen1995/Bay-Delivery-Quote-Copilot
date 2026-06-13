@@ -1155,11 +1155,18 @@ def test_large_structure_component_false_positives_do_not_use_large_structure_fl
         "whole metal fence",
         "old large shed",
         "old 16x20 shed",
+        "the shed",
+        "my gazebo",
+        "our deck",
         "remove old shed",
+        "remove the shed",
+        "remove a fence",
         "remove wooden fence",
         "demolish old shed",
+        "demolish the deck",
         "demo shed",
         "demo old shed",
+        "demo our shed",
         "demo wooden fence",
         "demo deck",
         "demo gazebo",
@@ -1170,6 +1177,7 @@ def test_large_structure_component_false_positives_do_not_use_large_structure_fl
         "teardown",
         "tear down",
         "dismantle",
+        "tear down my gazebo",
         "tear down shed",
         "tear down deck",
         "teardown deck",
@@ -1181,6 +1189,11 @@ def test_large_structure_component_false_positives_do_not_use_large_structure_fl
         "fence teardown",
         "gazebo teardown",
         "outbuilding teardown",
+        "shed removed",
+        "deck demolished",
+        "fence removed",
+        "gazebo dismantled",
+        "outbuilding removed",
         "shed needs removal",
         "deck needs demolition",
         "fence requires removal",
@@ -1254,9 +1267,16 @@ def test_non_structure_removal_false_positives_do_not_use_structure_floor(descri
         "debris",
         "roof rack",
         "roof vent",
+        "roof antenna",
         "deck boards",
         "fence boards",
         "shed door",
+        "remove deck boards",
+        "remove fence boards",
+        "remove shed door",
+        "remove deck railing",
+        "remove fence panel",
+        "remove shed roof",
         "deck access",
         "fence access",
         "backyard access",
@@ -1294,6 +1314,18 @@ def test_duplicated_structure_only_customer_descriptions_use_structure_floor(des
     assert result["_internal"]["demolition_owner_review_recommended"] is True
 
 
+@pytest.mark.parametrize("description", ["teardown", "tear down", "dismantle"])
+def test_duplicated_teardown_only_customer_descriptions_use_structure_floor(description: str) -> None:
+    result = _duplicated_demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1000.0
+    assert float(result["total_emt_cad"]) == 1130.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
 @pytest.mark.parametrize(
     "description",
     [
@@ -1305,6 +1337,12 @@ def test_duplicated_structure_only_customer_descriptions_use_structure_floor(des
         "deck boards",
         "fence boards",
         "shed door",
+        "remove deck boards",
+        "remove fence boards",
+        "remove shed door",
+        "remove deck railing",
+        "remove fence panel",
+        "remove shed roof",
         "deck access",
         "fence access",
         "remove cabinets from deck",
