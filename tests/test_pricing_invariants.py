@@ -984,6 +984,19 @@ def _demolition_description_quote(description: str) -> dict:
     )
 
 
+def _duplicated_demolition_description_quote(description: str) -> dict:
+    return calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+        job_description_customer=description,
+    )
+
+
 @pytest.mark.parametrize(
     "description",
     [
@@ -1134,6 +1147,14 @@ def test_large_structure_component_false_positives_do_not_use_large_structure_fl
         "small shed",
         "full shed",
         "whole deck",
+        "old wooden shed",
+        "old metal fence",
+        "16x20 wooden deck",
+        "large wooden deck",
+        "full wooden shed",
+        "whole metal fence",
+        "old large shed",
+        "old 16x20 shed",
         "remove old shed",
         "remove wooden fence",
         "demolish old shed",
@@ -1246,6 +1267,53 @@ def test_non_structure_removal_false_positives_do_not_use_structure_floor(descri
 )
 def test_structure_only_false_positives_do_not_use_structure_floor(description: str) -> None:
     result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "shed",
+        "large deck",
+        "old wooden shed",
+        "16x20 shed",
+    ],
+)
+def test_duplicated_structure_only_customer_descriptions_use_structure_floor(description: str) -> None:
+    result = _duplicated_demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1000.0
+    assert float(result["total_emt_cad"]) == 1130.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "cabinet",
+        "tile",
+        "junk",
+        "debris",
+        "roof rack",
+        "deck boards",
+        "fence boards",
+        "shed door",
+        "deck access",
+        "fence access",
+        "remove cabinets from deck",
+        "remove debris near fence",
+        "remove junk behind shed",
+    ],
+)
+def test_duplicated_structure_only_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _duplicated_demolition_description_quote(description)
     flags = result["_internal"]["demolition_safeguard_flags"]
 
     assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
