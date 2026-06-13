@@ -1071,10 +1071,14 @@ def test_clear_large_structure_demolition_uses_large_structure_floor(description
         "remove large debris on deck",
         "remove large cabinets on deck",
         "remove large junk on deck",
+        "remove large cabinets near deck",
         "remove large cabinets near shed",
         "remove large debris beside fence",
+        "remove large junk behind shed",
+        "remove large cabinets by deck",
         "remove large cabinets by shed",
         "remove large debris around fence",
+        "remove large junk beside shed",
         "demo large tile",
         "large cabinet dismantle",
         "large junk rip out",
@@ -1088,6 +1092,25 @@ def test_large_structure_false_positives_do_not_use_structure_floor(description:
 
     assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
     assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "remove large deck boards",
+        "remove large fence boards",
+        "remove large shed door",
+        "remove large deck railing",
+        "remove large fence panel",
+        "remove large shed roof",
+    ],
+)
+def test_large_structure_component_false_positives_do_not_use_large_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] != "large_structure"
     assert "large_structure" not in flags
 
 
@@ -1108,6 +1131,9 @@ def test_large_structure_false_positives_do_not_use_structure_floor(description:
         "rip out shed",
         "deck tear-out",
         "remove deck",
+        "teardown",
+        "tear down",
+        "dismantle",
         "tear down shed",
         "tear down deck",
         "teardown deck",
@@ -1232,6 +1258,11 @@ def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -
         "proofing demolition",
         "waterproofing tear off",
         "proofing tear off",
+        "remove roof rack",
+        "remove roof vent",
+        "remove roof antenna",
+        "demo roof antenna",
+        "demolish roof vent",
         "generic demolition with no roof or shingle target",
     ],
 )

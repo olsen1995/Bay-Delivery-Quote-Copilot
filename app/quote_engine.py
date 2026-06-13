@@ -132,6 +132,11 @@ _DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN = (
     r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings|"
     r"carport|carports)"
 )
+_DEMOLITION_LARGE_STRUCTURE_COMPONENT_PATTERN = r"(?:boards?|railings?|doors?|panels?|roof|trim)"
+_DEMOLITION_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN = (
+    rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}"
+    rf"(?!\s+{_DEMOLITION_LARGE_STRUCTURE_COMPONENT_PATTERN}\b)"
+)
 _DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN = r"(?:\s+[a-z0-9]+){0,3}"
 _DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN = r"(?:old|wooden|metal|large|small|two|[0-9]+x[0-9]+)"
 _DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN = (
@@ -162,15 +167,15 @@ _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
         rf"\blarge{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
-        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\s+"
         rf"{_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
         rf"\b{_DEMOLITION_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}\s+"
         rf"large{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
-        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\b",
         rf"\b(?:demolition|demo|removal)\s+of\s+large{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
-        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\b",
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\b",
         rf"\blarge{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
-        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}\s+"
+        rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\s+"
         rf"{_DEMOLITION_LARGE_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
         rf"\bfull{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         r"(?:teardown|tear down)\b",
@@ -188,6 +193,18 @@ _DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS = tuple(
         rf"{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\b",
         rf"\b{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         rf"{_DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
+    )
+)
+_DEMOLITION_TEARDOWN_ONLY_STRUCTURE_PATTERNS = (
+    re.compile(r"^(?:teardown|tear down|dismantle)$"),
+)
+_DEMOLITION_ROOF_FIXTURE_PATTERN = r"(?:rack|vent|antenna|fixture|cap|flashing|panel)"
+_DEMOLITION_ROOF_HEAVY_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        rf"\bremove\s+roof(?!\s+{_DEMOLITION_ROOF_FIXTURE_PATTERN}\b)\b",
+        rf"\bdemolish\s+roof(?!\s+{_DEMOLITION_ROOF_FIXTURE_PATTERN}\b)\b",
+        rf"\bdemo\s+roof(?!\s+{_DEMOLITION_ROOF_FIXTURE_PATTERN}\b)\b",
     )
 )
 _DEMOLITION_ROOF_HEAVY_PHRASES = (
@@ -209,9 +226,6 @@ _DEMOLITION_ROOF_HEAVY_PHRASES = (
     "remove old shingles",
     "demo shingles",
     "demolish shingles",
-    "remove roof",
-    "demolish roof",
-    "demo roof",
     "roofing removal",
     "roof shingles",
     "asphalt shingles",
@@ -826,6 +840,8 @@ def _matches_any_pattern(text: str, patterns: tuple[re.Pattern[str], ...]) -> bo
 
 
 def _has_demolition_structure_target(text: str) -> bool:
+    if _matches_any_pattern(text, _DEMOLITION_TEARDOWN_ONLY_STRUCTURE_PATTERNS):
+        return True
     if not _contains_any_phrase(text, _DEMOLITION_STRUCTURE_PHRASES):
         return False
     return _matches_any_pattern(text, _DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS)
@@ -873,6 +889,7 @@ def _demolition_safeguard(
     has_large_structure = _has_large_structure_demolition_signal(safeguard_text)
     has_roof_heavy = (
         _contains_any_phrase(safeguard_text, _DEMOLITION_ROOF_HEAVY_PHRASES)
+        or _matches_any_pattern(safeguard_text, _DEMOLITION_ROOF_HEAVY_PATTERNS)
         or construction_debris_value == "shingles"
         or dense_material_value == "shingles"
     )
