@@ -246,7 +246,7 @@ Required review rows:
 - Target-only positive: example `large deck demolition`. Expected: safeguard triggers.
 - Access-only false positive: example `deck access to remove cabinets`. Expected: safeguard does not trigger.
 - Target plus access combined: example `large deck demolition with deck access`. Expected: safeguard still triggers because the demolition target is explicit.
-- Cleanup/debris/removal near miss: example `old wooden shed cleanup and removal`. Expected: cleanup/debris wording does not become demolition-heavy unless the demolition target is explicit.
+- Cleanup/debris/removal near miss: example `old lumber cleanup and removal`. Expected: cleanup/debris wording does not become demolition-heavy unless the demolition target is explicit.
 - Simple structure removal: example `old shed removal`. Expected: protected if the target is a clear structure and removal is already accepted customer language.
 - Word-order swaps: examples `tear off roof` and `roof tear-off` and `roof tear off`. Expected: common safe customer word orders are covered.
 - Existing vocabulary preservation: examples `gazebo`, `outbuilding`, `carport`, `shed`, `deck`, `fence`. Expected: new safeguards do not accidentally drop existing protected structure terms, and do not invent a broad new taxonomy unless explicitly scoped.
