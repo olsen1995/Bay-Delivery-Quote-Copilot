@@ -946,8 +946,8 @@ def test_bare_unit_demolition_text_does_not_create_access_risk(
         ),
         (
             "Wet roof shingles and asphalt shingles tear-off debris.",
-            1200.0,
-            "heavy_material",
+            1500.0,
+            "roof_heavy",
         ),
         (
             "Laminate flooring, carpet, subfloor, underlayment, baseboards and trim rip-out.",
@@ -970,6 +970,579 @@ def test_demolition_material_and_access_safeguards(description: str, expected_mi
     assert float(result["total_cash_cad"]) >= expected_min_cash
     assert result["_internal"]["demolition_safeguard_tier"] == expected_tier
     assert float(result["_internal"]["demolition_safeguard_floor_cad"]) >= expected_min_cash
+
+
+def _demolition_description_quote(description: str) -> dict:
+    return calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+
+def _duplicated_demolition_description_quote(description: str) -> dict:
+    return calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+        job_description_customer=description,
+    )
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "large deck demolition",
+        "demolish large deck",
+        "large 16x20 wooden deck demolition",
+        "full old wooden deck teardown",
+        "large shed demolition",
+        "full shed teardown",
+        "large fence demolition",
+        "large deck demolition with deck access",
+        "large fence demolition with fence access",
+        "large structure demolition",
+        "large 20x20 structure removal",
+        "large carport demolition",
+        "large wooden carport teardown",
+        "large gazebo demolition",
+        "large outbuilding demolition",
+        "large shed removal",
+        "large deck removal",
+        "large gazebo removal",
+        "old wooden carport teardown",
+        "old wooden carport removal",
+        "large deck tear-out",
+        "large shed rip out",
+        "large gazebo dismantle",
+        "large deck to be removed",
+        "large deck needs removal",
+        "large fence requires removal",
+        "remove large deck",
+        "demo large deck",
+        "demolition of large gazebo",
+        "full gazebo teardown",
+        "full fence teardown",
+        "full outbuilding teardown",
+    ],
+)
+def test_clear_large_structure_demolition_uses_large_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "large_structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "large_structure" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "deck access to remove cabinets",
+        "use deck for access to remove cabinets",
+        "use access through the deck to remove cabinets",
+        "need access over the deck to remove wall",
+        "full shed debris removal",
+        "old wooden shed cleanup and removal",
+        "old fence boards cleanup and removal",
+        "small fence panel removal and yard cleanup",
+        "large shed debris removal",
+        "large deck access to remove cabinets",
+        "large cabinet removal",
+        "large junk removal",
+        "carport access to remove cabinets",
+        "remove old cabinets",
+        "remove wooden cabinets",
+        "demolish old tile",
+        "tear down cabinets",
+        "teardown tile",
+        "backyard cleanup",
+        "backyard junk removal",
+        "full cabinet removal",
+        "full tile removal",
+        "full junk removal",
+        "full carpet removal",
+        "remove large cabinet",
+        "remove large cabinets from deck",
+        "remove large debris from deck",
+        "remove large junk from deck",
+        "remove large tile from deck",
+        "remove large cabinet through fence",
+        "remove large cabinets through fence",
+        "remove large debris through fence",
+        "remove large junk through fence",
+        "remove large debris on deck",
+        "remove large cabinets on deck",
+        "remove large junk on deck",
+        "remove large cabinets near deck",
+        "remove large cabinets near shed",
+        "remove large debris beside fence",
+        "remove large junk behind shed",
+        "remove large cabinets by deck",
+        "remove large cabinets by shed",
+        "remove large debris around fence",
+        "remove large junk beside shed",
+        "demo large tile",
+        "large cabinet dismantle",
+        "large junk rip out",
+        "generic cabinet demo",
+        "generic tile demo",
+    ],
+)
+def test_large_structure_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "remove large deck boards",
+        "remove large fence boards",
+        "remove large shed door",
+        "remove large deck railing",
+        "remove large fence panel",
+        "remove large shed roof",
+    ],
+)
+def test_large_structure_component_false_positives_do_not_use_large_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] != "large_structure"
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "old shed removal",
+        "shed removal",
+        "shed",
+        "deck",
+        "fence",
+        "gazebo",
+        "outbuilding",
+        "structure",
+        "16x10 shed",
+        "12x12 deck",
+        "wooden deck",
+        "old shed",
+        "metal shed",
+        "large deck",
+        "small shed",
+        "full shed",
+        "whole deck",
+        "old wooden shed",
+        "old metal fence",
+        "16x20 wooden deck",
+        "large wooden deck",
+        "full wooden shed",
+        "whole metal fence",
+        "old large shed",
+        "old 16x20 shed",
+        "the shed",
+        "my gazebo",
+        "our deck",
+        "one shed",
+        "2 sheds",
+        "16 x 10 shed",
+        "remove old shed",
+        "remove the shed",
+        "remove a fence",
+        "remove one shed",
+        "remove 2 sheds",
+        "remove 16 x 10 shed",
+        "remove wooden fence",
+        "demolish old shed",
+        "demolish the deck",
+        "demo shed",
+        "demo old shed",
+        "demo our shed",
+        "demo wooden fence",
+        "demo deck",
+        "demo gazebo",
+        "demo outbuilding",
+        "rip out shed",
+        "ripout shed",
+        "rip off shed",
+        "removing shed",
+        "demolishing deck",
+        "deck tear-out",
+        "remove deck",
+        "teardown",
+        "tear down",
+        "dismantle",
+        "teardown and cleanup",
+        "tear down and cleanup",
+        "dismantle and haul away",
+        "teardown and haul away",
+        "tear down and remove debris",
+        "dismantle and remove debris",
+        "teardown cleanup",
+        "dismantle cleanup",
+        "tear down my gazebo",
+        "tear down shed",
+        "tear down deck",
+        "teardown deck",
+        "teardown shed",
+        "tear down fence",
+        "teardown fence",
+        "shed teardown",
+        "deck teardown",
+        "fence teardown",
+        "gazebo teardown",
+        "outbuilding teardown",
+        "shed removed",
+        "deck demolished",
+        "fence removed",
+        "gazebo dismantled",
+        "outbuilding removed",
+        "shed being removed",
+        "deck is being demolished",
+        "fence will be removed",
+        "deck has to be removed",
+        "old shed in yard",
+        "deck at house",
+        "fence behind garage",
+        "gazebo on property",
+        "shed needs removal",
+        "deck needs demolition",
+        "fence requires removal",
+        "shed to be removed",
+        "deck to be demolished",
+        "fence to be removed",
+    ],
+)
+def test_clear_structure_removal_uses_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1000.0
+    assert float(result["total_emt_cad"]) == 1130.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "shed demolition and yard cleanup",
+        "deck demolition and yard cleanup",
+    ],
+)
+def test_explicit_structure_demolition_with_yard_cleanup_uses_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) >= 1000.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "remove cabinets",
+        "generic junk removal",
+        "cabinet to be removed",
+        "cabinets to be removed",
+        "tile to be removed",
+        "junk to be removed",
+        "carpet to be removed",
+        "demo cabinets",
+        "demo tile",
+        "demo carpet",
+        "demo junk",
+        "cabinet teardown",
+        "tile teardown",
+        "junk teardown",
+        "carpet teardown",
+        "cabinet dismantle",
+        "tile dismantle",
+        "junk dismantle",
+        "dismantle cabinet",
+        "dismantle tile",
+        "teardown cabinet",
+        "teardown tile",
+    ],
+)
+def test_non_structure_removal_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] != "structure"
+    assert "structure_teardown" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "cabinet",
+        "cabinets",
+        "tile",
+        "junk",
+        "carpet",
+        "debris",
+        "roof rack",
+        "roof vent",
+        "roof antenna",
+        "roof racks",
+        "roof vents",
+        "deck boards",
+        "deck board removal",
+        "deck railing",
+        "deck railings",
+        "deck joists",
+        "deck joist removal",
+        "fence boards",
+        "fence board removal",
+        "fence panel",
+        "fence panels",
+        "fence posts",
+        "fence post removal",
+        "shed door",
+        "shed doors",
+        "shed roof",
+        "shed siding",
+        "shed siding removal",
+        "remove deck boards",
+        "remove fence boards",
+        "remove shed door",
+        "remove deck railing",
+        "remove fence panel",
+        "remove shed roof",
+        "deck access",
+        "fence access",
+        "backyard access",
+        "remove cabinets from deck",
+        "remove debris near fence",
+        "remove junk behind shed",
+        "remove large cabinets from deck",
+        "remove large fence posts",
+        "remove large deck joists",
+        "remove large shed siding",
+    ],
+)
+def test_structure_only_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "shed",
+        "large deck",
+        "old wooden shed",
+        "16x20 shed",
+    ],
+)
+def test_duplicated_structure_only_customer_descriptions_use_structure_floor(description: str) -> None:
+    result = _duplicated_demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1000.0
+    assert float(result["total_emt_cad"]) == 1130.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize("description", ["teardown", "tear down", "dismantle"])
+def test_duplicated_teardown_only_customer_descriptions_use_structure_floor(description: str) -> None:
+    result = _duplicated_demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1000.0
+    assert float(result["total_emt_cad"]) == 1130.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "structure"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1000.0
+    assert "structure_teardown" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "cabinet",
+        "tile",
+        "junk",
+        "debris",
+        "roof rack",
+        "deck boards",
+        "fence boards",
+        "shed door",
+        "remove deck boards",
+        "remove fence boards",
+        "remove shed door",
+        "remove deck railing",
+        "remove fence panel",
+        "remove shed roof",
+        "deck access",
+        "fence access",
+        "remove cabinets from deck",
+        "remove debris near fence",
+        "remove junk behind shed",
+    ],
+)
+def test_duplicated_structure_only_false_positives_do_not_use_structure_floor(description: str) -> None:
+    result = _duplicated_demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "roof demolition",
+        "roof removal",
+        "roof demo",
+        "tear off roof",
+        "roof tear-off",
+        "roof tear off",
+        "roofing tear-off",
+        "roof shingle removal",
+        "roof shingle demolition",
+        "shingle demolition",
+        "shingle removal",
+        "shingles removal",
+        "shingle tear-off",
+        "tear off shingles",
+        "shingles tear off",
+        "remove shingles",
+        "remove old shingles",
+        "demo shingles",
+        "demolish shingles",
+        "remove roof",
+        "demolish roof",
+        "demo roof",
+        "roofing removal",
+        "roof shingles",
+        "asphalt shingles",
+        "asphalt shingle removal",
+    ],
+)
+def test_clear_roof_shingle_demolition_uses_roof_heavy_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "roof_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "roof_heavy" in result["_internal"]["demolition_safeguard_flags"]
+    assert result["_internal"]["demolition_owner_review_recommended"] is True
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "waterproofing removal",
+        "proofing removal",
+        "waterproofing material demo",
+        "proofing demolition",
+        "waterproofing tear off",
+        "proofing tear off",
+        "remove roof rack",
+        "remove roof vent",
+        "remove roof antenna",
+        "demo roof antenna",
+        "demolish roof vent",
+        "generic demolition with no roof or shingle target",
+    ],
+)
+def test_roof_shingle_false_positives_do_not_use_roof_heavy_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] != "roof_heavy"
+    assert "roof_heavy" not in flags
+    assert result["_internal"]["demolition_safeguard_floor_cad"] < 1500.0
+
+
+@pytest.mark.parametrize("material_field", ["construction_debris_type", "dense_material_type"])
+def test_demolition_structured_shingles_use_roof_heavy_floor(material_field: str) -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition material removal.",
+        **{material_field: "shingles"},
+    )
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "roof_heavy"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert "roof_heavy" in result["_internal"]["demolition_safeguard_flags"]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Backyard concrete slab demolition",
+        "Back yard brick patio demo",
+        "backyard concrete demolition",
+        "backyard brick removal",
+    ],
+)
+def test_heavy_backyard_concrete_brick_slab_demolition_uses_heavy_access_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+
+    assert float(result["total_cash_cad"]) == 1500.0
+    assert float(result["total_emt_cad"]) == 1695.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "heavy_access"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 1500.0
+    assert {"heavy_material", "access_risk"}.issubset(result["_internal"]["demolition_safeguard_flags"])
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "backyard access to remove cabinets",
+        "deck access through backyard",
+        "backyard cleanup",
+        "backyard junk removal",
+        "backyard cabinet pickup",
+        "bathroom tile demo with fence access",
+        "full kitchen cabinet demo with deck access through backyard",
+    ],
+)
+def test_backyard_and_access_false_positives_do_not_use_heavy_backyard_or_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {
+        "heavy_access",
+        "structure",
+        "large_structure",
+    }
+    assert "large_structure" not in flags
+    assert "structure_teardown" not in flags
+    assert result["_internal"]["demolition_safeguard_floor_cad"] < 1500.0
 
 
 def test_demolition_structured_soil_counts_as_heavy_material_without_dense_checkbox() -> None:
