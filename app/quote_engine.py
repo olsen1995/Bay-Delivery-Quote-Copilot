@@ -128,46 +128,49 @@ _DEMOLITION_STRUCTURE_PHRASES = (
 _DEMOLITION_STRUCTURE_TARGET_PATTERN = (
     r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)"
 )
+_DEMOLITION_STRUCTURE_TARGET_BASE_BY_TOKEN = {
+    "deck": "deck",
+    "decks": "deck",
+    "shed": "shed",
+    "sheds": "shed",
+    "fence": "fence",
+    "fences": "fence",
+    "gazebo": "gazebo",
+    "gazebos": "gazebo",
+    "structure": "structure",
+    "structures": "structure",
+    "outbuilding": "outbuilding",
+    "outbuildings": "outbuilding",
+}
+_DEMOLITION_STRUCTURE_ROUTE_CONTEXT_TOKENS = frozenset(
+    {"from", "through", "on", "near", "behind", "beside", "around", "by", "over"}
+)
+_DEMOLITION_STRUCTURE_CONTEXT_SKIP_TOKENS = frozenset({"the", "a", "an", "my", "our", "their", "your"})
+_DEMOLITION_STRUCTURE_COMPONENT_TOKENS_BY_TARGET = {
+    "deck": frozenset({"board", "boards", "railing", "railings", "joist", "joists"}),
+    "fence": frozenset({"board", "boards", "panel", "panels", "post", "posts"}),
+    "shed": frozenset({"door", "doors", "roof", "siding"}),
+}
+_DEMOLITION_STRUCTURE_NON_TARGET_CONTEXT_TOKENS = frozenset(
+    {"cabinet", "cabinets", "tile", "junk", "carpet", "debris", "cleanup"}
+)
 _DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN = (
     r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings|"
     r"carport|carports)"
 )
-_DEMOLITION_LARGE_STRUCTURE_COMPONENT_PATTERN = r"(?:boards?|railings?|doors?|panels?|roof|trim)"
+_DEMOLITION_LARGE_STRUCTURE_COMPONENT_PATTERN = r"(?:boards?|railings?|joists?|doors?|panels?|posts?|roof|siding|trim)"
 _DEMOLITION_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN = (
     rf"{_DEMOLITION_LARGE_STRUCTURE_TARGET_PATTERN}"
     rf"(?!\s+{_DEMOLITION_LARGE_STRUCTURE_COMPONENT_PATTERN}\b)"
 )
-_DEMOLITION_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN = (
-    rf"{_DEMOLITION_STRUCTURE_TARGET_PATTERN}"
-    rf"(?!\s+{_DEMOLITION_LARGE_STRUCTURE_COMPONENT_PATTERN}\b)"
-)
-_DEMOLITION_STRUCTURE_DESCRIPTOR_PATTERN = r"(?:\s+[a-z0-9]+){0,3}"
 _DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN = (
     r"(?:the|a|an|my|our|their|your|old|wooden|wood|metal|large|small|full|whole|two|[0-9]+x[0-9]+)"
 )
 _DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN = (
     rf"(?:\s+{_DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN}){{0,4}}"
 )
-_DEMOLITION_STRUCTURE_TARGET_ONLY_BODY_PATTERN = (
-    rf"(?:{_DEMOLITION_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN}\s+){{0,4}}"
-    rf"{_DEMOLITION_STRUCTURE_TARGET_PATTERN}"
-)
-_DEMOLITION_STRUCTURE_TARGET_ONLY_PATTERNS = (
-    re.compile(rf"^{_DEMOLITION_STRUCTURE_TARGET_ONLY_BODY_PATTERN}$"),
-    re.compile(rf"^(?P<structure_only>{_DEMOLITION_STRUCTURE_TARGET_ONLY_BODY_PATTERN})\s+(?P=structure_only)$"),
-)
-_DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
-    r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
-)
 _DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN = (
     r"(?:demolition|demolished|demo|removal|removed|teardown|tear down|tear out|rip out|dismantle|dismantled)"
-)
-_DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN = (
-    r"(?:needs removal|need removal|needs demolition|need demolition|"
-    r"requires removal|require removal|requires demolition|require demolition|"
-    r"needs to be removed|needs to be demolished|"
-    r"requires to be removed|requires to be demolished|"
-    r"to be removed|to be demolished)"
 )
 _DEMOLITION_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
     r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
@@ -194,20 +197,6 @@ _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
         rf"\bfull{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+{_DEMOLITION_STRUCTURE_TARGET_PATTERN}\s+"
         r"(?:teardown|tear down)\b",
         r"\bold\s+wooden\s+(?:carport|carports)\s+(?:removal|teardown|tear down)\b",
-    )
-)
-_DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS = tuple(
-    re.compile(pattern)
-    for pattern in (
-        rf"\b{_DEMOLITION_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\s+"
-        rf"{_DEMOLITION_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
-        rf"\b{_DEMOLITION_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}"
-        rf"{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
-        rf"{_DEMOLITION_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\b",
-        rf"\b(?:demolition|demo|removal)\s+of{_DEMOLITION_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
-        rf"{_DEMOLITION_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\b",
-        rf"\b{_DEMOLITION_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\s+"
-        rf"{_DEMOLITION_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
     )
 )
 _DEMOLITION_TEARDOWN_ONLY_STRUCTURE_PATTERNS = (
@@ -855,14 +844,49 @@ def _matches_any_pattern(text: str, patterns: tuple[re.Pattern[str], ...]) -> bo
     return any(pattern.search(text) for pattern in patterns)
 
 
-def _has_demolition_structure_target(text: str) -> bool:
+def _previous_non_skip_token(tokens: list[str], index: int) -> str:
+    pos = index - 1
+    while pos >= 0 and tokens[pos] in _DEMOLITION_STRUCTURE_CONTEXT_SKIP_TOKENS:
+        pos -= 1
+    if pos < 0:
+        return ""
+    return tokens[pos]
+
+
+def _structure_target_is_negative_context(tokens: list[str], index: int) -> bool:
+    target_base = _DEMOLITION_STRUCTURE_TARGET_BASE_BY_TOKEN.get(tokens[index])
+    if not target_base:
+        return False
+
+    next_token = tokens[index + 1] if index + 1 < len(tokens) else ""
+    next_next_token = tokens[index + 2] if index + 2 < len(tokens) else ""
+    if next_token == "access" or (next_token == "for" and next_next_token == "access"):
+        return True
+
+    component_tokens = _DEMOLITION_STRUCTURE_COMPONENT_TOKENS_BY_TARGET.get(target_base, frozenset())
+    if next_token in component_tokens:
+        return True
+
+    if next_token in _DEMOLITION_STRUCTURE_NON_TARGET_CONTEXT_TOKENS:
+        return True
+
+    return _previous_non_skip_token(tokens, index) in _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_TOKENS
+
+
+def _has_clear_demolition_structure_target(text: str) -> bool:
     if _matches_any_pattern(text, _DEMOLITION_TEARDOWN_ONLY_STRUCTURE_PATTERNS):
         return True
-    if _matches_any_pattern(text, _DEMOLITION_STRUCTURE_TARGET_ONLY_PATTERNS):
-        return True
-    if not _contains_any_phrase(text, _DEMOLITION_STRUCTURE_PHRASES):
+
+    tokens = text.split()
+    target_indexes = [
+        index
+        for index, token in enumerate(tokens)
+        if token in _DEMOLITION_STRUCTURE_TARGET_BASE_BY_TOKEN
+    ]
+    if not target_indexes:
         return False
-    return _matches_any_pattern(text, _DEMOLITION_STRUCTURE_TARGET_ACTION_PATTERNS)
+
+    return any(not _structure_target_is_negative_context(tokens, index) for index in target_indexes)
 
 
 def _has_large_structure_demolition_signal(text: str) -> bool:
@@ -903,7 +927,7 @@ def _demolition_safeguard(
     has_controlled_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_CONTROLLED_PHRASES)
     has_generic_signal = _contains_any_phrase(safeguard_text, _DEMOLITION_GENERIC_PHRASES)
     has_medium_material = _contains_any_phrase(safeguard_text, _DEMOLITION_MEDIUM_MATERIAL_PHRASES)
-    has_structure = _has_demolition_structure_target(safeguard_text)
+    has_structure = _has_clear_demolition_structure_target(safeguard_text)
     has_large_structure = _has_large_structure_demolition_signal(safeguard_text)
     has_roof_heavy = (
         _contains_any_phrase(safeguard_text, _DEMOLITION_ROOF_HEAVY_PHRASES)
