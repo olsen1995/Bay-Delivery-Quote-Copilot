@@ -237,6 +237,39 @@ Approved later pricing order:
 
 Do not start pricing PRs early unless Austin explicitly overrides the roadmap.
 
+## Semantic Combination Review Matrix
+
+Future pricing-sensitive PRs that touch `app/quote_engine.py`, quote totals, demolition safeguards, access/material/structure phrase matching, or owner-review/advisory pricing metadata must review semantic combinations, not only isolated positive and isolated false-positive examples.
+
+Required review rows:
+
+- Target-only positive: example `large deck demolition`. Expected: safeguard triggers.
+- Access-only false positive: example `deck access to remove cabinets`. Expected: safeguard does not trigger.
+- Target plus access combined: example `large deck demolition with deck access`. Expected: safeguard still triggers because the demolition target is explicit.
+- Cleanup/debris/removal near miss: example `old lumber cleanup and removal`. Expected: cleanup/debris wording does not become demolition-heavy unless the demolition target is explicit.
+- Simple structure removal: example `old shed removal`. Expected: protected if the target is a clear structure and removal is already accepted customer language.
+- Word-order swaps: examples `tear off roof` and `roof tear-off` and `roof tear off`. Expected: common safe customer word orders are covered.
+- Existing vocabulary preservation: examples `gazebo`, `outbuilding`, `carport`, `shed`, `deck`, `fence`. Expected: new safeguards do not accidentally drop existing protected structure terms, and do not invent a broad new taxonomy unless explicitly scoped.
+- Substring traps: examples `waterproofing is not roofing`, `proofing is not roofing`, `wall-to-wall carpet is not wall demolition`, `drywall is not wall demolition`. Expected: no accidental substring matches.
+- Customer/internal boundary: customer-facing quote responses must not expose owner-review, risk, margin, admin, advisory, or internal wording.
+- Payment math: cash remains no HST and rounded correctly; EMT/e-transfer adds 13% HST and rounds to cents; no hardcoded EMT totals; no second pricing path.
+
+Required review rule for every new pricing safeguard or phrase-matching rule:
+
+- include at least one clean positive
+- include at least one clean false positive
+- include at least one positive mixed with access/location wording
+- include at least one cleanup/debris near miss
+- include at least one common alternate customer wording
+- include at least one substring trap
+- include an existing-vocabulary preservation check when the rule touches known target vocabularies
+
+Do not commit until this matrix is checked.
+
+Fix valid P1/P2 findings before commit.
+
+If the required fix would need forbidden files or broad matching, stop and report instead of expanding scope.
+
 ---
 
 ## Customer/Admin Boundary Rules
