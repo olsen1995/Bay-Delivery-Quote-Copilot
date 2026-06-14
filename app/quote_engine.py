@@ -145,7 +145,29 @@ _DEMOLITION_STRUCTURE_TARGET_BASE_BY_TOKEN = {
 _DEMOLITION_STRUCTURE_ROUTE_CONTEXT_TOKENS = frozenset(
     {"from", "through", "on", "near", "behind", "beside", "around", "by", "over"}
 )
-_DEMOLITION_STRUCTURE_CONTEXT_SKIP_TOKENS = frozenset({"the", "a", "an", "my", "our", "their", "your"})
+_DEMOLITION_STRUCTURE_CONTEXT_SKIP_TOKENS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "my",
+        "our",
+        "their",
+        "your",
+        "old",
+        "wooden",
+        "wood",
+        "metal",
+        "large",
+        "small",
+        "full",
+        "whole",
+        "one",
+        "two",
+        "x",
+    }
+)
+_DEMOLITION_STRUCTURE_DIMENSION_SKIP_TOKEN_RE = re.compile(r"^(?:[0-9]+x[0-9]+|[0-9]+)$")
 _DEMOLITION_STRUCTURE_COMPONENT_TOKENS_BY_TARGET = {
     "deck": frozenset({"board", "boards", "railing", "railings", "joist", "joists"}),
     "fence": frozenset({"board", "boards", "panel", "panels", "post", "posts"}),
@@ -846,9 +868,15 @@ def _matches_any_pattern(text: str, patterns: tuple[re.Pattern[str], ...]) -> bo
     return any(pattern.search(text) for pattern in patterns)
 
 
+def _is_structure_context_skip_token(token: str) -> bool:
+    return token in _DEMOLITION_STRUCTURE_CONTEXT_SKIP_TOKENS or bool(
+        _DEMOLITION_STRUCTURE_DIMENSION_SKIP_TOKEN_RE.fullmatch(token)
+    )
+
+
 def _previous_non_skip_token(tokens: list[str], index: int) -> str:
     pos = index - 1
-    while pos >= 0 and tokens[pos] in _DEMOLITION_STRUCTURE_CONTEXT_SKIP_TOKENS:
+    while pos >= 0 and _is_structure_context_skip_token(tokens[pos]):
         pos -= 1
     if pos < 0:
         return ""

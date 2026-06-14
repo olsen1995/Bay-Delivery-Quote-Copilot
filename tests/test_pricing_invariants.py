@@ -1350,6 +1350,23 @@ def test_structure_only_false_positives_do_not_use_structure_floor(description: 
 @pytest.mark.parametrize(
     "description",
     [
+        "remove cabinets from old shed",
+        "remove debris near wooden fence",
+        "remove junk behind 16x20 shed",
+    ],
+)
+def test_structure_route_context_with_descriptors_does_not_use_structure_floor(description: str) -> None:
+    result = _demolition_description_quote(description)
+    flags = result["_internal"]["demolition_safeguard_flags"]
+
+    assert result["_internal"]["demolition_safeguard_tier"] not in {"structure", "large_structure"}
+    assert "structure_teardown" not in flags
+    assert "large_structure" not in flags
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
         "shed",
         "large deck",
         "old wooden shed",
