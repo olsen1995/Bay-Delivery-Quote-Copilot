@@ -202,6 +202,8 @@ _DEMOLITION_LARGE_STRUCTURE_PATTERNS = tuple(
 _DEMOLITION_TEARDOWN_ONLY_STRUCTURE_PATTERNS = (
     re.compile(r"^(?:teardown|tear down|dismantle)$"),
     re.compile(r"^(?P<teardown_only>teardown|tear down|dismantle)\s+(?P=teardown_only)$"),
+    re.compile(r"^(?:teardown|tear down|dismantle)(?:\s+and)?\s+(?:cleanup|haul away)$"),
+    re.compile(r"^(?:teardown|tear down|dismantle)\s+and\s+remove\s+debris$"),
 )
 _DEMOLITION_ROOF_FIXTURE_PATTERN = r"(?:rack|vent|antenna|fixture|cap|flashing|panel)"
 _DEMOLITION_ROOF_HEAVY_PATTERNS = tuple(
