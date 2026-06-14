@@ -1496,97 +1496,213 @@ def _json_text_in(column: str, field_name: str, values: Tuple[str, ...]) -> str:
     )
 
 
-_DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS: Tuple[str, ...] = (
+_DEMOLITION_OWNER_REVIEW_ACCESS_TEXT_SIGNALS: Tuple[str, ...] = (
     "apartment",
     "apartments",
     "apartment building",
-    "asbestos",
     "awkward debris",
-    "backyard",
-    "back yard",
     "basement",
-    "block",
-    "blocks",
-    "brick",
-    "bricks",
-    "bathroom tile",
-    "bathroom tiles",
-    "ceramic tile",
-    "ceramic tiles",
-    "chimney",
-    "chimneys",
-    "concrete",
     "condo",
     "condos",
-    "deck",
-    "decks",
-    "dismantle",
     "downstairs",
-    "dirt",
     "elevator",
     "elevators",
-    "fence",
-    "fences",
-    "fireplace",
-    "fireplaces",
-    "floor tile",
-    "floor tiles",
-    "gazebo",
-    "gazebos",
+    "heavy awkward debris",
+    "high rise",
+    "inside removal",
+    "long carry",
+    "no driveway access",
+    "stairs",
+    "stair",
+    "tight access",
+    "upstairs unit",
+)
+_DEMOLITION_OWNER_REVIEW_UNKNOWN_TEXT_SIGNALS: Tuple[str, ...] = (
+    "asbestos",
     "hazardous material",
     "hazardous materials",
-    "heavy awkward debris",
     "hidden debris",
     "hidden material",
     "hidden material behind wall",
     "hidden rubble",
-    "high rise",
-    "inside removal",
-    "lath and plaster",
     "liability sensitive",
-    "long carry",
-    "masonry",
-    "masonry debris",
-    "mortar",
-    "mortars",
     "no photo",
     "no photos",
-    "no driveway access",
     "not sure what material",
-    "outbuilding",
-    "outbuildings",
     "permit required",
     "permit sensitive",
     "regulated material",
     "regulated materials",
-    "rubble",
-    "shed",
-    "sheds",
-    "shingle",
-    "shingles",
-    "soil",
-    "stairs",
-    "stair",
-    "stone",
-    "stones",
-    "structure",
-    "structures",
-    "tear down",
-    "teardown",
-    "tile",
-    "tiles",
-    "roof shingles",
-    "asphalt shingles",
-    "wet shingles",
-    "tight access",
     "unclear material",
     "unknown debris",
     "unknown disposal volume",
     "unknown material",
     "unknown materials",
     "unknown volume",
-    "upstairs unit",
     "without photos",
+)
+_DEMOLITION_OWNER_REVIEW_HEAVY_TEXT_SIGNALS: Tuple[str, ...] = (
+    "block",
+    "blocks",
+    "brick",
+    "bricks",
+    "chimney",
+    "chimneys",
+    "concrete",
+    "dirt",
+    "fireplace",
+    "fireplaces",
+    "lath and plaster",
+    "masonry",
+    "masonry debris",
+    "mortar",
+    "mortars",
+    "rubble",
+    "soil",
+    "stone",
+    "stones",
+)
+_DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS: Tuple[str, ...] = (
+    "roof demolition",
+    "roof removal",
+    "roof demo",
+    "tear off roof",
+    "roof tear off",
+    "roofing tear off",
+    "roof shingle removal",
+    "roof shingle demolition",
+    "shingle demolition",
+    "shingle removal",
+    "shingles removal",
+    "shingle tear off",
+    "tear off shingles",
+    "shingles tear off",
+    "remove shingles",
+    "remove old shingles",
+    "demo shingles",
+    "demolish shingles",
+    "roofing removal",
+    "roof shingles",
+    "asphalt shingles",
+    "asphalt shingle removal",
+    "wet shingles",
+    "remove roof",
+    "demolish roof",
+    "demo roof",
+)
+_DEMOLITION_OWNER_REVIEW_ROOF_EXCLUSION_TEXT_SIGNALS: Tuple[str, ...] = (
+    "roof rack",
+    "roof racks",
+    "roof vent",
+    "roof vents",
+    "roof antenna",
+    "roof antennas",
+)
+_DEMOLITION_OWNER_REVIEW_LARGE_STRUCTURE_TEXT_SIGNALS: Tuple[str, ...] = (
+    "large deck demolition",
+    "large shed removal",
+    "large fence demolition",
+)
+_DEMOLITION_OWNER_REVIEW_BACKYARD_HEAVY_TEXT_SIGNALS: Tuple[str, ...] = (
+    "backyard concrete removal",
+    "backyard brick removal",
+    "backyard slab removal",
+    "back yard concrete removal",
+    "back yard brick removal",
+    "back yard slab removal",
+)
+_DEMOLITION_OWNER_REVIEW_STRUCTURE_TEXT_SIGNALS: Tuple[str, ...] = (
+    "shed",
+    "sheds",
+    "deck",
+    "decks",
+    "fence",
+    "fences",
+    "gazebo",
+    "gazebos",
+    "outbuilding",
+    "outbuildings",
+    "old shed removal",
+    "deck demolition",
+    "fence removal",
+    "teardown",
+    "tear down",
+    "dismantle",
+    "teardown and cleanup",
+    "tear down and cleanup",
+    "dismantle and haul away",
+    "teardown and haul away",
+    "shed removal",
+    "deck removal",
+    "gazebo removal",
+    "outbuilding removal",
+    "shed demolition",
+    "demo shed",
+    "demo deck",
+    "demo fence",
+    "demo gazebo",
+    "demo outbuilding",
+    "shed teardown",
+    "deck teardown",
+    "fence teardown",
+    "gazebo teardown",
+    "outbuilding teardown",
+)
+_DEMOLITION_OWNER_REVIEW_STRUCTURE_EXCLUSION_TEXT_SIGNALS: Tuple[str, ...] = (
+    "deck access",
+    "deck for access",
+    "access through the deck",
+    "access over the deck",
+    "from deck",
+    "through deck",
+    "on deck",
+    "near deck",
+    "behind deck",
+    "beside deck",
+    "around deck",
+    "by deck",
+    "over deck",
+    "fence access",
+    "fence for access",
+    "access through the fence",
+    "from fence",
+    "through fence",
+    "on fence",
+    "near fence",
+    "behind fence",
+    "beside fence",
+    "around fence",
+    "by fence",
+    "shed access",
+    "shed for access",
+    "from shed",
+    "through shed",
+    "on shed",
+    "near shed",
+    "behind shed",
+    "beside shed",
+    "around shed",
+    "by shed",
+    "deck board",
+    "deck boards",
+    "deck railing",
+    "deck railings",
+    "deck joist",
+    "deck joists",
+    "fence board",
+    "fence boards",
+    "fence panel",
+    "fence panels",
+    "fence post",
+    "fence posts",
+    "shed door",
+    "shed doors",
+    "shed roof",
+    "shed siding",
+    "cabinet from deck",
+    "cabinets from deck",
+    "debris near fence",
+    "junk behind shed",
 )
 _DEMOLITION_OWNER_REVIEW_CONSTRUCTION_MATERIAL_VALUES: Tuple[str, ...] = (
     "concrete",
@@ -1613,13 +1729,101 @@ def _owner_review_like_patterns(value: str) -> Tuple[str, ...]:
     return tuple(f"%{separator.join(words)}%" for separator in (" ", "-", "_", "/", "."))
 
 
-def _json_text_like_any(column: str, field_name: str, values: Tuple[str, ...]) -> str:
-    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
+def _owner_review_sql_literal(value: str) -> str:
+    return value.replace("'", "''")
+
+
+def _owner_review_text_expr_like_any(
+    text_expr: str,
+    trimmed_text_expr: str,
+    values: Tuple[str, ...],
+) -> str:
     clauses = []
     for value in values:
+        words = tuple(part for part in value.split() if part)
+        if len(words) <= 1:
+            normalized_value = _owner_review_sql_literal(value.lower())
+            clauses.extend(
+                (
+                    f"{trimmed_text_expr} = '{normalized_value}'",
+                    f"{text_expr} LIKE '{normalized_value} %'",
+                    f"{text_expr} LIKE '% {normalized_value}'",
+                    f"{text_expr} LIKE '% {normalized_value} %'",
+                    f"{text_expr} LIKE '% {normalized_value}.%'",
+                    f"{text_expr} LIKE '% {normalized_value},%'",
+                )
+            )
+            continue
         for pattern in _owner_review_like_patterns(value):
             clauses.append(f"{text_expr} LIKE '{pattern}'")
+    if not clauses:
+        return "(0 = 1)"
     return f"({' OR '.join(clauses)})"
+
+
+def _json_text_group_match(
+    column: str,
+    field_name: str,
+    values: Tuple[str, ...],
+    *,
+    exclusions: Tuple[str, ...] = (),
+) -> str:
+    text_expr = f"LOWER(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), ''))"
+    trimmed_text_expr = (
+        f"LOWER(TRIM(COALESCE(CAST(json_extract({column}, '$.{field_name}') AS TEXT), '')))"
+    )
+    include_clause = _owner_review_text_expr_like_any(text_expr, trimmed_text_expr, values)
+    exclude_clause = _owner_review_text_expr_like_any(text_expr, trimmed_text_expr, exclusions)
+    return f"({include_clause} AND NOT {exclude_clause})"
+
+
+def _json_text_group_match_any_field(
+    column: str,
+    values: Tuple[str, ...],
+    *,
+    exclusions: Tuple[str, ...] = (),
+) -> str:
+    return (
+        f"({_json_text_group_match(column, 'description', values, exclusions=exclusions)} "
+        f"OR {_json_text_group_match(column, 'job_description_customer', values, exclusions=exclusions)})"
+    )
+
+
+def _demolition_owner_review_text_signal_filter(request_json: str) -> str:
+    grouped_text_clauses = (
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_ACCESS_TEXT_SIGNALS,
+        ),
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_UNKNOWN_TEXT_SIGNALS,
+        ),
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_HEAVY_TEXT_SIGNALS,
+        ),
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS,
+            exclusions=_DEMOLITION_OWNER_REVIEW_ROOF_EXCLUSION_TEXT_SIGNALS,
+        ),
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_LARGE_STRUCTURE_TEXT_SIGNALS,
+            exclusions=_DEMOLITION_OWNER_REVIEW_STRUCTURE_EXCLUSION_TEXT_SIGNALS,
+        ),
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_BACKYARD_HEAVY_TEXT_SIGNALS,
+        ),
+        _json_text_group_match_any_field(
+            request_json,
+            _DEMOLITION_OWNER_REVIEW_STRUCTURE_TEXT_SIGNALS,
+            exclusions=_DEMOLITION_OWNER_REVIEW_STRUCTURE_EXCLUSION_TEXT_SIGNALS,
+        ),
+    )
+    return f"({' OR '.join(grouped_text_clauses)})"
 
 
 def _owner_review_manual_signal_filter(alias: str) -> str:
@@ -1648,8 +1852,7 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                                OR {_json_truthy(request_json, "basement_or_inside_removal")}
                                OR {_json_int(request_json, "stairs_count")} > 0))
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
-                          AND ({_json_text_like_any(request_json, "description", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}
-                               OR {_json_text_like_any(request_json, "job_description_customer", _DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)}))
+                          AND {_demolition_owner_review_text_signal_filter(request_json)})
                     THEN 1
                     ELSE 0
                 END

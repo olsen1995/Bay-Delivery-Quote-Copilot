@@ -652,15 +652,156 @@ def test_owner_review_counts_text_derived_demolition_without_pricing_or_advisory
     assert resp.json()["counts"]["owner_review"] == 1
 
 
+def _fail_owner_review_recompute(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+
 def test_demolition_owner_review_text_signals_match_engine_owner_review_phrases() -> None:
-    expected_signals = (
-        set(quote_engine._DEMOLITION_ACCESS_RISK_PHRASES)
-        | set(quote_engine._DEMOLITION_UNKNOWN_SCOPE_PHRASES)
-        | set(quote_engine._DEMOLITION_HEAVY_MATERIAL_PHRASES)
-        | set(quote_engine._DEMOLITION_STRUCTURE_PHRASES)
+    expected_grouped_signals = {
+        "roof removal",
+        "roof demo",
+        "tear off roof",
+        "roofing tear off",
+        "roof tear off",
+        "shingle demolition",
+        "shingle tear off",
+        "large deck demolition",
+        "large shed removal",
+        "large fence demolition",
+        "backyard concrete removal",
+        "backyard brick removal",
+        "backyard slab removal",
+        "shed",
+        "deck",
+        "fence",
+        "gazebo",
+        "outbuilding",
+        "old shed removal",
+        "deck demolition",
+        "fence removal",
+        "teardown",
+        "tear down",
+        "dismantle",
+        "teardown and cleanup",
+        "dismantle and haul away",
+    }
+    actual_grouped_signals = (
+        set(storage._DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS)
+        | set(storage._DEMOLITION_OWNER_REVIEW_LARGE_STRUCTURE_TEXT_SIGNALS)
+        | set(storage._DEMOLITION_OWNER_REVIEW_BACKYARD_HEAVY_TEXT_SIGNALS)
+        | set(storage._DEMOLITION_OWNER_REVIEW_STRUCTURE_TEXT_SIGNALS)
     )
 
-    assert sorted(expected_signals - set(storage._DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)) == []
+    assert sorted(expected_grouped_signals - actual_grouped_signals) == []
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "roof removal",
+        "roof demo",
+        "tear off roof",
+        "roofing tear off",
+        "roof tear off",
+        "shingle demolition",
+        "shingle tear off",
+        "large deck demolition",
+        "large shed removal",
+        "large fence demolition",
+        "backyard concrete removal",
+        "backyard brick removal",
+        "backyard slab removal",
+        "shed",
+        "deck",
+        "fence",
+        "gazebo",
+        "outbuilding",
+        "old shed removal",
+        "deck demolition",
+        "fence removal",
+        "teardown",
+        "tear down",
+        "dismantle",
+        "teardown and cleanup",
+        "dismantle and haul away",
+    ],
+)
+def test_owner_review_counts_pr336_demolition_signal_parity_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-pr336-positive",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+    payload = resp.json()
+
+    assert resp.status_code == 200
+    assert payload["counts"]["owner_review"] == 1
+    assert _cards(payload)["owner_review"]["count"] == 1
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "deck access to remove cabinets",
+        "bathroom tile demo with fence access",
+        "remove cabinets from deck",
+        "remove debris near fence",
+        "remove junk behind shed",
+        "remove large cabinets from deck",
+        "remove large fence posts",
+        "remove large deck joists",
+        "remove large shed siding",
+        "remove roof rack",
+        "remove roof vent",
+        "demo roof antenna",
+        "generic tile demo",
+        "generic cabinet demo",
+        "yard cleanup",
+        "old lumber cleanup and removal",
+    ],
+)
+def test_owner_review_excludes_pr336_demolition_false_positives_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-pr336-false-positive",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+    payload = resp.json()
+
+    assert resp.status_code == 200
+    assert payload["counts"]["owner_review"] == 0
+    assert _cards(payload)["owner_review"]["count"] == 0
 
 
 @pytest.mark.parametrize(
@@ -787,7 +928,6 @@ def test_owner_review_counts_engine_demolition_text_signals_without_recompute(
     [
         "Tight-access demolition cleanup.",
         "No-photo demolition debris.",
-        "Back-yard demolition cleanup.",
         "No-driveway-access demolition debris.",
         "Long-carry demolition debris.",
         "Inside-removal demolition cleanup.",
