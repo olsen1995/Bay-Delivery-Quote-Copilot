@@ -1571,6 +1571,7 @@ _DEMOLITION_OWNER_REVIEW_HEAVY_TEXT_SIGNALS: Tuple[str, ...] = (
     "floor tiles",
     "bathroom tile",
     "bathroom tiles",
+    "shingles",
 )
 _DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS: Tuple[str, ...] = (
     "roof demolition",
@@ -1772,14 +1773,19 @@ _DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES: Tuple[str, ...] = (
 )
 
 
-_OWNER_REVIEW_TEXT_SEPARATORS: Tuple[str, ...] = ("-", "_", "/", ".", ",")
+def _owner_review_normalize_text(value: Any) -> str:
+    if value is None:
+        return ""
+    lowered = str(value).lower()
+    normalized_chars = [
+        char if ("a" <= char <= "z" or "0" <= char <= "9") else " "
+        for char in lowered
+    ]
+    return " ".join("".join(normalized_chars).split())
 
 
 def _owner_review_normalized_value(value: str) -> str:
-    normalized = value.lower()
-    for separator in _OWNER_REVIEW_TEXT_SEPARATORS:
-        normalized = normalized.replace(separator, " ")
-    return " ".join(normalized.split())
+    return _owner_review_normalize_text(value)
 
 
 def _owner_review_sql_literal(value: str) -> str:
@@ -1787,10 +1793,16 @@ def _owner_review_sql_literal(value: str) -> str:
 
 
 def _owner_review_normalized_text_expr(raw_text_expr: str) -> str:
-    normalized_expr = raw_text_expr
-    for separator in _OWNER_REVIEW_TEXT_SEPARATORS:
-        normalized_expr = f"REPLACE({normalized_expr}, '{separator}', ' ')"
-    return normalized_expr
+    return f"owner_review_normalize_text({raw_text_expr})"
+
+
+def _register_owner_review_sql_functions(conn: sqlite3.Connection) -> None:
+    conn.create_function(
+        "owner_review_normalize_text",
+        1,
+        _owner_review_normalize_text,
+        deterministic=True,
+    )
 
 
 def _owner_review_text_expr_like_any(text_expr: str, values: Tuple[str, ...]) -> str:
@@ -1962,6 +1974,7 @@ def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_star
     owner_review_quote_manual_signal_where = _owner_review_manual_signal_filter("q")
 
     conn = _connect()
+    _register_owner_review_sql_functions(conn)
     try:
         counts["new_requests"] = _count_query(
             conn,
