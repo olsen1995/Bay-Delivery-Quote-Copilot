@@ -1878,7 +1878,7 @@ _OWNER_REVIEW_TEARDOWN_ONLY_STRUCTURE_PATTERNS = (
     re.compile(r"^(?:teardown|tear down|dismantle)(?:\s+and)?\s+(?:cleanup|haul away)$"),
     re.compile(r"^(?:teardown|tear down|dismantle)\s+and\s+remove\s+debris$"),
 )
-_OWNER_REVIEW_ROOF_FIXTURE_PATTERN = r"(?:rack|racks|vent|vents|antenna|antennas|fixture|fixtures|cap|caps|flashing|panel|panels)"
+_OWNER_REVIEW_ROOF_FIXTURE_PATTERN = r"(?:rack|vent|antenna|fixture|cap|flashing|panel)"
 _OWNER_REVIEW_ROOF_ACTION_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
