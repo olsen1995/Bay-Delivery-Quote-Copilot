@@ -1627,6 +1627,9 @@ _DEMOLITION_OWNER_REVIEW_LARGE_STRUCTURE_TEXT_SIGNALS: Tuple[str, ...] = (
     "large deck demolition",
     "large shed removal",
     "large fence demolition",
+    "large carport demolition",
+    "remove large carport",
+    "old wooden carport removal",
 )
 _DEMOLITION_OWNER_REVIEW_BACKYARD_HEAVY_TEXT_SIGNALS: Tuple[str, ...] = (
     "backyard concrete removal",
@@ -1771,6 +1774,119 @@ _DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES: Tuple[str, ...] = (
     "stone",
     "tile",
 )
+_OWNER_REVIEW_STRUCTURE_ROUTE_CONTEXT_TOKENS = frozenset(
+    {"from", "through", "on", "near", "behind", "beside", "around", "by", "over"}
+)
+_OWNER_REVIEW_STRUCTURE_CONTEXT_SKIP_TOKENS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "my",
+        "our",
+        "their",
+        "your",
+        "old",
+        "wooden",
+        "wood",
+        "metal",
+        "large",
+        "small",
+        "full",
+        "whole",
+        "one",
+        "two",
+        "x",
+    }
+)
+_OWNER_REVIEW_STRUCTURE_DIMENSION_SKIP_TOKEN_RE = re.compile(r"^(?:[0-9]+x[0-9]+|[0-9]+)$")
+_OWNER_REVIEW_STRUCTURE_TARGET_BASE_BY_TOKEN = {
+    "deck": "deck",
+    "decks": "deck",
+    "shed": "shed",
+    "sheds": "shed",
+    "fence": "fence",
+    "fences": "fence",
+    "gazebo": "gazebo",
+    "gazebos": "gazebo",
+    "structure": "structure",
+    "structures": "structure",
+    "outbuilding": "outbuilding",
+    "outbuildings": "outbuilding",
+}
+_OWNER_REVIEW_STRUCTURE_COMPONENT_TOKENS_BY_TARGET = {
+    "deck": frozenset({"board", "boards", "railing", "railings", "joist", "joists"}),
+    "fence": frozenset({"board", "boards", "panel", "panels", "post", "posts"}),
+    "shed": frozenset({"door", "doors", "roof", "siding"}),
+}
+_OWNER_REVIEW_STRUCTURE_NON_TARGET_CONTEXT_TOKENS = frozenset(
+    {"cabinet", "cabinets", "tile", "junk", "carpet", "debris", "cleanup"}
+)
+_OWNER_REVIEW_STRUCTURE_TARGET_PATTERN = (
+    r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings)"
+)
+_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_PATTERN = (
+    r"(?:deck|decks|shed|sheds|fence|fences|gazebo|gazebos|structure|structures|outbuilding|outbuildings|"
+    r"carport|carports)"
+)
+_OWNER_REVIEW_LARGE_STRUCTURE_COMPONENT_PATTERN = (
+    r"(?:boards?|railings?|joists?|doors?|panels?|posts?|roof|siding|trim)"
+)
+_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN = (
+    rf"{_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_PATTERN}"
+    rf"(?!\s+{_OWNER_REVIEW_LARGE_STRUCTURE_COMPONENT_PATTERN}\b)"
+)
+_OWNER_REVIEW_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN = (
+    r"(?:the|a|an|my|our|their|your|old|wooden|wood|metal|large|small|full|whole|two|[0-9]+x[0-9]+)"
+)
+_OWNER_REVIEW_STRUCTURE_ACTION_DESCRIPTOR_PATTERN = (
+    rf"(?:\s+{_OWNER_REVIEW_STRUCTURE_DESCRIPTOR_TOKEN_PATTERN}){{0,4}}"
+)
+_OWNER_REVIEW_STRUCTURE_ACTION_AFTER_TARGET_PATTERN = (
+    r"(?:demolition|demolished|demo|removal|removed|teardown|tear down|tear out|rip out|dismantle|dismantled)"
+)
+_OWNER_REVIEW_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN = (
+    r"(?:demolish|remove|demo|teardown|tear down|tear out|rip out|dismantle)"
+)
+_OWNER_REVIEW_LARGE_STRUCTURE_CONNECTOR_ACTION_PATTERN = (
+    r"(?:to be removed|to be demolished|needs removal|need removal|"
+    r"needs demolition|need demolition|requires removal|require removal|"
+    r"requires demolition|require demolition)"
+)
+_OWNER_REVIEW_LARGE_STRUCTURE_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        rf"\blarge{_OWNER_REVIEW_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_STRUCTURE_ACTION_AFTER_TARGET_PATTERN}\b",
+        rf"\b{_OWNER_REVIEW_LARGE_STRUCTURE_VERB_BEFORE_TARGET_PATTERN}\s+"
+        rf"large{_OWNER_REVIEW_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\b",
+        rf"\b(?:demolition|demo|removal)\s+of\s+large{_OWNER_REVIEW_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\b",
+        rf"\blarge{_OWNER_REVIEW_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_LARGE_STRUCTURE_TARGET_WITHOUT_COMPONENT_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_LARGE_STRUCTURE_CONNECTOR_ACTION_PATTERN}\b",
+        rf"\bfull{_OWNER_REVIEW_STRUCTURE_ACTION_DESCRIPTOR_PATTERN}\s+"
+        rf"{_OWNER_REVIEW_STRUCTURE_TARGET_PATTERN}\s+(?:teardown|tear down)\b",
+        r"\bold\s+wooden\s+(?:carport|carports)\s+(?:removal|teardown|tear down)\b",
+    )
+)
+_OWNER_REVIEW_TEARDOWN_ONLY_STRUCTURE_PATTERNS = (
+    re.compile(r"^(?:teardown|tear down|dismantle)$"),
+    re.compile(r"^(?P<teardown_only>teardown|tear down|dismantle)\s+(?P=teardown_only)$"),
+    re.compile(r"^(?:teardown|tear down|dismantle)(?:\s+and)?\s+(?:cleanup|haul away)$"),
+    re.compile(r"^(?:teardown|tear down|dismantle)\s+and\s+remove\s+debris$"),
+)
+_OWNER_REVIEW_ROOF_FIXTURE_PATTERN = r"(?:rack|racks|vent|vents|antenna|antennas|fixture|fixtures|cap|caps|flashing|panel|panels)"
+_OWNER_REVIEW_ROOF_ACTION_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        rf"\bremove\s+roof(?!\s+{_OWNER_REVIEW_ROOF_FIXTURE_PATTERN}\b)\b",
+        rf"\bdemolish\s+roof(?!\s+{_OWNER_REVIEW_ROOF_FIXTURE_PATTERN}\b)\b",
+        rf"\bdemo\s+roof(?!\s+{_OWNER_REVIEW_ROOF_FIXTURE_PATTERN}\b)\b",
+    )
+)
 
 
 def _owner_review_normalize_text(value: Any) -> str:
@@ -1782,6 +1898,123 @@ def _owner_review_normalize_text(value: Any) -> str:
         for char in lowered
     ]
     return " ".join("".join(normalized_chars).split())
+
+
+def _owner_review_normalize_parts(*parts: Any) -> str:
+    raw = " ".join(str(part or "") for part in parts if part is not None)
+    return _owner_review_normalize_text(raw)
+
+
+def _owner_review_contains_any_phrase(text: str, phrases: Tuple[str, ...]) -> bool:
+    if not text:
+        return False
+    padded_text = f" {text} "
+    return any(
+        f" {_owner_review_normalize_text(phrase)} " in padded_text
+        for phrase in phrases
+        if _owner_review_normalize_text(phrase)
+    )
+
+
+def _owner_review_matches_any_pattern(text: str, patterns: Tuple[re.Pattern[str], ...]) -> bool:
+    return any(pattern.search(text) for pattern in patterns)
+
+
+def _owner_review_is_structure_context_skip_token(token: str) -> bool:
+    return token in _OWNER_REVIEW_STRUCTURE_CONTEXT_SKIP_TOKENS or bool(
+        _OWNER_REVIEW_STRUCTURE_DIMENSION_SKIP_TOKEN_RE.fullmatch(token)
+    )
+
+
+def _owner_review_previous_non_skip_token(tokens: List[str], index: int) -> str:
+    pos = index - 1
+    while pos >= 0 and _owner_review_is_structure_context_skip_token(tokens[pos]):
+        pos -= 1
+    if pos < 0:
+        return ""
+    return tokens[pos]
+
+
+def _owner_review_structure_target_is_negative_context(tokens: List[str], index: int) -> bool:
+    target_base = _OWNER_REVIEW_STRUCTURE_TARGET_BASE_BY_TOKEN.get(tokens[index])
+    if not target_base:
+        return False
+
+    next_token = tokens[index + 1] if index + 1 < len(tokens) else ""
+    next_next_token = tokens[index + 2] if index + 2 < len(tokens) else ""
+    if next_token == "access" or (next_token == "for" and next_next_token == "access"):
+        return True
+
+    component_tokens = _OWNER_REVIEW_STRUCTURE_COMPONENT_TOKENS_BY_TARGET.get(
+        target_base, frozenset()
+    )
+    if next_token in component_tokens:
+        return True
+
+    if next_token in _OWNER_REVIEW_STRUCTURE_NON_TARGET_CONTEXT_TOKENS:
+        return True
+
+    return (
+        _owner_review_previous_non_skip_token(tokens, index)
+        in _OWNER_REVIEW_STRUCTURE_ROUTE_CONTEXT_TOKENS
+    )
+
+
+def _owner_review_has_clear_structure_target(text: str) -> bool:
+    if _owner_review_matches_any_pattern(text, _OWNER_REVIEW_TEARDOWN_ONLY_STRUCTURE_PATTERNS):
+        return True
+
+    tokens = text.split()
+    target_indexes = [
+        index
+        for index, token in enumerate(tokens)
+        if token in _OWNER_REVIEW_STRUCTURE_TARGET_BASE_BY_TOKEN
+    ]
+    return any(
+        not _owner_review_structure_target_is_negative_context(tokens, index)
+        for index in target_indexes
+    )
+
+
+def _owner_review_has_large_structure_signal(text: str) -> bool:
+    return _owner_review_matches_any_pattern(text, _OWNER_REVIEW_LARGE_STRUCTURE_PATTERNS)
+
+
+def _owner_review_has_roof_action_signal(text: str) -> bool:
+    return _owner_review_matches_any_pattern(text, _OWNER_REVIEW_ROOF_ACTION_PATTERNS)
+
+
+def _owner_review_load_request_json(request_json: Any) -> Dict[str, Any]:
+    if request_json is None:
+        return {}
+    try:
+        payload = json.loads(str(request_json))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _owner_review_demolition_text_signal(request_json: Any) -> int:
+    """Admin Owner Review visibility only; does not calculate prices or customer output."""
+    payload = _owner_review_load_request_json(request_json)
+    text = _owner_review_normalize_parts(
+        payload.get("job_description_customer"),
+        payload.get("description"),
+    )
+    if not text:
+        return 0
+
+    has_owner_review_signal = (
+        _owner_review_contains_any_phrase(text, _DEMOLITION_OWNER_REVIEW_ACCESS_TEXT_SIGNALS)
+        or _owner_review_contains_any_phrase(text, _DEMOLITION_OWNER_REVIEW_UNKNOWN_TEXT_SIGNALS)
+        or _owner_review_contains_any_phrase(text, _DEMOLITION_OWNER_REVIEW_HEAVY_TEXT_SIGNALS)
+        or _owner_review_contains_any_phrase(text, _DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS)
+        or _owner_review_has_roof_action_signal(text)
+        or _owner_review_has_large_structure_signal(text)
+        or _owner_review_contains_any_phrase(text, _DEMOLITION_OWNER_REVIEW_BACKYARD_HEAVY_TEXT_SIGNALS)
+        or _owner_review_has_clear_structure_target(text)
+    )
+    return int(has_owner_review_signal)
 
 
 def _owner_review_normalized_value(value: str) -> str:
@@ -1796,12 +2029,30 @@ def _owner_review_normalized_text_expr(raw_text_expr: str) -> str:
     return f"owner_review_normalize_text({raw_text_expr})"
 
 
+def _create_owner_review_sql_function(
+    conn: sqlite3.Connection,
+    name: str,
+    num_params: int,
+    func: Any,
+) -> None:
+    try:
+        conn.create_function(name, num_params, func, deterministic=True)
+    except sqlite3.NotSupportedError:
+        conn.create_function(name, num_params, func)
+
+
 def _register_owner_review_sql_functions(conn: sqlite3.Connection) -> None:
-    conn.create_function(
+    _create_owner_review_sql_function(
+        conn,
         "owner_review_normalize_text",
         1,
         _owner_review_normalize_text,
-        deterministic=True,
+    )
+    _create_owner_review_sql_function(
+        conn,
+        "owner_review_demolition_text_signal",
+        1,
+        _owner_review_demolition_text_signal,
     )
 
 
@@ -1849,46 +2100,7 @@ def _json_text_group_match_any_field(
 
 
 def _demolition_owner_review_text_signal_filter(request_json: str) -> str:
-    structure_target_clauses = tuple(
-        _json_text_group_match_any_field(request_json, values, exclusions=exclusions)
-        for values, exclusions in _DEMOLITION_OWNER_REVIEW_STRUCTURE_TARGET_GROUPS
-    )
-    grouped_text_clauses = (
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_ACCESS_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_UNKNOWN_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_HEAVY_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_ROOF_ACTION_TEXT_SIGNALS,
-            exclusions=_DEMOLITION_OWNER_REVIEW_ROOF_ACTION_EXCLUSION_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_LARGE_STRUCTURE_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_BACKYARD_HEAVY_TEXT_SIGNALS,
-        ),
-        _json_text_group_match_any_field(
-            request_json,
-            _DEMOLITION_OWNER_REVIEW_STRUCTURE_ACTION_TEXT_SIGNALS,
-        ),
-    ) + structure_target_clauses
-    return f"({' OR '.join(grouped_text_clauses)})"
+    return f"owner_review_demolition_text_signal({request_json}) = 1"
 
 
 def _owner_review_manual_signal_filter(alias: str) -> str:
