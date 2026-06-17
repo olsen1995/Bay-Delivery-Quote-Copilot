@@ -252,14 +252,14 @@ Do not rely on ad hoc manual release checks when a repeatable script or workflow
 
 ### 4. Docs and GPT Publication Unit
 
-When source docs feed generated artifacts, treat `docs/gpt/*`, `dist/gpt_grounding_pack/*`, and manifest parity as one publish unit.
+When source docs feed generated artifacts, treat `docs/gpt/*`, `dist/gpt_grounding_pack/*`, manifest parity, and any repo skill/template files that carry the same business rules or current-state guidance as one publish unit.
 
 If docs/gpt changes:
 - regenerate dist/gpt_grounding_pack
 - update manifest hashes
 - run GPT grounding parity
 - stage ignored generated files intentionally if required
-- verify source docs, exported files, and manifest all match
+- verify source docs, exported files, manifest, and any paired skill/template guidance all match
 
 Do not merge docs/GPT changes with stale generated output.
 
@@ -275,6 +275,64 @@ When improving visible UX:
 - avoid public leakage of internal pricing, risk, or admin language
 
 Use tests to prove the public quote contract stayed intact.
+
+### 6. Pricing Phrase Adversarial Matrix Design
+
+When a PR changes pricing wording, safeguard phrases, owner-review phrases, or other quote/pricing text interpretation, require a phrase-level adversarial matrix before commit.
+
+The matrix is not optional for wording-only pricing work just because totals are unchanged.
+
+It must show:
+- target positives that should still trigger protection
+- near-miss negatives that must stay below the safeguard
+- mixed context cases where true demolition/pricing targets appear alongside access, cleanup, debris, or route wording
+- word-order and descriptor variations
+- punctuation and separator variations
+- plural/singular and verb-form variations
+- preserved legacy positives from existing accepted behavior
+
+Recent examples that should have been in the matrix up front:
+- `old shed removal`
+- `large deck demolition with fence access`
+- `roof tear-off`
+- `shed demolition and yard cleanup`
+- `full carport teardown`
+
+### 7. Quote-Engine Oracle Parity for Owner-Review Read Models
+
+When `app/storage.py`, admin owner-review SQL, or any read-model logic tries to mirror `quote_engine` owner-review outcomes, use `quote_engine` as the oracle and prove parity with focused tests.
+
+Required discipline:
+- create or identify one failing parity test before the read-model patch
+- derive expected owner-review outcomes from `quote_engine`, not from duplicated handwritten assumptions
+- keep storage/read-model logic non-authoritative and local to the admin/reporting surface
+- add adversarial parity coverage for separators, plural/singular wording, negative-context guards, and text-only requests
+
+Do not claim parity because the phrases "look similar". Prove it with an oracle-backed corpus.
+
+### 8. Security Boundary Trigger Discipline
+
+Treat boundary-hardening PRs as security-scan work even when they look small or docs-adjacent.
+
+Auto-trigger `codex-security:security-diff-scan` when a PR touches:
+- docs or API exposure rules
+- pre-auth admin boundaries
+- CSP, origin, CORS, or header behavior
+- dependency pins or security-audit remediations
+
+The review must explicitly confirm the customer path did not widen and that the protected diff stayed inside the intended boundary surface.
+
+### 9. Narrow Dependency-Audit and Lock Hygiene
+
+Dependency audit or lock refresh work is its own narrow workflow, not an excuse to mix in runtime cleanup.
+
+For dependency-only PRs:
+- keep the diff limited to dependency files unless Austin explicitly expands scope
+- show why each pin changed
+- run lockfile freshness and security verification
+- prove no runtime, pricing, storage, schema, Render, workflow, or GPT drift came along for the ride
+
+If a dependency fix appears to require unrelated runtime edits, stop and report instead of broadening the PR.
 
 ## Active Defaults and Trigger-Only Overlays
 
@@ -298,12 +356,16 @@ Active defaults for normal Bay Delivery repo PR work:
 Trigger-only overlays:
 - superpowers:test-driven-development only for pricing, public quote, GPT/admin-boundary, storage/read-model, and customer-facing behavior changes
   - create or identify the failing or covering contract test first, then patch only the owning surface
+- superpowers:test-driven-development is mandatory for pricing phrase or safeguard wording changes
+  - build the pricing phrase adversarial matrix before commit, not after review comments arrive
+- superpowers:test-driven-development is mandatory for admin/storage/read-model owner-review matching changes
+  - use `quote_engine` as the oracle and keep the read-model parity corpus in focused tests
 - Browser/Playwright verification only for static, UI, or public-page changes
   - verify `/`, `/quote`, `/admin`, and `/admin/mobile` at desktop and mobile widths
   - fail the overlay on overflow, weak CTA visibility, internal-language leakage, broken responsive layout, or oversized assets
   - do not assume Vercel deployment behavior; Bay Delivery deploys on Render
-- codex-security:security-diff-scan only for admin, auth, CSP, public-exposure, docs exposure, headers, origin/CORS/CSP, or customer-path boundary changes
-  - check pre-auth admin surfaces, docs exposure, CSP behavior, and no customer-path drift
+- codex-security:security-diff-scan only for admin, auth, CSP, public-exposure, docs exposure, headers, origin/CORS/CSP, dependency security fixes, or customer-path boundary changes
+  - check pre-auth admin surfaces, docs exposure, CSP/origin behavior, dependency-pin scope, and no customer-path drift
 
 Other specialized workflows like CI triage or systematic debugging still apply when the task is specifically a CI or environment failure, but they are not part of the default Bay Delivery repo-safety stack.
 
@@ -355,6 +417,8 @@ Required evidence:
 
 Required when applicable:
 - pricing red-team review result for pricing/quote-engine/customer-total/business-rule tasks
+- pricing phrase adversarial matrix evidence for pricing or safeguard wording tasks
+- quote-engine oracle parity evidence for admin/storage/read-model owner-review matching tasks
 - focused test additions or updates for review-fix regressions
 - Render/live verification evidence for deployment-impacting checks
 
@@ -362,6 +426,8 @@ Bay examples from recent review patterns:
 - PR review follow-ups can pass tests and still miss review-level issues before commit.
 - Public quote/page polish needs explicit proof that IDs, selectors, payload shape, and wording boundaries stayed stable.
 - Pricing safeguard work needs adversarial checks against near-miss wording, not just happy-path tests.
+- Owner-review read models can drift from `quote_engine` unless parity is proven with an oracle-backed corpus.
+- Security-boundary hardening and dependency-audit fixes need explicit boundary-scope review even when the code diff is small.
 - Docs/template/process changes should tighten evidence quality without creating a second workflow system.
 
 ## Required Validation
@@ -406,6 +472,12 @@ docker run --rm -v "${PWD}:/repo" -w /repo python:3.11 bash -lc "python -m pip i
 
 After lock refresh, confirm expected dependency pins and run pip-audit.
 
+Dependency-only workflow requirements:
+- keep the PR dependency-only unless Austin explicitly widens scope
+- explain whether the change came from security audit remediation, freshness, or compatibility
+- run the dependency-only protected diff and confirm no runtime/pricing/storage/schema/Render/workflow/GPT drift
+- if a dependency issue truly requires runtime code changes, stop first and ask for widened scope
+
 Expected pip-audit result:
 - No known vulnerabilities found.
 
@@ -414,6 +486,8 @@ Expected pip-audit result:
 If editing docs/gpt/*, regenerate dist/gpt_grounding_pack.
 
 Always keep source docs and generated pack in parity.
+
+If the docs change also updates business rules, current-state guidance, or repo workflow expectations, review any paired skill/template guidance in the same pass so the source docs, generated pack, manifest, and repo guidance do not drift.
 
 Run:
 - .\.venv\Scripts\python.exe tools\check_gpt_grounding_pack_parity.py
@@ -481,6 +555,12 @@ For self-review before commit:
 ## Protected Diff Patterns
 
 Use protected diff checks that match the task scope.
+
+For skill/template/process-only PRs:
+git diff main...HEAD -- app static tests scripts tools docs/gpt dist/gpt_grounding_pack render.yaml .github/workflows requirements.txt requirements.lock.txt VERSION DEPLOYMENT_NOTES.md
+
+Expected:
+- no output
 
 For docs/GPT-only PRs:
 git diff main...HEAD -- app static tests scripts tools render.yaml .github/workflows requirements.txt requirements.lock.txt VERSION DEPLOYMENT_NOTES.md
@@ -566,7 +646,7 @@ Must check:
 - cash/EMT/HST totals
 - safeguarded and non-safeguarded totals preserve cash/EMT/HST behavior
 
-For pricing-sensitive reviews, also require a semantic-combination review matrix before commit.
+For pricing-sensitive reviews that change pricing wording, safeguard phrases, or quote/pricing text interpretation, also require a pricing phrase adversarial matrix before commit.
 
 The matrix must cover:
 - target-only positive
@@ -575,6 +655,7 @@ The matrix must cover:
 - cleanup/debris/removal near miss
 - simple structure removal
 - word-order swaps
+- punctuation/separator variants
 - existing vocabulary preservation
 - substring traps
 - customer/internal boundary
@@ -586,6 +667,7 @@ For every new pricing safeguard or phrase-matching rule, include at least:
 - one positive mixed with access/location wording
 - one cleanup/debris near miss
 - one common alternate customer wording
+- one punctuation or separator variant when phrase matching is involved
 - one substring trap
 - one existing-vocabulary preservation check when the rule touches known target vocabularies
 
