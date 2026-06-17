@@ -1,4 +1,6 @@
 import base64
+import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -652,15 +654,375 @@ def test_owner_review_counts_text_derived_demolition_without_pricing_or_advisory
     assert resp.json()["counts"]["owner_review"] == 1
 
 
-def test_demolition_owner_review_text_signals_match_engine_owner_review_phrases() -> None:
-    expected_signals = (
-        set(quote_engine._DEMOLITION_ACCESS_RISK_PHRASES)
-        | set(quote_engine._DEMOLITION_UNKNOWN_SCOPE_PHRASES)
-        | set(quote_engine._DEMOLITION_HEAVY_MATERIAL_PHRASES)
-        | set(quote_engine._DEMOLITION_STRUCTURE_PHRASES)
+def _fail_owner_review_recompute(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_pricing(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review read model must not call calculate_quote")
+
+    def fail_advisory(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("owner review count should use SQL signals, not advisory recompute")
+
+    monkeypatch.setattr(quote_engine, "calculate_quote", fail_pricing)
+    monkeypatch.setattr(quote_risk_scoring, "build_quote_risk_advisory", fail_advisory)
+
+
+def _quote_engine_demolition_owner_review(
+    *,
+    description: str,
+    job_description_customer: str | None,
+) -> bool:
+    result = quote_engine.calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+        job_description_customer=job_description_customer,
+    )
+    return bool(result["_internal"]["demolition_owner_review_recommended"])
+
+
+@pytest.mark.parametrize(
+    ("description", "job_description_customer"),
+    [
+        ("remove old deck with deck access easy", "remove old deck with deck access easy"),
+        ("remove old fence with fence access", "remove old fence with fence access"),
+        ("remove roof and remove roof vent", "remove roof and remove roof vent"),
+        ("deck demolition with fence access", "deck demolition with fence access"),
+        ("large deck demolition with fence access", "large deck demolition with fence access"),
+        ("roof removal with roof vent", "roof removal with roof vent"),
+        ("large deck demolition", "large deck demolition"),
+        ("large shed removal", "large shed removal"),
+        ("large fence demolition", "large fence demolition"),
+        ("carport", "carport"),
+        ("carports", "carports"),
+        ("large carport demolition", "large carport demolition"),
+        ("large wooden carport teardown", "large wooden carport teardown"),
+        ("remove large carport", "remove large carport"),
+        ("old wooden carport removal", "old wooden carport removal"),
+        ("full carport teardown", "full carport teardown"),
+        ("shed", "shed"),
+        ("deck", "deck"),
+        ("fence", "fence"),
+        ("gazebo", "gazebo"),
+        ("outbuilding", "outbuilding"),
+        ("structure demolition", "structure demolition"),
+        ("old structure removal", "old structure removal"),
+        ("remove cabinets from old shed", "remove cabinets from old shed"),
+        ("remove debris near wooden fence", "remove debris near wooden fence"),
+        ("remove debris near old wooden fence", "remove debris near old wooden fence"),
+        ("remove junk behind 16x20 shed", "remove junk behind 16x20 shed"),
+        ("remove junk through old shed", "remove junk through old shed"),
+        ("remove debris over fence", "remove debris over fence"),
+        ("remove cabinets from gazebo", "remove cabinets from gazebo"),
+        ("remove debris near structure", "remove debris near structure"),
+        ("remove junk behind outbuilding", "remove junk behind outbuilding"),
+        ("remove large fence posts", "remove large fence posts"),
+        ("remove large deck joists", "remove large deck joists"),
+        ("remove large shed siding", "remove large shed siding"),
+        ("roof removal", "roof removal"),
+        ("roof demo", "roof demo"),
+        ("tear off roof", "tear off roof"),
+        ("remove roof vent and shingles", "remove roof vent and shingles"),
+        ("remove roof vent", "remove roof vent"),
+        ("remove roof vents", "remove roof vents"),
+        ("demo roof antenna", "demo roof antenna"),
+        ("demo roof antennas", "demo roof antennas"),
+        ("demo roof flashing", "demo roof flashing"),
+        ("demo roof flashings", "demo roof flashings"),
+        ("demo roof fixture", "demo roof fixture"),
+        ("demo roof fixtures", "demo roof fixtures"),
+        ("demo roof cap", "demo roof cap"),
+        ("demo roof caps", "demo roof caps"),
+        ("demo roof panel", "demo roof panel"),
+        ("demo roof panels", "demo roof panels"),
+        ("remove roof rack", "remove roof rack"),
+        ("remove roof racks", "remove roof racks"),
+        ("remove rooftop antenna", "remove rooftop antenna"),
+        ("remove roofing materials", "remove roofing materials"),
+        ("tile", "tile"),
+        ("tiles", "tiles"),
+        ("ceramic tile", "ceramic tile"),
+        ("bathroom tile", "bathroom tile"),
+        ("bathroom tile demo", "bathroom tile demo"),
+        ("generic tile demo", "generic tile demo"),
+        ("shingles", "shingles"),
+        ("old shingles in bags", "old shingles in bags"),
+        ("roof shingles", "roof shingles"),
+        ("wet shingles", "wet shingles"),
+        ("concrete removal", "concrete removal"),
+        ("concrete-removal demolition", "concrete-removal demolition"),
+        ("concrete:removal demolition", "concrete:removal demolition"),
+        ("brick/block demolition debris", "brick/block demolition debris"),
+        ("stone_dirt demolition debris", "stone_dirt demolition debris"),
+        ("no photo; demolition debris", "no photo; demolition debris"),
+        ("no photo\n demolition debris", "no photo\n demolition debris"),
+        ("no photo\t demolition debris", "no photo\t demolition debris"),
+        ("no photo's demolition debris", "no photo's demolition debris"),
+        ("teardown", "teardown"),
+        ("tear down", "tear down"),
+        ("dismantle", "dismantle"),
+        ("teardown and cleanup", "teardown and cleanup"),
+        ("dismantle and haul away", "dismantle and haul away"),
+        ("teardown and cleanup", ""),
+        ("dismantle and haul away", ""),
+        ("dismantle cabinets", "dismantle cabinets"),
+        ("tear down cabinets", "tear down cabinets"),
+        ("teardown old carpet", "teardown old carpet"),
+    ],
+)
+def test_owner_review_matches_quote_engine_for_broad_demolition_parity_corpus_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+    job_description_customer: str | None,
+) -> None:
+    expected_owner_review = _quote_engine_demolition_owner_review(
+        description=description,
+        job_description_customer=job_description_customer,
+    )
+    _seed_quote(
+        "q-owner-demo-broad-parity",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": job_description_customer,
+        },
+    )
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+    payload = resp.json()
+
+    assert resp.status_code == 200
+    assert payload["counts"]["owner_review"] == int(expected_owner_review)
+    assert _cards(payload)["owner_review"]["count"] == int(expected_owner_review)
+
+
+def test_owner_review_visibility_sql_functions_are_registered_and_null_safe() -> None:
+    conn = sqlite3.connect(":memory:")
+    storage._register_owner_review_sql_functions(conn)
+    request_json = json.dumps(
+        {
+            "service_type": "demolition",
+            "description": "large carport demolition",
+            "job_description_customer": "large carport demolition",
+        }
     )
 
-    assert sorted(expected_signals - set(storage._DEMOLITION_OWNER_REVIEW_TEXT_SIGNALS)) == []
+    assert conn.execute("SELECT owner_review_normalize_text(NULL)").fetchone()[0] == ""
+    assert (
+        conn.execute(
+            "SELECT owner_review_demolition_text_signal(NULL), "
+            "owner_review_demolition_text_signal(?)",
+            (request_json,),
+        ).fetchone()
+        == (0, 1)
+    )
+
+
+def _normalized_signal_set(values: tuple[str, ...]) -> set[str]:
+    return {storage._owner_review_normalize_text(value) for value in values}
+
+
+def test_demolition_owner_review_text_signals_cover_engine_owner_review_phrase_constants() -> None:
+    storage_access = _normalized_signal_set(storage._DEMOLITION_OWNER_REVIEW_ACCESS_TEXT_SIGNALS)
+    storage_unknown = _normalized_signal_set(storage._DEMOLITION_OWNER_REVIEW_UNKNOWN_TEXT_SIGNALS)
+    storage_material_or_roof = _normalized_signal_set(
+        storage._DEMOLITION_OWNER_REVIEW_HEAVY_TEXT_SIGNALS
+        + storage._DEMOLITION_OWNER_REVIEW_ROOF_TEXT_SIGNALS
+    )
+    storage_structure_targets = _normalized_signal_set(
+        storage._DEMOLITION_OWNER_REVIEW_STRUCTURE_TARGET_TEXT_SIGNALS
+    )
+
+    assert (
+        _normalized_signal_set(quote_engine._DEMOLITION_ACCESS_RISK_PHRASES)
+        - storage_access
+    ) == set()
+    assert (
+        _normalized_signal_set(quote_engine._DEMOLITION_UNKNOWN_SCOPE_PHRASES)
+        - storage_unknown
+    ) == set()
+    assert (
+        _normalized_signal_set(quote_engine._DEMOLITION_HEAVY_MATERIAL_PHRASES)
+        - storage_material_or_roof
+    ) == set()
+    assert (
+        _normalized_signal_set(quote_engine._DEMOLITION_ROOF_HEAVY_PHRASES)
+        - storage_material_or_roof
+    ) == set()
+    assert (
+        _normalized_signal_set(quote_engine._DEMOLITION_STRUCTURE_PHRASES)
+        == storage_structure_targets
+    )
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "roof removal",
+        "roof demo",
+        "tear off roof",
+        "roofing tear off",
+        "roof tear off",
+        "shingle demolition",
+        "shingle tear off",
+        "large deck demolition",
+        "large shed removal",
+        "large fence demolition",
+        "backyard concrete removal",
+        "backyard brick removal",
+        "backyard slab removal",
+        "shed",
+        "deck",
+        "fence",
+        "gazebo",
+        "outbuilding",
+        "old shed removal",
+        "deck demolition",
+        "fence removal",
+        "teardown",
+        "tear down",
+        "dismantle",
+    ],
+)
+def test_owner_review_counts_pr336_demolition_signal_parity_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-pr336-positive",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+    payload = resp.json()
+
+    assert resp.status_code == 200
+    assert payload["counts"]["owner_review"] == 1
+    assert _cards(payload)["owner_review"]["count"] == 1
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "deck demolition with fence access",
+        "large deck demolition with fence access",
+        "roof removal with roof vent",
+        "tile",
+        "tiles",
+        "ceramic tile",
+        "bathroom tile",
+        "bathroom tile demo",
+        "bathroom tile demo with fence access",
+        "generic tile demo",
+        "backyard demolition cleanup",
+        "backyard junk removal",
+        "structure demolition",
+        "old structure removal",
+        "concrete:removal demolition",
+        "no photo; demolition debris",
+        "no photo\n demolition debris",
+        "no photo's demolition debris",
+        "concrete removal",
+        "concrete-removal demolition",
+        "brick/block demolition debris",
+        "stone_dirt demolition debris",
+        "old shingles in bags",
+        "remove roof vent and shingles",
+        "shingles",
+        "roof shingles",
+        "wet shingles",
+    ],
+)
+def test_owner_review_counts_pr339_review_edge_case_parity_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-pr339-review-positive",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+    payload = resp.json()
+
+    assert resp.status_code == 200
+    assert payload["counts"]["owner_review"] == 1
+    assert _cards(payload)["owner_review"]["count"] == 1
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "deck access to remove cabinets",
+        "remove cabinets from deck",
+        "remove cabinets from old shed",
+        "remove debris near fence",
+        "remove debris near wooden fence",
+        "remove junk behind shed",
+        "remove junk behind 16x20 shed",
+        "remove large cabinets from deck",
+        "remove large fence posts",
+        "remove large deck joists",
+        "remove large shed siding",
+        "remove rooftop antenna",
+        "remove roofing materials",
+        "remove roof rack",
+        "remove roof vent",
+        "demo roof antenna",
+        "demo roof flashing",
+        "demo roof fixture",
+        "demo roof cap",
+        "demo roof panel",
+        "generic cabinet demo",
+        "yard cleanup",
+        "old lumber cleanup and removal",
+    ],
+)
+def test_owner_review_excludes_pr336_demolition_false_positives_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+) -> None:
+    _seed_quote(
+        "q-owner-demo-pr336-false-positive",
+        request_overrides={
+            "service_type": "demolition",
+            "description": description,
+            "job_description_customer": description,
+        },
+    )
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+    payload = resp.json()
+
+    assert resp.status_code == 200
+    assert payload["counts"]["owner_review"] == 0
+    assert _cards(payload)["owner_review"]["count"] == 0
 
 
 @pytest.mark.parametrize(
@@ -787,7 +1149,6 @@ def test_owner_review_counts_engine_demolition_text_signals_without_recompute(
     [
         "Tight-access demolition cleanup.",
         "No-photo demolition debris.",
-        "Back-yard demolition cleanup.",
         "No-driveway-access demolition debris.",
         "Long-carry demolition debris.",
         "Inside-removal demolition cleanup.",
