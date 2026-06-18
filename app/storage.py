@@ -1488,6 +1488,10 @@ def _json_int(column: str, field_name: str) -> str:
     return f"CAST(json_extract({column}, '$.{field_name}') AS INTEGER)"
 
 
+def _json_real(column: str, field_name: str) -> str:
+    return f"CAST(json_extract({column}, '$.{field_name}') AS REAL)"
+
+
 def _json_text_in(column: str, field_name: str, values: Tuple[str, ...]) -> str:
     quoted_values = ", ".join(f"'{value}'" for value in values)
     return (
@@ -1773,6 +1777,27 @@ _DEMOLITION_OWNER_REVIEW_DENSE_MATERIAL_VALUES: Tuple[str, ...] = (
     "soil",
     "stone",
     "tile",
+)
+_OWNER_REVIEW_HIGH_CARE_MOVE_SERVICE_VALUES: Tuple[str, ...] = (
+    "small_move",
+    "item_delivery",
+    "moving",
+    "delivery",
+)
+_OWNER_REVIEW_HIGH_CARE_MOVE_TEXT_SIGNALS: Tuple[str, ...] = (
+    "appliance",
+    "appliances",
+    "appliance move",
+    "appliance moving",
+    "high risk move",
+    "high risk appliance",
+    "expensive item",
+    "expensive items",
+    "expensive house",
+    "expensive property",
+    "careful handling",
+    "extra care",
+    "extra careful",
 )
 _OWNER_REVIEW_STRUCTURE_ROUTE_CONTEXT_TOKENS = frozenset(
     {"from", "through", "on", "near", "behind", "beside", "around", "by", "over"}
@@ -2103,6 +2128,15 @@ def _demolition_owner_review_text_signal_filter(request_json: str) -> str:
     return f"owner_review_demolition_text_signal({request_json}) = 1"
 
 
+def _high_care_move_owner_review_signal_filter(request_json: str) -> str:
+    return (
+        f"({_json_text_in(request_json, 'service_type', _OWNER_REVIEW_HIGH_CARE_MOVE_SERVICE_VALUES)} "
+        f"AND {_json_int(request_json, 'crew_size')} >= 4 "
+        f"AND {_json_real(request_json, 'estimated_hours')} >= 6.0 "
+        f"AND {_json_text_group_match_any_field(request_json, _OWNER_REVIEW_HIGH_CARE_MOVE_TEXT_SIGNALS)})"
+    )
+
+
 def _owner_review_manual_signal_filter(alias: str) -> str:
     request_json = f"{alias}.request_json"
     return f"""
@@ -2130,6 +2164,7 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
                                OR {_json_int(request_json, "stairs_count")} > 0))
                       OR ({_json_text_in(request_json, "service_type", ("demolition",))}
                           AND {_demolition_owner_review_text_signal_filter(request_json)})
+                      OR {_high_care_move_owner_review_signal_filter(request_json)}
                     THEN 1
                     ELSE 0
                 END

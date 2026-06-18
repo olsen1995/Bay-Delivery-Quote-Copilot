@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app import quote_engine
 from app import storage
 from app.main import app
-from app.services import quote_risk_scoring
+from app.services import quote_risk_scoring, quote_service
 
 
 @pytest.fixture
@@ -78,6 +78,7 @@ def _seed_request(
     requested_time_window: str | None = "morning",
     created_at: str = "2026-04-28T10:00:00",
     submitted_at: str | None = None,
+    request_json: dict[str, Any] | None = None,
 ) -> None:
     accepted_or_approved_at = submitted_at or created_at
     storage.save_quote_request(
@@ -94,7 +95,7 @@ def _seed_request(
             "service_type": "haul_away",
             "cash_total_cad": 160.0,
             "emt_total_cad": 180.8,
-            "request_json": {"service_type": "haul_away"},
+            "request_json": request_json if request_json is not None else {"service_type": "haul_away"},
             "notes": None,
             "requested_job_date": requested_job_date,
             "requested_time_window": requested_time_window,
@@ -652,6 +653,49 @@ def test_owner_review_counts_text_derived_demolition_without_pricing_or_advisory
 
     assert resp.status_code == 200
     assert resp.json()["counts"]["owner_review"] == 1
+
+
+def test_owner_review_counts_high_care_move_quotes_requests_and_jobs_without_recompute(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    high_care_request = {
+        "service_type": "small_move",
+        "description": "High-risk appliance move with expensive items and careful handling.",
+        "job_description_customer": "High-risk appliance move with expensive items and careful handling.",
+        "estimated_hours": 6.5,
+        "crew_size": 4,
+        "pickup_address": "1 Pickup Rd",
+        "dropoff_address": "2 Dropoff Ave",
+    }
+    artifacts = quote_service.build_quote_artifacts(dict(high_care_request))
+    assert artifacts["quote_risk_advisory"]["manual_review_recommended"] is True
+    assert artifacts["quote_risk_advisory"]["pricing_effect"] == "none"
+
+    _seed_quote("q-owner-high-care-quote", request_overrides=high_care_request)
+    _seed_quote("q-owner-high-care", request_overrides=high_care_request)
+    _seed_request(
+        "req-owner-high-care",
+        quote_id="q-owner-high-care",
+        request_json=high_care_request,
+    )
+    _seed_job(
+        "job-owner-high-care",
+        quote_id="q-owner-high-care-job",
+        request_id="req-owner-high-care-job",
+        status="approved",
+        request_json=high_care_request,
+    )
+
+    _fail_owner_review_recompute(monkeypatch)
+
+    resp = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["counts"]["owner_review"] == 3
+    assert _cards(resp.json())["owner_review"]["count"] == 3
 
 
 def _fail_owner_review_recompute(monkeypatch: pytest.MonkeyPatch) -> None:

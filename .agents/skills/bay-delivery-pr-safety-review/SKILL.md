@@ -72,8 +72,8 @@ Protect these unless Austin explicitly starts a pricing-change task:
   - Primary: $20/hr
   - Helper: $16/hr
 - Mattress disposal:
-  - $50 per mattress
-  - $50 per box spring
+  - $60 per mattress
+  - $60 per box spring
 - Scrap pickup:
   - Curbside: free
   - Inside removal: $30

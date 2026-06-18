@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
+_TEXT_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 _ROUTE_REQUIRED_SERVICE_TYPES = {"small_move", "item_delivery"}
 _ALLOWED_ACCESS_DIFFICULTIES = {"normal", "difficult", "extreme"}
 _ALLOWED_TRAVEL_ZONES = {"in_town", "surrounding", "out_of_town"}
@@ -28,6 +30,7 @@ _ADVISORY_FLAG_ORDER = (
     "ACCESS_LABOUR_RISK",
     "DEMOLITION_SCOPE_RISK",
     "DEMOLITION_OWNER_REVIEW_RECOMMENDED",
+    "HIGH_CARE_MOVE_REVIEW",
     "WEATHER_PROTECTION_RISK",
 )
 _ADVISORY_SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3}
@@ -38,6 +41,21 @@ _MEDIUM_CONSTRUCTION_DEBRIS_TYPES = {"tile", "shingles", "mixed"}
 _REFRIGERANT_APPLIANCE_TYPES = {"fridge", "freezer", "air_conditioner", "dehumidifier"}
 _MOVE_DELIVERY_SERVICE_TYPES = {"small_move", "item_delivery", "moving", "delivery"}
 _VAGUE_SCOPE_WORDS = {"stuff", "junk", "items", "things", "load", "misc", "miscellaneous"}
+_HIGH_CARE_MOVE_PHRASES = (
+    "appliance",
+    "appliances",
+    "appliance move",
+    "appliance moving",
+    "high risk move",
+    "high risk appliance",
+    "expensive item",
+    "expensive items",
+    "expensive house",
+    "expensive property",
+    "careful handling",
+    "extra care",
+    "extra careful",
+)
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
@@ -67,6 +85,17 @@ def _normalized_allowed_value(value: Any, allowed: set[str]) -> str | None:
 
 def _normalized_text(value: Any) -> str:
     return str(value or "").strip().lower()
+
+
+def _normalized_phrase_text(*values: Any) -> str:
+    raw = " ".join(str(value or "") for value in values if value is not None)
+    normalized = _TEXT_NORMALIZE_RE.sub(" ", raw.lower())
+    return " ".join(normalized.split())
+
+
+def _contains_phrase(text: str, phrase: str) -> bool:
+    normalized_phrase = _normalized_phrase_text(phrase)
+    return bool(normalized_phrase and f" {normalized_phrase} " in f" {text} ")
 
 
 def _as_bool(value: Any) -> bool:
@@ -297,6 +326,34 @@ def build_quote_risk_advisory(normalized_request: dict[str, Any]) -> dict[str, A
             actions=("Confirm appliance type and refrigerant handling before approval.",),
         )
 
+    service_type = _normalized_text(request.get("service_type"))
+    estimated_hours = max(_as_float(request.get("estimated_hours")), 0.0)
+    crew_size = max(_as_int(request.get("crew_size"), 1), 1)
+    high_care_text = _normalized_phrase_text(
+        request.get("description"),
+        request.get("job_description_customer"),
+    )
+    has_high_care_move_signal = any(
+        _contains_phrase(high_care_text, phrase)
+        for phrase in _HIGH_CARE_MOVE_PHRASES
+    )
+    if (
+        service_type in _MOVE_DELIVERY_SERVICE_TYPES
+        and crew_size >= 4
+        and estimated_hours >= 6.0
+        and has_high_care_move_signal
+    ):
+        add_flag(
+            code="HIGH_CARE_MOVE_REVIEW",
+            severity="high",
+            label="High-care move review",
+            operator_note="High-care appliance or moving scope may need owner review before approval.",
+            manual_review=True,
+            actions=(
+                "Confirm crew, time, access, and item/property risk before approving.",
+            ),
+        )
+
     stairs_count = max(_as_int(request.get("stairs_count")), 0)
     floor_count = max(_as_int(request.get("floor_count")), 0)
     basement_or_inside_removal = _as_bool(request.get("basement_or_inside_removal"))
@@ -419,6 +476,8 @@ def build_quote_risk_summary(
         add_reason("access_or_stairs_risk")
     if "REFRIGERANT_APPLIANCE_RISK" in advisory_codes:
         add_reason("refrigerant_appliance_check")
+    if "HIGH_CARE_MOVE_REVIEW" in advisory_codes:
+        add_reason("high_care_move_review")
     if "DEMOLITION_SCOPE_RISK" in advisory_codes:
         add_reason("demolition_or_ripout_scope")
     if assessment_data.get("confidence_level") == "low" or {
