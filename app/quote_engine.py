@@ -19,8 +19,24 @@ SCRAP_CURBSIDE_BASE_CAD = 0.0
 SCRAP_INSIDE_BASE_CAD = 30.0
 
 # Mattress/box spring (included in total; customer sees note only)
-DEFAULT_MATTRESS_FEE_EACH = 50.0
-DEFAULT_BOXSPRING_FEE_EACH = 50.0
+DEFAULT_MATTRESS_FEE_EACH = 60.0
+DEFAULT_BOXSPRING_FEE_EACH = 60.0
+
+# North Bay dump/disposal calibration defaults for quote-engine internal use.
+# These are assumptions for dump/disposal haul-away jobs only, not customer line items.
+NORTH_BAY_DUMP_ROUTE_DEFAULT_DISTANCE_KM = 50.0
+NORTH_BAY_DUMP_ROUTE_DEFAULT_DURATION_MINUTES = 48.0
+LANDFILL_RESIDENTIAL_SMALL_LOAD_FEE_CAD = 10.0
+LANDFILL_RESIDENTIAL_TRUCK_OR_TRAILER_FEE_CAD = 25.0
+LANDFILL_RESIDENTIAL_VEHICLE_AND_TRAILER_FEE_CAD = 35.0
+LANDFILL_DUAL_AXLE_RATE_PER_TONNE_CAD = 118.0
+LANDFILL_DUAL_AXLE_MINIMUM_FEE_CAD = 25.0
+LANDFILL_MIXED_OR_CONTAMINATED_RATE_PER_TONNE_CAD = 236.0
+LANDFILL_MATTRESS_COST_EACH_CAD = 30.0
+LANDFILL_BOXSPRING_COST_EACH_CAD = 30.0
+LANDFILL_REFRIGERANT_APPLIANCE_FEE_EACH_CAD = 25.0
+LANDFILL_WOOD_TREE_BRUSH_FEE_CAD = 25.0
+LANDFILL_CLEAN_SEPARATED_STREAM_FEE_CAD = 0.0
 
 # Haul-away disposal allowance tiers (included in total; NOT itemized)
 DEFAULT_BAG_TIER_SMALL_MAX = 5
@@ -458,6 +474,20 @@ _SINGLE_ITEM_PHRASES = (
     "single ",
     "just one ",
 )
+_DUMP_ROUTE_SERVICE_ALIASES = frozenset(
+    {
+        "dump_run",
+        "junk_removal",
+    }
+)
+_DUMP_DISPOSAL_ROUTE_PHRASES = (
+    "dump run",
+    "dump pickup",
+    "dump",
+    "disposal",
+    "landfill",
+    "junk removal",
+)
 
 
 def load_config() -> Dict[str, Any]:
@@ -641,8 +671,8 @@ def _mattress_boxspring_fee(service_conf: Dict[str, Any], m: int, b: int) -> flo
     mb_cfg = service_conf.get("mattress_boxspring") or {}
     fee_each = float(mb_cfg.get("fee_each", DEFAULT_MATTRESS_FEE_EACH))
     # If they ever split fees later, still safe
-    mattress_each = float(mb_cfg.get("mattress_fee_each", fee_each))
-    box_each = float(mb_cfg.get("boxspring_fee_each", fee_each))
+    mattress_each = max(float(mb_cfg.get("mattress_fee_each", fee_each)), DEFAULT_MATTRESS_FEE_EACH)
+    box_each = max(float(mb_cfg.get("boxspring_fee_each", fee_each)), DEFAULT_BOXSPRING_FEE_EACH)
     return float(m * mattress_each + b * box_each)
 
 
@@ -850,6 +880,74 @@ def _contains_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
         if normalized_phrase and f" {normalized_phrase} " in padded_text:
             return True
     return False
+
+
+def _positive_float_or_none(value: Any) -> float | None:
+    try:
+        candidate = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(candidate) or candidate <= 0.0:
+        return None
+    return candidate
+
+
+def _is_dump_disposal_route_job(*, raw_service_type: str, normalized_service_type: str, text: str) -> bool:
+    if normalized_service_type != "haul_away":
+        return False
+    if raw_service_type in _DUMP_ROUTE_SERVICE_ALIASES:
+        return True
+    return _contains_any_phrase(text, _DUMP_DISPOSAL_ROUTE_PHRASES)
+
+
+def _dump_route_calibration(
+    *,
+    raw_service_type: str,
+    normalized_service_type: str,
+    text: str,
+    estimated_hours: float,
+    route_distance_km: Any,
+    route_duration_minutes: Any,
+) -> dict[str, Any]:
+    supplied_distance = _positive_float_or_none(route_distance_km)
+    supplied_minutes = _positive_float_or_none(route_duration_minutes)
+    if not _is_dump_disposal_route_job(
+        raw_service_type=raw_service_type,
+        normalized_service_type=normalized_service_type,
+        text=text,
+    ):
+        return {
+            "default_applied": False,
+            "source": "not_applicable",
+            "distance_km": None,
+            "duration_minutes": None,
+            "duration_hours": None,
+        }
+    if supplied_distance is not None or supplied_minutes is not None:
+        duration_hours = supplied_minutes / 60.0 if supplied_minutes is not None else None
+        return {
+            "default_applied": False,
+            "source": "supplied",
+            "distance_km": supplied_distance,
+            "duration_minutes": supplied_minutes,
+            "duration_hours": duration_hours,
+        }
+    if estimated_hours > 0.0:
+        return {
+            "default_applied": False,
+            "source": "estimated_hours",
+            "distance_km": None,
+            "duration_minutes": None,
+            "duration_hours": None,
+        }
+    duration_hours = NORTH_BAY_DUMP_ROUTE_DEFAULT_DURATION_MINUTES / 60.0
+    return {
+        "default_applied": True,
+        "source": "north_bay_default",
+        "distance_km": NORTH_BAY_DUMP_ROUTE_DEFAULT_DISTANCE_KM,
+        "duration_minutes": NORTH_BAY_DUMP_ROUTE_DEFAULT_DURATION_MINUTES,
+        "duration_hours": duration_hours,
+    }
 
 
 def _count_matched_phrases(text: str, phrases: tuple[str, ...]) -> int:
@@ -1163,6 +1261,8 @@ def calculate_quote(
     job_description_customer: str | None = None,
     pickup_address: str | None = None,
     dropoff_address: str | None = None,
+    route_distance_km: float | None = None,
+    route_duration_minutes: float | None = None,
     stairs_count: int | None = None,
     floor_count: int | None = None,
     basement_or_inside_removal: bool | None = None,
@@ -1181,10 +1281,20 @@ def calculate_quote(
     config = load_config()
     tax = _get_tax_rates(config)
 
+    raw_service_type = str(service_type or "").strip().lower()
     normalized = _normalize_service_type(config, service_type)
     normalized_load_mode = _normalize_load_mode(load_mode)
     signal_text = _normalized_signal_text(job_description_customer, description)
     route_complete = bool(str(pickup_address or "").strip() and str(dropoff_address or "").strip())
+    raw_hours = max(float(hours), 0.0)
+    dump_route = _dump_route_calibration(
+        raw_service_type=raw_service_type,
+        normalized_service_type=normalized,
+        text=signal_text,
+        estimated_hours=raw_hours,
+        route_distance_km=route_distance_km,
+        route_duration_minutes=route_duration_minutes,
+    )
 
     # ------------------------------------------------------------
     # Scrap pickup uses location-specific base inputs, but the
@@ -1215,6 +1325,11 @@ def calculate_quote(
                 "scrap_cad": round(cash_total, 2),
                 "risk_margin_protection_cad": 0.0,
                 "risk_margin_protection_flags": [],
+                "dump_route_default_applied": False,
+                "dump_route_source": "not_applicable",
+                "dump_route_distance_km": None,
+                "dump_route_duration_minutes": None,
+                "dump_route_duration_hours": None,
             },
         }
 
@@ -1224,7 +1339,11 @@ def calculate_quote(
     svc = _service_conf(config, normalized)
     rates = _rates(svc)
 
-    billable_hours = max(float(hours), _get_min_hours(svc))
+    effective_hours = raw_hours
+    dump_route_duration_hours = dump_route.get("duration_hours")
+    if effective_hours <= 0.0 and dump_route_duration_hours is not None:
+        effective_hours = max(effective_hours, float(dump_route_duration_hours))
+    billable_hours = max(effective_hours, _get_min_hours(svc))
 
     # Resolve and clamp access difficulty
     _ad = (access_difficulty or "normal").strip().lower()
@@ -1512,5 +1631,19 @@ def calculate_quote(
             "small_load_bulky_trap_adder_cad": round(float(small_load_bulky_trap_adder), 2),
             "risk_margin_protection_cad": round(float(risk_margin_protection_cad), 2),
             "risk_margin_protection_flags": risk_margin_protection_flags,
+            "dump_route_default_applied": bool(dump_route["default_applied"]),
+            "dump_route_source": str(dump_route["source"]),
+            "dump_route_distance_km": (
+                round(float(dump_route["distance_km"]), 2)
+                if dump_route["distance_km"] is not None else None
+            ),
+            "dump_route_duration_minutes": (
+                round(float(dump_route["duration_minutes"]), 2)
+                if dump_route["duration_minutes"] is not None else None
+            ),
+            "dump_route_duration_hours": (
+                round(float(dump_route["duration_hours"]), 2)
+                if dump_route["duration_hours"] is not None else None
+            ),
         },
     }

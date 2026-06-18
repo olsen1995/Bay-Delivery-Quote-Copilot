@@ -222,6 +222,69 @@ def test_weather_move_advisory_sets_enclosed_trailer_without_manual_review() -> 
     assert advisory["recommended_trailer"] == "newer_enclosed"
 
 
+def test_high_care_appliance_move_sets_owner_review_without_pricing_effect() -> None:
+    payload = _base_payload(
+        service_type="small_move",
+        description="High-risk appliance move with expensive items in an expensive house and careful handling.",
+        job_description_customer=(
+            "High-risk appliance move with expensive items in an expensive house and careful handling."
+        ),
+        pickup_address="1 Pickup Rd",
+        dropoff_address="2 Dropoff Ave",
+        estimated_hours=6.5,
+        crew_size=4,
+    )
+
+    artifacts = quote_service.build_quote_artifacts(payload)
+    advisory = artifacts["quote_risk_advisory"]
+    summary = build_quote_risk_summary(
+        artifacts["normalized_request"],
+        advisory,
+        artifacts["internal_risk_assessment"],
+    )
+
+    assert advisory is not None
+    assert advisory["customer_visible"] is False
+    assert advisory["pricing_effect"] == "none"
+    assert advisory["manual_review_recommended"] is True
+    assert "HIGH_CARE_MOVE_REVIEW" in _codes(advisory)
+    assert summary["customer_visible"] is False
+    assert summary["pricing_effect"] == "none"
+    assert summary["risk_level"] == "owner_review"
+    assert summary["suggested_action"] == "owner_review_before_approving"
+    assert summary["crew_suggestion"] == "owner_review"
+    assert "high_care_move_review" in summary["reasons"]
+
+
+def test_high_care_move_advisory_does_not_change_normal_small_move_pricing() -> None:
+    normal_payload = _base_payload(
+        service_type="small_move",
+        description="Normal small apartment move.",
+        job_description_customer="Normal small apartment move.",
+        pickup_address="1 Pickup Rd",
+        dropoff_address="2 Dropoff Ave",
+        estimated_hours=4.0,
+        crew_size=2,
+    )
+    high_care_payload = _base_payload(
+        service_type="small_move",
+        description="Appliance move with expensive items and careful handling.",
+        job_description_customer="Appliance move with expensive items and careful handling.",
+        pickup_address="1 Pickup Rd",
+        dropoff_address="2 Dropoff Ave",
+        estimated_hours=6.0,
+        crew_size=4,
+    )
+
+    normal = quote_service.build_quote_artifacts(normal_payload)
+    high_care = quote_service.build_quote_artifacts(high_care_payload)
+
+    assert normal["response"]["cash_total_cad"] == 330.0
+    assert normal["quote_risk_advisory"] is None
+    assert high_care["quote_risk_advisory"]["pricing_effect"] == "none"
+    assert high_care["response"]["cash_total_cad"] == high_care["engine_quote"]["total_cash_cad"]
+
+
 @pytest.mark.parametrize(
     ("request_fields", "advisory", "assessment", "expected"),
     [
@@ -523,6 +586,39 @@ def test_public_quote_and_customer_review_exclude_advisory_metadata(client: Test
     assert "quote_risk_summary" not in review_body["request"]
     assert "quote_risk_advisory" not in review_body["response"]
     assert "quote_risk_summary" not in review_body["response"]
+
+
+def test_public_quote_excludes_high_care_move_advisory_and_completed_job_calibration_text(
+    client: TestClient,
+) -> None:
+    payload = _base_payload(
+        service_type="small_move",
+        description="High-risk appliance move with expensive items and careful handling.",
+        job_description_customer="High-risk appliance move with expensive items and careful handling.",
+        pickup_address="1 Pickup Rd",
+        dropoff_address="2 Dropoff Ave",
+        estimated_hours=6.5,
+        crew_size=4,
+    )
+
+    quote_response = client.post("/quote/calculate", json=payload)
+
+    assert quote_response.status_code == 200
+    quote_body = quote_response.json()
+    public_text = str(quote_body).lower()
+    for forbidden in (
+        "quote_risk_advisory",
+        "quote_risk_summary",
+        "owner_review",
+        "manual_review",
+        "high_care_move_review",
+        "margin",
+        "87b campbell",
+        "campbell",
+        "1,100",
+        "1400",
+    ):
+        assert forbidden not in public_text
 
 
 def test_admin_quote_detail_includes_recomputed_advisory_metadata(client: TestClient) -> None:

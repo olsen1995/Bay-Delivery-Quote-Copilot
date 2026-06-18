@@ -491,6 +491,60 @@ def test_haul_away_box_springs_count_monotonic_non_decreasing(client: TestClient
     assert all(next_emt >= prev_emt for prev_emt, next_emt in zip(seen_emt, seen_emt[1:]))
 
 
+def test_mattress_and_box_spring_customer_charge_uses_sixty_each() -> None:
+    base_kwargs = {
+        "crew_size": 1,
+        "garbage_bag_count": 1,
+        "trailer_fill_estimate": "under_quarter",
+        "travel_zone": "in_town",
+        "access_difficulty": "normal",
+        "has_dense_materials": False,
+    }
+
+    mattress = calculate_quote("haul_away", 0.0, mattresses_count=1, **base_kwargs)
+    box_spring = calculate_quote("haul_away", 0.0, box_springs_count=1, **base_kwargs)
+    stacked = calculate_quote(
+        "haul_away",
+        0.0,
+        mattresses_count=1,
+        box_springs_count=1,
+        **base_kwargs,
+    )
+
+    assert mattress["_internal"]["mattress_boxspring_cad"] == 60.0
+    assert box_spring["_internal"]["mattress_boxspring_cad"] == 60.0
+    assert stacked["_internal"]["mattress_boxspring_cad"] == 120.0
+    assert stacked["total_cash_cad"] == 200.0
+    assert stacked["total_emt_cad"] == 226.0
+    assert stacked["total_cash_cad"] != 180.0
+
+
+def test_legacy_mattress_boxspring_config_fee_each_no_longer_underprices(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = deepcopy(quote_engine.load_config())
+    config["services"]["haul_away"]["mattress_boxspring"] = {
+        "enabled": True,
+        "fee_each": 50,
+        "customer_note": "legacy stale config",
+    }
+    monkeypatch.setattr(quote_engine, "load_config", lambda: config)
+
+    result = calculate_quote(
+        "haul_away",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        mattresses_count=1,
+        box_springs_count=1,
+        trailer_fill_estimate="under_quarter",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+
+    assert result["_internal"]["mattress_boxspring_cad"] == 120.0
+    assert result["total_cash_cad"] == 200.0
+
+
 @pytest.mark.parametrize("service_type", ["small_move", "item_delivery", "moving", "delivery"])
 @pytest.mark.parametrize("missing_fields", [("pickup_address",), ("dropoff_address",), ("pickup_address", "dropoff_address")])
 def test_move_and_delivery_require_pickup_and_dropoff(
@@ -1840,7 +1894,7 @@ def test_non_demolition_reference_totals_stay_unchanged() -> None:
                 has_dense_materials=False,
                 description="Mattress and box spring outside.",
             ),
-            180.0,
+            200.0,
         ),
         (
             "full_trailer",
@@ -1920,6 +1974,126 @@ def test_small_load_protection_does_not_apply_at_4_bags(client: TestClient) -> N
     assert cash_5 >= cash_4, (
         f"5-bag job should cost >= 4-bag job; got 4={cash_4}, 5={cash_5}"
     )
+
+
+@pytest.mark.parametrize(
+    ("service_type", "description"),
+    [
+        ("dump_run", "dump run"),
+        ("haul_away", "dump pickup"),
+        ("junk_removal", "junk removal to landfill"),
+        ("haul_away", "disposal load"),
+        ("haul_away", "landfill run"),
+    ],
+)
+def test_dump_disposal_jobs_use_north_bay_dump_route_default_when_route_missing(
+    service_type: str,
+    description: str,
+) -> None:
+    result = calculate_quote(
+        service_type,
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        trailer_fill_estimate="under_quarter",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+    )
+
+    internal = result["_internal"]
+    assert internal["dump_route_default_applied"] is True
+    assert internal["dump_route_source"] == "north_bay_default"
+    assert internal["dump_route_distance_km"] == pytest.approx(50.0)
+    assert internal["dump_route_duration_minutes"] == pytest.approx(48.0)
+    assert internal["dump_route_duration_hours"] == pytest.approx(0.8)
+    assert internal["billable_hours"] == 1.0
+    assert internal["travel_min_cad"] == 40.0
+    assert result["total_cash_cad"] == 80.0
+    assert result["total_emt_cad"] == 90.4
+
+
+def test_supplied_dump_route_data_overrides_default_where_supported() -> None:
+    result = calculate_quote(
+        "dump_run",
+        0.0,
+        crew_size=1,
+        garbage_bag_count=1,
+        trailer_fill_estimate="under_quarter",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="dump run",
+        route_distance_km=72.5,
+        route_duration_minutes=120.0,
+    )
+
+    internal = result["_internal"]
+    assert internal["dump_route_default_applied"] is False
+    assert internal["dump_route_source"] == "supplied"
+    assert internal["dump_route_distance_km"] == pytest.approx(72.5)
+    assert internal["dump_route_duration_minutes"] == pytest.approx(120.0)
+    assert internal["dump_route_duration_hours"] == pytest.approx(2.0)
+    assert internal["billable_hours"] == 2.0
+    assert result["total_cash_cad"] == 100.0
+    assert result["total_emt_cad"] == 113.0
+
+
+def test_positive_estimated_hours_override_default_dump_route_time() -> None:
+    result = calculate_quote(
+        "dump_run",
+        2.5,
+        crew_size=1,
+        garbage_bag_count=1,
+        trailer_fill_estimate="under_quarter",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="dump run",
+    )
+
+    internal = result["_internal"]
+    assert internal["dump_route_default_applied"] is False
+    assert internal["dump_route_source"] == "estimated_hours"
+    assert internal["dump_route_distance_km"] is None
+    assert internal["dump_route_duration_minutes"] is None
+    assert internal["billable_hours"] == 2.5
+    assert result["total_cash_cad"] == 110.0
+    assert result["total_emt_cad"] == 124.3
+
+
+@pytest.mark.parametrize(
+    ("service_type", "description"),
+    [
+        ("small_move", "non-dump small move with appliances"),
+        ("item_delivery", "delivery to customer"),
+        ("demolition", "small controlled demolition"),
+        ("scrap_pickup", "scrap metal pickup"),
+        ("haul_away", "single couch from garage"),
+    ],
+)
+def test_non_dump_jobs_do_not_receive_dump_route_defaults(service_type: str, description: str) -> None:
+    result = calculate_quote(
+        service_type,
+        0.0,
+        crew_size=2 if service_type in {"small_move", "demolition"} else 1,
+        garbage_bag_count=1 if service_type == "haul_away" else 0,
+        trailer_fill_estimate="under_quarter" if service_type == "haul_away" else None,
+        scrap_pickup_location="curbside",
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description=description,
+        pickup_address="1 Pickup Rd",
+        dropoff_address="2 Dropoff Ave",
+    )
+
+    internal = result["_internal"]
+    assert internal["dump_route_default_applied"] is False
+    assert internal["dump_route_source"] == "not_applicable"
+    assert internal["dump_route_distance_km"] is None
+    assert internal["dump_route_duration_minutes"] is None
 
 
 # =============================================================================

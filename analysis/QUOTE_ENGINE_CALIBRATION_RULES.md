@@ -110,6 +110,63 @@ A pricing change is bad if it:
 
 ---
 
+## North Bay Dump / Disposal Calibration
+
+For dump/disposal haul-away jobs, the quote engine may use the North Bay local
+dump-route default only when no better route or time data is supplied:
+
+- approximately 50 km round trip
+- approximately 48 minutes round trip
+
+This default is for dump/disposal jobs only. Do not apply it to ordinary
+small moves, item deliveries, demolition jobs, scrap pickup, or generic
+haul-away work that does not include a dump/disposal/landfill signal.
+
+Current landfill assumptions for future pricing review:
+
+- 6 bags or less: $10
+- 7+ bags / half-ton truck or trailer: $25
+- vehicle + trailer double load: $35
+- dual-axle weighed trailer: $118/tonne, $25 minimum
+- mixed/contaminated load: $236/tonne
+- mattress landfill cost: $30 each
+- box spring landfill cost: $30 each
+- refrigerant appliance fee: $25 each
+- wood/tree brush: $25
+- clean separated grass/leaves, concrete without rebar, bricks, and tires: free
+
+These assumptions are internal calibration data. Customer totals should remain
+bundled and customer-safe; do not expose landfill cost, margin, or owner-review
+language in public quote output.
+
+---
+
+## Completed High-Risk Move Calibration Evidence
+
+Internal calibration example:
+
+- Date: 2026-06-13
+- Internal job reference/address: 87B Campbell
+- Job type: high-risk appliance / moving job
+- Charged: $1,200 CAD
+- Crew: 4 workers
+- Time: approximately 6-7 hours each
+- Total labour-hours: approximately 24-28
+- Factors: multiple appliances, expensive/high-risk items, expensive
+  house/property, extra-care handling, workers on site for most/all of the job
+
+Pricing lesson:
+
+- Similar high-risk appliance/moving jobs with 4 workers and 6+ hours should
+  not be treated as a basic small move.
+- Similar completed-job calibration range may be roughly $1,100-$1,400
+  depending on crew, time, access, travel, item risk, and property risk.
+- This is calibration evidence, not a hardcoded pricing rule.
+- Do not require the address for pricing logic.
+- Do not expose the exact address in customer-facing output.
+
+---
+
 ## Rules for Difficult Access / Dense Materials
 
 - Stairs, basement access, long carries, and awkward loading are labour-intensive.

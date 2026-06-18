@@ -34,6 +34,11 @@ This file documents current Bay Delivery business and pricing rules as grounded 
 - Small-load protection applies to tiny light loads so disposal scales proportionally.
 - Dense-material scenarios preserve stronger disposal protection via config-backed multipliers.
 - Mattress/box-spring disposal impacts total and remains note-based for customer presentation.
+- Current customer charge calibration is $60 per mattress and $60 per box spring.
+- North Bay dump/disposal jobs may use the internal local default of approximately 50 km / 48 minutes round trip only when no better route or time data is supplied.
+- The dump-route default must not be applied to ordinary small moves, item deliveries, demolition jobs, scrap pickup, or generic non-disposal work.
+- Internal landfill assumptions include: $10 for 6 bags or less; $25 for 7+ bags / half-ton truck or trailer; $35 for vehicle + trailer double load; $118/tonne for dual-axle weighed trailer with $25 minimum; $236/tonne for mixed/contaminated load; $30 each mattress/box spring landfill cost; $25 each refrigerant appliance; $25 wood/tree brush; and free clean separated grass/leaves/concrete without rebar/bricks/tires.
+- GPT must not expose landfill cost, margin, owner-review wording, or internal disposal calibration as customer-facing quote line items.
 
 ## Scrap Rules
 
@@ -53,6 +58,7 @@ This file documents current Bay Delivery business and pricing rules as grounded 
 - Class-specific trailer fill anchors apply where configured.
 - Small move/item delivery use enclosed trailer adders where configured.
 - Optional haul-away `space_fill` mode applies bounded discount logic with class floors.
+- High-care appliance/moving jobs with 4 workers and 6+ hours should trigger internal owner review when item/property risk or extra-care handling is present; this advisory has no pricing effect and is not customer-visible.
 
 ## Item Delivery Guardrail
 

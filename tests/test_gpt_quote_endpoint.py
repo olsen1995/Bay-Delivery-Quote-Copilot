@@ -199,6 +199,32 @@ def test_gpt_quote_accepts_structured_demolition_access_field(client: TestClient
     assert body["quote_risk_summary"]["customer_visible"] is False
 
 
+def test_gpt_quote_surfaces_high_care_appliance_move_internal_advisory(client: TestClient) -> None:
+    payload = _base_payload(service_type="small_move")
+    payload["description"] = "High-risk appliance move with expensive items and careful handling."
+    payload["estimated_hours"] = 6.5
+    payload["crew_size"] = 4
+
+    response = client.post("/api/gpt/quote", headers=_headers(), json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    artifacts = build_quote_artifacts(_translated_payload(payload))
+    assert body["cash_total_cad"] == artifacts["response"]["cash_total_cad"]
+    assert body["emt_total_cad"] == artifacts["response"]["emt_total_cad"]
+    assert body["quote_risk_advisory"]["customer_visible"] is False
+    assert body["quote_risk_advisory"]["pricing_effect"] == "none"
+    assert body["quote_risk_advisory"]["manual_review_recommended"] is True
+    assert any(
+        flag["code"] == "HIGH_CARE_MOVE_REVIEW"
+        for flag in body["quote_risk_advisory"]["risk_flags"]
+    )
+    assert body["quote_risk_summary"]["customer_visible"] is False
+    assert body["quote_risk_summary"]["pricing_effect"] == "none"
+    assert body["quote_risk_summary"]["risk_level"] == "owner_review"
+    assert body["quote_risk_summary"]["suggested_action"] == "owner_review_before_approving"
+
+
 def test_gpt_action_schema_documents_structured_demolition_and_advisory_fields() -> None:
     schema_text = Path("docs/gpt/GPT_ACTIONS_OPENAPI.yaml").read_text(encoding="utf-8")
 
