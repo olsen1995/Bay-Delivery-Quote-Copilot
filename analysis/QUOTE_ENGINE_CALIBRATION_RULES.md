@@ -146,7 +146,7 @@ language in public quote output.
 Internal calibration example:
 
 - Date: 2026-06-13
-- Internal job reference/address: 87B Campbell
+- Internal job reference: completed high-care move calibration example, 2026-06-13
 - Job type: high-risk appliance / moving job
 - Charged: $1,200 CAD
 - Crew: 4 workers

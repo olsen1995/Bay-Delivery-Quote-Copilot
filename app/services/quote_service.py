@@ -62,6 +62,10 @@ _DEMOLITION_PRICING_CONTEXT_FIELDS = (
     "construction_debris_type",
     "dense_material_type",
 )
+_ROUTE_CALIBRATION_FIELDS = (
+    "route_distance_km",
+    "route_duration_minutes",
+)
 LEAD_SOURCE_LABELS = {
     "facebook": "Facebook",
     "google": "Google",
@@ -245,6 +249,9 @@ def _quote_engine_inputs(
         for field in _DEMOLITION_PRICING_CONTEXT_FIELDS:
             if field in request_payload:
                 inputs[field] = request_payload.get(field)
+    for field in _ROUTE_CALIBRATION_FIELDS:
+        if field in request_payload:
+            inputs[field] = request_payload.get(field)
     return inputs
 
 
@@ -301,6 +308,9 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
         "load_mode": normalized_load_mode,
     }
+    for field in _ROUTE_CALIBRATION_FIELDS:
+        if field in request_payload:
+            normalized_request[field] = request_payload.get(field)
     normalized_request.update(_structured_intake_values(request_payload))
 
     internal_risk_assessment = build_quote_risk_assessment(

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app import quote_engine
 from app.quote_engine import calculate_quote
+from app.services import quote_service
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
@@ -2038,6 +2039,35 @@ def test_supplied_dump_route_data_overrides_default_where_supported() -> None:
     assert internal["billable_hours"] == 2.0
     assert result["total_cash_cad"] == 100.0
     assert result["total_emt_cad"] == 113.0
+
+
+def test_quote_service_wires_supplied_dump_route_data_to_final_engine_quote() -> None:
+    artifacts = quote_service.build_quote_artifacts(
+        {
+            "service_type": "dump_run",
+            "description": "dump run",
+            "job_description_customer": "dump run",
+            "estimated_hours": 0.0,
+            "crew_size": 1,
+            "garbage_bag_count": 1,
+            "trailer_fill_estimate": "under_quarter",
+            "travel_zone": "in_town",
+            "access_difficulty": "normal",
+            "has_dense_materials": False,
+            "route_distance_km": 72.5,
+            "route_duration_minutes": 120.0,
+        }
+    )
+
+    internal = artifacts["engine_quote"]["_internal"]
+    assert internal["dump_route_default_applied"] is False
+    assert internal["dump_route_source"] == "supplied"
+    assert internal["dump_route_distance_km"] == pytest.approx(72.5)
+    assert internal["dump_route_duration_minutes"] == pytest.approx(120.0)
+    assert internal["dump_route_duration_hours"] == pytest.approx(2.0)
+    assert internal["billable_hours"] == 2.0
+    assert artifacts["response"]["cash_total_cad"] == 100.0
+    assert artifacts["response"]["emt_total_cad"] == 113.0
 
 
 def test_positive_estimated_hours_override_default_dump_route_time() -> None:
