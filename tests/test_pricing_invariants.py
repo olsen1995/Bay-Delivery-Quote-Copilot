@@ -665,6 +665,218 @@ def test_difficult_access_adder_applied(client: TestClient) -> None:
     )
 
 
+def test_structured_stairs_raise_normal_haul_away_to_difficult_access() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    explicit_difficult = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+    )
+    structured = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        stairs_count=1,
+    )
+
+    assert structured["_internal"]["access_difficulty"] == "difficult"
+    assert structured["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured["total_cash_cad"] == explicit_difficult["total_cash_cad"]
+    assert structured["total_cash_cad"] > baseline["total_cash_cad"]
+
+
+def test_structured_basement_removal_raises_normal_haul_away_to_difficult_access() -> None:
+    explicit_difficult = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+    )
+    structured = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        basement_or_inside_removal=True,
+    )
+
+    assert structured["_internal"]["access_difficulty"] == "difficult"
+    assert structured["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured["total_cash_cad"] == explicit_difficult["total_cash_cad"]
+
+
+def test_structured_stairs_raise_small_move_to_difficult_without_breaking_labor_floor() -> None:
+    baseline = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+    )
+    explicit_difficult = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+    )
+    structured = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        stairs_count=1,
+    )
+
+    assert structured["_internal"]["access_difficulty"] == "difficult"
+    assert structured["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured["_internal"]["move_labor_floor_applied"] is True
+    assert structured["total_cash_cad"] == explicit_difficult["total_cash_cad"]
+    assert structured["total_cash_cad"] > baseline["total_cash_cad"]
+
+
+def test_structured_no_access_facts_keep_normal_access_unchanged() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    structured_no_access = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        stairs_count=0,
+        basement_or_inside_removal=False,
+    )
+
+    assert structured_no_access["_internal"]["access_difficulty"] == "normal"
+    assert structured_no_access["_internal"]["access_difficulty_adder_cad"] == 0.0
+    assert structured_no_access["total_cash_cad"] == baseline["total_cash_cad"]
+    assert structured_no_access["total_emt_cad"] == baseline["total_emt_cad"]
+
+
+def test_structured_access_does_not_downgrade_explicit_extreme() -> None:
+    explicit_extreme = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="extreme",
+        has_dense_materials=False,
+    )
+    structured_extreme = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="extreme",
+        has_dense_materials=False,
+        stairs_count=2,
+        basement_or_inside_removal=True,
+    )
+
+    assert structured_extreme["_internal"]["access_difficulty"] == "extreme"
+    assert structured_extreme["_internal"]["access_difficulty_adder_cad"] == 60.0
+    assert structured_extreme["total_cash_cad"] == explicit_extreme["total_cash_cad"]
+
+
+def test_structured_access_does_not_change_explicit_difficult() -> None:
+    explicit_difficult = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+    )
+    structured_difficult = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+        stairs_count=1,
+    )
+
+    assert structured_difficult["_internal"]["access_difficulty"] == "difficult"
+    assert structured_difficult["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured_difficult["total_cash_cad"] == explicit_difficult["total_cash_cad"]
+
+
+def test_structured_access_preserves_demolition_safeguard_without_access_adder_double_count() -> None:
+    result = calculate_quote(
+        "demolition",
+        1.0,
+        crew_size=1,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        description="Demolition debris cleanup.",
+        stairs_count=1,
+        basement_or_inside_removal=True,
+    )
+
+    assert result["_internal"]["access_difficulty"] == "normal"
+    assert result["_internal"]["access_difficulty_adder_cad"] == 0.0
+    assert result["_internal"]["demolition_safeguard_tier"] == "access_risk"
+    assert result["_internal"]["demolition_safeguard_floor_cad"] == 750.0
+    assert "access_risk" in result["_internal"]["demolition_safeguard_flags"]
+
+
+def test_structured_access_pricing_does_not_require_advisory_metadata() -> None:
+    structured = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        stairs_count=1,
+    )
+
+    assert structured["_internal"]["access_difficulty"] == "difficult"
+    assert structured["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured["_internal"]["risk_margin_protection_cad"] == 0.0
+    assert structured["_internal"]["risk_margin_protection_flags"] == []
+
+
 def test_unknown_access_difficulty_returns_400(client: TestClient) -> None:
     """An unrecognised access_difficulty value must be rejected before pricing."""
     payload = _base_payload(service_type="haul_away")

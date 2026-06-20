@@ -1037,6 +1037,28 @@ def _coerce_non_negative_int(value: Any) -> int:
         return 0
 
 
+def _resolve_access_difficulty(
+    *,
+    access_difficulty: str | None,
+    normalized_service_type: str,
+    stairs_count: Any = None,
+    basement_or_inside_removal: Any = None,
+) -> str:
+    resolved = (access_difficulty or "normal").strip().lower()
+    if resolved not in ACCESS_DIFFICULTY_ADDERS:
+        resolved = "normal"
+    if (
+        normalized_service_type != "demolition"
+        and resolved == "normal"
+        and (
+            _coerce_non_negative_int(stairs_count) > 0
+            or _coerce_bool(basement_or_inside_removal)
+        )
+    ):
+        return "difficult"
+    return resolved
+
+
 def _demolition_safeguard(
     *,
     text: str,
@@ -1346,9 +1368,12 @@ def calculate_quote(
     billable_hours = max(effective_hours, _get_min_hours(svc))
 
     # Resolve and clamp access difficulty
-    _ad = (access_difficulty or "normal").strip().lower()
-    if _ad not in ACCESS_DIFFICULTY_ADDERS:
-        _ad = "normal"
+    _ad = _resolve_access_difficulty(
+        access_difficulty=access_difficulty,
+        normalized_service_type=normalized,
+        stairs_count=stairs_count,
+        basement_or_inside_removal=basement_or_inside_removal,
+    )
     access_adder = float(ACCESS_DIFFICULTY_ADDERS[_ad])
 
     # Moving minimum 4 hours (your rule)
