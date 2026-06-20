@@ -727,6 +727,32 @@ def test_structured_basement_removal_raises_normal_haul_away_to_difficult_access
     assert structured["total_cash_cad"] == explicit_difficult["total_cash_cad"]
 
 
+def test_structured_floor_count_raises_normal_haul_away_to_difficult_access() -> None:
+    explicit_difficult = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+        has_dense_materials=False,
+    )
+    structured = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        floor_count=2,
+    )
+
+    assert structured["_internal"]["access_difficulty"] == "difficult"
+    assert structured["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured["total_cash_cad"] == explicit_difficult["total_cash_cad"]
+
+
 def test_structured_stairs_raise_small_move_to_difficult_without_breaking_labor_floor() -> None:
     baseline = calculate_quote(
         "small_move",
@@ -758,6 +784,29 @@ def test_structured_stairs_raise_small_move_to_difficult_without_breaking_labor_
     assert structured["total_cash_cad"] > baseline["total_cash_cad"]
 
 
+def test_structured_floor_count_raises_small_move_to_difficult_access() -> None:
+    explicit_difficult = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="difficult",
+    )
+    structured = calculate_quote(
+        "small_move",
+        4.0,
+        crew_size=2,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        floor_count=2,
+    )
+
+    assert structured["_internal"]["access_difficulty"] == "difficult"
+    assert structured["_internal"]["access_difficulty_adder_cad"] == 25.0
+    assert structured["_internal"]["move_labor_floor_applied"] is True
+    assert structured["total_cash_cad"] == explicit_difficult["total_cash_cad"]
+
+
 def test_structured_no_access_facts_keep_normal_access_unchanged() -> None:
     baseline = calculate_quote(
         "haul_away",
@@ -777,6 +826,7 @@ def test_structured_no_access_facts_keep_normal_access_unchanged() -> None:
         access_difficulty="normal",
         has_dense_materials=False,
         stairs_count=0,
+        floor_count=0,
         basement_or_inside_removal=False,
     )
 
@@ -784,6 +834,33 @@ def test_structured_no_access_facts_keep_normal_access_unchanged() -> None:
     assert structured_no_access["_internal"]["access_difficulty_adder_cad"] == 0.0
     assert structured_no_access["total_cash_cad"] == baseline["total_cash_cad"]
     assert structured_no_access["total_emt_cad"] == baseline["total_emt_cad"]
+
+
+def test_structured_floor_count_one_keeps_normal_access_unchanged() -> None:
+    baseline = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+    )
+    one_floor = calculate_quote(
+        "haul_away",
+        1.0,
+        crew_size=1,
+        garbage_bag_count=5,
+        travel_zone="in_town",
+        access_difficulty="normal",
+        has_dense_materials=False,
+        floor_count=1,
+    )
+
+    assert one_floor["_internal"]["access_difficulty"] == "normal"
+    assert one_floor["_internal"]["access_difficulty_adder_cad"] == 0.0
+    assert one_floor["total_cash_cad"] == baseline["total_cash_cad"]
+    assert one_floor["total_emt_cad"] == baseline["total_emt_cad"]
 
 
 def test_structured_access_does_not_downgrade_explicit_extreme() -> None:
@@ -805,6 +882,7 @@ def test_structured_access_does_not_downgrade_explicit_extreme() -> None:
         access_difficulty="extreme",
         has_dense_materials=False,
         stairs_count=2,
+        floor_count=3,
         basement_or_inside_removal=True,
     )
 
@@ -849,6 +927,7 @@ def test_structured_access_preserves_demolition_safeguard_without_access_adder_d
         has_dense_materials=False,
         description="Demolition debris cleanup.",
         stairs_count=1,
+        floor_count=2,
         basement_or_inside_removal=True,
     )
 

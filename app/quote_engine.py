@@ -1042,6 +1042,7 @@ def _resolve_access_difficulty(
     access_difficulty: str | None,
     normalized_service_type: str,
     stairs_count: Any = None,
+    floor_count: Any = None,
     basement_or_inside_removal: Any = None,
 ) -> str:
     resolved = (access_difficulty or "normal").strip().lower()
@@ -1052,6 +1053,7 @@ def _resolve_access_difficulty(
         and resolved == "normal"
         and (
             _coerce_non_negative_int(stairs_count) > 0
+            or _coerce_non_negative_int(floor_count) >= 2
             or _coerce_bool(basement_or_inside_removal)
         )
     ):
@@ -1372,6 +1374,7 @@ def calculate_quote(
         access_difficulty=access_difficulty,
         normalized_service_type=normalized,
         stairs_count=stairs_count,
+        floor_count=floor_count,
         basement_or_inside_removal=basement_or_inside_removal,
     )
     access_adder = float(ACCESS_DIFFICULTY_ADDERS[_ad])

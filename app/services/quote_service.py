@@ -64,6 +64,7 @@ _DEMOLITION_PRICING_CONTEXT_FIELDS = (
 )
 _STRUCTURED_ACCESS_PRICING_FIELDS = (
     "stairs_count",
+    "floor_count",
     "basement_or_inside_removal",
 )
 _ROUTE_CALIBRATION_FIELDS = (
