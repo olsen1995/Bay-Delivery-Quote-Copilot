@@ -211,18 +211,18 @@ components:
             - integer
             - "null"
           minimum: 0
-          description: Optional demolition access context. Used only by backend quote safeguards.
+          description: Optional structured access fact. Backend quote safeguards use stairs_count > 0 to let normal access price through the existing difficult-access path after PR #345, including small move or haul-away jobs and demolition context where applicable.
         floor_count:
           type:
             - integer
             - "null"
           minimum: 0
-          description: Optional demolition access context. Used only by backend quote safeguards.
+          description: Optional structured access fact. Backend quote safeguards use floor_count >= 2 to let normal access price through the existing difficult-access path after PR #345, including small move or haul-away jobs and demolition context where applicable.
         basement_or_inside_removal:
           type:
             - boolean
             - "null"
-          description: Optional demolition access context. Used only by backend quote safeguards.
+          description: Optional structured access fact. Backend quote safeguards use true basement or inside-removal context to let normal access price through the existing difficult-access path after PR #345, including small move or haul-away jobs and demolition context where applicable.
         demolition_ripout:
           type:
             - boolean

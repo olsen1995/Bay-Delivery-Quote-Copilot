@@ -105,9 +105,11 @@ Always check whether the task belongs to the active roadmap.
 
 Current verified baseline:
 
-- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
-- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
-- Current version: `0.12.0`.
+- Current local/GitHub `main` after PR #346: `4d879c491a8012ea1df83199bc869a6f6783d985`.
+- Latest merged PR: PR #346 `update codex prompt sources for skills and agents layout`.
+- Prior relevant runtime/pricing PR: PR #345 `create structured access pricing guardrails`.
+- Version: `0.12.0`.
+- Render/live alignment after the docs-only PR #346 was not reverified due tooling/network blockers; do not claim `4d879c4` was freshly live-smoked unless a later live-safe smoke verifies it.
 
 Current active roadmap/current-state focus:
 
