@@ -119,7 +119,19 @@ def test_public_callers_cannot_submit_internal_advisory_fields(
 
 def test_advisory_metadata_has_no_pricing_effect(client: TestClient) -> None:
     baseline = client.post("/quote/calculate", json=_base_payload()).json()["response"]
-    enriched = client.post("/quote/calculate", json=_advisory_payload()).json()["response"]
+    enriched = client.post(
+        "/quote/calculate",
+        json=_base_payload(
+            dense_material_type="concrete",
+            mixed_load=True,
+            contains_scrap=True,
+            contains_garbage=True,
+            has_refrigerant_appliance=True,
+            appliance_type="fridge",
+            demolition_ripout=True,
+            weather_protection_required=True,
+        ),
+    ).json()["response"]
 
     assert enriched["cash_total_cad"] == baseline["cash_total_cad"]
     assert enriched["emt_total_cad"] == baseline["emt_total_cad"]

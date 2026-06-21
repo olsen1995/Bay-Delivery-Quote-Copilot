@@ -62,6 +62,11 @@ _DEMOLITION_PRICING_CONTEXT_FIELDS = (
     "construction_debris_type",
     "dense_material_type",
 )
+_STRUCTURED_ACCESS_PRICING_FIELDS = (
+    "stairs_count",
+    "floor_count",
+    "basement_or_inside_removal",
+)
 _ROUTE_CALIBRATION_FIELDS = (
     "route_distance_km",
     "route_duration_minutes",
@@ -245,10 +250,14 @@ def _quote_engine_inputs(
         "pickup_address": request_payload.get("pickup_address"),
         "dropoff_address": request_payload.get("dropoff_address"),
     }
-    if str(service_type or "").strip().lower() == "demolition":
-        for field in _DEMOLITION_PRICING_CONTEXT_FIELDS:
-            if field in request_payload:
-                inputs[field] = request_payload.get(field)
+    pricing_context_fields = (
+        _DEMOLITION_PRICING_CONTEXT_FIELDS
+        if str(service_type or "").strip().lower() == "demolition"
+        else _STRUCTURED_ACCESS_PRICING_FIELDS
+    )
+    for field in pricing_context_fields:
+        if field in request_payload:
+            inputs[field] = request_payload.get(field)
     for field in _ROUTE_CALIBRATION_FIELDS:
         if field in request_payload:
             inputs[field] = request_payload.get(field)
