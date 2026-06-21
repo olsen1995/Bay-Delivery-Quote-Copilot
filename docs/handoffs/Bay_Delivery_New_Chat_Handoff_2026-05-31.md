@@ -100,18 +100,18 @@ Use VS Code Agent for:
 - read-only post-merge verification
 - branch/status verification
 - local validation commands
-- live visual/browser checks when Browser/Chrome is available
+- live visual/browser checks when Browser or Computer Use is explicitly needed
 
 Codex defaults:
 - New Codex task/chat: YES
 - Repo: C:\Repos\Bay-Delivery-Quote-Copilot
 - Branch from latest main: YES for implementation, NO for read-only audits
-- Goal mode / Pursue goal: OFF unless explicitly requested
+- Goal Mode: OFF by default unless explicitly requested
 - Plan Mode: ON for risky/broad/unclear work, OFF for approved narrow implementation
 - Reasoning: Medium for narrow docs/static; High for audits/security/workflow/Render/pricing-adjacent/customer-facing static work
 - Auto-review: ON
 - Include IDE context: ON
-- Network: OFF unless explicitly needed
+- Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
 
 Goal Mode rule:
 - OFF by default.
@@ -503,37 +503,27 @@ CODEX SETTINGS:
 New Codex task/chat: YES
 Repo: C:\Repos\Bay-Delivery-Quote-Copilot
 Branch from latest main: YES
-Goal mode / Pursue goal: OFF
+Goal Mode: OFF by default
 Plan Mode: OFF
 Reasoning: High
 Auto-review: ON
 Include IDE context: ON
-Network: OFF unless explicitly needed
+Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
 
-PLUGINS:
-Use:
-- GitHub
-- Superpowers
+CONTEXT / TOOLS:
+- GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
+- Skills: use relevant local Bay Delivery skills automatically if available.
+- Explicit skills when supported:
+  - $bay-delivery-pr-safety-review
+  - $verification-before-completion
+  - $receiving-code-review when fixing review comments
+  - $test-driven-development when pricing/quote behavior changes
+- Typed agents/subagents: OFF unless explicitly requested.
+- Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
+- Other connectors/apps: OFF unless explicitly requested and task-specific.
 
-Do not use unless task clearly requires it:
-- Browser
-- Chrome
-- Render
-- Codex Security
-- OpenAI Developers
-- Google Calendar
-- Gmail
-- Canva
-- Spreadsheets
-- Documents
-- Presentations
-- Supabase
-- HubSpot
-- Build Web Apps
-- Build Web Data Visualization
-
-PLUGIN / MEMORY ACCESS:
-If local skill/memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
+LOCAL SKILL / MEMORY ACCESS:
+If local skill, plugin, or memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
 /sandbox-add-read-dir C:\Users\austi\.codex\plugins
 /sandbox-add-read-dir C:\Users\austi\.codex\memories
 
@@ -783,7 +773,7 @@ Return:
 10. PR link
 11. P1/P2/P3 self-review
 12. Confirmation no forbidden files changed
-13. Plugins used
+13. Context/tools used
 14. Confirmation Codex stopped after opening PR
 
 STOP CONDITIONS:

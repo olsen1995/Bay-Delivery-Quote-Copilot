@@ -135,7 +135,7 @@ Prefer:
 - Protected no-go diff
 - Final report requirements
 - Stop conditions
-- Plugin guidance
+- Context/tool guidance
 - Whether to use Codex or VS Code Agent
 - Whether plan-only is needed or skipped
 
@@ -147,27 +147,26 @@ CODEX SETTINGS:
 New Codex task/chat: YES
 Repo: C:\Repos\Bay-Delivery-Quote-Copilot
 Branch from latest main: YES
-Goal mode / Pursue goal: OFF unless explicitly requested
+Goal Mode: OFF by default unless explicitly requested
 Plan mode: ON only for risky/architecture/schema-sensitive tasks
 Reasoning: Medium for narrow docs/UI PRs; High for schema/security/runtime PRs
 Auto-review: ON
 Include IDE context: ON
-Network: OFF unless explicitly needed
+Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
 
-PLUGINS:
-Use:
-- GitHub
-- Superpowers
+CONTEXT / TOOLS:
+- GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
+- Skills: use relevant local Bay Delivery skills automatically if available.
+- Explicit skills when supported:
+  - $bay-delivery-pr-safety-review
+  - $verification-before-completion
+  - $receiving-code-review when fixing review comments
+  - $test-driven-development when pricing/quote behavior changes
+- Typed agents/subagents: OFF unless explicitly requested.
+- Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
 
-Do not use unless task requires it:
-- Browser
-- Chrome
-- Render
-- Codex Security
-- OpenAI Developers
-
-PLUGIN / MEMORY ACCESS:
-If Codex needs local skill/memory reads and the Windows sandbox blocks them, use read-only sandbox grants only:
+LOCAL SKILL / MEMORY ACCESS:
+If Codex needs local skill, plugin, or memory reads and the Windows sandbox blocks them, use read-only sandbox grants only:
 /sandbox-add-read-dir C:\Users\austi\.codex\plugins
 /sandbox-add-read-dir C:\Users\austi\.codex\memories
 
@@ -186,46 +185,45 @@ Use:
 
 Do not waste high reasoning on tiny docs-only edits unless the task is tied to sensitive project state.
 
-## Codex plugins
+## Codex context and tools
 
-Default plugin guidance for Bay Delivery repo tasks:
+Default context/tool guidance for Bay Delivery repo tasks:
 
-Use:
-
-- GitHub
-- Superpowers
-
-Usually leave available but do not actively use unless needed:
-
-- Browser
-- Chrome
-- Render
-- Codex Security
-- OpenAI Developers
-
-Do not use unless task requires it:
-
-- Render production/deploy actions
-- Browser/Chrome live browsing
-- Codex Security scans
-- OpenAI Developers documentation lookup
+- Plan Mode ON for planning, risky work, or unclear scope.
+- Plan Mode OFF for approved narrow implementation.
+- Goal Mode OFF by default.
+- Agent/subagents OFF unless explicitly requested.
+- GitHub context ON for PR work.
+- Network OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks.
+- Skills: use relevant local Bay Delivery skills automatically if available.
+- Explicit skills when supported:
+  - $bay-delivery-pr-safety-review
+  - $verification-before-completion
+  - $receiving-code-review when fixing review comments
+  - $test-driven-development when pricing/quote behavior changes
+- Browser/Computer Use OFF unless the task specifically needs visual UI inspection or computer control.
+- Render OFF unless doing read-only deployment checks or approved live-safe checks.
+- Codex Security OFF unless doing dependency/security/security-review tasks.
+- OpenAI Developers OFF unless doing OpenAI API/GPT Action/API-key setup.
+- Plugins: keep minimal and task-specific.
 
 For docs-only/version PRs:
 
-Plugins:
-- GitHub: YES
-- Superpowers: YES
-- Render: NO
-- Browser/Chrome: NO
-- Codex Security: NO
-- OpenAI Developers: NO
+Context/tools:
+- GitHub context: ON for branch status, changed files, PR creation, and checks.
+- Skills: use relevant local Bay Delivery skills if available.
+- Typed agents/subagents: OFF unless explicitly requested.
+- Browser/Computer Use: OFF.
+- Render: OFF.
+- Codex Security: OFF unless the task is dependency/security/security-review work.
+- OpenAI Developers: OFF unless the task is OpenAI API/GPT Action/API-key setup.
 
 For Render/live verification tasks:
 
-Plugins:
-- GitHub: YES
-- Render: only if needed
-- Browser/Chrome: only if visual/manual checks are explicitly needed
+Context/tools:
+- GitHub context: ON for branch, PR, and check status when needed.
+- Render: read-only only, and only when the task explicitly scopes deployment/live checks.
+- Browser/Computer Use: only if visual/manual checks or computer control are explicitly needed.
 
 ## Codex sandbox and memory guidance
 

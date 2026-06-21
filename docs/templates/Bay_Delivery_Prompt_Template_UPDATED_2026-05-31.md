@@ -13,7 +13,7 @@ Bay Delivery Quote Copilot is production infrastructure for Bay Delivery in Nort
 
 # 1. Austin Add-ons / Current Prompt Rules
 
-Use these rules whenever creating Codex, VS Code Agent, Browser/Chrome, or ChatGPT PR-review prompts for Bay Delivery Quote Copilot.
+Use these rules whenever creating Codex, VS Code Agent, Browser, Computer Use, or ChatGPT PR-review prompts for Bay Delivery Quote Copilot.
 
 ## Prompt quality rule
 
@@ -25,7 +25,7 @@ Do not give a mostly-good prompt and then list extra things to add afterward unl
 
 Default:
 
-Goal mode / Pursue goal: OFF
+Goal Mode: OFF by default
 
 Use Goal Mode ON only for exploratory investigation where Codex needs to own an outcome, such as unknown CI failures, unknown bugs, broad read-only audits, flaky test investigation, or performance/root-cause discovery.
 
@@ -170,7 +170,7 @@ Every Codex implementation report must include:
 8. PR link
 9. P1/P2/P3 self-review
 10. Confirmation no forbidden files changed
-11. Plugins used
+11. Context/tools used
 12. Confirmation Codex stopped after opening/updating PR
 
 ## Default stop conditions
@@ -199,45 +199,35 @@ CODEX SETTINGS:
 New Codex task/chat: YES
 Repo: C:\Repos\Bay-Delivery-Quote-Copilot
 Branch from latest main: YES
-Goal mode / Pursue goal: OFF unless explicitly requested
+Goal Mode: OFF by default unless explicitly requested
 Plan Mode: [ON/OFF]
 Reasoning: [Medium/High]
 Auto-review: ON
 Include IDE context: ON
-Network: OFF unless explicitly needed
+Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
 ```
 
-## Codex plugin block
+## Codex context/tools block
 
 ```text
-PLUGINS:
-Use:
-- GitHub
-- Superpowers
-
-Do not use unless task clearly requires it:
-- Browser
-- Chrome
-- Render
-- Codex Security
-- OpenAI Developers
-- Google Calendar
-- Gmail
-- Canva
-- Spreadsheets
-- Documents
-- Presentations
-- Supabase
-- HubSpot
-- Build Web Apps
-- Build Web Data Visualization
+CONTEXT / TOOLS:
+- GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
+- Skills: use relevant local Bay Delivery skills automatically if available.
+- Explicit skills when supported:
+  - $bay-delivery-pr-safety-review
+  - $verification-before-completion
+  - $receiving-code-review when fixing review comments
+  - $test-driven-development when pricing/quote behavior changes
+- Typed agents/subagents: OFF unless explicitly requested.
+- Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
+- Other connectors/apps: OFF unless explicitly requested and task-specific.
 ```
 
-## Codex plugin / memory access block
+## Codex local skill / memory access block
 
 ```text
-PLUGIN / MEMORY ACCESS:
-If local skill/memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
+LOCAL SKILL / MEMORY ACCESS:
+If local skill, plugin, or memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
 /sandbox-add-read-dir C:\Users\austi\.codex\plugins
 /sandbox-add-read-dir C:\Users\austi\.codex\memories
 
@@ -254,37 +244,27 @@ CODEX SETTINGS:
 New Codex task/chat: YES
 Repo: C:\Repos\Bay-Delivery-Quote-Copilot
 Branch from latest main: YES
-Goal mode / Pursue goal: OFF
+Goal Mode: OFF by default
 Plan Mode: OFF
 Reasoning: [Medium/High]
 Auto-review: ON
 Include IDE context: ON
-Network: OFF unless explicitly needed
+Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
 
-PLUGINS:
-Use:
-- GitHub
-- Superpowers
+CONTEXT / TOOLS:
+- GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
+- Skills: use relevant local Bay Delivery skills automatically if available.
+- Explicit skills when supported:
+  - $bay-delivery-pr-safety-review
+  - $verification-before-completion
+  - $receiving-code-review when fixing review comments
+  - $test-driven-development when pricing/quote behavior changes
+- Typed agents/subagents: OFF unless explicitly requested.
+- Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
+- Other connectors/apps: OFF unless explicitly requested and task-specific.
 
-Do not use unless task clearly requires it:
-- Browser
-- Chrome
-- Render
-- Codex Security
-- OpenAI Developers
-- Google Calendar
-- Gmail
-- Canva
-- Spreadsheets
-- Documents
-- Presentations
-- Supabase
-- HubSpot
-- Build Web Apps
-- Build Web Data Visualization
-
-PLUGIN / MEMORY ACCESS:
-If local skill/memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
+LOCAL SKILL / MEMORY ACCESS:
+If local skill, plugin, or memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
 /sandbox-add-read-dir C:\Users\austi\.codex\plugins
 /sandbox-add-read-dir C:\Users\austi\.codex\memories
 
@@ -443,7 +423,7 @@ Return:
 8. PR link
 9. P1/P2/P3 self-review
 10. Confirmation no forbidden files changed
-11. Plugins used
+11. Context/tools used
 12. Confirmation Codex stopped after opening PR
 
 STOP CONDITIONS:
@@ -479,37 +459,27 @@ CODEX SETTINGS:
 New Codex task/chat: YES
 Repo: C:\Repos\Bay-Delivery-Quote-Copilot
 Branch from latest main: NO
-Goal mode / Pursue goal: OFF unless explicitly requested
+Goal Mode: OFF by default unless explicitly requested
 Plan Mode: ON
 Reasoning: High
 Auto-review: ON
 Include IDE context: ON
-Network: OFF unless explicitly needed
+Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
 
-PLUGINS:
-Use:
-- GitHub
-- Superpowers
+CONTEXT / TOOLS:
+- GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
+- Skills: use relevant local Bay Delivery skills automatically if available.
+- Explicit skills when supported:
+  - $bay-delivery-pr-safety-review
+  - $verification-before-completion
+  - $receiving-code-review when fixing review comments
+  - $test-driven-development when pricing/quote behavior changes
+- Typed agents/subagents: OFF unless explicitly requested.
+- Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
+- Other connectors/apps: OFF unless explicitly requested and task-specific.
 
-Do not use unless task clearly requires it:
-- Browser
-- Chrome
-- Render
-- Codex Security
-- OpenAI Developers
-- Google Calendar
-- Gmail
-- Canva
-- Spreadsheets
-- Documents
-- Presentations
-- Supabase
-- HubSpot
-- Build Web Apps
-- Build Web Data Visualization
-
-PLUGIN / MEMORY ACCESS:
-If local skill/memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
+LOCAL SKILL / MEMORY ACCESS:
+If local skill, plugin, or memory reads are needed and Windows sandbox blocks them, use read-only sandbox grants only:
 /sandbox-add-read-dir C:\Users\austi\.codex\plugins
 /sandbox-add-read-dir C:\Users\austi\.codex\memories
 
@@ -999,7 +969,7 @@ Requirements:
 - Include recommended reasoning level.
 - Include Plan Mode ON or OFF and explain why before the prompt.
 - Include Goal Mode ON or OFF and explain why before the prompt.
-- Include plugins and memory access block.
+- Include context/tools and memory access block.
 - Include current verified state.
 - Include scope.
 - Include files allowed.
