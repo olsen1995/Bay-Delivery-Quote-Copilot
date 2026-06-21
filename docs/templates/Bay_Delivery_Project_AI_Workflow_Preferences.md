@@ -152,7 +152,7 @@ Plan mode: ON only for risky/architecture/schema-sensitive tasks
 Reasoning: Medium for narrow docs/UI PRs; High for schema/security/runtime PRs
 Auto-review: ON
 Include IDE context: ON
-Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
+Network: OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 
 CONTEXT / TOOLS:
 - GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
@@ -160,8 +160,8 @@ CONTEXT / TOOLS:
 - Explicit skills when supported:
   - $bay-delivery-pr-safety-review
   - $verification-before-completion
-  - $receiving-code-review when fixing review comments
-  - $test-driven-development when pricing/quote behavior changes
+  - superpowers:receiving-code-review / $receiving-code-review when fixing PR review comments; triage comments P1/P2/P3, avoid broad scope expansion, and add targeted regression tests when behavior changes
+  - superpowers:test-driven-development / $test-driven-development when pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - Typed agents/subagents: OFF unless explicitly requested.
 - Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
 
@@ -194,16 +194,16 @@ Default context/tool guidance for Bay Delivery repo tasks:
 - Goal Mode OFF by default.
 - Agent/subagents OFF unless explicitly requested.
 - GitHub context ON for PR work.
-- Network OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks.
+- Network OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 - Skills: use relevant local Bay Delivery skills automatically if available.
 - Explicit skills when supported:
   - $bay-delivery-pr-safety-review
   - $verification-before-completion
-  - $receiving-code-review when fixing review comments
-  - $test-driven-development when pricing/quote behavior changes
+  - superpowers:receiving-code-review / $receiving-code-review when fixing PR review comments; triage comments P1/P2/P3, avoid broad scope expansion, and add targeted regression tests when behavior changes
+  - superpowers:test-driven-development / $test-driven-development when pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - Browser/Computer Use OFF unless the task specifically needs visual UI inspection or computer control.
 - Render OFF unless doing read-only deployment checks or approved live-safe checks.
-- Codex Security OFF unless doing dependency/security/security-review tasks.
+- Codex Security OFF by default. Turn ON or request `codex-security:security-diff-scan` for admin, auth, CSP, public/docs exposure, headers, origin/CORS/CSP, dependency security fixes, customer-path boundary changes, or other security-sensitive/boundary-sensitive hardening.
 - OpenAI Developers OFF unless doing OpenAI API/GPT Action/API-key setup.
 - Plugins: keep minimal and task-specific.
 
@@ -215,7 +215,7 @@ Context/tools:
 - Typed agents/subagents: OFF unless explicitly requested.
 - Browser/Computer Use: OFF.
 - Render: OFF.
-- Codex Security: OFF unless the task is dependency/security/security-review work.
+- Codex Security: OFF by default. Turn ON or request `codex-security:security-diff-scan` for admin, auth, CSP, public/docs exposure, headers, origin/CORS/CSP, dependency security fixes, customer-path boundary changes, or other security-sensitive/boundary-sensitive hardening.
 - OpenAI Developers: OFF unless the task is OpenAI API/GPT Action/API-key setup.
 
 For Render/live verification tasks:

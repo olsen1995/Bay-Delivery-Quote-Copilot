@@ -204,7 +204,7 @@ Plan Mode: [ON/OFF]
 Reasoning: [Medium/High]
 Auto-review: ON
 Include IDE context: ON
-Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
+Network: OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 ```
 
 ## Codex context/tools block
@@ -216,8 +216,8 @@ CONTEXT / TOOLS:
 - Explicit skills when supported:
   - $bay-delivery-pr-safety-review
   - $verification-before-completion
-  - $receiving-code-review when fixing review comments
-  - $test-driven-development when pricing/quote behavior changes
+  - superpowers:receiving-code-review / $receiving-code-review when fixing PR review comments; triage comments P1/P2/P3, avoid broad scope expansion, and add targeted regression tests when behavior changes
+  - superpowers:test-driven-development / $test-driven-development when pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - Typed agents/subagents: OFF unless explicitly requested.
 - Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
 - Other connectors/apps: OFF unless explicitly requested and task-specific.
@@ -249,7 +249,7 @@ Plan Mode: OFF
 Reasoning: [Medium/High]
 Auto-review: ON
 Include IDE context: ON
-Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
+Network: OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 
 CONTEXT / TOOLS:
 - GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
@@ -257,8 +257,8 @@ CONTEXT / TOOLS:
 - Explicit skills when supported:
   - $bay-delivery-pr-safety-review
   - $verification-before-completion
-  - $receiving-code-review when fixing review comments
-  - $test-driven-development when pricing/quote behavior changes
+  - superpowers:receiving-code-review / $receiving-code-review when fixing PR review comments; triage comments P1/P2/P3, avoid broad scope expansion, and add targeted regression tests when behavior changes
+  - superpowers:test-driven-development / $test-driven-development when pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - Typed agents/subagents: OFF unless explicitly requested.
 - Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
 - Other connectors/apps: OFF unless explicitly requested and task-specific.
@@ -464,7 +464,7 @@ Plan Mode: ON
 Reasoning: High
 Auto-review: ON
 Include IDE context: ON
-Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
+Network: OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 
 CONTEXT / TOOLS:
 - GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
@@ -472,8 +472,8 @@ CONTEXT / TOOLS:
 - Explicit skills when supported:
   - $bay-delivery-pr-safety-review
   - $verification-before-completion
-  - $receiving-code-review when fixing review comments
-  - $test-driven-development when pricing/quote behavior changes
+  - superpowers:receiving-code-review / $receiving-code-review when fixing PR review comments; triage comments P1/P2/P3, avoid broad scope expansion, and add targeted regression tests when behavior changes
+  - superpowers:test-driven-development / $test-driven-development when pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - Typed agents/subagents: OFF unless explicitly requested.
 - Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
 - Other connectors/apps: OFF unless explicitly requested and task-specific.

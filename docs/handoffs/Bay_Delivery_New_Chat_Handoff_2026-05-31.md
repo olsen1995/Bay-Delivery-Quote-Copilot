@@ -111,7 +111,7 @@ Codex defaults:
 - Reasoning: Medium for narrow docs/static; High for audits/security/workflow/Render/pricing-adjacent/customer-facing static work
 - Auto-review: ON
 - Include IDE context: ON
-- Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
+- Network: OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 
 Goal Mode rule:
 - OFF by default.
@@ -211,14 +211,14 @@ CURRENT VERIFIED STATE:
 
 ### Skills / workflow discussion
 Useful Bay Delivery skills/checklists narrowed:
-1. receiving-code-review
+1. superpowers:receiving-code-review
 2. bay-delivery-pr-safety-review
 3. verification-before-completion
 
 Other skills should trigger only when relevant:
-- superpowers:test-driven-development for pricing, public quote, GPT/admin-boundary, storage/read-model, and customer-facing behavior changes
+- superpowers:test-driven-development for pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - browser/Playwright verification for static/UI/public-page changes, with `/`, `/quote`, `/admin`, and `/admin/mobile` checked at desktop and mobile widths
-- codex-security:security-diff-scan for admin, auth, CSP, public-exposure, docs exposure, headers, origin/CORS/CSP, and customer-path boundary changes
+- codex-security:security-diff-scan for admin, auth, CSP, public/docs exposure, headers, origin/CORS/CSP, dependency security fixes, customer-path boundary changes, or other security-sensitive/boundary-sensitive hardening
 - small-PR evidence discipline is already default
 
 ### PR #324 — Current-state refresh for visual polish
@@ -425,7 +425,7 @@ Use only when triggered:
 - protected-surface frontend contract review
 - small-PR evidence discipline is default
 Core three useful skills:
-- receiving-code-review
+- superpowers:receiving-code-review
 - bay-delivery-pr-safety-review
 - verification-before-completion
 
@@ -508,7 +508,7 @@ Plan Mode: OFF
 Reasoning: High
 Auto-review: ON
 Include IDE context: ON
-Network: OFF by default, except explicitly approved GitHub-only operations such as fetch, push, PR creation, and PR checks
+Network: OFF by default. GitHub-only network is allowed when explicitly needed for fetch, push, PR creation, PR checks, and review inspection. Non-GitHub network is allowed only when explicitly scoped to an approved tool/task, such as Render live-safe checks, Browser/Computer Use visual verification, OpenAI Developers documentation lookup, or approved live endpoint verification. Do not use broad web access, package installs, dependency updates, or unrelated external calls.
 
 CONTEXT / TOOLS:
 - GitHub context: ON for PR work, review comments, changed files, checks, mergeability, and branch status.
@@ -516,8 +516,8 @@ CONTEXT / TOOLS:
 - Explicit skills when supported:
   - $bay-delivery-pr-safety-review
   - $verification-before-completion
-  - $receiving-code-review when fixing review comments
-  - $test-driven-development when pricing/quote behavior changes
+  - superpowers:receiving-code-review / $receiving-code-review when fixing PR review comments; triage comments P1/P2/P3, avoid broad scope expansion, and add targeted regression tests when behavior changes
+  - superpowers:test-driven-development / $test-driven-development when pricing, quote behavior, GPT/admin-boundary behavior, storage/read-model behavior, customer-facing behavior, quote-engine oracle parity, or other contract-sensitive behavior changes
 - Typed agents/subagents: OFF unless explicitly requested.
 - Plugins: keep minimal. Use GitHub by default for PR work. Browser, Computer Use, Render, Codex Security, and OpenAI Developers are task-specific only.
 - Other connectors/apps: OFF unless explicitly requested and task-specific.
