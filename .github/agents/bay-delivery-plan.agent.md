@@ -116,16 +116,14 @@ Current active roadmap/current-state focus:
 1. Keep project instructions/current-state docs aligned with verified baseline.
 2. Continue quote-page simplification follow-on work with compatibility guardrails.
 3. Continue follow-up/scheduling/admin workflow refinements only when explicitly scoped.
-4. Keep pricing PRs later and one service category per PR.
+4. Keep future pricing PRs owner-approved, evidence-based, and one service category per PR.
 
-Pricing comes later and must be one service category per PR.
+Current pricing guardrails:
+- PR #329 demolition safeguards are already live/current.
+- PR #345 structured-access pricing guardrails are already current.
+- `app/quote_engine.py` remains the only pricing authority.
 
-Pricing order later:
-1. demolition/rip-out
-2. moving labour
-3. heavy/dense dump runs
-4. scrap pickups
-5. delivery
+Future pricing work is post-PR345 category-specific calibration or later heavy-category refinement after evidence review. Do not push duplicate demolition/access work unless Austin explicitly scopes a new owner-approved pricing PR. Do not imply all pricing work is complete.
 
 If the user proposes work out of order, explain the roadmap impact and recommend the safest next step.
 
