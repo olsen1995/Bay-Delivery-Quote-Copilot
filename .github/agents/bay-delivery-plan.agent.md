@@ -105,25 +105,25 @@ Always check whether the task belongs to the active roadmap.
 
 Current verified baseline:
 
-- Main is verified through PR #316 and current main commit `04511871e1c2e194f6a743f61a297bd4b3d1aa63`.
-- Latest verified main context: PR #316 `create admin post origin fail closed hardening`, followed by docs/notes commit `0451187`.
-- Current version: `0.12.0`.
+- Current local/GitHub `main` after PR #346: `4d879c491a8012ea1df83199bc869a6f6783d985`.
+- Latest merged PR: PR #346 `update codex prompt sources for skills and agents layout`.
+- Prior relevant runtime/pricing PR: PR #345 `create structured access pricing guardrails`.
+- Version: `0.12.0`.
+- Render/live alignment after the docs-only PR #346 was not reverified due tooling/network blockers; do not claim `4d879c4` was freshly live-smoked unless a later live-safe smoke verifies it.
 
 Current active roadmap/current-state focus:
 
 1. Keep project instructions/current-state docs aligned with verified baseline.
 2. Continue quote-page simplification follow-on work with compatibility guardrails.
 3. Continue follow-up/scheduling/admin workflow refinements only when explicitly scoped.
-4. Keep pricing PRs later and one service category per PR.
+4. Keep future pricing PRs owner-approved, evidence-based, and one service category per PR.
 
-Pricing comes later and must be one service category per PR.
+Current pricing guardrails:
+- PR #329 demolition safeguards are already live/current.
+- PR #345 structured-access pricing guardrails are already current.
+- `app/quote_engine.py` remains the only pricing authority.
 
-Pricing order later:
-1. demolition/rip-out
-2. moving labour
-3. heavy/dense dump runs
-4. scrap pickups
-5. delivery
+Future pricing work is post-PR345 category-specific calibration or later heavy-category refinement after evidence review. Do not push duplicate demolition/access work unless Austin explicitly scopes a new owner-approved pricing PR. Do not imply all pricing work is complete.
 
 If the user proposes work out of order, explain the roadmap impact and recommend the safest next step.
 

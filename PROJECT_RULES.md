@@ -320,10 +320,13 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Main is verified through PR #323 plus follow-up cSpell commit `15b9d7b` (short SHA).
-- Latest completed PR baseline: PR #323 `create desktop admin collapsible section polish`.
-- Latest verified main commit after PR #323 (full SHA): `15b9d7b35a22aef982772f729cdad05829991418 add "Avenir" to cSpell custom words list`.
+- Current local/GitHub `main` baseline after PR #346: `4d879c491a8012ea1df83199bc869a6f6783d985`.
+- Latest merged PR: PR #346 `update codex prompt sources for skills and agents layout`.
+- Prior relevant merged PR: PR #345 `create structured access pricing guardrails`.
 - Current version: `0.12.0`.
+- Local validation after PR #346 passed version parity and GPT grounding parity.
+- PR #345 runtime/pricing verification included full pytest passing and production live-safe smoke passing against `edf5d99`.
+- Render/live alignment after the docs-only PR #346 was not reverified in the full audit due tooling/network blockers; do not represent `4d879c4` as freshly live-smoked unless a later live-safe smoke verifies it.
 
 Instruction hierarchy:
 

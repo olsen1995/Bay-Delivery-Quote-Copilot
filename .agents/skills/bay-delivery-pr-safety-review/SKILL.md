@@ -93,12 +93,13 @@ Recent completed work includes:
 - PR #318 create demolition pricing readiness plan.
 
 Current verified baseline:
-- Main is verified through PR #318 and current main commit `ef569102df5f12a4f92acbc8054cf645aeffe2e5`.
-- Latest verified main context: PR #318 `create demolition pricing readiness plan`.
+- Current local/GitHub `main` after PR #346: `4d879c491a8012ea1df83199bc869a6f6783d985`.
+- Latest merged PR: PR #346 `update codex prompt sources for skills and agents layout`.
+- Prior relevant runtime/pricing PR: PR #345 `create structured access pricing guardrails`.
 - Current version: `0.12.0`.
-- GPT grounding parity passed previously.
-- Full pytest passed previously: 719 passed.
-- Render parity verified at version `0.12.0` with commit `ef569102df5f`.
+- Local validation after PR #346 passed version parity and GPT grounding parity.
+- PR #345 runtime/pricing verification included full pytest passing and production live-safe smoke passing against `edf5d99`.
+- Render/live alignment after the docs-only PR #346 was not reverified due tooling/network blockers; do not claim `4d879c4` was freshly live-smoked unless a later live-safe smoke verifies it.
 
 Booking notification infrastructure exists but remains disabled until Austin authorizes customer launch.
 
