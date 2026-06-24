@@ -320,13 +320,14 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Current local/GitHub `main` baseline after PR #346: `4d879c491a8012ea1df83199bc869a6f6783d985`.
-- Latest merged PR: PR #346 `update codex prompt sources for skills and agents layout`.
-- Prior relevant merged PR: PR #345 `create structured access pricing guardrails`.
+- Current local/GitHub `main` baseline after PR #347: `375b33d1e94ded7eb505342aced7307b2db37585`.
+- Latest merged PR: PR #347 `create current baseline documentation refresh`.
+- Prior relevant merged PRs: PR #346 `update codex prompt sources for skills and agents layout` and PR #345 `create structured access pricing guardrails`.
 - Current version: `0.12.0`.
-- Local validation after PR #346 passed version parity and GPT grounding parity.
+- Local validation after PR #347 passed compileall, `tests/test_gpt_quote_endpoint.py` with 17 passed and 1 warning, and full pytest with 1344 passed and 1 warning.
+- Austin verified live Render `/health` after PR #347: version `0.12.0`, commit prefix `375b33d1e94d`, and `drive_configured=true`.
 - PR #345 runtime/pricing verification included full pytest passing and production live-safe smoke passing against `edf5d99`.
-- Render/live alignment after the docs-only PR #346 was not reverified in the full audit due tooling/network blockers; do not represent `4d879c4` as freshly live-smoked unless a later live-safe smoke verifies it.
+- Treat Austin's local PowerShell `/health` verification as the authoritative live Render check when external cached reads disagree.
 
 Instruction hierarchy:
 
