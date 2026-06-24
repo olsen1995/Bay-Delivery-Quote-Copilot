@@ -52,15 +52,23 @@ def test_homepage_images_exist():
 
 def test_homepage_logo_and_primary_cta_are_present() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
-    logo_asset = Path("static/images/bay-delivery-logo.png")
+    logo_asset = Path("static/assets/brand/bay-delivery-logo-horizontal-header.png")
+    social_asset = Path("static/assets/brand/bay-delivery-social-share-1200x630.png")
 
     assert logo_asset.exists()
     width, height = struct.unpack(">II", logo_asset.read_bytes()[16:24])
-    assert width == 256
-    assert height == 250
-    assert logo_asset.stat().st_size < 100_000
-    assert 'src="/static/images/bay-delivery-logo.png"' in index_html
-    assert 'alt="Bay Delivery truck and trailer logo"' in index_html
+    assert width == 600
+    assert height == 177
+    assert logo_asset.stat().st_size < 300_000
+    assert social_asset.exists()
+    social_width, social_height = struct.unpack(">II", social_asset.read_bytes()[16:24])
+    assert social_width == 1200
+    assert social_height == 630
+    assert social_asset.stat().st_size < 500_000
+    assert 'src="/static/assets/brand/bay-delivery-logo-horizontal-header.png"' in index_html
+    assert 'alt="Bay Delivery"' in index_html
+    assert '<meta property="og:image" content="/static/assets/brand/bay-delivery-social-share-1200x630.png" />' in index_html
+    assert '<meta name="twitter:image" content="/static/assets/brand/bay-delivery-social-share-1200x630.png" />' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
     assert 'href="/quote">Get a Quote<' in index_html
     assert 'href="tel:+17053034409">Call 705-303-4409<' in index_html
@@ -219,22 +227,30 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
     assert ".quoteResultBreakdown," in quote_css
     assert ".estimateDetails" in quote_css
 
-def test_static_pages_reference_shared_favicon() -> None:
+def test_static_pages_reference_favicon_without_browser_fallback() -> None:
     """Ensure routed HTML pages avoid browser fallback requests for /favicon.ico."""
-    favicon_path = Path("static/favicon.svg")
-    assert favicon_path.exists()
-    assert favicon_path.stat().st_size < 2048
+    shared_favicon_path = Path("static/favicon.svg")
+    homepage_favicon_path = Path("static/assets/brand/bay-delivery-favicon-512.png")
 
-    favicon_link = '<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />'
-    for html_path in [
-        Path("static/index.html"),
-        Path("static/quote.html"),
-        Path("static/admin.html"),
-        Path("static/admin_mobile.html"),
-        Path("static/admin_uploads.html"),
-    ]:
+    assert shared_favicon_path.exists()
+    assert shared_favicon_path.stat().st_size < 2048
+    assert homepage_favicon_path.exists()
+    assert homepage_favicon_path.stat().st_size < 500_000
+
+    shared_favicon_link = '<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />'
+    homepage_favicon_link = '<link rel="icon" type="image/png" sizes="512x512" href="/static/assets/brand/bay-delivery-favicon-512.png" />'
+
+    expected_links = {
+        Path("static/index.html"): homepage_favicon_link,
+        Path("static/quote.html"): shared_favicon_link,
+        Path("static/admin.html"): shared_favicon_link,
+        Path("static/admin_mobile.html"): shared_favicon_link,
+        Path("static/admin_uploads.html"): shared_favicon_link,
+    }
+
+    for html_path, favicon_link in expected_links.items():
         content = html_path.read_text(encoding="utf-8")
-        assert favicon_link in content, f"{html_path} is missing the shared favicon link"
+        assert favicon_link in content, f"{html_path} is missing the expected favicon link"
         assert "/favicon.ico" not in content
 
 
