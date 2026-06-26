@@ -311,7 +311,27 @@ Required discipline:
 
 Do not claim parity because the phrases "look similar". Prove it with an oracle-backed corpus.
 
-### 8. Security Boundary Trigger Discipline
+### 8. Pricing Fact Pass-Through Boundary Review
+
+When a task adds or changes a structured field, intake fact, GPT field, admin field, quote request field, or persisted quote/request fact, trace the field before implementation and before merge.
+
+Required trace:
+- intake
+- quote service
+- quote engine
+- public output
+- GPT/internal output
+- admin/reporting output
+
+Classify every touched field as one of:
+- pricing-relevant
+- advisory-only
+- admin-only
+- display-only
+
+If a field is pricing-relevant, it must reach `app/quote_engine.py` through the existing quote-service path without creating duplicate pricing logic. If a field is advisory-only, admin-only, or display-only, prove it cannot change customer totals, cash/EMT/HST math, pricing floors, or owner pricing authority unless that behavior is explicitly scoped.
+
+### 9. Security Boundary Trigger Discipline
 
 Treat boundary-hardening PRs as security-scan work even when they look small or docs-adjacent.
 
@@ -323,7 +343,7 @@ Auto-trigger `codex-security:security-diff-scan` when a PR touches:
 
 The review must explicitly confirm the customer path did not widen and that the protected diff stayed inside the intended boundary surface.
 
-### 9. Narrow Dependency-Audit and Lock Hygiene
+### 10. Narrow Dependency-Audit and Lock Hygiene
 
 Dependency audit or lock refresh work is its own narrow workflow, not an excuse to mix in runtime cleanup.
 
@@ -338,6 +358,30 @@ If a dependency fix appears to require unrelated runtime edits, stop and report 
 ## Active Defaults and Trigger-Only Overlays
 
 Keep the Bay Delivery workflow opinionated but not bloated.
+
+Active priority skills to apply in future Bay Delivery work:
+1. Adversarial pricing-language red teaming.
+   - Highest priority because it directly protects against undercharging.
+   - Use for any pricing, demolition, access-difficulty, junk-removal, disposal, service-minimum, payment, or customer wording change.
+   - Build the phrase matrix before implementation and before merge: target-only, action-only, target plus access, cleanup near-miss, word-order swaps, substring traps, and payment math.
+2. Pricing fact pass-through boundary review.
+   - Use when a new structured field, intake fact, GPT field, admin field, or quote request field is added or changed.
+   - Trace intake -> quote service -> quote engine -> public/GPT/admin outputs.
+   - Classify each field as pricing-relevant, advisory-only, admin-only, or display-only.
+3. Quote-engine oracle parity for read models.
+   - Use for admin, storage, database, reporting, owner-review visibility, or read-model work.
+   - `app/quote_engine.py` remains the pricing source of truth.
+   - Admin/storage/read models may mirror quote-engine signals, but must not become pricing authority.
+   - Add oracle-backed parity tests where appropriate.
+4. Read-only GitHub/Render readiness execution.
+   - Trigger only when Austin explicitly asks for deployment, readiness, or live-state verification; when a PR review is specifically about merge/deploy readiness; or during post-merge deployment verification.
+   - Do not run Render/live endpoint checks for ordinary implementation, docs, static, or test-only PRs unless live/deployment verification is explicitly scoped.
+   - When triggered, verify branch, PR state, CI, GitHub Actions, Render `/health.version`, Render `/health.commit`, and commit mismatch classification without mutating live infrastructure.
+   - Keep all Render/live checks read-only.
+
+Lower-priority overlays:
+- Docs/GPT publication-unit hygiene applies when business rules, pricing rules, OpenAPI descriptions, grounding pack, or GPT-facing docs change.
+- Dependency/security remediation with protected scope applies only for dependency/security PRs.
 
 Active defaults for normal Bay Delivery repo PR work:
 - superpowers:receiving-code-review
