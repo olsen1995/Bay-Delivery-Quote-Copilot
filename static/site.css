@@ -88,6 +88,7 @@ a:hover { opacity: 0.92; }
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
+  max-width: min(100%, 760px);
 }
 
 .badgeLink{
@@ -498,7 +499,7 @@ a:hover { opacity: 0.92; }
 
 .contactInfo{
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin: 20px 0;
 }

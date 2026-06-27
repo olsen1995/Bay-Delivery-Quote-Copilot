@@ -26,7 +26,7 @@
 }
 
 body.quotePage {
-  font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color: var(--quote-text);
   max-width: 1180px;
   margin: 0 auto;
@@ -96,42 +96,67 @@ body.quotePage {
 }
 
 .quotePage .topbar {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: var(--quote-navy);
-  border: 1px solid rgba(217, 45, 39, 0.24);
-  box-shadow: 0 16px 30px rgba(7, 24, 39, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .quotePage .brandLogo {
-  width: 58px;
-  height: 58px;
-  border-radius: 13px;
+  display: block;
+  width: auto;
+  height: 60px;
+  max-width: 260px;
+  border-radius: 0;
   object-fit: contain;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 16px rgba(7, 24, 39, 0.18);
-  padding: 5px;
-  filter: saturate(1.08) contrast(1.08);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  filter: none;
 }
 
 .quotePage .topbar .brandTitle strong {
-  color: #f4f7fb;
+  color: var(--quote-text);
 }
 
 .quotePage .topbar .brandTitle .muted {
-  color: rgba(244, 247, 251, 0.78);
+  color: var(--quote-muted);
   margin-top: 2px;
 }
 
+.quotePage .toplinks {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: min(100%, 640px);
+}
+
 .quotePage .topbar .badgeLink {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.24);
-  color: #f4f7fb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border-color: var(--line-soft);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--quote-navy);
+  box-shadow: 0 8px 18px rgba(7, 24, 39, 0.08);
 }
 
 .quotePage .topbar .badgeLink:hover {
-  background: rgba(217, 45, 39, 0.24);
+  border-color: var(--quote-accent);
+  color: var(--quote-accent);
+  background: #ffffff;
 }
 
 .quoteTrustStrip {
@@ -309,6 +334,7 @@ body.quotePage {
 }
 
 .quotePage .btn {
+  font-family: inherit;
   padding: 10px 14px;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -963,7 +989,20 @@ body.quotePage {
   }
 
   .quotePage .topbar {
-    padding: 12px;
+    align-items: flex-start;
+    padding: 0;
+  }
+
+  .quotePage .toplinks {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    justify-content: stretch;
+  }
+
+  .quotePage .topbar .badgeLink {
+    width: 100%;
   }
 
   .quoteTrustStrip {
