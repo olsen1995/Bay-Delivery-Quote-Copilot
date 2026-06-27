@@ -59,16 +59,10 @@ a:hover { opacity: 0.92; }
 
 .brandLogo{
   display: block;
-  width: clamp(82px, 12vw, 132px);
-  height: auto;
-  max-width: 100%;
-  border-radius: 14px;
+  width: auto;
+  height: clamp(44px, 7vw, 60px);
+  max-width: min(46vw, 260px);
   object-fit: contain;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
-  padding: 7px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 10px 22px rgba(7,24,39,0.14);
-  filter: saturate(1.08) contrast(1.08);
 }
 
 .brandTitle{
@@ -624,9 +618,8 @@ a:hover { opacity: 0.92; }
   }
 
   .brandLogo{
-    width: 86px;
-    padding: 6px;
-    border-radius: 14px;
+    height: 48px;
+    max-width: 210px;
   }
 
   .brandTitle strong{
