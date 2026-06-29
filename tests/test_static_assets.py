@@ -71,16 +71,27 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
     assert '<meta name="twitter:image" content="/static/assets/brand/bay-delivery-social-share-1200x630.png" />' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
     assert 'href="/quote">Get a Quote<' in index_html
-    assert 'href="tel:+17053034409">Call 705-303-4409<' in index_html
+    assert 'href="tel:+17053034409"' in index_html
+    assert 'href="tel:+12493588087"' in index_html
+    assert "Dan 705-303-4409" in index_html
+    assert "Austin 249-358-8087" in index_html
+    assert "Call/Text Dan" in index_html
+    assert "Call/Text Austin" in index_html
 
 
 def test_quote_page_uses_current_logo_asset() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
-    logo_asset = Path("static/images/bay-delivery-logo.png")
+    logo_asset = Path("static/assets/brand/bay-delivery-logo-horizontal-header.png")
 
     assert logo_asset.exists()
-    assert 'src="/static/images/bay-delivery-logo.png"' in quote_html
+    assert 'src="/static/assets/brand/bay-delivery-logo-horizontal-header.png"' in quote_html
+    assert 'alt="Bay Delivery"' in quote_html
+    assert 'src="/static/images/bay-delivery-logo.png"' not in quote_html
     assert 'src="/static/images/logo.jpg"' not in quote_html
+    assert 'href="tel:+17053034409"' in quote_html
+    assert 'href="tel:+12493588087"' in quote_html
+    assert "Call/Text Dan 705-303-4409" in quote_html
+    assert "Call/Text Austin 249-358-8087" in quote_html
 
 
 def test_quote_page_owns_public_stylesheet_boundary() -> None:
@@ -163,10 +174,11 @@ def test_homepage_premium_polish_stays_local_service_first() -> None:
     site_css = Path("static/site.css").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
     admin_css = Path("static/admin.css").read_text(encoding="utf-8")
-    hero_asset = Path("static/images/homepage-hero-full.jpg")
+    hero_asset = Path("static/assets/brand/bay-delivery-hero-brand-refresh.jpg")
 
     assert hero_asset.exists()
-    assert 'src="/static/images/homepage-hero-full.jpg"' in index_html
+    assert 'src="/static/assets/brand/bay-delivery-hero-brand-refresh.jpg"' in index_html
+    assert 'src="/static/images/homepage-hero-full.jpg"' not in index_html
     assert 'src="/static/assets/bay-delivery-premium-hero.png"' not in index_html
     assert "working_assets/" not in index_html
     assert "working_assets/" not in site_css
@@ -188,13 +200,14 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     site_css = Path("static/site.css").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
-    hero_asset = Path("static/images/homepage-hero-full.jpg")
+    hero_asset = Path("static/assets/brand/bay-delivery-hero-brand-refresh.jpg")
 
     width, height = _jpeg_dimensions(hero_asset)
     assert width == 1727
     assert height == 911
     assert 100_000 < hero_asset.stat().st_size < 450_000
     assert "image/jpeg" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
+    assert "705-303-4409" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
     assert "object-fit: contain;" in site_css
     assert "aspect-ratio: 1727 / 911;" in site_css
     assert "GET A QUOTE" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
@@ -242,7 +255,7 @@ def test_static_pages_reference_favicon_without_browser_fallback() -> None:
 
     expected_links = {
         Path("static/index.html"): homepage_favicon_link,
-        Path("static/quote.html"): shared_favicon_link,
+        Path("static/quote.html"): homepage_favicon_link,
         Path("static/admin.html"): shared_favicon_link,
         Path("static/admin_mobile.html"): shared_favicon_link,
         Path("static/admin_uploads.html"): shared_favicon_link,
@@ -252,6 +265,53 @@ def test_static_pages_reference_favicon_without_browser_fallback() -> None:
         content = html_path.read_text(encoding="utf-8")
         assert favicon_link in content, f"{html_path} is missing the expected favicon link"
         assert "/favicon.ico" not in content
+
+
+def test_quote_page_brand_header_matches_homepage_direction() -> None:
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    body_match = re.search(r"body\.quotePage\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert body_match is not None
+    assert "font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;" in body_match.group("body")
+
+    logo_match = re.search(r"\.quotePage \.brandLogo\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert logo_match is not None
+    logo_body = logo_match.group("body")
+    assert "height: 60px;" in logo_body
+    assert "max-width: 260px;" in logo_body
+    assert "border-radius: 0;" in logo_body
+    assert "background: transparent;" in logo_body
+    assert "border: 0;" in logo_body
+    assert "box-shadow: none;" in logo_body
+    assert "padding: 0;" in logo_body
+    for old_square_logo_rule in [
+        "width: 58px;",
+        "height: 58px;",
+        "border-radius: 13px;",
+        "border: 2px solid",
+        "padding: 5px;",
+        "box-shadow: 0 8px 16px",
+    ]:
+        assert old_square_logo_rule not in logo_body
+
+    topbar_match = re.search(r"\.quotePage \.topbar\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert topbar_match is not None
+    topbar_body = topbar_match.group("body")
+    assert "display: flex;" in topbar_body
+    assert "background: transparent;" in topbar_body
+    assert "box-shadow: none;" in topbar_body
+
+    nav_match = re.search(r"\.quotePage \.topbar \.badgeLink\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert nav_match is not None
+    nav_body = nav_match.group("body")
+    assert "border-radius: 999px;" in nav_body
+    assert "background: rgba(255, 255, 255, 0.82);" in nav_body
+    assert "box-shadow: 0 8px 18px rgba(7, 24, 39, 0.08);" in nav_body
+    assert ".quotePage .toplinks" in quote_css
+
+    button_match = re.search(r"\.quotePage \.btn\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
+    assert button_match is not None
+    assert "font-family: inherit;" in button_match.group("body")
 
 
 def test_quote_page_uses_external_script_for_csp():
