@@ -620,7 +620,7 @@ a:hover { opacity: 0.92; }
   }
 }
 
-@media (min-width: 1120px){
+@media (min-width: 1180px){
   .toplinks{
     grid-template-columns: minmax(106px, 0.8fr) minmax(178px, 1.3fr) minmax(188px, 1.35fr) minmax(100px, 0.75fr) minmax(130px, 0.95fr);
   }
@@ -632,13 +632,28 @@ a:hover { opacity: 0.92; }
   }
 }
 
-@media (max-width: 1120px){
+@media (max-width: 1179px){
   .heroActions{
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .heroActions .btnLink{
     grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 840px){
+  .toplinks{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toplinks .primaryNavLink,
+  .toplinks .callNavLink{
+    grid-column: 1 / -1;
+  }
+
+  .toplinks .socialNavLink{
+    grid-column: auto;
   }
 }
 
