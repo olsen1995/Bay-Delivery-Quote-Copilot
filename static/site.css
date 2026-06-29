@@ -83,18 +83,30 @@ a:hover { opacity: 0.92; }
 }
 
 .toplinks{
-  display:flex;
+  display:grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  align-items: center;
-  max-width: min(100%, 760px);
+  align-items: stretch;
+  width: min(100%, 820px);
+  max-width: 100%;
+}
+
+.toplinks .primaryNavLink,
+.toplinks .callNavLink{
+  grid-column: span 2;
+}
+
+.toplinks .socialNavLink{
+  grid-column: span 3;
 }
 
 .badgeLink{
   display:inline-flex;
   align-items:center;
   justify-content:center;
+  width: 100%;
+  min-width: 0;
   min-height: 42px;
   padding: 10px 14px;
   border: 1px solid var(--border);
@@ -105,6 +117,7 @@ a:hover { opacity: 0.92; }
   font-size: 13px;
   font-weight: 800;
   box-shadow: 0 8px 18px rgba(7,24,39,0.08);
+  white-space: nowrap;
 }
 
 .primaryNavLink{
@@ -164,8 +177,8 @@ a:hover { opacity: 0.92; }
 }
 
 .heroActions{
-  display:flex;
-  flex-wrap: wrap;
+  display:grid;
+  grid-template-columns: minmax(190px, 1.25fr) minmax(126px, 0.8fr) minmax(138px, 0.9fr);
   gap: 12px;
   margin-top: 24px;
 }
@@ -175,6 +188,8 @@ a:hover { opacity: 0.92; }
   display:inline-flex;
   align-items:center;
   justify-content:center;
+  width: 100%;
+  min-width: 0;
   min-height: 48px;
   padding: 14px 18px;
   border-radius: 10px;
@@ -182,6 +197,7 @@ a:hover { opacity: 0.92; }
   font-weight: 900;
   font-size: 15px;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .btnLink{
@@ -604,6 +620,28 @@ a:hover { opacity: 0.92; }
   }
 }
 
+@media (min-width: 1120px){
+  .toplinks{
+    grid-template-columns: minmax(106px, 0.8fr) minmax(178px, 1.3fr) minmax(188px, 1.35fr) minmax(100px, 0.75fr) minmax(130px, 0.95fr);
+  }
+
+  .toplinks .primaryNavLink,
+  .toplinks .callNavLink,
+  .toplinks .socialNavLink{
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 1120px){
+  .heroActions{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .heroActions .btnLink{
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 720px){
   .container{
     width: min(100% - 24px, 1180px);
@@ -649,6 +687,10 @@ a:hover { opacity: 0.92; }
     grid-column: 1 / -1;
   }
 
+  .toplinks .socialNavLink{
+    grid-column: auto;
+  }
+
   .premiumHero{
     border-radius: 14px;
   }
@@ -672,6 +714,10 @@ a:hover { opacity: 0.92; }
     grid-template-columns: 1fr;
     gap: 10px;
     margin-top: 18px;
+  }
+
+  .heroActions .btnLink{
+    grid-column: auto;
   }
 
   .btnLink,
