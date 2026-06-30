@@ -1325,8 +1325,9 @@ def calculate_quote(
     # quoted customer total still respects the universal minimum.
     # ------------------------------------------------------------
     if normalized == "scrap_pickup":
-        scrap_base = SCRAP_INSIDE_BASE_CAD if str(scrap_pickup_location) == "inside" else SCRAP_CURBSIDE_BASE_CAD
-        cash_total = max(float(scrap_base), GLOBAL_MIN_TOTAL_CAD)
+        is_inside_scrap = str(scrap_pickup_location) == "inside"
+        base_floor = max(float(SCRAP_CURBSIDE_BASE_CAD), GLOBAL_MIN_TOTAL_CAD)
+        cash_total = base_floor + (float(SCRAP_INSIDE_BASE_CAD) if is_inside_scrap else 0.0)
         emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
 
         return {
