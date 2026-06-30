@@ -277,7 +277,29 @@ When improving visible UX:
 
 Use tests to prove the public quote contract stayed intact.
 
-### 6. Pricing Phrase Adversarial Matrix Design
+### 6. Static Asset Contract Co-Evolution
+
+When a PR changes logos, favicons, social previews, or other public assets, update the HTML references and static asset tests together.
+
+Review:
+- shared favicon/logo contracts across routed pages
+- asset size versus displayed size, especially header logos
+- absolute Open Graph/Twitter preview URLs when social cards are part of the change
+- responsive wrapping and tap comfort at breakpoint edges, not only common desktop/mobile widths
+
+### 7. Public Copy and Pricing Consistency
+
+When public copy mentions price, free service, minimums, payment, access difficulty, or included work, compare it against `app/quote_engine.py` and existing pricing tests before merge.
+
+Do not let homepage, quote-page, or GPT-facing wording promise behavior that the quote engine cannot produce. For structured intake facts, confirm pricing-relevant fields still pass through the existing quote-service path instead of becoming duplicate pricing logic.
+
+### 8. Baseline and GPT Schema Synchronization
+
+When a PR updates current baseline notes, verified commits, pricing-roadmap wording, GPT current state, or OpenAPI descriptions, search active docs, GPT files, repo skills, and agent prompts for stale PR numbers, SHAs, and rule descriptions.
+
+For YAML/OpenAPI descriptions, quote or reword text containing `#` so PR references do not become YAML comments. Parser-safety issues count as publication bugs, not wording polish.
+
+### 9. Pricing Phrase Adversarial Matrix Design
 
 When a PR changes pricing wording, safeguard phrases, owner-review phrases, or other quote/pricing text interpretation, require a phrase-level adversarial matrix before commit.
 
@@ -299,7 +321,7 @@ Recent examples that should have been in the matrix up front:
 - `shed demolition and yard cleanup`
 - `full carport teardown`
 
-### 7. Quote-Engine Oracle Parity for Owner-Review Read Models
+### 10. Quote-Engine Oracle Parity for Owner-Review Read Models
 
 When `app/storage.py`, admin owner-review SQL, or any read-model logic tries to mirror `quote_engine` owner-review outcomes, use `quote_engine` as the oracle and prove parity with focused tests.
 
@@ -311,7 +333,7 @@ Required discipline:
 
 Do not claim parity because the phrases "look similar". Prove it with an oracle-backed corpus.
 
-### 8. Pricing Fact Pass-Through Boundary Review
+### 11. Pricing Fact Pass-Through Boundary Review
 
 When a task adds or changes a structured field, intake fact, GPT field, admin field, quote request field, or persisted quote/request fact, trace the field before implementation and before merge.
 
@@ -331,7 +353,7 @@ Classify every touched field as one of:
 
 If a field is pricing-relevant, it must reach `app/quote_engine.py` through the existing quote-service path without creating duplicate pricing logic. If a field is advisory-only, admin-only, or display-only, prove it cannot change customer totals, cash/EMT/HST math, pricing floors, or owner pricing authority unless that behavior is explicitly scoped.
 
-### 9. Security Boundary Trigger Discipline
+### 12. Security Boundary Trigger Discipline
 
 Treat boundary-hardening PRs as security-scan work even when they look small or docs-adjacent.
 
@@ -343,7 +365,7 @@ Auto-trigger `codex-security:security-diff-scan` when a PR touches:
 
 The review must explicitly confirm the customer path did not widen and that the protected diff stayed inside the intended boundary surface.
 
-### 10. Narrow Dependency-Audit and Lock Hygiene
+### 13. Narrow Dependency-Audit and Lock Hygiene
 
 Dependency audit or lock refresh work is its own narrow workflow, not an excuse to mix in runtime cleanup.
 
