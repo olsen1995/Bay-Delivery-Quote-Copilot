@@ -100,7 +100,7 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
-          description: Customer-visible job details or internal scope notes to price. For haul_away, description alone may be insufficient; include at least one known load detail such as bag count, trailer fill, trailer class, mattress or box spring count, or supported dense/heavy material details.
+          description: Customer-visible job details or internal scope notes to price. For haul_away, description alone may be insufficient; include at least one load detail the backend accepts by itself, such as garbage_bag_count, trailer_fill_estimate, mattresses_count, box_springs_count, or has_dense_materials true.
         pickup_address:
           type:
             - string
@@ -160,7 +160,7 @@ components:
             - older_enclosed
             - newer_enclosed
             - null
-          description: Trailer type when it materially affects the quote or when trailer fill is the main haul_away load detail.
+          description: Supporting trailer context. For haul_away, use this with trailer_fill_estimate when trailer or load size is the main load detail; trailer_class alone is not enough load detail.
         mattresses_count:
           type: integer
           minimum: 0
@@ -197,7 +197,7 @@ components:
         has_dense_materials:
           type: boolean
           default: false
-          description: Whether dense or heavy materials are present, including haul_away jobs where heavy load detail is known.
+          description: Whether dense or heavy materials are present. For haul_away dense/heavy load context, set this to true; material-type fields alone are supporting context and may not be enough load detail.
         load_mode:
           type:
             - string
@@ -243,7 +243,7 @@ components:
             - mixed
             - other
             - null
-          description: Optional demolition or haul_away material context for supported dense/heavy load details. Used only by backend quote safeguards.
+          description: Optional demolition material context. For haul_away dense/heavy context, also set has_dense_materials true; this field is supporting context unless the backend service type uses it directly.
         dense_material_type:
           type:
             - string
@@ -259,7 +259,7 @@ components:
             - mixed
             - other
             - null
-          description: Optional dense demolition or haul_away material context for supported dense/heavy load details. Used only by backend quote safeguards.
+          description: Optional dense demolition material context. For haul_away dense/heavy context, also set has_dense_materials true; this field is supporting context unless the backend service type uses it directly.
     GptQuoteResponse:
       type: object
       additionalProperties: false
