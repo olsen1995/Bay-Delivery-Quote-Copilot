@@ -320,12 +320,13 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Current local/GitHub `main` baseline after PR #347: `375b33d1e94ded7eb505342aced7307b2db37585`.
-- Latest merged PR: PR #347 `create current baseline documentation refresh`.
-- Prior relevant merged PRs: PR #346 `update codex prompt sources for skills and agents layout` and PR #345 `create structured access pricing guardrails`.
+- Current local/GitHub `main` baseline after PR #355: `6bca6dadfca3b12aa9c81fb9ebd5a5e7cf5a5f06`.
+- Latest merged PR: PR #355 `fix scrap inside removal pricing`.
+- Prior relevant merged PRs: PR #354, PR #347 `create current baseline documentation refresh`, PR #346 `update codex prompt sources for skills and agents layout`, and PR #345 `create structured access pricing guardrails`.
 - Current version: `0.12.0`.
-- Local validation after PR #347 passed compileall, `tests/test_gpt_quote_endpoint.py` with 17 passed and 1 warning, and full pytest with 1344 passed and 1 warning.
-- Austin verified live Render `/health` after PR #347: version `0.12.0`, commit prefix `375b33d1e94d`, and `drive_configured=true`.
+- Local validation after PR #355 passed version parity, GPT grounding parity, `tests/test_pricing_invariants.py` with 586 passed, and `tests/test_quote_boundary_validation.py` with 12 passed.
+- Austin verified live Render `/health` after PR #355: version `0.12.0`, commit prefix `6bca6dadfca3`, and `drive_configured=true`.
+- PR #355 fixed inside scrap removal pricing: curbside scrap remains `$60` cash / `$67.80` EMT, and inside scrap is now `$90` cash / `$101.70` EMT. README, GPT business rules, grounding pack, and disclaimer wording were aligned in PR #355.
 - PR #345 runtime/pricing verification included full pytest passing and production live-safe smoke passing against `edf5d99`.
 - Treat Austin's local PowerShell `/health` verification as the authoritative live Render check when external cached reads disagree.
 
