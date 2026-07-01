@@ -1325,18 +1325,26 @@ def calculate_quote(
     # quoted customer total still respects the universal minimum.
     # ------------------------------------------------------------
     if normalized == "scrap_pickup":
-        scrap_base = SCRAP_INSIDE_BASE_CAD if str(scrap_pickup_location) == "inside" else SCRAP_CURBSIDE_BASE_CAD
-        cash_total = max(float(scrap_base), GLOBAL_MIN_TOTAL_CAD)
+        is_inside_scrap = str(scrap_pickup_location) == "inside"
+        base_floor = max(float(SCRAP_CURBSIDE_BASE_CAD), GLOBAL_MIN_TOTAL_CAD)
+        cash_total = base_floor + (float(SCRAP_INSIDE_BASE_CAD) if is_inside_scrap else 0.0)
         emt_total = round(cash_total * (1.0 + tax["emt"]), 2)
+        disclaimer = (
+            "Inside scrap removal includes the minimum service charge plus the inside removal charge, "
+            "covering labor, travel, handling, and inside-removal handling. "
+            "Cash is tax-free; EMT/e-transfer adds 13% HST."
+            if is_inside_scrap
+            else (
+                "Curbside scrap pickup is included as part of the minimum service charge, covering labor, "
+                "travel, and handling. Cash is tax-free; EMT/e-transfer adds 13% HST."
+            )
+        )
 
         return {
             "service_type": normalized,
             "total_cash_cad": round(cash_total, 2),
             "total_emt_cad": round(emt_total, 2),
-            "disclaimer": (
-                "Scrap pickup is included as part of the minimum service charge, covering labor, "
-                "travel, and handling. Cash is tax-free; EMT/e-transfer adds 13% HST."
-            ),
+            "disclaimer": disclaimer,
             "_internal": {
                 "crew_size": 1,
                 "billable_hours": 0.0,

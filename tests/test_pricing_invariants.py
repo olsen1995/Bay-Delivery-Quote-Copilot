@@ -1153,7 +1153,7 @@ def test_small_load_above_minimum_total(client: TestClient, bag_count: int) -> N
     assert cash >= 60, f"Small-load quote must be >= minimum $60; got {cash}"
 
 
-def test_global_minimum_floor_applies_to_small_job() -> None:
+def test_global_minimum_floor_applies_to_curbside_scrap_pickup() -> None:
     """The curbside scrap path must still be hard-floored to $60 cash."""
     result = calculate_quote(
         "scrap_pickup",
@@ -1161,6 +1161,32 @@ def test_global_minimum_floor_applies_to_small_job() -> None:
         scrap_pickup_location="curbside",
     )
     assert float(result["total_cash_cad"]) == 60.0
+    assert float(result["total_emt_cad"]) == 67.8
+    assert float(result["_internal"]["scrap_cad"]) == 60.0
+    assert "minimum service charge" in result["disclaimer"]
+    assert "inside removal charge" not in result["disclaimer"]
+
+
+def test_inside_scrap_removal_adds_charge_above_curbside_floor() -> None:
+    curbside = calculate_quote(
+        "scrap_pickup",
+        0.0,
+        scrap_pickup_location="curbside",
+    )
+    inside = calculate_quote(
+        "scrap_pickup",
+        0.0,
+        scrap_pickup_location="inside",
+    )
+
+    assert float(inside["total_cash_cad"]) == float(curbside["total_cash_cad"]) + 30.0
+    assert float(inside["total_cash_cad"]) == 90.0
+    assert float(inside["total_emt_cad"]) == 101.7
+    assert float(inside["_internal"]["scrap_cad"]) == 90.0
+    assert "minimum service charge plus the inside removal charge" in inside["disclaimer"]
+    assert "margin" not in inside["disclaimer"].lower()
+    assert "risk" not in inside["disclaimer"].lower()
+    assert "admin" not in inside["disclaimer"].lower()
 
 
 def test_global_minimum_overrides_legacy_50_service_minimum(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2170,7 +2196,7 @@ def test_non_demolition_reference_totals_stay_unchanged() -> None:
             330.0,
         ),
         ("scrap_curbside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="curbside"), 60.0),
-        ("scrap_inside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="inside"), 60.0),
+        ("scrap_inside", calculate_quote("scrap_pickup", 0.0, scrap_pickup_location="inside"), 90.0),
         (
             "mattress_boxspring",
             calculate_quote(
@@ -2209,15 +2235,15 @@ def test_non_demolition_reference_totals_stay_unchanged() -> None:
         assert float(quote["total_emt_cad"]) == round(expected_cash * 1.13, 2), label
 
 
-def test_emt_total_still_correct_when_global_floor_applies() -> None:
-    """Inside scrap must still compute EMT from the same $60 floor-protected cash total."""
+def test_emt_total_still_correct_when_inside_scrap_adds_to_floor() -> None:
+    """Inside scrap must compute EMT from the $90 floor-plus-inside-removal cash total."""
     result = calculate_quote(
         "scrap_pickup",
         0.0,
         scrap_pickup_location="inside",
     )
-    assert float(result["total_cash_cad"]) == 60.0
-    assert float(result["total_emt_cad"]) == 67.8
+    assert float(result["total_cash_cad"]) == 90.0
+    assert float(result["total_emt_cad"]) == 101.7
 
 
 def test_small_load_dense_escapes_protection(client: TestClient) -> None:
