@@ -33,6 +33,8 @@ paths:
           description: Invalid business-rule input, such as an unknown service type or missing required load details.
         "401":
           description: Missing or invalid internal bearer token.
+        "404":
+          description: Endpoint fails closed when the internal GPT API token is not configured.
         "422":
           description: Request body does not match the action schema.
         "429":
@@ -98,7 +100,7 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
-          description: Customer-visible job details or internal scope notes to price.
+          description: Customer-visible job details or internal scope notes to price. For haul_away, description alone may be insufficient; include at least one known load detail such as bag count, trailer fill, trailer class, mattress or box spring count, or supported dense/heavy material details.
         pickup_address:
           type:
             - string
@@ -125,7 +127,7 @@ components:
           type: integer
           minimum: 0
           default: 0
-          description: Number of garbage bags for haul_away load detail.
+          description: Number of garbage bags for haul_away load detail when the customer gives bags, garbage bags, or similar count.
         bag_type:
           type:
             - string
@@ -147,7 +149,7 @@ components:
             - three_quarter
             - full
             - null
-          description: Trailer space estimate for haul_away load detail.
+          description: Trailer space estimate for haul_away load detail when the customer gives truck fill, trailer fill, load size, or fraction of a trailer.
         trailer_class:
           type:
             - string
@@ -158,24 +160,24 @@ components:
             - older_enclosed
             - newer_enclosed
             - null
-          description: Trailer type when it materially affects the quote.
+          description: Trailer type when it materially affects the quote or when trailer fill is the main haul_away load detail.
         mattresses_count:
           type: integer
           minimum: 0
           default: 0
-          description: Number of mattresses in the haul-away scope.
+          description: Number of mattresses in the haul-away scope. Use this for mattress_count-style user wording.
         box_springs_count:
           type: integer
           minimum: 0
           default: 0
-          description: Number of box springs in the haul-away scope.
+          description: Number of box springs in the haul-away scope. Use this for boxspring_count or box spring user wording.
         scrap_pickup_location:
           type: string
           enum:
             - curbside
             - inside
           default: curbside
-          description: Pickup location for scrap_pickup.
+          description: Pickup location for scrap_pickup. Use curbside only when scrap is outside, at the curb, or easy outside pickup. Use inside when scrap requires inside removal, basement, garage, shed, stairs, or other not-curbside pickup. If omitted, backend defaults may price as curbside. Current expected totals are curbside scrap $60 cash / $67.80 EMT and inside scrap $90 cash / $101.70 EMT.
         travel_zone:
           type: string
           enum:
@@ -195,7 +197,7 @@ components:
         has_dense_materials:
           type: boolean
           default: false
-          description: Whether dense or heavy materials are present.
+          description: Whether dense or heavy materials are present, including haul_away jobs where heavy load detail is known.
         load_mode:
           type:
             - string
@@ -241,7 +243,7 @@ components:
             - mixed
             - other
             - null
-          description: Optional demolition material context. Used only by backend quote safeguards.
+          description: Optional demolition or haul_away material context for supported dense/heavy load details. Used only by backend quote safeguards.
         dense_material_type:
           type:
             - string
@@ -257,7 +259,7 @@ components:
             - mixed
             - other
             - null
-          description: Optional dense demolition material context. Used only by backend quote safeguards.
+          description: Optional dense demolition or haul_away material context for supported dense/heavy load details. Used only by backend quote safeguards.
     GptQuoteResponse:
       type: object
       additionalProperties: false
