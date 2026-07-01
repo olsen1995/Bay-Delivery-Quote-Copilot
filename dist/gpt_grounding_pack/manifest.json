@@ -13,7 +13,7 @@
     {
       "file": "docs/gpt/GPT_CURRENT_STATE.md",
       "output": "GPT_CURRENT_STATE.md",
-      "sha256": "c03d8d82a76a20a4b239ef6e4461d46d9dc0c4028858ccb11c3002241534b388"
+      "sha256": "33b3315f9c9c3cfd05a718f74218c6970c6e690a9d2bf23e98afabb7f923b18e"
     },
     {
       "file": "docs/gpt/GPT_SYSTEM_BOUNDARIES.md",
@@ -38,7 +38,7 @@
     {
       "file": "PROJECT_RULES.md",
       "output": "PROJECT_RULES.md",
-      "sha256": "436989d526cc9baddfe2c3e2c48871fdd2703088a524151f08f854964630f217"
+      "sha256": "0f94c539eca9bf24313261c7b26346be0672b5bafde20a2a63a2f2d6251a8c6c"
     },
     {
       "file": "docs/instruction_hierarchy.md",
