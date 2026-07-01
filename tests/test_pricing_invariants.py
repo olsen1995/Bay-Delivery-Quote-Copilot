@@ -1163,6 +1163,8 @@ def test_global_minimum_floor_applies_to_curbside_scrap_pickup() -> None:
     assert float(result["total_cash_cad"]) == 60.0
     assert float(result["total_emt_cad"]) == 67.8
     assert float(result["_internal"]["scrap_cad"]) == 60.0
+    assert "minimum service charge" in result["disclaimer"]
+    assert "inside removal charge" not in result["disclaimer"]
 
 
 def test_inside_scrap_removal_adds_charge_above_curbside_floor() -> None:
@@ -1181,6 +1183,10 @@ def test_inside_scrap_removal_adds_charge_above_curbside_floor() -> None:
     assert float(inside["total_cash_cad"]) == 90.0
     assert float(inside["total_emt_cad"]) == 101.7
     assert float(inside["_internal"]["scrap_cad"]) == 90.0
+    assert "minimum service charge plus the inside removal charge" in inside["disclaimer"]
+    assert "margin" not in inside["disclaimer"].lower()
+    assert "risk" not in inside["disclaimer"].lower()
+    assert "admin" not in inside["disclaimer"].lower()
 
 
 def test_global_minimum_overrides_legacy_50_service_minimum(monkeypatch: pytest.MonkeyPatch) -> None:

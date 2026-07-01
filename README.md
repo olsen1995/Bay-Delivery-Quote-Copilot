@@ -102,9 +102,10 @@ For `small_move` and `item_delivery`, also required:
   - This adder is specific to `small_move` and is separate from haul-away trailer-class fill-floor behavior
 
 - **Scrap Pickup**
-  - Scrap pickup uses a dedicated scrap path in `app/quote_engine.py`, then the universal **$60 CAD** minimum floor is applied
-  - Effective current customer quote outcome is the minimum service charge for both curbside and inside scrap pickup
-  - Customer-facing scrap wording should describe the quote as covering labor, travel, and handling
+  - Curbside scrap pickup uses a dedicated scrap path in `app/quote_engine.py` and follows the normal scrap/minimum behavior
+  - Inside scrap removal adds **$30 CAD** above the normal scrap/minimum behavior
+  - If curbside scrap is **$60 CAD** cash, inside scrap is **$90 CAD** cash before EMT/HST
+  - Customer-facing scrap wording should describe the quote as covering labor, travel, handling, and any inside-removal handling when applicable
 
 - **Item Delivery**
   - A protected floor of **$100 CAD** is enforced against the full pre-access subtotal (travel + labour + other pre-access components) before any access-based adjustments

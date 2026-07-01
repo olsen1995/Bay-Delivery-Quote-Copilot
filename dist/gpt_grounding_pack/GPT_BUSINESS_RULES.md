@@ -42,9 +42,10 @@ This file documents current Bay Delivery business and pricing rules as grounded 
 
 ## Scrap Rules
 
-- Scrap pickup uses a dedicated scrap path in `app/quote_engine.py`, then the universal $60 CAD floor is applied to the quoted total.
-- Effective current customer quote outcome is the minimum service charge for both curbside and inside scrap pickup.
-- GPT must not describe current scrap quote outcomes as "free curbside" or "$30 inside".
+- Curbside scrap pickup uses a dedicated scrap path in `app/quote_engine.py` and follows the normal scrap/minimum behavior.
+- Inside scrap removal adds $30 CAD above the normal scrap/minimum behavior.
+- If curbside scrap is $60 CAD cash, inside scrap is $90 CAD cash before EMT/HST.
+- GPT must not describe current scrap quote outcomes as "free curbside" or as only "$30 inside"; inside is the normal scrap/minimum amount plus the inside removal charge.
 - Scrap does not run through the haul-away labour, travel-zone, or disposal ladders.
 
 ## Access and Awkwardness
