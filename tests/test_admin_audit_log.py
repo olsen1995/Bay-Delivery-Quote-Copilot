@@ -9,6 +9,9 @@ from app.main import app
 from app import storage
 
 
+DB_IMPORT_CONFIRMATION = "IMPORT BAY DELIVERY DATABASE"
+
+
 @pytest.fixture
 def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory) -> None:
     monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(tmp_path / "test-admin-audit.sqlite3"))
@@ -206,7 +209,7 @@ def test_db_import_success_writes_admin_audit_log(
     resp = client.post(
         "/admin/api/db/import",
         headers=make_basic_auth(username, password),
-        json={"payload": {"tables": {}}},
+        json={"payload": {"tables": {}}, "confirm_action": DB_IMPORT_CONFIRMATION},
     )
 
     assert resp.status_code == 200
@@ -230,7 +233,7 @@ def test_db_import_failure_writes_failed_admin_audit_log(
         client.post(
             "/admin/api/db/import",
             headers=make_basic_auth(username, password),
-            json={"payload": {"tables": []}},
+            json={"payload": {"tables": []}, "confirm_action": DB_IMPORT_CONFIRMATION},
         )
 
     entry = latest_audit_entry()
