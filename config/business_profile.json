@@ -66,7 +66,7 @@
       "dense_material_disposal_multiplier": 1.15,
       "mattress_boxspring": {
         "enabled": true,
-        "fee_each": 50,
+        "fee_each": 60,
         "customer_note": "Mattresses/box springs may have an additional disposal cost if included.",
         "note": "Fee is included in total only (not itemized)."
       }
