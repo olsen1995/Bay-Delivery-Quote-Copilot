@@ -320,12 +320,14 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Current local/GitHub `main` baseline after PR #355: `6bca6dadfca3b12aa9c81fb9ebd5a5e7cf5a5f06`.
-- Latest merged PR: PR #355 `fix scrap inside removal pricing`.
-- Prior relevant merged PRs: PR #354, PR #347 `create current baseline documentation refresh`, PR #346 `update codex prompt sources for skills and agents layout`, and PR #345 `create structured access pricing guardrails`.
+- Current local/GitHub `main` baseline after PR #358: `729f761 align mattress box spring config pricing (#358)`.
+- Latest merged PR: PR #358 `align mattress box spring config pricing`.
+- Prior relevant merged PRs: PR #357 `clarify GPT Action YAML guidance`, PR #355 `fix scrap inside removal pricing`, PR #354, PR #347 `create current baseline documentation refresh`, PR #346 `update codex prompt sources for skills and agents layout`, and PR #345 `create structured access pricing guardrails`.
 - Current version: `0.12.0`.
-- Local validation after PR #355 passed version parity, GPT grounding parity, `tests/test_pricing_invariants.py` with 586 passed, and `tests/test_quote_boundary_validation.py` with 12 passed.
+- Recent validation after PR #358 passed version parity, GPT grounding parity, and `tests/test_pricing_invariants.py` with 586 passed and 1 warning.
 - Austin verified live Render `/health` after PR #355: version `0.12.0`, commit prefix `6bca6dadfca3`, and `drive_configured=true`.
+- PR #357 clarified GPT Action YAML guidance only; it did not change runtime, pricing, auth, config, Render, workflow, dependency, `VERSION`, static/admin, SQLite, or grounding-pack behavior.
+- PR #358 aligned mattress/boxspring config `fee_each` from `50` to `60`; no runtime pricing behavior changed.
 - PR #355 fixed inside scrap removal pricing: curbside scrap remains `$60` cash / `$67.80` EMT, and inside scrap is now `$90` cash / `$101.70` EMT. README, GPT business rules, grounding pack, and disclaimer wording were aligned in PR #355.
 - PR #345 runtime/pricing verification included full pytest passing and production live-safe smoke passing against `edf5d99`.
 - Treat Austin's local PowerShell `/health` verification as the authoritative live Render check when external cached reads disagree.
