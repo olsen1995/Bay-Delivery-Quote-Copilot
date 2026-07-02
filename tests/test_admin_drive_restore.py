@@ -9,6 +9,7 @@ from app.main import app
 
 
 VALID_FILE_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+DRIVE_RESTORE_CONFIRMATION = "RESTORE BAY DELIVERY DATABASE"
 
 
 @pytest.fixture
@@ -65,7 +66,11 @@ def test_drive_restore_happy_path(monkeypatch: pytest.MonkeyPatch, isolated_db: 
     monkeypatch.setattr("app.main.import_db_from_json", lambda data: {"ok": True, "restored": {"quotes": 2, "jobs": 1}})
 
     with TestClient(app) as client:
-        resp = client.post("/admin/api/drive/restore", headers=_admin_headers(), json={"file_id": VALID_FILE_ID})
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers=_admin_headers(),
+            json={"file_id": VALID_FILE_ID, "confirm_action": DRIVE_RESTORE_CONFIRMATION},
+        )
 
     assert resp.status_code == 200
     assert resp.json() == {
@@ -91,7 +96,11 @@ def test_drive_restore_invalid_structure(monkeypatch: pytest.MonkeyPatch, isolat
     monkeypatch.setattr("app.main.gdrive.download_file", lambda file_id: json.dumps(payload).encode("utf-8"))
 
     with TestClient(app) as client:
-        resp = client.post("/admin/api/drive/restore", headers=_admin_headers(), json={"file_id": VALID_FILE_ID})
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers=_admin_headers(),
+            json={"file_id": VALID_FILE_ID, "confirm_action": DRIVE_RESTORE_CONFIRMATION},
+        )
 
     assert resp.status_code == 400
     assert "tables" in resp.json()["detail"]
@@ -112,7 +121,11 @@ def test_drive_restore_malformed_json(monkeypatch: pytest.MonkeyPatch, isolated_
     monkeypatch.setattr("app.main.gdrive.download_file", lambda file_id: b"not-json")
 
     with TestClient(app) as client:
-        resp = client.post("/admin/api/drive/restore", headers=_admin_headers(), json={"file_id": VALID_FILE_ID})
+        resp = client.post(
+            "/admin/api/drive/restore",
+            headers=_admin_headers(),
+            json={"file_id": VALID_FILE_ID, "confirm_action": DRIVE_RESTORE_CONFIRMATION},
+        )
 
     assert resp.status_code == 400
     assert "Invalid backup JSON" in resp.json()["detail"]

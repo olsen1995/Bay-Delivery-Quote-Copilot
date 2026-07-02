@@ -2636,10 +2636,14 @@ def admin_db_export(request: Request):
 
 class ImportPayload(BaseModel):
     payload: dict = Field(...)
+    confirm_action: Optional[str] = None
+    dry_run: bool = False
 
 
 class DriveRestorePayload(BaseModel):
     file_id: str = Field(...)
+    confirm_action: Optional[str] = None
+    dry_run: bool = False
 
     @field_validator("file_id")
     @classmethod
@@ -2653,10 +2657,114 @@ class DriveRestorePayload(BaseModel):
             raise ValueError(str(exc))
 
 
+_DB_IMPORT_CONFIRMATION = "IMPORT BAY DELIVERY DATABASE"
+_DRIVE_RESTORE_CONFIRMATION = "RESTORE BAY DELIVERY DATABASE"
+_BACKUP_FORMAT = "bay-delivery-sqlite-backup"
+
+
+def _confirmation_failure_reason(value: Optional[str], expected: str) -> Optional[str]:
+    if value is None or not value.strip():
+        return "missing_confirm_action"
+    if value.strip() != expected:
+        return "invalid_confirm_action"
+    return None
+
+
+def _safe_backup_version(value: Any) -> Any:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and re.fullmatch(r"\d+(?:\.\d+){0,3}", value):
+        return value
+    return None
+
+
+def _build_backup_preview(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Backup payload must be a JSON object.")
+
+    raw_tables = payload.get("tables")
+    if not isinstance(raw_tables, dict):
+        raise HTTPException(status_code=400, detail="Backup payload missing 'tables' object.")
+
+    known_counts: dict[str, int] = {}
+    unknown_count = 0
+    for name, rows in raw_tables.items():
+        if name not in storage.KNOWN_TABLES:
+            unknown_count += 1
+            continue
+        if not isinstance(rows, list):
+            raise HTTPException(status_code=400, detail="Backup table preview requires row lists.")
+        if any(not isinstance(row, dict) for row in rows):
+            raise HTTPException(status_code=400, detail="Backup rows must be JSON objects.")
+        known_counts[name] = len(rows)
+
+    meta = payload.get("meta")
+    preview: dict[str, Any] = {
+        "known_table_counts": known_counts,
+        "known_table_count": len(known_counts),
+        "unknown_table_count": unknown_count,
+        "total_known_rows": sum(known_counts.values()),
+    }
+    if isinstance(meta, dict):
+        backup_format = meta.get("format")
+        backup_version = meta.get("version")
+        preview["backup_format"] = _BACKUP_FORMAT if backup_format == _BACKUP_FORMAT else "unrecognized"
+        safe_version = _safe_backup_version(backup_version)
+        if safe_version is not None:
+            preview["backup_version"] = safe_version
+    return preview
+
+
+def _admin_preview_response(preview: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "dry_run": True,
+        "would_restore": False,
+        "preview": preview,
+    }
+
+
 @app.post("/admin/api/db/import")
 def admin_db_import(request: Request, body: ImportPayload, background_tasks: BackgroundTasks):
     _require_admin(request)
     operator_username = _admin_operator_username(request)
+    if body.dry_run:
+        try:
+            preview = _build_backup_preview(body.payload)
+        except Exception as exc:
+            _try_log_admin_audit(
+                operator_username=operator_username,
+                action_type="db_import_dry_run",
+                entity_type="database",
+                record_id="primary",
+                success=False,
+                error_summary=str(exc.detail) if isinstance(exc, HTTPException) else str(exc),
+            )
+            raise
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="db_import_dry_run",
+            entity_type="database",
+            record_id="primary",
+            success=True,
+            error_summary=f"preview: known_rows={preview['total_known_rows']}; unknown_table_count={preview['unknown_table_count']}",
+        )
+        return _admin_preview_response(preview)
+
+    confirmation_failure = _confirmation_failure_reason(body.confirm_action, _DB_IMPORT_CONFIRMATION)
+    if confirmation_failure:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="db_import_confirmation_failed",
+            entity_type="database",
+            record_id="primary",
+            success=False,
+            error_summary=confirmation_failure,
+        )
+        raise HTTPException(status_code=400, detail="Missing or invalid confirmation for database import.")
+
     try:
         result = import_db_from_json(body.payload)
         _try_log_admin_audit(
@@ -2746,6 +2854,19 @@ def admin_drive_backups(request: Request, limit: int = 20):
 def admin_drive_restore(request: Request, body: DriveRestorePayload, background_tasks: BackgroundTasks):
     _require_admin(request)
     operator_username = _admin_operator_username(request)
+    if not body.dry_run:
+        confirmation_failure = _confirmation_failure_reason(body.confirm_action, _DRIVE_RESTORE_CONFIRMATION)
+        if confirmation_failure:
+            _try_log_admin_audit(
+                operator_username=operator_username,
+                action_type="drive_restore_confirmation_failed",
+                entity_type="drive_backup",
+                record_id=body.file_id,
+                success=False,
+                error_summary=confirmation_failure,
+            )
+            raise HTTPException(status_code=400, detail="Missing or invalid confirmation for Drive restore.")
+
     try:
         if not _drive_enabled():
             raise HTTPException(status_code=501, detail="Google Drive not configured.")
@@ -2768,8 +2889,22 @@ def admin_drive_restore(request: Request, body: DriveRestorePayload, background_
         meta = payload.get("meta")
         if isinstance(meta, dict):
             backup_format = meta.get("format")
-            if backup_format is not None and backup_format != "bay-delivery-sqlite-backup":
+            if backup_format is not None and backup_format != _BACKUP_FORMAT:
                 raise HTTPException(status_code=400, detail="Unsupported backup format.")
+
+        if body.dry_run:
+            preview = _build_backup_preview(payload)
+            _try_log_admin_audit(
+                operator_username=operator_username,
+                action_type="drive_restore_dry_run",
+                entity_type="drive_backup",
+                record_id=body.file_id,
+                success=True,
+                error_summary=f"preview: known_rows={preview['total_known_rows']}; unknown_table_count={preview['unknown_table_count']}",
+            )
+            response = _admin_preview_response(preview)
+            response["restored_from_file_id"] = body.file_id
+            return response
 
         try:
             result = import_db_from_json(payload)
@@ -2793,7 +2928,7 @@ def admin_drive_restore(request: Request, body: DriveRestorePayload, background_
     except Exception as exc:
         _try_log_admin_audit(
             operator_username=operator_username,
-            action_type="drive_restore",
+            action_type="drive_restore_dry_run" if body.dry_run else "drive_restore",
             entity_type="drive_backup",
             record_id=body.file_id,
             success=False,
