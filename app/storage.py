@@ -643,6 +643,40 @@ def _quote_request_quote_id_duplicate_summary(
     return duplicate_group_count, samples
 
 
+def _quote_request_quote_id_duplicate_summary_from_rows(
+    rows: Any,
+    *,
+    quote_id_sample_limit: int = 5,
+    request_id_sample_limit: int = 5,
+) -> Tuple[int, List[Dict[str, Any]]]:
+    if not isinstance(rows, list):
+        return 0, []
+
+    request_ids_by_quote_id: Dict[str, List[str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        quote_id = row.get("quote_id")
+        if quote_id is None:
+            continue
+        request_id = row.get("request_id")
+        request_ids_by_quote_id.setdefault(str(quote_id), []).append(str(request_id or ""))
+
+    duplicate_quote_ids = sorted(
+        quote_id for quote_id, request_ids in request_ids_by_quote_id.items() if len(request_ids) > 1
+    )
+    samples = [
+        {
+            "quote_id": quote_id,
+            "duplicate_count": len(request_ids_by_quote_id[quote_id]),
+            "request_ids": request_ids_by_quote_id[quote_id][:request_id_sample_limit],
+        }
+        for quote_id in duplicate_quote_ids[:quote_id_sample_limit]
+    ]
+
+    return len(duplicate_quote_ids), samples
+
+
 def _ensure_quote_requests_quote_id_unique_index(conn: sqlite3.Connection) -> None:
     duplicate_group_count, duplicate_samples = _quote_request_quote_id_duplicate_summary(conn)
     if duplicate_group_count:
@@ -3172,13 +3206,37 @@ def get_quote_request_record(request_id: str) -> Optional[QuoteRequestRecord]:
 def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
     conn = _connect()
     try:
-        row = conn.execute("SELECT request_id FROM quote_requests WHERE quote_id = ?", (quote_id,)).fetchone()
+        rows = conn.execute(
+            """
+            SELECT request_id
+            FROM quote_requests
+            WHERE quote_id = ?
+            ORDER BY datetime(created_at), rowid
+            LIMIT 5
+            """,
+            (quote_id,),
+        ).fetchall()
+        if len(rows) > 1:
+            duplicate_count = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM quote_requests WHERE quote_id = ?",
+                    (quote_id,),
+                ).fetchone()[0]
+            )
+            logger.error(
+                "duplicate quote_requests rows for quote_id lookup; returning no row; "
+                "quote_id=%s duplicate_count=%s request_ids=%s",
+                quote_id,
+                duplicate_count,
+                [row["request_id"] for row in rows],
+            )
+            return None
     finally:
         conn.close()
 
-    if not row:
+    if not rows:
         return None
-    return get_quote_request(row["request_id"])
+    return get_quote_request(rows[0]["request_id"])
 
 
 def list_quote_requests(
@@ -4847,6 +4905,10 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(tables, dict):
         raise ValueError("Backup payload missing 'tables' object")
 
+    incoming_quote_request_duplicate_group_count, _ = _quote_request_quote_id_duplicate_summary_from_rows(
+        tables.get("quote_requests", [])
+    )
+
     init_db()
     restored_counts: Dict[str, int] = {}
     quote_accept_tokens_by_id: Dict[str, str] = {}
@@ -4863,6 +4925,9 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                 conn.execute(f"DELETE FROM {safe_table}")
             except sqlite3.OperationalError:
                 continue
+
+        if incoming_quote_request_duplicate_group_count:
+            conn.execute("DROP INDEX IF EXISTS uq_quote_requests_quote_id")
 
         for table in KNOWN_TABLES:
             safe_table = _validate_table_name(table)
@@ -4918,6 +4983,8 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
 
             conn.executemany(sql, values_to_insert)
             restored_counts[safe_table] = len(values_to_insert)
+
+        _ensure_quote_requests_quote_id_unique_index(conn)
 
         conn.execute("COMMIT")
         conn.execute("PRAGMA foreign_keys = ON")

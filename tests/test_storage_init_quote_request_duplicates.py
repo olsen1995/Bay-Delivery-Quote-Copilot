@@ -110,6 +110,56 @@ def _insert_quote_request(
     )
 
 
+def _backup_quote_request_row(
+    *,
+    request_id: str,
+    quote_id: str | None,
+    created_at: str,
+    customer_name: str = "Sensitive Customer",
+    customer_phone: str = "705-555-0101",
+    job_address: str = "123 Private Road",
+    job_description_customer: str = "Private customer description",
+    job_description_internal: str = "Private internal description",
+    cash_total_cad: float = 125.0,
+    emt_total_cad: float = 141.25,
+    request_json: dict[str, object] | str | None = None,
+    accept_token: str = "accept-secret",
+    booking_token: str = "booking-secret",
+) -> dict[str, object]:
+    return {
+        "request_id": request_id,
+        "created_at": created_at,
+        "status": "customer_accepted",
+        "quote_id": quote_id,
+        "customer_name": customer_name,
+        "customer_phone": customer_phone,
+        "job_address": job_address,
+        "job_description_customer": job_description_customer,
+        "job_description_internal": job_description_internal,
+        "service_type": "haul_away",
+        "cash_total_cad": cash_total_cad,
+        "emt_total_cad": emt_total_cad,
+        "request_json": request_json
+        if request_json is not None
+        else {"token": "private-token", "secret": "do-not-log"},
+        "notes": None,
+        "requested_job_date": None,
+        "requested_time_window": None,
+        "customer_accepted_at": None,
+        "admin_approved_at": None,
+        "accept_token": accept_token,
+        "booking_token": booking_token,
+        "booking_token_created_at": None,
+        "followup_status": None,
+        "deposit_required_cad": None,
+        "deposit_status": None,
+        "deposit_paid_at": None,
+        "deposit_refund_status": None,
+        "deposit_refunded_at": None,
+        "deposit_last_error": None,
+    }
+
+
 def _seed_legacy_quote_requests(
     db_path: Path,
     rows: list[tuple[str, str | None, str]],
@@ -280,3 +330,97 @@ def test_init_db_creates_quote_request_quote_id_unique_index_on_clean_db(
     storage.init_db()
 
     assert _quote_request_quote_id_index_exists()
+
+
+def test_import_db_from_json_preserves_duplicate_quote_requests_when_unique_index_exists(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _use_tmp_db(tmp_path)
+    storage.init_db()
+    assert _quote_request_quote_id_index_exists()
+
+    payload = {
+        "tables": {
+            "quote_requests": [
+                _backup_quote_request_row(
+                    request_id="req-import-a",
+                    quote_id="quote-import-duplicate",
+                    created_at="2026-05-01T09:00:00",
+                ),
+                _backup_quote_request_row(
+                    request_id="req-import-b",
+                    quote_id="quote-import-duplicate",
+                    created_at="2026-05-01T10:00:00",
+                ),
+            ]
+        }
+    }
+
+    with caplog.at_level("ERROR", logger="app.storage"):
+        result = storage.import_db_from_json(payload)
+
+    assert result["ok"] is True
+    assert result["restored"]["quote_requests"] == 2
+    assert _quote_request_ids_for_quote_id("quote-import-duplicate") == ["req-import-a", "req-import-b"]
+    assert not _quote_request_quote_id_index_exists()
+
+    log_text = caplog.text
+    assert "quote_requests duplicate quote_id values block unique index creation" in log_text
+    assert "quote-import-duplicate" in log_text
+    assert "req-import-a" in log_text
+    assert "req-import-b" in log_text
+    for fragment in [
+        "Sensitive Customer",
+        "705-555-0101",
+        "123 Private Road",
+        "Private customer description",
+        "Private internal description",
+        "125.0",
+        "141.25",
+        "private-token",
+        "do-not-log",
+        "accept-secret",
+        "booking-secret",
+    ]:
+        assert fragment not in log_text
+
+
+def test_get_quote_request_by_quote_id_fails_closed_for_duplicate_quote_id(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    db_path = _use_tmp_db(tmp_path)
+    _seed_legacy_quote_requests(
+        db_path,
+        [
+            ("req-lookup-a", "quote-lookup-duplicate", "2026-05-01T09:00:00"),
+            ("req-lookup-b", "quote-lookup-duplicate", "2026-05-01T10:00:00"),
+        ],
+    )
+    storage.init_db()
+
+    with caplog.at_level("ERROR", logger="app.storage"):
+        result = storage.get_quote_request_by_quote_id("quote-lookup-duplicate")
+
+    assert result is None
+    log_text = caplog.text
+    assert "duplicate quote_requests rows for quote_id lookup" in log_text
+    assert "quote-lookup-duplicate" in log_text
+    assert "duplicate_count=2" in log_text
+    assert "req-lookup-a" in log_text
+    assert "req-lookup-b" in log_text
+    for fragment in [
+        "Sensitive Customer",
+        "705-555-0101",
+        "123 Private Road",
+        "Private customer description",
+        "Private internal description",
+        "125.0",
+        "141.25",
+        "private-token",
+        "do-not-log",
+        "accept-secret",
+        "booking-secret",
+    ]:
+        assert fragment not in log_text
