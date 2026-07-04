@@ -227,7 +227,10 @@ def _admin_basic_header() -> str:
     return f"Basic {token}"
 
 
-_DRIVE_RESTORE_PAYLOAD = {"file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"}
+_DRIVE_RESTORE_PAYLOAD = {
+    "file_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+    "confirm_action": "RESTORE BAY DELIVERY DATABASE",
+}
 
 _PUBLIC_QUOTE_PAYLOAD = {
     "customer_name": "Origin Tester",
