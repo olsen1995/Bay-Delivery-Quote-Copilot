@@ -81,17 +81,18 @@ def _assert_no_key(data: Any, forbidden_key: str) -> None:
             _assert_no_key(value, forbidden_key)
 
 
-def _assert_no_lists(data: Any) -> None:
-    assert not isinstance(data, list)
+def _assert_no_row_arrays(data: Any) -> None:
+    if isinstance(data, list):
+        assert all(not isinstance(value, (dict, list)) for value in data)
+        return
     if isinstance(data, dict):
         for value in data.values():
-            _assert_no_lists(value)
+            _assert_no_row_arrays(value)
 
 
 def _assert_no_forbidden_preview_content(data: Any) -> None:
     rendered = json.dumps(data, sort_keys=True)
     forbidden_fragments = [
-        "tables",
         "Alice Example",
         "Bob Example",
         "705-555",
@@ -114,6 +115,16 @@ def _assert_no_forbidden_preview_content(data: Any) -> None:
     ]
     for fragment in forbidden_fragments:
         assert fragment not in rendered
+
+
+def _assert_preview_counts_all_known_tables(data: dict[str, Any]) -> None:
+    counts = data["preview"]["known_table_counts"]
+    assert set(counts) == set(storage.KNOWN_TABLES)
+    assert data["preview"]["known_table_count"] == len(storage.KNOWN_TABLES)
+    assert data["preview"]["omitted_known_tables"] == [
+        table for table in storage.KNOWN_TABLES if table not in {"quotes", "quote_requests"}
+    ]
+    assert all(counts[table] == 0 for table in data["preview"]["omitted_known_tables"])
 
 
 def latest_audit_entry() -> dict[str, object]:
@@ -186,8 +197,9 @@ def test_db_import_dry_run_returns_safe_preview_and_does_not_mutate(
     assert data["preview"]["known_table_counts"]["quote_requests"] == 1
     assert data["preview"]["total_known_rows"] == 2
     assert data["preview"]["unknown_table_count"] == 1
+    _assert_preview_counts_all_known_tables(data)
     _assert_no_key(data, "tables")
-    _assert_no_lists(data)
+    _assert_no_row_arrays(data)
     _assert_no_forbidden_preview_content(data)
     entry = latest_audit_entry()
     assert entry["action_type"] == "db_import_dry_run"
@@ -291,8 +303,9 @@ def test_drive_restore_dry_run_returns_safe_preview_and_does_not_mutate(
     assert data["preview"]["total_known_rows"] == 2
     assert data["preview"]["unknown_table_count"] == 1
     assert data["restored_from_file_id"] == VALID_FILE_ID
+    _assert_preview_counts_all_known_tables(data)
     _assert_no_key(data, "tables")
-    _assert_no_lists(data)
+    _assert_no_row_arrays(data)
     _assert_no_forbidden_preview_content(data)
     entry = latest_audit_entry()
     assert entry["action_type"] == "drive_restore_dry_run"
@@ -394,5 +407,5 @@ def test_preview_output_excludes_sensitive_fields(
     assert resp.status_code == 200
     data = resp.json()
     _assert_no_key(data, "tables")
-    _assert_no_lists(data)
+    _assert_no_row_arrays(data)
     _assert_no_forbidden_preview_content(data)

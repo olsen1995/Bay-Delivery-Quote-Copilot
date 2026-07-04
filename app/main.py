@@ -2688,7 +2688,8 @@ def _build_backup_preview(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_tables, dict):
         raise HTTPException(status_code=400, detail="Backup payload missing 'tables' object.")
 
-    known_counts: dict[str, int] = {}
+    known_counts: dict[str, int] = {table: 0 for table in storage.KNOWN_TABLES}
+    omitted_known_tables = set(storage.KNOWN_TABLES)
     unknown_count = 0
     for name, rows in raw_tables.items():
         if name not in storage.KNOWN_TABLES:
@@ -2699,11 +2700,13 @@ def _build_backup_preview(payload: dict[str, Any]) -> dict[str, Any]:
         if any(not isinstance(row, dict) for row in rows):
             raise HTTPException(status_code=400, detail="Backup rows must be JSON objects.")
         known_counts[name] = len(rows)
+        omitted_known_tables.discard(name)
 
     meta = payload.get("meta")
     preview: dict[str, Any] = {
         "known_table_counts": known_counts,
         "known_table_count": len(known_counts),
+        "omitted_known_tables": [table for table in storage.KNOWN_TABLES if table in omitted_known_tables],
         "unknown_table_count": unknown_count,
         "total_known_rows": sum(known_counts.values()),
     }
