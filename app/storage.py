@@ -18,6 +18,18 @@ DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
 DB_PATH = DEFAULT_DB_PATH  # overridable by tests
 UNSET = object()
 
+
+class DuplicateQuoteRequestError(RuntimeError):
+    """Raised when quote_id maps to multiple quote_requests rows."""
+
+    def __init__(self, *, quote_id: str, duplicate_count: int, request_ids: List[str]) -> None:
+        self.quote_id = quote_id
+        self.duplicate_count = duplicate_count
+        self.request_ids = request_ids
+        super().__init__(
+            f"duplicate quote_requests rows for quote_id={quote_id!r}; duplicate_count={duplicate_count}"
+        )
+
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
 BACKUP_TOKEN_ROTATION_PLACEHOLDER = "__bay_delivery_token_rotated_on_import__"
@@ -3128,6 +3140,49 @@ def save_quote_request(record: Dict[str, Any]) -> None:
 
     conn = _connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        quote_id = record.get("quote_id")
+        request_id = record["request_id"]
+        if quote_id is not None:
+            duplicate_count = int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                      AND request_id <> ?
+                    """,
+                    (quote_id, request_id),
+                ).fetchone()[0]
+            )
+            if duplicate_count:
+                request_rows = conn.execute(
+                    """
+                    SELECT request_id
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                      AND request_id <> ?
+                    ORDER BY datetime(created_at), rowid
+                    LIMIT 4
+                    """,
+                    (quote_id, request_id),
+                ).fetchall()
+                request_ids = [row["request_id"] for row in request_rows]
+                request_ids.append(str(request_id))
+                error = DuplicateQuoteRequestError(
+                    quote_id=str(quote_id),
+                    duplicate_count=duplicate_count + 1,
+                    request_ids=request_ids[:5],
+                )
+                logger.error(
+                    "duplicate quote_requests rows for quote_id write; rejected write; "
+                    "quote_id=%s duplicate_count=%s request_ids=%s",
+                    error.quote_id,
+                    error.duplicate_count,
+                    error.request_ids,
+                )
+                raise error
+
         conn.execute(
             """
             INSERT OR REPLACE INTO quote_requests
@@ -3173,6 +3228,12 @@ def save_quote_request(record: Dict[str, Any]) -> None:
             ),
         )
         conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -3223,14 +3284,19 @@ def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
                     (quote_id,),
                 ).fetchone()[0]
             )
-            logger.error(
-                "duplicate quote_requests rows for quote_id lookup; returning no row; "
-                "quote_id=%s duplicate_count=%s request_ids=%s",
-                quote_id,
-                duplicate_count,
-                [row["request_id"] for row in rows],
+            error = DuplicateQuoteRequestError(
+                quote_id=str(quote_id),
+                duplicate_count=duplicate_count,
+                request_ids=[row["request_id"] for row in rows],
             )
-            return None
+            logger.error(
+                "duplicate quote_requests rows for quote_id lookup; "
+                "quote_id=%s duplicate_count=%s request_ids=%s",
+                error.quote_id,
+                error.duplicate_count,
+                error.request_ids,
+            )
+            raise error
     finally:
         conn.close()
 

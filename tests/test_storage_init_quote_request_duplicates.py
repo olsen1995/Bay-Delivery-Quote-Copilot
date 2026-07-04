@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 import sqlite3
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app import storage
 
@@ -217,6 +219,58 @@ def _quote_request_quote_id_index_exists() -> bool:
     return row is not None
 
 
+def _save_quote(quote_id: str, *, accept_token: str = "accept-token") -> None:
+    storage.save_quote(
+        {
+            "quote_id": quote_id,
+            "created_at": "2099-01-01T08:00:00",
+            "request": {
+                "customer_name": "Route Customer",
+                "customer_phone": "705-555-0199",
+                "job_address": "99 Route St",
+                "job_description_customer": "Route private description",
+                "service_type": "haul_away",
+            },
+            "response": {
+                "job_description_internal": "Route internal description",
+                "cash_total_cad": 150.0,
+                "emt_total_cad": 169.5,
+            },
+            "accept_token": accept_token,
+        }
+    )
+
+
+def _admin_headers() -> dict[str, str]:
+    token = base64.b64encode(b"admin:secret").decode("utf-8")
+    return {"Authorization": f"Basic {token}", "Sec-Fetch-Site": "same-origin"}
+
+
+def _assert_safe_duplicate_log_and_response(text: str) -> None:
+    for fragment in [
+        "Sensitive Customer",
+        "Route Customer",
+        "705-555-0101",
+        "705-555-0199",
+        "123 Private Road",
+        "99 Route St",
+        "Private customer description",
+        "Private internal description",
+        "Route private description",
+        "Route internal description",
+        "125.0",
+        "141.25",
+        "150.0",
+        "169.5",
+        "private-token",
+        "do-not-log",
+        "accept-secret",
+        "booking-secret",
+        "accept-token",
+    ]:
+        assert fragment not in text
+
+
 def test_init_db_preserves_duplicate_quote_requests_when_quote_id_blocks_unique_index(
     tmp_path: Path,
 ) -> None:
@@ -399,28 +453,153 @@ def test_get_quote_request_by_quote_id_fails_closed_for_duplicate_quote_id(
         ],
     )
     storage.init_db()
+    caplog.clear()
 
     with caplog.at_level("ERROR", logger="app.storage"):
-        result = storage.get_quote_request_by_quote_id("quote-lookup-duplicate")
+        with pytest.raises(storage.DuplicateQuoteRequestError) as exc_info:
+            storage.get_quote_request_by_quote_id("quote-lookup-duplicate")
 
-    assert result is None
+    assert exc_info.value.quote_id == "quote-lookup-duplicate"
+    assert exc_info.value.duplicate_count == 2
+    assert exc_info.value.request_ids == ["req-lookup-a", "req-lookup-b"]
     log_text = caplog.text
     assert "duplicate quote_requests rows for quote_id lookup" in log_text
     assert "quote-lookup-duplicate" in log_text
     assert "duplicate_count=2" in log_text
     assert "req-lookup-a" in log_text
     assert "req-lookup-b" in log_text
-    for fragment in [
-        "Sensitive Customer",
-        "705-555-0101",
-        "123 Private Road",
-        "Private customer description",
-        "Private internal description",
-        "125.0",
-        "141.25",
-        "private-token",
-        "do-not-log",
-        "accept-secret",
-        "booking-secret",
-    ]:
-        assert fragment not in log_text
+    _assert_safe_duplicate_log_and_response(log_text)
+
+
+def test_save_quote_request_prevents_new_duplicate_quote_id_when_unique_index_is_skipped(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    db_path = _use_tmp_db(tmp_path)
+    _seed_legacy_quote_requests(
+        db_path,
+        [
+            ("req-legacy-a", "quote-legacy-duplicate", "2026-05-01T09:00:00"),
+            ("req-legacy-b", "quote-legacy-duplicate", "2026-05-01T10:00:00"),
+        ],
+    )
+    storage.init_db()
+    assert not _quote_request_quote_id_index_exists()
+
+    storage.save_quote_request(
+        _backup_quote_request_row(
+            request_id="req-new-a",
+            quote_id="quote-new-guarded",
+            created_at="2026-05-01T11:00:00",
+        )
+    )
+
+    caplog.clear()
+    with caplog.at_level("ERROR", logger="app.storage"):
+        with pytest.raises(storage.DuplicateQuoteRequestError) as exc_info:
+            storage.save_quote_request(
+                _backup_quote_request_row(
+                    request_id="req-new-b",
+                    quote_id="quote-new-guarded",
+                    created_at="2026-05-01T12:00:00",
+                )
+            )
+
+    assert exc_info.value.quote_id == "quote-new-guarded"
+    assert exc_info.value.duplicate_count == 2
+    assert exc_info.value.request_ids == ["req-new-a", "req-new-b"]
+    assert _quote_request_ids_for_quote_id("quote-new-guarded") == ["req-new-a"]
+    assert _quote_request_ids_for_quote_id("quote-legacy-duplicate") == ["req-legacy-a", "req-legacy-b"]
+
+    log_text = caplog.text
+    assert "duplicate quote_requests rows for quote_id write" in log_text
+    assert "quote-new-guarded" in log_text
+    assert "duplicate_count=2" in log_text
+    assert "req-new-a" in log_text
+    assert "req-new-b" in log_text
+    _assert_safe_duplicate_log_and_response(log_text)
+
+
+def test_admin_expire_quote_fails_closed_for_duplicate_quote_requests(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    db_path = _use_tmp_db(tmp_path)
+    _seed_legacy_quote_requests(
+        db_path,
+        [
+            ("req-expire-a", "quote-expire-duplicate", "2026-05-01T09:00:00"),
+            ("req-expire-b", "quote-expire-duplicate", "2026-05-01T10:00:00"),
+        ],
+    )
+    storage.init_db()
+    _save_quote("quote-expire-duplicate")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret")
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        caplog.clear()
+        with caplog.at_level("ERROR", logger="app.storage"):
+            response = client.post(
+                "/admin/api/quotes/quote-expire-duplicate/expire",
+                headers=_admin_headers(),
+            )
+
+    assert response.status_code == 409
+    response_text = response.text
+    assert "duplicate" in response_text.lower()
+    assert storage.get_quote_record("quote-expire-duplicate")["admin_status"] == "pending"
+    assert _quote_request_ids_for_quote_id("quote-expire-duplicate") == ["req-expire-a", "req-expire-b"]
+
+    log_text = caplog.text
+    assert "duplicate quote_requests rows for quote_id lookup" in log_text
+    assert "quote-expire-duplicate" in log_text
+    assert "duplicate_count=2" in log_text
+    assert "req-expire-a" in log_text
+    assert "req-expire-b" in log_text
+    _assert_safe_duplicate_log_and_response(log_text + response_text)
+
+
+def test_process_customer_decision_fails_closed_for_duplicate_quote_requests_without_creating_more(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    db_path = _use_tmp_db(tmp_path)
+    _seed_legacy_quote_requests(
+        db_path,
+        [
+            ("req-decision-a", "quote-decision-duplicate", "2026-05-01T09:00:00"),
+            ("req-decision-b", "quote-decision-duplicate", "2026-05-01T10:00:00"),
+        ],
+    )
+    storage.init_db()
+    _save_quote("quote-decision-duplicate")
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        caplog.clear()
+        with caplog.at_level("ERROR", logger="app.storage"):
+            response = client.post(
+                "/quote/quote-decision-duplicate/decision",
+                json={"action": "accept", "accept_token": "accept-token"},
+            )
+
+    assert response.status_code == 409
+    response_text = response.text
+    assert "duplicate" in response_text.lower()
+    assert _quote_request_ids_for_quote_id("quote-decision-duplicate") == [
+        "req-decision-a",
+        "req-decision-b",
+    ]
+
+    log_text = caplog.text
+    assert "duplicate quote_requests rows for quote_id lookup" in log_text
+    assert "quote-decision-duplicate" in log_text
+    assert "duplicate_count=2" in log_text
+    assert "req-decision-a" in log_text
+    assert "req-decision-b" in log_text
+    _assert_safe_duplicate_log_and_response(log_text + response_text)
