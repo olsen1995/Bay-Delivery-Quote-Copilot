@@ -583,42 +583,85 @@ def _table_info(conn: sqlite3.Connection, table: str) -> List[sqlite3.Row]:
         return []
 
 
-def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
-    """Backfill cleanup for pre-unique-index databases.
+def _quote_request_quote_id_duplicate_summary(
+    conn: sqlite3.Connection,
+    *,
+    quote_id_sample_limit: int = 5,
+    request_id_sample_limit: int = 5,
+) -> Tuple[int, List[Dict[str, Any]]]:
+    """Return safe duplicate quote_id samples that would block the unique index."""
+    duplicate_group_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM (
+                SELECT quote_id
+                FROM quote_requests
+                WHERE quote_id IS NOT NULL
+                GROUP BY quote_id
+                HAVING COUNT(*) > 1
+            )
+            """
+        ).fetchone()[0]
+    )
+    if duplicate_group_count == 0:
+        return 0, []
 
-    Keeps the newest row per quote_id (by created_at, then rowid) and removes
-    older duplicates so unique index creation succeeds on startup.
-    """
     duplicate_quote_ids = conn.execute(
         """
-        SELECT quote_id
+        SELECT quote_id, COUNT(*) AS duplicate_count
         FROM quote_requests
+        WHERE quote_id IS NOT NULL
         GROUP BY quote_id
         HAVING COUNT(*) > 1
-        """
+        ORDER BY quote_id
+        LIMIT ?
+        """,
+        (quote_id_sample_limit,),
     ).fetchall()
 
+    samples: List[Dict[str, Any]] = []
     for row in duplicate_quote_ids:
-        quote_id = row["quote_id"]
-        rows = conn.execute(
+        request_rows = conn.execute(
             """
-            SELECT rowid
+            SELECT request_id
             FROM quote_requests
             WHERE quote_id = ?
-            ORDER BY datetime(created_at) DESC, rowid DESC
+            ORDER BY datetime(created_at), rowid
+            LIMIT ?
             """,
-            (quote_id,),
+            (row["quote_id"], request_id_sample_limit),
         ).fetchall()
+        samples.append(
+            {
+                "quote_id": row["quote_id"],
+                "duplicate_count": int(row["duplicate_count"]),
+                "request_ids": [request_row["request_id"] for request_row in request_rows],
+            }
+        )
 
-        # Keep the newest row and remove the rest.
-        rowids_to_delete = [r["rowid"] for r in rows[1:]]
-        if not rowids_to_delete:
-            continue
+    return duplicate_group_count, samples
 
-        placeholders = ",".join("?" for _ in rowids_to_delete)
+
+def _ensure_quote_requests_quote_id_unique_index(conn: sqlite3.Connection) -> None:
+    duplicate_group_count, duplicate_samples = _quote_request_quote_id_duplicate_summary(conn)
+    if duplicate_group_count:
+        logger.error(
+            "quote_requests duplicate quote_id values block unique index creation; "
+            "preserved all rows and skipped uq_quote_requests_quote_id; "
+            "duplicate_group_count=%s duplicate_samples=%s",
+            duplicate_group_count,
+            duplicate_samples,
+        )
+        return
+
+    try:
         conn.execute(
-            f"DELETE FROM quote_requests WHERE rowid IN ({placeholders})",
-            rowids_to_delete,
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)"
+        )
+    except Exception:
+        logger.exception(
+            "unexpected failure creating uq_quote_requests_quote_id; preserved all quote_requests rows"
         )
 
 
@@ -960,14 +1003,7 @@ def init_db() -> None:
         _try_add_column(conn, "screenshot_assistant_analyses", "quote_id TEXT")
 
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
-        try:
-            _dedupe_quote_requests_by_quote_id(conn)
-            conn.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)"
-            )
-        except Exception:
-            # Don't block startup; worst case we just don't get the unique index.
-            pass
+        _ensure_quote_requests_quote_id_unique_index(conn)
 
         # Refresh schema cache in case init created new tables/cols.
         _TABLE_COL_CACHE.clear()
