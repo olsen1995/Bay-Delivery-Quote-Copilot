@@ -18,6 +18,18 @@ DEFAULT_DB_PATH = Path("app/data/bay_delivery.sqlite3")
 DB_PATH = DEFAULT_DB_PATH  # overridable by tests
 UNSET = object()
 
+
+class DuplicateQuoteRequestError(RuntimeError):
+    """Raised when quote_id maps to multiple quote_requests rows."""
+
+    def __init__(self, *, quote_id: str, duplicate_count: int, request_ids: List[str]) -> None:
+        self.quote_id = quote_id
+        self.duplicate_count = duplicate_count
+        self.request_ids = request_ids
+        super().__init__(
+            f"duplicate quote_requests rows for quote_id={quote_id!r}; duplicate_count={duplicate_count}"
+        )
+
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
 BACKUP_TOKEN_ROTATION_PLACEHOLDER = "__bay_delivery_token_rotated_on_import__"
@@ -583,42 +595,119 @@ def _table_info(conn: sqlite3.Connection, table: str) -> List[sqlite3.Row]:
         return []
 
 
-def _dedupe_quote_requests_by_quote_id(conn: sqlite3.Connection) -> None:
-    """Backfill cleanup for pre-unique-index databases.
+def _quote_request_quote_id_duplicate_summary(
+    conn: sqlite3.Connection,
+    *,
+    quote_id_sample_limit: int = 5,
+    request_id_sample_limit: int = 5,
+) -> Tuple[int, List[Dict[str, Any]]]:
+    """Return safe duplicate quote_id samples that would block the unique index."""
+    duplicate_group_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM (
+                SELECT quote_id
+                FROM quote_requests
+                WHERE quote_id IS NOT NULL
+                GROUP BY quote_id
+                HAVING COUNT(*) > 1
+            )
+            """
+        ).fetchone()[0]
+    )
+    if duplicate_group_count == 0:
+        return 0, []
 
-    Keeps the newest row per quote_id (by created_at, then rowid) and removes
-    older duplicates so unique index creation succeeds on startup.
-    """
     duplicate_quote_ids = conn.execute(
         """
-        SELECT quote_id
+        SELECT quote_id, COUNT(*) AS duplicate_count
         FROM quote_requests
+        WHERE quote_id IS NOT NULL
         GROUP BY quote_id
         HAVING COUNT(*) > 1
-        """
+        ORDER BY quote_id
+        LIMIT ?
+        """,
+        (quote_id_sample_limit,),
     ).fetchall()
 
+    samples: List[Dict[str, Any]] = []
     for row in duplicate_quote_ids:
-        quote_id = row["quote_id"]
-        rows = conn.execute(
+        request_rows = conn.execute(
             """
-            SELECT rowid
+            SELECT request_id
             FROM quote_requests
             WHERE quote_id = ?
-            ORDER BY datetime(created_at) DESC, rowid DESC
+            ORDER BY datetime(created_at), rowid
+            LIMIT ?
             """,
-            (quote_id,),
+            (row["quote_id"], request_id_sample_limit),
         ).fetchall()
+        samples.append(
+            {
+                "quote_id": row["quote_id"],
+                "duplicate_count": int(row["duplicate_count"]),
+                "request_ids": [request_row["request_id"] for request_row in request_rows],
+            }
+        )
 
-        # Keep the newest row and remove the rest.
-        rowids_to_delete = [r["rowid"] for r in rows[1:]]
-        if not rowids_to_delete:
+    return duplicate_group_count, samples
+
+
+def _quote_request_quote_id_duplicate_summary_from_rows(
+    rows: Any,
+    *,
+    quote_id_sample_limit: int = 5,
+    request_id_sample_limit: int = 5,
+) -> Tuple[int, List[Dict[str, Any]]]:
+    if not isinstance(rows, list):
+        return 0, []
+
+    request_ids_by_quote_id: Dict[str, List[str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
             continue
+        quote_id = row.get("quote_id")
+        if quote_id is None:
+            continue
+        request_id = row.get("request_id")
+        request_ids_by_quote_id.setdefault(str(quote_id), []).append(str(request_id or ""))
 
-        placeholders = ",".join("?" for _ in rowids_to_delete)
+    duplicate_quote_ids = sorted(
+        quote_id for quote_id, request_ids in request_ids_by_quote_id.items() if len(request_ids) > 1
+    )
+    samples = [
+        {
+            "quote_id": quote_id,
+            "duplicate_count": len(request_ids_by_quote_id[quote_id]),
+            "request_ids": request_ids_by_quote_id[quote_id][:request_id_sample_limit],
+        }
+        for quote_id in duplicate_quote_ids[:quote_id_sample_limit]
+    ]
+
+    return len(duplicate_quote_ids), samples
+
+
+def _ensure_quote_requests_quote_id_unique_index(conn: sqlite3.Connection) -> None:
+    duplicate_group_count, duplicate_samples = _quote_request_quote_id_duplicate_summary(conn)
+    if duplicate_group_count:
+        logger.error(
+            "quote_requests duplicate quote_id values block unique index creation; "
+            "preserved all rows and skipped uq_quote_requests_quote_id; "
+            "duplicate_group_count=%s duplicate_samples=%s",
+            duplicate_group_count,
+            duplicate_samples,
+        )
+        return
+
+    try:
         conn.execute(
-            f"DELETE FROM quote_requests WHERE rowid IN ({placeholders})",
-            rowids_to_delete,
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)"
+        )
+    except Exception:
+        logger.exception(
+            "unexpected failure creating uq_quote_requests_quote_id; preserved all quote_requests rows"
         )
 
 
@@ -960,14 +1049,7 @@ def init_db() -> None:
         _try_add_column(conn, "screenshot_assistant_analyses", "quote_id TEXT")
 
         # Ensure uniqueness of quote_id in quote_requests for safe joins/status lookups
-        try:
-            _dedupe_quote_requests_by_quote_id(conn)
-            conn.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_requests_quote_id ON quote_requests(quote_id)"
-            )
-        except Exception:
-            # Don't block startup; worst case we just don't get the unique index.
-            pass
+        _ensure_quote_requests_quote_id_unique_index(conn)
 
         # Refresh schema cache in case init created new tables/cols.
         _TABLE_COL_CACHE.clear()
@@ -3058,6 +3140,49 @@ def save_quote_request(record: Dict[str, Any]) -> None:
 
     conn = _connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        quote_id = record.get("quote_id")
+        request_id = record["request_id"]
+        if quote_id is not None:
+            duplicate_count = int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                      AND request_id <> ?
+                    """,
+                    (quote_id, request_id),
+                ).fetchone()[0]
+            )
+            if duplicate_count:
+                request_rows = conn.execute(
+                    """
+                    SELECT request_id
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                      AND request_id <> ?
+                    ORDER BY datetime(created_at), rowid
+                    LIMIT 4
+                    """,
+                    (quote_id, request_id),
+                ).fetchall()
+                request_ids = [row["request_id"] for row in request_rows]
+                request_ids.append(str(request_id))
+                error = DuplicateQuoteRequestError(
+                    quote_id=str(quote_id),
+                    duplicate_count=duplicate_count + 1,
+                    request_ids=request_ids[:5],
+                )
+                logger.error(
+                    "duplicate quote_requests rows for quote_id write; rejected write; "
+                    "quote_id=%s duplicate_count=%s request_ids=%s",
+                    error.quote_id,
+                    error.duplicate_count,
+                    error.request_ids,
+                )
+                raise error
+
         conn.execute(
             """
             INSERT OR REPLACE INTO quote_requests
@@ -3103,6 +3228,12 @@ def save_quote_request(record: Dict[str, Any]) -> None:
             ),
         )
         conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -3136,13 +3267,42 @@ def get_quote_request_record(request_id: str) -> Optional[QuoteRequestRecord]:
 def get_quote_request_by_quote_id(quote_id: str) -> Optional[QuoteRequest]:
     conn = _connect()
     try:
-        row = conn.execute("SELECT request_id FROM quote_requests WHERE quote_id = ?", (quote_id,)).fetchone()
+        rows = conn.execute(
+            """
+            SELECT request_id
+            FROM quote_requests
+            WHERE quote_id = ?
+            ORDER BY datetime(created_at), rowid
+            LIMIT 5
+            """,
+            (quote_id,),
+        ).fetchall()
+        if len(rows) > 1:
+            duplicate_count = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM quote_requests WHERE quote_id = ?",
+                    (quote_id,),
+                ).fetchone()[0]
+            )
+            error = DuplicateQuoteRequestError(
+                quote_id=str(quote_id),
+                duplicate_count=duplicate_count,
+                request_ids=[row["request_id"] for row in rows],
+            )
+            logger.error(
+                "duplicate quote_requests rows for quote_id lookup; "
+                "quote_id=%s duplicate_count=%s request_ids=%s",
+                error.quote_id,
+                error.duplicate_count,
+                error.request_ids,
+            )
+            raise error
     finally:
         conn.close()
 
-    if not row:
+    if not rows:
         return None
-    return get_quote_request(row["request_id"])
+    return get_quote_request(rows[0]["request_id"])
 
 
 def list_quote_requests(
@@ -4811,6 +4971,10 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(tables, dict):
         raise ValueError("Backup payload missing 'tables' object")
 
+    incoming_quote_request_duplicate_group_count, _ = _quote_request_quote_id_duplicate_summary_from_rows(
+        tables.get("quote_requests", [])
+    )
+
     init_db()
     restored_counts: Dict[str, int] = {}
     quote_accept_tokens_by_id: Dict[str, str] = {}
@@ -4827,6 +4991,9 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                 conn.execute(f"DELETE FROM {safe_table}")
             except sqlite3.OperationalError:
                 continue
+
+        if incoming_quote_request_duplicate_group_count:
+            conn.execute("DROP INDEX IF EXISTS uq_quote_requests_quote_id")
 
         for table in KNOWN_TABLES:
             safe_table = _validate_table_name(table)
@@ -4882,6 +5049,8 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
 
             conn.executemany(sql, values_to_insert)
             restored_counts[safe_table] = len(values_to_insert)
+
+        _ensure_quote_requests_quote_id_unique_index(conn)
 
         conn.execute("COMMIT")
         conn.execute("PRAGMA foreign_keys = ON")

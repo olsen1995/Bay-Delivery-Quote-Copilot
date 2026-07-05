@@ -1885,6 +1885,11 @@ def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: Back
             notes_provided=notes_provided,
             now_iso=_now_local_iso(),
         )
+    except storage.DuplicateQuoteRequestError:
+        raise HTTPException(
+            status_code=409,
+            detail="Quote has duplicate request records and requires operator review.",
+        )
     except InvalidQuoteRequestTransition as e:
         return _invalid_status_transition_response(e)
 
@@ -2005,7 +2010,21 @@ def admin_expire_quote(request: Request, quote_id: str, background_tasks: Backgr
         )
         raise HTTPException(status_code=404, detail="Quote not found.")
 
-    linked_request = storage.get_quote_request_by_quote_id(quote_id)
+    try:
+        linked_request = storage.get_quote_request_by_quote_id(quote_id)
+    except storage.DuplicateQuoteRequestError:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="expire_quote",
+            entity_type="quote",
+            record_id=quote_id,
+            success=False,
+            error_summary="Duplicate quote request records",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="Quote has duplicate request records and requires operator review.",
+        )
     linked_status = str(linked_request.get("status") or "") if linked_request else ""
     if linked_status in {"customer_accepted", "admin_approved"}:
         _try_log_admin_audit(
