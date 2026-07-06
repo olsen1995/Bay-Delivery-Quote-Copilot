@@ -320,11 +320,13 @@ Follow the roadmap order unless Austin explicitly changes it.
 
 Current verified baseline:
 
-- Current local/GitHub `main` baseline after PR #361: `bf56cee fix startup quote request duplicate handling (#361)`.
+- Latest merged runtime baseline before the 0.13.0 metadata bump: `bf56cee fix startup quote request duplicate handling (#361)`. That PR #361 baseline was verified at version `0.12.0`.
+- Current release-marker baseline: PR #362 `update version after storage safety fixes`, with initial version-bump commit `354b6e8 update version after storage safety fixes`, updates repo metadata to version `0.13.0`.
 - Latest merged PR: PR #361 `fix startup quote request duplicate handling`.
+- Latest release-marker PR: PR #362 `update version after storage safety fixes`.
 - Prior relevant merged PRs: PR #360 `create admin import restore safety guards`, PR #358 `align mattress box spring config pricing`, PR #357 `clarify GPT Action YAML guidance`, PR #355 `fix scrap inside removal pricing`, PR #354, PR #347 `create current baseline documentation refresh`, PR #346 `update codex prompt sources for skills and agents layout`, and PR #345 `create structured access pricing guardrails`.
 - Current version: `0.13.0`.
-- Recent post-merge validation after PR #361 passed version parity, GPT grounding parity, compileall, storage duplicate tests (10 passed), adjacent focused tests (33 passed), full pytest (1367 passed, 1 existing Starlette/httpx warning), protected no-go diff, and production live-safe smoke.
+- Recent post-merge validation after PR #361 passed version parity at `0.12.0`, GPT grounding parity, compileall, storage duplicate tests (10 passed), adjacent focused tests (33 passed), full pytest (1367 passed, 1 existing Starlette/httpx warning), protected no-go diff, and production live-safe smoke.
 - Austin verified live Render after PR #361 with production live-safe smoke passing.
 - PR #357 clarified GPT Action YAML guidance only; it did not change runtime, pricing, auth, config, Render, workflow, dependency, `VERSION`, static/admin, SQLite, or grounding-pack behavior.
 - PR #358 aligned mattress/boxspring config `fee_each` from `50` to `60`; no runtime pricing behavior changed.
