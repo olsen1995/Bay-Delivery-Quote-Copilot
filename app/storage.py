@@ -3355,59 +3355,107 @@ def update_quote_request(
     deposit_refunded_at: Any = UNSET,
     deposit_last_error: Any = UNSET,
 ) -> Optional[QuoteRequest]:
-    existing = get_quote_request_record(request_id)
-    if not existing:
-        return None
-
-    updates: Dict[str, Any] = {}
-
-    # Status is not nullable in our schema; `None` means "leave unchanged".
-    if status is not None:
-        validate_quote_request_transition(existing["status"], status)
-        updates["status"] = status
-
-    # Nullable fields: UNSET means "leave unchanged", None means "clear"
-    if notes is not UNSET:
-        updates["notes"] = notes
-    if requested_job_date is not UNSET:
-        updates["requested_job_date"] = requested_job_date
-    if requested_time_window is not UNSET:
-        updates["requested_time_window"] = requested_time_window
-    if customer_accepted_at is not UNSET:
-        updates["customer_accepted_at"] = customer_accepted_at
-    if admin_approved_at is not UNSET:
-        updates["admin_approved_at"] = admin_approved_at
-    if booking_token is not UNSET:
-        updates["booking_token"] = booking_token
-    if booking_token_created_at is not UNSET:
-        updates["booking_token_created_at"] = booking_token_created_at
-    if followup_status is not UNSET:
-        updates["followup_status"] = _validate_quote_request_followup_status(followup_status)
-    if deposit_required_cad is not UNSET:
-        updates["deposit_required_cad"] = deposit_required_cad
-    if deposit_status is not UNSET:
-        _validate_deposit_status(deposit_status)
-        updates["deposit_status"] = deposit_status
-    if deposit_paid_at is not UNSET:
-        updates["deposit_paid_at"] = deposit_paid_at
-    if deposit_refund_status is not UNSET:
-        updates["deposit_refund_status"] = deposit_refund_status
-    if deposit_refunded_at is not UNSET:
-        updates["deposit_refunded_at"] = deposit_refunded_at
-    if deposit_last_error is not UNSET:
-        updates["deposit_last_error"] = deposit_last_error
-
-    if not updates:
-        return get_quote_request(request_id)
-
-    assignments = ", ".join(f"{field_name} = ?" for field_name in updates)
-    params = list(updates.values())
-    params.append(request_id)
-
     conn = _connect()
     try:
-        conn.execute(f"UPDATE quote_requests SET {assignments} WHERE request_id = ?", params)
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM quote_requests WHERE request_id = ?", (request_id,)).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+
+        existing = cast(
+            QuoteRequestRecord,
+            _quote_request_from_row(row, include_payment_fields=True, include_followup_status=True),
+        )
+
+        updates: Dict[str, Any] = {}
+
+        # Status is not nullable in our schema; `None` means "leave unchanged".
+        if status is not None:
+            validate_quote_request_transition(existing["status"], status)
+            updates["status"] = status
+
+        # Nullable fields: UNSET means "leave unchanged", None means "clear"
+        if notes is not UNSET:
+            updates["notes"] = notes
+        if requested_job_date is not UNSET:
+            updates["requested_job_date"] = requested_job_date
+        if requested_time_window is not UNSET:
+            updates["requested_time_window"] = requested_time_window
+        if customer_accepted_at is not UNSET:
+            updates["customer_accepted_at"] = customer_accepted_at
+        if admin_approved_at is not UNSET:
+            updates["admin_approved_at"] = admin_approved_at
+        if booking_token is not UNSET:
+            updates["booking_token"] = booking_token
+        if booking_token_created_at is not UNSET:
+            updates["booking_token_created_at"] = booking_token_created_at
+        if followup_status is not UNSET:
+            updates["followup_status"] = _validate_quote_request_followup_status(followup_status)
+        if deposit_required_cad is not UNSET:
+            updates["deposit_required_cad"] = deposit_required_cad
+        if deposit_status is not UNSET:
+            _validate_deposit_status(deposit_status)
+            updates["deposit_status"] = deposit_status
+        if deposit_paid_at is not UNSET:
+            updates["deposit_paid_at"] = deposit_paid_at
+        if deposit_refund_status is not UNSET:
+            updates["deposit_refund_status"] = deposit_refund_status
+        if deposit_refunded_at is not UNSET:
+            updates["deposit_refunded_at"] = deposit_refunded_at
+        if deposit_last_error is not UNSET:
+            updates["deposit_last_error"] = deposit_last_error
+
+        if updates:
+            quote_id = existing["quote_id"]
+            duplicate_count = int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                      AND request_id <> ?
+                    """,
+                    (quote_id, request_id),
+                ).fetchone()[0]
+            )
+            if duplicate_count:
+                request_rows = conn.execute(
+                    """
+                    SELECT request_id
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                    ORDER BY datetime(created_at), rowid
+                    LIMIT 5
+                    """,
+                    (quote_id,),
+                ).fetchall()
+                error = DuplicateQuoteRequestError(
+                    quote_id=str(quote_id),
+                    duplicate_count=duplicate_count + 1,
+                    request_ids=[row["request_id"] for row in request_rows],
+                )
+                logger.error(
+                    "duplicate quote_requests rows for quote_id update; rejected update; "
+                    "quote_id=%s duplicate_count=%s request_ids=%s",
+                    error.quote_id,
+                    error.duplicate_count,
+                    error.request_ids,
+                )
+                raise error
+
+            assignments = ", ".join(f"{field_name} = ?" for field_name in updates)
+            params = list(updates.values())
+            params.append(request_id)
+            conn.execute(f"UPDATE quote_requests SET {assignments} WHERE request_id = ?", params)
+
         conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 

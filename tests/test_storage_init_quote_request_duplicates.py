@@ -646,6 +646,64 @@ def test_save_quote_request_prevents_new_duplicate_quote_id_when_unique_index_is
     _assert_safe_duplicate_log_and_response(log_text)
 
 
+def test_update_quote_request_fails_closed_for_duplicate_quote_id_without_mutating(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    db_path = _use_tmp_db(tmp_path)
+    _seed_legacy_quote_requests(
+        db_path,
+        [
+            ("req-update-a", "quote-update-duplicate", "2026-05-01T09:00:00"),
+            ("req-update-b", "quote-update-duplicate", "2026-05-01T10:00:00"),
+        ],
+    )
+    storage.init_db()
+    assert not _quote_request_quote_id_index_exists()
+
+    caplog.clear()
+    with caplog.at_level("ERROR", logger="app.storage"):
+        with pytest.raises(storage.DuplicateQuoteRequestError) as exc_info:
+            storage.update_quote_request(
+                "req-update-a",
+                status="admin_approved",
+                admin_approved_at="2026-05-01T11:00:00",
+                notes="must not be saved",
+            )
+
+    assert exc_info.value.quote_id == "quote-update-duplicate"
+    assert exc_info.value.duplicate_count == 2
+    assert exc_info.value.request_ids == ["req-update-a", "req-update-b"]
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT request_id, status, admin_approved_at, notes
+            FROM quote_requests
+            WHERE quote_id = ?
+            ORDER BY datetime(created_at), rowid
+            """,
+            ("quote-update-duplicate",),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert [row["request_id"] for row in rows] == ["req-update-a", "req-update-b"]
+    assert [row["status"] for row in rows] == ["customer_accepted", "customer_accepted"]
+    assert [row["admin_approved_at"] for row in rows] == [None, None]
+    assert [row["notes"] for row in rows] == [None, None]
+
+    log_text = caplog.text
+    assert "duplicate quote_requests rows for quote_id update" in log_text
+    assert "quote-update-duplicate" in log_text
+    assert "duplicate_count=2" in log_text
+    assert "req-update-a" in log_text
+    assert "req-update-b" in log_text
+    _assert_safe_duplicate_log_and_response(log_text)
+
+
 def test_admin_expire_quote_fails_closed_for_duplicate_quote_requests(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
