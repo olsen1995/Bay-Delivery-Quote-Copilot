@@ -157,6 +157,107 @@ def test_save_and_read_job_costing_data(isolated_db: Path) -> None:
     assert updated["disposal_receipt_note"] == "Receipt in Drive."
 
 
+def test_save_job_duplicate_preserves_scheduling_calendar_lifecycle_and_costing_fields(
+    isolated_db: Path,
+) -> None:
+    _seed_job(job_id="job-duplicate-safety", status="completed")
+    storage.update_job(
+        "job-duplicate-safety",
+        status="completed",
+        scheduled_start="2026-04-27T09:00:00",
+        scheduled_end="2026-04-27T11:00:00",
+        google_calendar_event_id="calendar-event-keep",
+        calendar_sync_status="synced",
+        calendar_last_error="previous transient warning",
+        started_at="2026-04-27T09:05:00",
+        completed_at="2026-04-27T10:45:00",
+        cancelled_at="2026-04-27T10:50:00",
+        closeout_notes="Closeout note to preserve.",
+    )
+    storage.update_job_costing(
+        "job-duplicate-safety",
+        actual_hours=2.5,
+        actual_crew_size=2,
+        actual_labor_cost_cad=90.0,
+        actual_disposal_cost_cad=35.0,
+        actual_fuel_cost_cad=15.0,
+        actual_other_costs_cad=5.0,
+        final_amount_collected_cad=260.0,
+        payment_method="emt",
+        payment_status="paid_in_full",
+        job_profit_status="profitable",
+        quote_accuracy_note="Known-cost note to preserve.",
+        disposal_receipt_note="Receipt note to preserve.",
+    )
+
+    storage.save_job(
+        {
+            "job_id": "job-duplicate-safety",
+            "created_at": "2026-04-28T10:00:00",
+            "status": "approved",
+            "quote_id": "quote-job-duplicate-safety",
+            "request_id": "request-job-duplicate-safety",
+            "customer_name": "Stale Duplicate Customer",
+            "customer_phone": "705-555-0199",
+            "job_address": "999 Stale Duplicate St",
+            "job_description_customer": "Stale duplicate payload",
+            "job_description_internal": "Stale duplicate internal details",
+            "service_type": "dump_run",
+            "cash_total_cad": 999.0,
+            "emt_total_cad": 1128.87,
+            "request_json": {"service_type": "dump_run", "stale": True},
+            "notes": None,
+            "scheduled_start": None,
+            "scheduled_end": None,
+            "google_calendar_event_id": None,
+            "calendar_sync_status": "not_configured",
+            "calendar_last_error": None,
+            "started_at": None,
+            "completed_at": None,
+            "cancelled_at": None,
+            "closeout_notes": None,
+            "actual_hours": 0.0,
+            "actual_crew_size": 0,
+            "actual_labor_cost_cad": 0.0,
+            "actual_disposal_cost_cad": 0.0,
+            "actual_fuel_cost_cad": 0.0,
+            "actual_other_costs_cad": 0.0,
+            "final_amount_collected_cad": 0.0,
+            "payment_method": None,
+            "payment_status": "not_paid_yet",
+            "job_profit_status": None,
+            "quote_accuracy_note": "",
+            "disposal_receipt_note": "",
+        }
+    )
+
+    stored = storage.require_job("job-duplicate-safety")
+    assert stored["status"] == "completed"
+    assert stored["cash_total_cad"] == 240.0
+    assert stored["emt_total_cad"] == 271.2
+    assert stored["scheduled_start"] == "2026-04-27T09:00:00"
+    assert stored["scheduled_end"] == "2026-04-27T11:00:00"
+    assert stored["google_calendar_event_id"] == "calendar-event-keep"
+    assert stored["calendar_sync_status"] == "synced"
+    assert stored["calendar_last_error"] == "previous transient warning"
+    assert stored["started_at"] == "2026-04-27T09:05:00"
+    assert stored["completed_at"] == "2026-04-27T10:45:00"
+    assert stored["cancelled_at"] == "2026-04-27T10:50:00"
+    assert stored["closeout_notes"] == "Closeout note to preserve."
+    assert stored["actual_hours"] == 2.5
+    assert stored["actual_crew_size"] == 2
+    assert stored["actual_labor_cost_cad"] == 90.0
+    assert stored["actual_disposal_cost_cad"] == 35.0
+    assert stored["actual_fuel_cost_cad"] == 15.0
+    assert stored["actual_other_costs_cad"] == 5.0
+    assert stored["final_amount_collected_cad"] == 260.0
+    assert stored["payment_method"] == "emt"
+    assert stored["payment_status"] == "paid_in_full"
+    assert stored["job_profit_status"] == "profitable"
+    assert stored["quote_accuracy_note"] == "Known-cost note to preserve."
+    assert stored["disposal_receipt_note"] == "Receipt note to preserve."
+
+
 def test_admin_job_costing_requires_auth(client: TestClient, isolated_db: Path) -> None:
     _seed_job()
 

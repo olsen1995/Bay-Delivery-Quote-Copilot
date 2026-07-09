@@ -125,8 +125,18 @@ def _backup_quote_request_row(
     cash_total_cad: float = 125.0,
     emt_total_cad: float = 141.25,
     request_json: dict[str, object] | str | None = None,
+    customer_accepted_at: str | None = None,
+    admin_approved_at: str | None = None,
     accept_token: str = "accept-secret",
     booking_token: str = "booking-secret",
+    booking_token_created_at: str | None = None,
+    followup_status: str | None = None,
+    deposit_required_cad: float | None = None,
+    deposit_status: str | None = None,
+    deposit_paid_at: str | None = None,
+    deposit_refund_status: str | None = None,
+    deposit_refunded_at: str | None = None,
+    deposit_last_error: str | None = None,
 ) -> dict[str, object]:
     return {
         "request_id": request_id,
@@ -147,18 +157,18 @@ def _backup_quote_request_row(
         "notes": None,
         "requested_job_date": None,
         "requested_time_window": None,
-        "customer_accepted_at": None,
-        "admin_approved_at": None,
+        "customer_accepted_at": customer_accepted_at,
+        "admin_approved_at": admin_approved_at,
         "accept_token": accept_token,
         "booking_token": booking_token,
-        "booking_token_created_at": None,
-        "followup_status": None,
-        "deposit_required_cad": None,
-        "deposit_status": None,
-        "deposit_paid_at": None,
-        "deposit_refund_status": None,
-        "deposit_refunded_at": None,
-        "deposit_last_error": None,
+        "booking_token_created_at": booking_token_created_at,
+        "followup_status": followup_status,
+        "deposit_required_cad": deposit_required_cad,
+        "deposit_status": deposit_status,
+        "deposit_paid_at": deposit_paid_at,
+        "deposit_refund_status": deposit_refund_status,
+        "deposit_refunded_at": deposit_refunded_at,
+        "deposit_last_error": deposit_last_error,
     }
 
 
@@ -269,6 +279,122 @@ def _assert_safe_duplicate_log_and_response(text: str) -> None:
         "accept-token",
     ]:
         assert fragment not in text
+
+
+def test_save_quote_rejects_duplicate_quote_id_without_erasing_token_or_admin_status(tmp_path: Path) -> None:
+    _use_tmp_db(tmp_path)
+    storage.init_db()
+
+    storage.save_quote(
+        {
+            "quote_id": "quote-create-only",
+            "created_at": "2026-05-01T09:00:00",
+            "request": {
+                "customer_name": "Original Customer",
+                "customer_phone": "705-555-0101",
+                "job_address": "123 Original St",
+                "job_description_customer": "Original request",
+                "service_type": "haul_away",
+            },
+            "response": {
+                "job_description_internal": "Original internal details",
+                "cash_total_cad": 125.0,
+                "emt_total_cad": 141.25,
+            },
+            "accept_token": "original-accept-token",
+            "admin_status": "expired",
+        }
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        storage.save_quote(
+            {
+                "quote_id": "quote-create-only",
+                "created_at": "2026-05-01T10:00:00",
+                "request": {
+                    "customer_name": "Stale Customer",
+                    "customer_phone": "705-555-0199",
+                    "job_address": "999 Stale St",
+                    "job_description_customer": "Stale request",
+                    "service_type": "haul_away",
+                },
+                "response": {
+                    "job_description_internal": "Stale internal details",
+                    "cash_total_cad": 999.0,
+                    "emt_total_cad": 1128.87,
+                },
+                "accept_token": None,
+                "admin_status": "pending",
+            }
+        )
+
+    stored = storage.get_quote_record("quote-create-only")
+    assert stored is not None
+    assert stored["accept_token"] == "original-accept-token"
+    assert stored["admin_status"] == "expired"
+    assert stored["request"]["customer_name"] == "Original Customer"
+    assert stored["response"]["cash_total_cad"] == 125.0
+
+
+def test_save_quote_request_rejects_same_request_id_without_erasing_protected_fields(tmp_path: Path) -> None:
+    _use_tmp_db(tmp_path)
+    storage.init_db()
+
+    storage.save_quote_request(
+        _backup_quote_request_row(
+            request_id="req-create-only",
+            quote_id="quote-create-only-request",
+            created_at="2026-05-01T09:00:00",
+            customer_accepted_at="2026-05-01T09:10:00",
+            admin_approved_at="2026-05-01T09:20:00",
+            accept_token="accept-original",
+            booking_token="booking-original",
+            booking_token_created_at="2026-05-01T09:11:00",
+            followup_status="waiting_on_customer",
+            deposit_required_cad=75.0,
+            deposit_status="paid",
+            deposit_paid_at="2026-05-01T09:30:00",
+            deposit_refund_status="not_requested",
+            deposit_refunded_at="2026-05-01T09:40:00",
+            deposit_last_error="keep existing provider note",
+        )
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        storage.save_quote_request(
+            _backup_quote_request_row(
+                request_id="req-create-only",
+                quote_id="quote-create-only-request",
+                created_at="2026-05-01T10:00:00",
+                customer_name="Stale Customer",
+                customer_phone="705-555-0199",
+                job_address="999 Stale St",
+                job_description_customer="Stale description",
+                job_description_internal="Stale internal",
+                cash_total_cad=999.0,
+                emt_total_cad=1128.87,
+                request_json={"stale": True},
+                accept_token=None,
+                booking_token=None,
+            )
+        )
+
+    stored = storage.get_quote_request_record("req-create-only")
+    assert stored is not None
+    assert stored["customer_accepted_at"] == "2026-05-01T09:10:00"
+    assert stored["admin_approved_at"] == "2026-05-01T09:20:00"
+    assert stored["accept_token"] == "accept-original"
+    assert stored["booking_token"] == "booking-original"
+    assert stored["booking_token_created_at"] == "2026-05-01T09:11:00"
+    assert stored["followup_status"] == "waiting_on_customer"
+    assert stored["deposit_required_cad"] == 75.0
+    assert stored["deposit_status"] == "paid"
+    assert stored["deposit_paid_at"] == "2026-05-01T09:30:00"
+    assert stored["deposit_refund_status"] == "not_requested"
+    assert stored["deposit_refunded_at"] == "2026-05-01T09:40:00"
+    assert stored["deposit_last_error"] == "keep existing provider note"
+    assert stored["customer_name"] == "Sensitive Customer"
+    assert stored["cash_total_cad"] == 125.0
 
 
 def test_init_db_preserves_duplicate_quote_requests_when_quote_id_blocks_unique_index(
