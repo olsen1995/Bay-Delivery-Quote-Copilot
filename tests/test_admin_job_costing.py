@@ -258,6 +258,119 @@ def test_save_job_duplicate_preserves_scheduling_calendar_lifecycle_and_costing_
     assert stored["disposal_receipt_note"] == "Receipt note to preserve."
 
 
+def test_save_job_duplicate_preserves_operational_fields_from_non_default_stale_values(
+    isolated_db: Path,
+) -> None:
+    _seed_job(job_id="job-non-default-duplicate", status="completed")
+    storage.update_job(
+        "job-non-default-duplicate",
+        status="completed",
+        scheduled_start="2026-05-02T09:00:00",
+        scheduled_end="2026-05-02T11:00:00",
+        google_calendar_event_id="calendar-event-current",
+        calendar_sync_status="synced",
+        calendar_last_error="current calendar note",
+        started_at="2026-05-02T09:05:00",
+        completed_at="2026-05-02T10:55:00",
+        cancelled_at="2026-05-02T11:10:00",
+        closeout_notes="Current closeout note.",
+    )
+    storage.update_job_costing(
+        "job-non-default-duplicate",
+        actual_hours=2.5,
+        actual_crew_size=2,
+        actual_labor_cost_cad=90.0,
+        actual_disposal_cost_cad=35.0,
+        actual_fuel_cost_cad=15.0,
+        actual_other_costs_cad=5.0,
+        final_amount_collected_cad=260.0,
+        payment_method="emt",
+        payment_status="paid_in_full",
+        job_profit_status="profitable",
+        quote_accuracy_note="Current quote accuracy note.",
+        disposal_receipt_note="Current receipt note.",
+    )
+
+    storage.save_job(
+        {
+            "job_id": "job-non-default-duplicate",
+            "created_at": "2026-05-03T12:00:00",
+            "status": "scheduled",
+            "quote_id": "quote-job-non-default-duplicate",
+            "request_id": "request-job-non-default-duplicate",
+            "customer_name": "Updated Customer Name",
+            "customer_phone": "705-555-0144",
+            "job_address": "44 Updated St",
+            "job_description_customer": "Updated customer-facing description",
+            "job_description_internal": "Updated internal description",
+            "service_type": "small_move",
+            "cash_total_cad": 100.0,
+            "emt_total_cad": 113.0,
+            "request_json": {"service_type": "small_move", "stale": True},
+            "notes": "Updated descriptive notes",
+            "scheduled_start": "2026-05-03T13:00:00",
+            "scheduled_end": "2026-05-03T15:00:00",
+            "google_calendar_event_id": "calendar-event-stale",
+            "calendar_sync_status": "failed",
+            "calendar_last_error": "stale failure",
+            "started_at": "2026-05-03T13:05:00",
+            "completed_at": "2026-05-03T14:45:00",
+            "cancelled_at": "2026-05-03T15:10:00",
+            "closeout_notes": "Stale closeout note",
+            "actual_hours": 1.0,
+            "actual_crew_size": 1,
+            "actual_labor_cost_cad": 20.0,
+            "actual_disposal_cost_cad": 10.0,
+            "actual_fuel_cost_cad": 8.0,
+            "actual_other_costs_cad": 3.0,
+            "final_amount_collected_cad": 100.0,
+            "payment_method": "cash",
+            "payment_status": "partial_payment",
+            "job_profit_status": "fair",
+            "quote_accuracy_note": "Stale quote accuracy note",
+            "disposal_receipt_note": "Stale receipt note",
+        }
+    )
+
+    stored = storage.require_job("job-non-default-duplicate")
+    assert stored["customer_name"] == "Updated Customer Name"
+    assert stored["customer_phone"] == "705-555-0144"
+    assert stored["job_address"] == "44 Updated St"
+    assert stored["job_description_customer"] == "Updated customer-facing description"
+    assert stored["job_description_internal"] == "Updated internal description"
+    assert stored["notes"] == "Updated descriptive notes"
+    assert stored["created_at"] == "2026-04-26T10:00:00"
+    assert stored["status"] == "completed"
+    assert stored["quote_id"] == "quote-job-non-default-duplicate"
+    assert stored["request_id"] == "request-job-non-default-duplicate"
+    assert stored["service_type"] == "dump_run"
+    assert stored["cash_total_cad"] == 240.0
+    assert stored["emt_total_cad"] == 271.2
+    assert stored["request_json"] == {"service_type": "dump_run"}
+    assert stored["scheduled_start"] == "2026-05-02T09:00:00"
+    assert stored["scheduled_end"] == "2026-05-02T11:00:00"
+    assert stored["google_calendar_event_id"] == "calendar-event-current"
+    assert stored["calendar_sync_status"] == "synced"
+    assert stored["calendar_last_error"] == "current calendar note"
+    assert stored["started_at"] == "2026-05-02T09:05:00"
+    assert stored["completed_at"] == "2026-05-02T10:55:00"
+    assert stored["cancelled_at"] == "2026-05-02T11:10:00"
+    # Compatibility exception: local seed collision handling refreshes closeout text labels.
+    assert stored["closeout_notes"] == "Stale closeout note"
+    assert stored["actual_hours"] == 2.5
+    assert stored["actual_crew_size"] == 2
+    assert stored["actual_labor_cost_cad"] == 90.0
+    assert stored["actual_disposal_cost_cad"] == 35.0
+    assert stored["actual_fuel_cost_cad"] == 15.0
+    assert stored["actual_other_costs_cad"] == 5.0
+    assert stored["final_amount_collected_cad"] == 260.0
+    assert stored["payment_method"] == "emt"
+    assert stored["payment_status"] == "paid_in_full"
+    assert stored["job_profit_status"] == "profitable"
+    assert stored["quote_accuracy_note"] == "Current quote accuracy note."
+    assert stored["disposal_receipt_note"] == "Current receipt note."
+
+
 def test_admin_job_costing_requires_auth(client: TestClient, isolated_db: Path) -> None:
     _seed_job()
 

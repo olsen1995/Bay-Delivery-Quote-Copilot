@@ -3945,10 +3945,7 @@ def save_job(job: Dict[str, Any]) -> None:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(job_id) DO UPDATE SET
                 created_at = jobs.created_at,
-                status = CASE
-                    WHEN excluded.status = 'approved' AND jobs.status <> 'approved' THEN jobs.status
-                    ELSE excluded.status
-                END,
+                status = jobs.status,
                 quote_id = jobs.quote_id,
                 request_id = jobs.request_id,
                 customer_name = COALESCE(excluded.customer_name, jobs.customer_name),
@@ -3961,70 +3958,27 @@ def save_job(job: Dict[str, Any]) -> None:
                 emt_total_cad = jobs.emt_total_cad,
                 request_json = jobs.request_json,
                 notes = COALESCE(excluded.notes, jobs.notes),
-                scheduled_start = COALESCE(NULLIF(excluded.scheduled_start, ''), jobs.scheduled_start),
-                scheduled_end = COALESCE(NULLIF(excluded.scheduled_end, ''), jobs.scheduled_end),
-                google_calendar_event_id = COALESCE(NULLIF(excluded.google_calendar_event_id, ''), jobs.google_calendar_event_id),
-                calendar_sync_status = CASE
-                    WHEN jobs.calendar_sync_status IS NOT NULL
-                         AND (excluded.calendar_sync_status IS NULL OR excluded.calendar_sync_status = 'not_configured')
-                    THEN jobs.calendar_sync_status
-                    ELSE excluded.calendar_sync_status
-                END,
-                calendar_last_error = COALESCE(NULLIF(excluded.calendar_last_error, ''), jobs.calendar_last_error),
-                started_at = COALESCE(NULLIF(excluded.started_at, ''), jobs.started_at),
-                completed_at = COALESCE(NULLIF(excluded.completed_at, ''), jobs.completed_at),
-                cancelled_at = COALESCE(NULLIF(excluded.cancelled_at, ''), jobs.cancelled_at),
+                scheduled_start = jobs.scheduled_start,
+                scheduled_end = jobs.scheduled_end,
+                google_calendar_event_id = jobs.google_calendar_event_id,
+                calendar_sync_status = jobs.calendar_sync_status,
+                calendar_last_error = jobs.calendar_last_error,
+                started_at = jobs.started_at,
+                completed_at = jobs.completed_at,
+                cancelled_at = jobs.cancelled_at,
                 closeout_notes = COALESCE(NULLIF(excluded.closeout_notes, ''), jobs.closeout_notes),
-                actual_hours = CASE
-                    WHEN jobs.actual_hours IS NOT NULL AND (excluded.actual_hours IS NULL OR excluded.actual_hours = 0)
-                    THEN jobs.actual_hours
-                    ELSE excluded.actual_hours
-                END,
-                actual_crew_size = CASE
-                    WHEN jobs.actual_crew_size IS NOT NULL AND (excluded.actual_crew_size IS NULL OR excluded.actual_crew_size = 0)
-                    THEN jobs.actual_crew_size
-                    ELSE excluded.actual_crew_size
-                END,
-                actual_labor_cost_cad = CASE
-                    WHEN jobs.actual_labor_cost_cad IS NOT NULL
-                         AND (excluded.actual_labor_cost_cad IS NULL OR excluded.actual_labor_cost_cad = 0)
-                    THEN jobs.actual_labor_cost_cad
-                    ELSE excluded.actual_labor_cost_cad
-                END,
-                actual_disposal_cost_cad = CASE
-                    WHEN jobs.actual_disposal_cost_cad IS NOT NULL
-                         AND (excluded.actual_disposal_cost_cad IS NULL OR excluded.actual_disposal_cost_cad = 0)
-                    THEN jobs.actual_disposal_cost_cad
-                    ELSE excluded.actual_disposal_cost_cad
-                END,
-                actual_fuel_cost_cad = CASE
-                    WHEN jobs.actual_fuel_cost_cad IS NOT NULL
-                         AND (excluded.actual_fuel_cost_cad IS NULL OR excluded.actual_fuel_cost_cad = 0)
-                    THEN jobs.actual_fuel_cost_cad
-                    ELSE excluded.actual_fuel_cost_cad
-                END,
-                actual_other_costs_cad = CASE
-                    WHEN jobs.actual_other_costs_cad IS NOT NULL
-                         AND (excluded.actual_other_costs_cad IS NULL OR excluded.actual_other_costs_cad = 0)
-                    THEN jobs.actual_other_costs_cad
-                    ELSE excluded.actual_other_costs_cad
-                END,
-                final_amount_collected_cad = CASE
-                    WHEN jobs.final_amount_collected_cad IS NOT NULL
-                         AND (excluded.final_amount_collected_cad IS NULL OR excluded.final_amount_collected_cad = 0)
-                    THEN jobs.final_amount_collected_cad
-                    ELSE excluded.final_amount_collected_cad
-                END,
-                payment_method = COALESCE(NULLIF(excluded.payment_method, ''), jobs.payment_method),
-                payment_status = CASE
-                    WHEN jobs.payment_status IS NOT NULL
-                         AND (excluded.payment_status IS NULL OR excluded.payment_status = 'not_paid_yet')
-                    THEN jobs.payment_status
-                    ELSE excluded.payment_status
-                END,
-                job_profit_status = COALESCE(NULLIF(excluded.job_profit_status, ''), jobs.job_profit_status),
-                quote_accuracy_note = COALESCE(NULLIF(excluded.quote_accuracy_note, ''), jobs.quote_accuracy_note),
-                disposal_receipt_note = COALESCE(NULLIF(excluded.disposal_receipt_note, ''), jobs.disposal_receipt_note)
+                actual_hours = jobs.actual_hours,
+                actual_crew_size = jobs.actual_crew_size,
+                actual_labor_cost_cad = jobs.actual_labor_cost_cad,
+                actual_disposal_cost_cad = jobs.actual_disposal_cost_cad,
+                actual_fuel_cost_cad = jobs.actual_fuel_cost_cad,
+                actual_other_costs_cad = jobs.actual_other_costs_cad,
+                final_amount_collected_cad = jobs.final_amount_collected_cad,
+                payment_method = jobs.payment_method,
+                payment_status = jobs.payment_status,
+                job_profit_status = jobs.job_profit_status,
+                quote_accuracy_note = jobs.quote_accuracy_note,
+                disposal_receipt_note = jobs.disposal_receipt_note
             """,
             (
                 job["job_id"],
