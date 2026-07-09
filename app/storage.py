@@ -1197,7 +1197,7 @@ def save_quote(record: Dict[str, Any]) -> None:
 
         conn.execute(
             f"""
-            INSERT OR REPLACE INTO quotes ({col_sql})
+            INSERT INTO quotes ({col_sql})
             VALUES ({placeholders})
             """,
             values,
@@ -3185,7 +3185,7 @@ def save_quote_request(record: Dict[str, Any]) -> None:
 
         conn.execute(
             """
-            INSERT OR REPLACE INTO quote_requests
+            INSERT INTO quote_requests
             (request_id, created_at, status, quote_id,
              customer_name, customer_phone, job_address,
              job_description_customer, job_description_internal,
@@ -3355,80 +3355,110 @@ def update_quote_request(
     deposit_refunded_at: Any = UNSET,
     deposit_last_error: Any = UNSET,
 ) -> Optional[QuoteRequest]:
-    existing = get_quote_request_record(request_id)
-    if not existing:
-        return None
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM quote_requests WHERE request_id = ?", (request_id,)).fetchone()
+        if not row:
+            conn.rollback()
+            return None
 
-    updated: Dict[str, Any] = dict(existing)
+        existing = cast(
+            QuoteRequestRecord,
+            _quote_request_from_row(row, include_payment_fields=True, include_followup_status=True),
+        )
 
-    # Status is not nullable in our schema; `None` means "leave unchanged".
-    if status is not None:
-        validate_quote_request_transition(existing["status"], status)
-        updated["status"] = status
+        updates: Dict[str, Any] = {}
 
-    # Nullable fields: UNSET means "leave unchanged", None means "clear"
-    if notes is not UNSET:
-        updated["notes"] = notes
-    if requested_job_date is not UNSET:
-        updated["requested_job_date"] = requested_job_date
-    if requested_time_window is not UNSET:
-        updated["requested_time_window"] = requested_time_window
-    if customer_accepted_at is not UNSET:
-        updated["customer_accepted_at"] = customer_accepted_at
-    if admin_approved_at is not UNSET:
-        updated["admin_approved_at"] = admin_approved_at
-    if booking_token is not UNSET:
-        updated["booking_token"] = booking_token
-    if booking_token_created_at is not UNSET:
-        updated["booking_token_created_at"] = booking_token_created_at
-    if followup_status is not UNSET:
-        updated["followup_status"] = _validate_quote_request_followup_status(followup_status)
-    if deposit_required_cad is not UNSET:
-        updated["deposit_required_cad"] = deposit_required_cad
-    if deposit_status is not UNSET:
-        _validate_deposit_status(deposit_status)
-        updated["deposit_status"] = deposit_status
-    if deposit_paid_at is not UNSET:
-        updated["deposit_paid_at"] = deposit_paid_at
-    if deposit_refund_status is not UNSET:
-        updated["deposit_refund_status"] = deposit_refund_status
-    if deposit_refunded_at is not UNSET:
-        updated["deposit_refunded_at"] = deposit_refunded_at
-    if deposit_last_error is not UNSET:
-        updated["deposit_last_error"] = deposit_last_error
+        # Status is not nullable in our schema; `None` means "leave unchanged".
+        if status is not None:
+            validate_quote_request_transition(existing["status"], status)
+            updates["status"] = status
 
-    save_quote_request(
-        {
-            "request_id": updated["request_id"],
-            "created_at": updated["created_at"],
-            "status": updated["status"],
-            "quote_id": updated["quote_id"],
-            "customer_name": updated.get("customer_name"),
-            "customer_phone": updated.get("customer_phone"),
-            "job_address": updated.get("job_address"),
-            "job_description_customer": updated.get("job_description_customer"),
-            "job_description_internal": updated.get("job_description_internal"),
-            "service_type": updated["service_type"],
-            "cash_total_cad": float(updated["cash_total_cad"]),
-            "emt_total_cad": float(updated["emt_total_cad"]),
-            "request_json": updated["request_json"],
-            "notes": updated.get("notes"),
-            "requested_job_date": updated.get("requested_job_date"),
-            "requested_time_window": updated.get("requested_time_window"),
-            "customer_accepted_at": updated.get("customer_accepted_at"),
-            "admin_approved_at": updated.get("admin_approved_at"),
-            "accept_token": updated.get("accept_token"),
-            "booking_token": updated.get("booking_token"),
-            "booking_token_created_at": updated.get("booking_token_created_at"),
-            "followup_status": updated.get("followup_status"),
-            "deposit_required_cad": updated.get("deposit_required_cad"),
-            "deposit_status": updated.get("deposit_status"),
-            "deposit_paid_at": updated.get("deposit_paid_at"),
-            "deposit_refund_status": updated.get("deposit_refund_status"),
-            "deposit_refunded_at": updated.get("deposit_refunded_at"),
-            "deposit_last_error": updated.get("deposit_last_error"),
-        }
-    )
+        # Nullable fields: UNSET means "leave unchanged", None means "clear"
+        if notes is not UNSET:
+            updates["notes"] = notes
+        if requested_job_date is not UNSET:
+            updates["requested_job_date"] = requested_job_date
+        if requested_time_window is not UNSET:
+            updates["requested_time_window"] = requested_time_window
+        if customer_accepted_at is not UNSET:
+            updates["customer_accepted_at"] = customer_accepted_at
+        if admin_approved_at is not UNSET:
+            updates["admin_approved_at"] = admin_approved_at
+        if booking_token is not UNSET:
+            updates["booking_token"] = booking_token
+        if booking_token_created_at is not UNSET:
+            updates["booking_token_created_at"] = booking_token_created_at
+        if followup_status is not UNSET:
+            updates["followup_status"] = _validate_quote_request_followup_status(followup_status)
+        if deposit_required_cad is not UNSET:
+            updates["deposit_required_cad"] = deposit_required_cad
+        if deposit_status is not UNSET:
+            _validate_deposit_status(deposit_status)
+            updates["deposit_status"] = deposit_status
+        if deposit_paid_at is not UNSET:
+            updates["deposit_paid_at"] = deposit_paid_at
+        if deposit_refund_status is not UNSET:
+            updates["deposit_refund_status"] = deposit_refund_status
+        if deposit_refunded_at is not UNSET:
+            updates["deposit_refunded_at"] = deposit_refunded_at
+        if deposit_last_error is not UNSET:
+            updates["deposit_last_error"] = deposit_last_error
+
+        if updates:
+            quote_id = existing["quote_id"]
+            duplicate_count = int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                      AND request_id <> ?
+                    """,
+                    (quote_id, request_id),
+                ).fetchone()[0]
+            )
+            if duplicate_count:
+                request_rows = conn.execute(
+                    """
+                    SELECT request_id
+                    FROM quote_requests
+                    WHERE quote_id = ?
+                    ORDER BY datetime(created_at), rowid
+                    LIMIT 5
+                    """,
+                    (quote_id,),
+                ).fetchall()
+                error = DuplicateQuoteRequestError(
+                    quote_id=str(quote_id),
+                    duplicate_count=duplicate_count + 1,
+                    request_ids=[row["request_id"] for row in request_rows],
+                )
+                logger.error(
+                    "duplicate quote_requests rows for quote_id update; rejected update; "
+                    "quote_id=%s duplicate_count=%s request_ids=%s",
+                    error.quote_id,
+                    error.duplicate_count,
+                    error.request_ids,
+                )
+                raise error
+
+            assignments = ", ".join(f"{field_name} = ?" for field_name in updates)
+            params = list(updates.values())
+            params.append(request_id)
+            conn.execute(f"UPDATE quote_requests SET {assignments} WHERE request_id = ?", params)
+
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
     return get_quote_request(request_id)
 
 
@@ -3948,7 +3978,7 @@ def save_job(job: Dict[str, Any]) -> None:
     try:
         conn.execute(
             """
-            INSERT OR REPLACE INTO jobs
+            INSERT INTO jobs
             (job_id, created_at, status, quote_id, request_id,
              customer_name, customer_phone, job_address,
              job_description_customer, job_description_internal,
@@ -3958,9 +3988,45 @@ def save_job(job: Dict[str, Any]) -> None:
              completed_at, cancelled_at, closeout_notes,
              actual_hours, actual_crew_size, actual_labor_cost_cad,
              actual_disposal_cost_cad, actual_fuel_cost_cad, actual_other_costs_cad,
-             final_amount_collected_cad, payment_method,
-             payment_status, job_profit_status, quote_accuracy_note, disposal_receipt_note)
+              final_amount_collected_cad, payment_method,
+              payment_status, job_profit_status, quote_accuracy_note, disposal_receipt_note)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id) DO UPDATE SET
+                created_at = jobs.created_at,
+                status = jobs.status,
+                quote_id = jobs.quote_id,
+                request_id = jobs.request_id,
+                customer_name = COALESCE(excluded.customer_name, jobs.customer_name),
+                customer_phone = COALESCE(excluded.customer_phone, jobs.customer_phone),
+                job_address = COALESCE(excluded.job_address, jobs.job_address),
+                job_description_customer = COALESCE(excluded.job_description_customer, jobs.job_description_customer),
+                job_description_internal = COALESCE(excluded.job_description_internal, jobs.job_description_internal),
+                service_type = jobs.service_type,
+                cash_total_cad = jobs.cash_total_cad,
+                emt_total_cad = jobs.emt_total_cad,
+                request_json = jobs.request_json,
+                notes = COALESCE(excluded.notes, jobs.notes),
+                scheduled_start = jobs.scheduled_start,
+                scheduled_end = jobs.scheduled_end,
+                google_calendar_event_id = jobs.google_calendar_event_id,
+                calendar_sync_status = jobs.calendar_sync_status,
+                calendar_last_error = jobs.calendar_last_error,
+                started_at = jobs.started_at,
+                completed_at = jobs.completed_at,
+                cancelled_at = jobs.cancelled_at,
+                closeout_notes = COALESCE(NULLIF(excluded.closeout_notes, ''), jobs.closeout_notes),
+                actual_hours = jobs.actual_hours,
+                actual_crew_size = jobs.actual_crew_size,
+                actual_labor_cost_cad = jobs.actual_labor_cost_cad,
+                actual_disposal_cost_cad = jobs.actual_disposal_cost_cad,
+                actual_fuel_cost_cad = jobs.actual_fuel_cost_cad,
+                actual_other_costs_cad = jobs.actual_other_costs_cad,
+                final_amount_collected_cad = jobs.final_amount_collected_cad,
+                payment_method = jobs.payment_method,
+                payment_status = jobs.payment_status,
+                job_profit_status = jobs.job_profit_status,
+                quote_accuracy_note = jobs.quote_accuracy_note,
+                disposal_receipt_note = jobs.disposal_receipt_note
             """,
             (
                 job["job_id"],
