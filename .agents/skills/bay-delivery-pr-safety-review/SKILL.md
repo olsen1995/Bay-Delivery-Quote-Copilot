@@ -64,7 +64,12 @@ Protect these unless Austin explicitly starts a pricing-change task:
 - Cash: no HST, rounded to nearest $5.
 - EMT/e-transfer: add 13% HST and round to cents.
 - Travel protection: $20 gas + $20 wear = $40 minimum.
-- Global customer quote floor: $60 cash before any higher service-specific floor or adder.
+- Configured service minimum inputs:
+  - Haul-away / dump run: $50
+  - Small move: $60
+  - Item delivery / other: $50
+  - Demolition: $75
+- Effective customer output: the global $60 cash floor applies before any higher service-specific floor, safeguard, or adder.
 - Labour internal anchors:
   - Primary: $20/hr
   - Helper: $16/hr
@@ -78,17 +83,19 @@ Protect these unless Austin explicitly starts a pricing-change task:
   - Curbside: $60 cash / $67.80 EMT
   - Inside removal: $90 cash / $101.70 EMT
 
-Raw config values and adders are inputs, not customer-total promises or separate pricing authority. In particular, do not describe curbside scrap pickup as free because the quote engine applies the global customer floor.
+Configured service minimums and raw adders are protected pricing inputs, not customer-total promises or separate pricing authority. `app/quote_engine.py` remains the only authority for final customer totals. Do not imply that a configured $50 service input bypasses the effective $60 global customer floor, and do not describe curbside scrap pickup as free.
 
 Any task touching pricing, quote totals, quote risk, customer quote payloads, or app/quote_engine.py is high-risk.
 
-## Current Baseline Notes
+## Skill Authoring Reference Baseline
 
-Current verified baseline:
-- Current version: `0.13.0`.
-- Current verified local/GitHub `main`: `0dbd49cadb61543dcdbc279ac9690366f1f3cf66`.
-- Latest merged PR: PR #363 `fix storage save paths`.
-- Render `/health` and Production Live-Safe Smoke were verified against PR #363.
+This historical snapshot was the verified reference state used while authoring the skill update that followed PR #363. It is not the canonical current-state publication source and must not be treated as automatically current:
+- Version: `0.13.0`.
+- Verified local/GitHub `main`: `0dbd49cadb61543dcdbc279ac9690366f1f3cf66`.
+- Latest merged PR at authoring time: PR #363 `fix storage save paths`.
+- Render `/health` was in parity with PR #363 and Production Live-Safe Smoke passed after that deployment.
+
+Future work must freshly verify local `main`, `origin/main`, GitHub `main`, the latest merged PR, `VERSION`, Render state, and Production Live-Safe Smoke state instead of using this embedded reference snapshot as current evidence.
 
 Relevant storage-safety sequence:
 - PR #360 `create admin import restore safety guards`.

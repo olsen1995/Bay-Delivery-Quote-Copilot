@@ -97,7 +97,9 @@ Collect and report each state separately. Do not collapse them into one "current
 
 - current GitHub `main` full SHA
 - latest merged PR number and title
-- for a specific PR: head SHA, merge SHA, draft/ready/merged state, and changed filenames
+- for a specific PR: always report the head SHA, draft/ready/merged state, and changed filenames
+- report the actual merge commit SHA only after the PR is merged
+- if GitHub exposes a synthetic/test merge commit or merge ref for an open PR, label it non-final and never present it as the actual merge commit
 - CI/check status
 - unresolved review threads
 - whether the latest review coverage includes the latest PR head when relevant
