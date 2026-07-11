@@ -60,46 +60,41 @@ Protect these unless Austin explicitly starts a pricing-change task:
 - One pricing engine only: app/quote_engine.py.
 - Do not create a second pricing system.
 - GPT/internal assistants may advise but must not override pricing authority.
+- Currency is CAD.
 - Cash: no HST, rounded to nearest $5.
 - EMT/e-transfer: add 13% HST and round to cents.
-- Travel minimum: $20 gas + $20 wear = $40 minimum.
-- Service minimums:
-  - Dump run: $50
-  - Small move: $60
-  - Demolition: $75
-  - Other: $50
+- Travel protection: $20 gas + $20 wear = $40 minimum.
+- Global customer quote floor: $60 cash before any higher service-specific floor or adder.
 - Labour internal anchors:
   - Primary: $20/hr
   - Helper: $16/hr
 - Mattress disposal:
   - $60 per mattress
   - $60 per box spring
-- Scrap pickup:
-  - Curbside: free
-  - Inside removal: $30
-- Currency is CAD.
+- Scrap pickup raw location inputs:
+  - Curbside base: $0
+  - Inside removal adder: $30
+- Scrap pickup effective customer totals under the global floor:
+  - Curbside: $60 cash / $67.80 EMT
+  - Inside removal: $90 cash / $101.70 EMT
+
+Raw config values and adders are inputs, not customer-total promises or separate pricing authority. In particular, do not describe curbside scrap pickup as free because the quote engine applies the global customer floor.
 
 Any task touching pricing, quote totals, quote risk, customer quote payloads, or app/quote_engine.py is high-risk.
 
 ## Current Baseline Notes
 
-Recent completed work includes:
-- PR #309 create version 0.12.0 bump.
-- PR #310 create launch readiness current state docs refresh.
-- PR #311 create booking notification status visibility.
-- PR #312 create quote page step heading clarity polish.
-- PR #315 create quote first-view simplification polish.
-- PR #316 create admin post origin fail closed hardening.
-- PR #318 create demolition pricing readiness plan.
-
 Current verified baseline:
-- Current local/GitHub `main` after PR #346: `4d879c491a8012ea1df83199bc869a6f6783d985`.
-- Latest merged PR: PR #346 `update codex prompt sources for skills and agents layout`.
-- Prior relevant runtime/pricing PR: PR #345 `create structured access pricing guardrails`.
-- Current version: `0.12.0`.
-- Local validation after PR #346 passed version parity and GPT grounding parity.
-- PR #345 runtime/pricing verification included full pytest passing and production live-safe smoke passing against `edf5d99`.
-- Render/live alignment after the docs-only PR #346 was not reverified due tooling/network blockers; do not claim `4d879c4` was freshly live-smoked unless a later live-safe smoke verifies it.
+- Current version: `0.13.0`.
+- Current verified local/GitHub `main`: `0dbd49cadb61543dcdbc279ac9690366f1f3cf66`.
+- Latest merged PR: PR #363 `fix storage save paths`.
+- Render `/health` and Production Live-Safe Smoke were verified against PR #363.
+
+Relevant storage-safety sequence:
+- PR #360 `create admin import restore safety guards`.
+- PR #361 `fix startup quote request duplicate handling`.
+- PR #362 `update version after storage safety fixes`.
+- PR #363 `fix storage save paths`.
 
 Booking notification infrastructure exists but remains disabled until Austin authorizes customer launch.
 
@@ -264,6 +259,19 @@ If docs/gpt changes:
 
 Do not merge docs/GPT changes with stale generated output.
 
+Mechanical parity is necessary but not sufficient. Semantically verify every applicable publication surface together:
+- `VERSION`
+- the README current-version marker when applicable
+- `PROJECT_RULES.md`
+- `docs/gpt/GPT_CURRENT_STATE.md`
+- generated grounding-pack copies
+- manifest hashes
+- current `main` commit SHA
+- latest merged PR attribution
+- chronology and current-versus-historical wording
+
+Reject impossible pairings, including a version attributed to a commit before that version existed, a latest-main SHA paired with an older PR, an old PR described as current, or mechanically matching generated output that is semantically stale.
+
 ### 5. Contract-Safe Static UX Polish
 
 For static UI polish, prefer CSS/layout fixes before changing JS behavior or payload contracts.
@@ -282,10 +290,17 @@ Use tests to prove the public quote contract stayed intact.
 When a PR changes logos, favicons, social previews, or other public assets, update the HTML references and static asset tests together.
 
 Review:
-- shared favicon/logo contracts across routed pages
-- asset size versus displayed size, especially header logos
-- absolute Open Graph/Twitter preview URLs when social cards are part of the change
-- responsive wrapping and tap comfort at breakpoint edges, not only common desktop/mobile widths
+- source assets and every intended variant exist
+- HTML references resolve and favicon/logo usage stays aligned across routed pages
+- social-preview URLs are valid when in scope
+- static tests evolve with the asset contract
+- asset dimensions are appropriate for displayed size, especially header logos
+- visible layout changes receive Browser/Playwright verification
+- the actual CSS breakpoints are read and tested immediately below, at, and immediately above each affected breakpoint
+- CTA/header wrapping, horizontal overflow, and tap comfort remain sound
+- mobile and desktop route contracts remain intact
+
+Do not substitute generic viewport widths for implementation-derived breakpoint edges.
 
 ### 7. Public Copy and Pricing Consistency
 
@@ -293,11 +308,25 @@ When public copy mentions price, free service, minimums, payment, access difficu
 
 Do not let homepage, quote-page, or GPT-facing wording promise behavior that the quote engine cannot produce. For structured intake facts, confirm pricing-relevant fields still pass through the existing quote-service path instead of becoming duplicate pricing logic.
 
+For pricing, disposal, scrap, mattress/box spring, minimum, access, payment, cash, EMT, or HST wording, compare every applicable surface:
+- `app/quote_engine.py`
+- `config/business_profile.json`
+- public homepage and quote-page wording
+- generated backend disclaimers and customer responses
+- `docs/gpt/GPT_ACTIONS_OPENAPI.yaml`
+- `docs/gpt/GPT_BUSINESS_RULES.md` and `docs/gpt/GPT_CURRENT_STATE.md` when relevant
+- generated grounding-pack copies
+- focused tests
+
+Copy, config descriptions, GPT schema, docs, and tests must follow runtime truth. They must never become additional pricing authorities.
+
 ### 8. Baseline and GPT Schema Synchronization
 
 When a PR updates current baseline notes, verified commits, pricing-roadmap wording, GPT current state, or OpenAPI descriptions, search active docs, GPT files, repo skills, and agent prompts for stale PR numbers, SHAs, and rule descriptions.
 
 For YAML/OpenAPI descriptions, quote or reword text containing `#` so PR references do not become YAML comments. Parser-safety issues count as publication bugs, not wording polish.
+
+Apply the semantic publication-unit chronology checks above; a passing hash/parity check does not prove that a version, SHA, and PR attribution describe a possible repository state.
 
 ### 9. Pricing Phrase Adversarial Matrix Design
 
@@ -395,10 +424,13 @@ Active priority skills to apply in future Bay Delivery work:
    - `app/quote_engine.py` remains the pricing source of truth.
    - Admin/storage/read models may mirror quote-engine signals, but must not become pricing authority.
    - Add oracle-backed parity tests where appropriate.
-4. Read-only GitHub/Render readiness execution.
+4. Storage invariant review.
+   - **REQUIRED SUB-SKILL:** Use `bay-delivery-storage-invariant-review` for `app/storage.py`, SQLite constraints/indexes, save/update/upsert paths, `INSERT OR REPLACE`, import, restore, backup, dry-run preview, duplicate handling, startup integrity, seed/compatibility behavior, or storage migrations.
+   - Keep this skill as the Bay Delivery router and use the focused storage skill for the complete invariant workflow.
+5. Read-only GitHub/Render readiness execution.
    - Trigger only when Austin explicitly asks for deployment, readiness, or live-state verification; when a PR review is specifically about merge/deploy readiness; or during post-merge deployment verification.
    - Do not run Render/live endpoint checks for ordinary implementation, docs, static, or test-only PRs unless live/deployment verification is explicitly scoped.
-   - When triggered, verify branch, PR state, CI, GitHub Actions, Render `/health.version`, Render `/health.commit`, and commit mismatch classification without mutating live infrastructure.
+   - When triggered, verify branch, PR state, CI, and GitHub Actions. Verify Render `/health.version`, Render `/health.commit`, and commit mismatch classification only when Austin approves live-safe GET checks; otherwise report deployed health as unverified.
    - Keep all Render/live checks read-only.
 
 Lower-priority overlays:
