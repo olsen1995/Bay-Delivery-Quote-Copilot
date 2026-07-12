@@ -11,10 +11,9 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from functools import wraps
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -100,7 +99,17 @@ _DEPLOY_COMMIT_ENV_VARS = ("BAYDELIVERY_COMMIT_SHA", "RENDER_GIT_COMMIT")
 _DEPLOY_COMMIT_HEX_RE = re.compile(r"^[0-9a-fA-F]{12,64}$")
 _RENDER_ENV_MARKERS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
 _PUBLIC_SITE_ORIGIN = "https://bay-delivery-quote-copilot.onrender.com"
-_ADMIN_SHELL_ROBOTS_TAG = "noindex, nofollow, noarchive"
+_NOINDEX_ROBOTS_TAG = "noindex, nofollow, noarchive"
+_NOINDEX_SHELL_PATHS = frozenset(
+    {
+        "/admin",
+        "/admin/mobile",
+        "/admin/uploads",
+        "/static/admin.html",
+        "/static/admin_mobile.html",
+        "/static/admin_uploads.html",
+    }
+)
 
 # Initialize audit table at startup
 init_audit_table()
@@ -542,6 +551,19 @@ class StaticFileCacheMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(StaticFileCacheMiddleware)
+
+
+# Crawlability headers for exact admin shell paths and saved quote reviews
+class CrawlabilityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path in _NOINDEX_SHELL_PATHS or (path == "/quote" and "quote_id" in request.query_params):
+            response.headers["X-Robots-Tag"] = _NOINDEX_ROBOTS_TAG
+        return response
+
+
+app.add_middleware(CrawlabilityHeadersMiddleware)
 
 
 # Security headers middleware
@@ -1125,7 +1147,7 @@ def robots_txt() -> Response:
         content=(
             "User-agent: *\n"
             "Allow: /\n"
-            "Disallow: /admin\n"
+            "Disallow: /admin/api/\n"
             "Disallow: /api/\n"
             "Disallow: /quote/\n"
             "Disallow: /health\n"
@@ -1166,30 +1188,17 @@ def quote_page():
     return FileResponse(str(STATIC_DIR / "quote.html"))
 
 
-def _admin_shell_noindex(endpoint: Callable[[], FileResponse]) -> Callable[[], FileResponse]:
-    @wraps(endpoint)
-    def wrapped() -> FileResponse:
-        response = endpoint()
-        response.headers["X-Robots-Tag"] = _ADMIN_SHELL_ROBOTS_TAG
-        return response
-
-    return wrapped
-
-
 @app.get("/admin")
-@_admin_shell_noindex
 def admin_page():
     return FileResponse(str(STATIC_DIR / "admin.html"))
 
 
 @app.get("/admin/mobile")
-@_admin_shell_noindex
 def admin_mobile_page():
     return FileResponse(str(STATIC_DIR / "admin_mobile.html"))
 
 
 @app.get("/admin/uploads")
-@_admin_shell_noindex
 def admin_uploads_page():
     return FileResponse(str(STATIC_DIR / "admin_uploads.html"))
 

@@ -12,7 +12,7 @@ SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
 ROBOTS_TXT = (
     "User-agent: *\n"
     "Allow: /\n"
-    "Disallow: /admin\n"
+    "Disallow: /admin/api/\n"
     "Disallow: /api/\n"
     "Disallow: /quote/\n"
     "Disallow: /health\n"
@@ -38,7 +38,7 @@ def test_robots_txt_uses_exact_public_crawl_policy(client: TestClient) -> None:
     assert "User-agent: *" in response.text
     assert "Allow: /" in response.text
     for directive in (
-        "Disallow: /admin",
+        "Disallow: /admin/api/",
         "Disallow: /api/",
         "Disallow: /quote/",
         "Disallow: /health",
@@ -47,6 +47,7 @@ def test_robots_txt_uses_exact_public_crawl_policy(client: TestClient) -> None:
         "Disallow: /openapi.json",
     ):
         assert directive in response.text.splitlines()
+    assert "Disallow: /admin" not in response.text.splitlines()
     assert "Disallow: /quote" not in response.text.splitlines()
     assert f"Sitemap: {PUBLIC_SITE_ORIGIN}/sitemap.xml" in response.text.splitlines()
     assert "hostile.example" not in response.text
@@ -108,6 +109,29 @@ def test_admin_shells_are_noindex_and_preserve_existing_file_responses(
 @pytest.mark.parametrize(
     ("path", "static_path"),
     [
+        ("/static/admin.html", Path("static/admin.html")),
+        ("/static/admin_mobile.html", Path("static/admin_mobile.html")),
+        ("/static/admin_uploads.html", Path("static/admin_uploads.html")),
+    ],
+)
+def test_direct_static_admin_shells_are_noindex_and_preserve_static_responses(
+    client: TestClient,
+    path: str,
+    static_path: Path,
+) -> None:
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.history == []
+    assert response.request.url.path == path
+    assert response.content == static_path.read_bytes()
+    assert response.headers["cache-control"] == "public, max-age=3600"
+    assert response.headers["x-robots-tag"] == "noindex, nofollow, noarchive"
+
+
+@pytest.mark.parametrize(
+    ("path", "static_path"),
+    [
         ("/", Path("static/index.html")),
         ("/quote", Path("static/quote.html")),
     ],
@@ -123,4 +147,24 @@ def test_public_pages_remain_indexable_and_preserve_existing_file_responses(
     assert response.history == []
     assert response.request.url.path == path
     assert response.content == static_path.read_bytes()
+    assert "noindex" not in response.headers.get("x-robots-tag", "").lower()
+
+
+def test_saved_quote_review_query_is_noindex_and_preserves_quote_page(client: TestClient) -> None:
+    response = client.get("/quote?quote_id=test-quote")
+
+    assert response.status_code == 200
+    assert response.history == []
+    assert response.request.url.path == "/quote"
+    assert response.content == Path("static/quote.html").read_bytes()
+    assert response.headers["x-robots-tag"] == "noindex, nofollow, noarchive"
+
+
+def test_unrelated_quote_query_remains_indexable(client: TestClient) -> None:
+    response = client.get("/quote?source=google")
+
+    assert response.status_code == 200
+    assert response.history == []
+    assert response.request.url.path == "/quote"
+    assert response.content == Path("static/quote.html").read_bytes()
     assert "noindex" not in response.headers.get("x-robots-tag", "").lower()
