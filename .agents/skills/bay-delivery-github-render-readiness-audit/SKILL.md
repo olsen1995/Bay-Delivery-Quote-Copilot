@@ -82,6 +82,68 @@ Use this checklist unless Austin narrows scope:
 - review protected surfaces for unexpected changes or drift
 - only if Austin explicitly approves live-safe GETs, check `/health` version and commit parity
 
+## Required Evidence By State
+
+Collect and report each state separately. Do not collapse them into one "current" state.
+
+### Local
+
+- current branch
+- worktree status
+- local HEAD full SHA
+- whether local `main` matches `origin/main`
+
+### GitHub
+
+- current GitHub `main` full SHA
+- latest merged PR number and title
+- for a specific PR: always report the head SHA, draft/ready/merged state, and changed filenames
+- report the actual merge commit SHA only after the PR is merged
+- if GitHub exposes a synthetic/test merge commit or merge ref for an open PR, label it non-final and never present it as the actual merge commit
+- CI/check status
+- unresolved review threads
+- whether the latest review coverage includes the latest PR head when relevant
+
+### Repository Release State
+
+- `VERSION`
+- version parity result
+- GPT grounding parity result when applicable
+
+### Render
+
+Collect these only when Austin has explicitly approved the live-safe `GET /health` check:
+
+- `/health.ok`
+- `/health.version`
+- `/health.commit`
+- Drive configured state when returned
+- whether the deployed commit maps to current GitHub `main`
+
+Without live-GET approval, report Render health as unverified and do not assign an in-parity deployment result.
+
+### Production Smoke
+
+- latest Production Live-Safe Smoke status
+- event type
+- branch
+- run ID
+- conclusion
+- whether the run occurred after the relevant deployment
+
+## Deployment Drift Classifications
+
+Use exactly one applicable classification when sufficient evidence is available:
+
+- `IN PARITY`: Render `/health.commit` matches current GitHub `main` and the expected version is aligned.
+- `DEPLOYMENT PENDING`: GitHub `main` changed recently and an active deployment or normal approved deployment window explains the lag.
+- `PRODUCTION BEHIND`: Render reports an older known commit beyond the expected deployment window, or no active deployment explains the lag.
+- `PRODUCTION AHEAD OR UNKNOWN`: the Render commit cannot be mapped safely to inspected GitHub state or appears ahead of it.
+- `VERSION DRIFT`: the deployed version/commit pairing is inconsistent with repository history or expected release state.
+- `HEALTH FAILURE`: `/health` is unavailable, invalid, unhealthy, or missing required readiness fields.
+
+If live evidence is not approved or is unavailable, report the missing evidence explicitly instead of guessing a classification.
+
 ## Protected Surfaces
 
 Treat these as protected during readiness audits:
@@ -129,11 +191,17 @@ Start every audit report with:
 `Recommendation: Ready / Not ready / Needs follow-up`
 
 Then include:
-- Current setup observed
-- GitHub status
-- Render/deployment status
+- Local state
+- `origin/main` state
+- PR state when applicable
+- GitHub `main` state
+- Repository release state
+- Deployed Render/deployment status, always:
+  - with approved valid live-safe GET evidence, report `/health.ok`, `/health.version`, `/health.commit`, Drive configured state when returned, and the applicable deployment drift classification
+  - without live-safe GET approval, report `UNVERIFIED — live-safe GET approval was not provided`; do not infer parity or assign a deployment classification
+  - with approval but an unavailable or invalid endpoint, report the failure explicitly and use `HEALTH FAILURE` when supported by the evidence
 - Workflow/check status
-- Smoke/live-safe status if approved
+- Production Live-Safe Smoke workflow status
 - Protected-surface review
 - P1 blockers
 - P2 risks
