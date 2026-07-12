@@ -11,9 +11,10 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
 from threading import Lock
-from typing import Any, Literal, Optional
+from typing import Any, Callable, Literal, Optional
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -98,6 +99,8 @@ _DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8000"
 _DEPLOY_COMMIT_ENV_VARS = ("BAYDELIVERY_COMMIT_SHA", "RENDER_GIT_COMMIT")
 _DEPLOY_COMMIT_HEX_RE = re.compile(r"^[0-9a-fA-F]{12,64}$")
 _RENDER_ENV_MARKERS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
+_PUBLIC_SITE_ORIGIN = "https://bay-delivery-quote-copilot.onrender.com"
+_ADMIN_SHELL_ROBOTS_TAG = "noindex, nofollow, noarchive"
 
 # Initialize audit table at startup
 init_audit_table()
@@ -1116,6 +1119,43 @@ def _maybe_auto_snapshot(background_tasks: BackgroundTasks) -> None:
 # Pages
 # =========================
 
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt() -> Response:
+    return Response(
+        content=(
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /admin\n"
+            "Disallow: /api/\n"
+            "Disallow: /quote/\n"
+            "Disallow: /health\n"
+            "Disallow: /docs\n"
+            "Disallow: /redoc\n"
+            "Disallow: /openapi.json\n"
+            f"Sitemap: {_PUBLIC_SITE_ORIGIN}/sitemap.xml\n"
+        ),
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml() -> Response:
+    return Response(
+        content=(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "  <url>\n"
+            f"    <loc>{_PUBLIC_SITE_ORIGIN}/</loc>\n"
+            "  </url>\n"
+            "  <url>\n"
+            f"    <loc>{_PUBLIC_SITE_ORIGIN}/quote</loc>\n"
+            "  </url>\n"
+            "</urlset>\n"
+        ),
+        media_type="application/xml",
+    )
+
+
 @app.get("/")
 def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
@@ -1126,17 +1166,30 @@ def quote_page():
     return FileResponse(str(STATIC_DIR / "quote.html"))
 
 
+def _admin_shell_noindex(endpoint: Callable[[], FileResponse]) -> Callable[[], FileResponse]:
+    @wraps(endpoint)
+    def wrapped() -> FileResponse:
+        response = endpoint()
+        response.headers["X-Robots-Tag"] = _ADMIN_SHELL_ROBOTS_TAG
+        return response
+
+    return wrapped
+
+
 @app.get("/admin")
+@_admin_shell_noindex
 def admin_page():
     return FileResponse(str(STATIC_DIR / "admin.html"))
 
 
 @app.get("/admin/mobile")
+@_admin_shell_noindex
 def admin_mobile_page():
     return FileResponse(str(STATIC_DIR / "admin_mobile.html"))
 
 
 @app.get("/admin/uploads")
+@_admin_shell_noindex
 def admin_uploads_page():
     return FileResponse(str(STATIC_DIR / "admin_uploads.html"))
 
