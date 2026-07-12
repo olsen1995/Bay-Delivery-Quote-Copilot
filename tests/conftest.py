@@ -1,8 +1,52 @@
 import importlib.util
 import importlib
+import os
+from pathlib import Path
+import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_OPERATIONAL_DB_PATH = (_REPO_ROOT / "app/data/bay_delivery.sqlite3").resolve()
+_PYTEST_DB_TEMP_DIR: tempfile.TemporaryDirectory | None = None
+
+
+def _configure_pytest_database() -> None:
+    global _PYTEST_DB_TEMP_DIR
+
+    if "BAYDELIVERY_DB_PATH" in os.environ:
+        configured_value = os.environ["BAYDELIVERY_DB_PATH"]
+        if not configured_value:
+            raise pytest.UsageError(
+                "Pytest database isolation refused an empty BAYDELIVERY_DB_PATH because "
+                "the application would fall back to app/data/bay_delivery.sqlite3."
+            )
+        selected_path = Path(configured_value).expanduser().resolve()
+    else:
+        temp_dir = tempfile.TemporaryDirectory(prefix="bay-delivery-pytest-db-")
+        selected_path = (Path(temp_dir.name) / "pytest.sqlite3").resolve()
+        if selected_path == _REPO_ROOT or _REPO_ROOT in selected_path.parents:
+            temp_dir.cleanup()
+            raise pytest.UsageError(
+                "Pytest database isolation refused to create its temporary database "
+                "inside the repository."
+            )
+        _PYTEST_DB_TEMP_DIR = temp_dir
+        os.environ["BAYDELIVERY_DB_PATH"] = str(selected_path)
+
+    if selected_path == _OPERATIONAL_DB_PATH:
+        if _PYTEST_DB_TEMP_DIR is not None:
+            _PYTEST_DB_TEMP_DIR.cleanup()
+            _PYTEST_DB_TEMP_DIR = None
+        raise pytest.UsageError(
+            "Pytest database isolation refused the operational database path: "
+            f"{_OPERATIONAL_DB_PATH}"
+        )
+
+
+_configure_pytest_database()
 
 from app.abuse_controls import RateLimitMiddleware
 from app import main as main_module
@@ -89,6 +133,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             f"{missing_text}. Required files: tests/test_launch_smoke_playwright.py, "
             "tests/test_admin_mobile_playwright.py."
         )
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    global _PYTEST_DB_TEMP_DIR
+
+    if _PYTEST_DB_TEMP_DIR is not None:
+        _PYTEST_DB_TEMP_DIR.cleanup()
+        _PYTEST_DB_TEMP_DIR = None
 
 
 @pytest.fixture(autouse=True)
