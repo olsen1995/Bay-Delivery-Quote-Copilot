@@ -196,7 +196,10 @@ Then include:
 - PR state when applicable
 - GitHub `main` state
 - Repository release state
-- Deployed Render state and drift classification when live evidence is approved
+- Deployed Render/deployment status, always:
+  - with approved valid live-safe GET evidence, report `/health.ok`, `/health.version`, `/health.commit`, Drive configured state when returned, and the applicable deployment drift classification
+  - without live-safe GET approval, report `UNVERIFIED — live-safe GET approval was not provided`; do not infer parity or assign a deployment classification
+  - with approval but an unavailable or invalid endpoint, report the failure explicitly and use `HEALTH FAILURE` when supported by the evidence
 - Workflow/check status
 - Production Live-Safe Smoke workflow status
 - Protected-surface review

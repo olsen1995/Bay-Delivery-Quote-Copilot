@@ -69,7 +69,9 @@ Protect these unless Austin explicitly starts a pricing-change task:
   - Small move: $60
   - Item delivery / other: $50
   - Demolition: $75
-- Effective customer output: the global $60 cash floor applies before any higher service-specific floor, safeguard, or adder.
+- Global customer cash floor: $60.
+- Item delivery protected base floor: $100 before applicable access and enclosed-trailer adjustments.
+- Higher service-specific floors, protected base floors, safeguards, access adjustments, trailer adjustments, and other pricing logic may also apply. Their calculation order and final interaction are defined only by `app/quote_engine.py`; never infer `$60 + adder`, `adder + $60`, or any other pricing sequence from this summary.
 - Labour internal anchors:
   - Primary: $20/hr
   - Helper: $16/hr
@@ -83,7 +85,7 @@ Protect these unless Austin explicitly starts a pricing-change task:
   - Curbside: $60 cash / $67.80 EMT
   - Inside removal: $90 cash / $101.70 EMT
 
-Configured service minimums and raw adders are protected pricing inputs, not customer-total promises or separate pricing authority. `app/quote_engine.py` remains the only authority for final customer totals. Do not imply that a configured $50 service input bypasses the effective $60 global customer floor, and do not describe curbside scrap pickup as free.
+Configured service minimums and raw adders are protected pricing inputs, not customer-total promises or separate pricing authority. `app/quote_engine.py` remains the only authority for final customer totals and pricing order. Do not imply that a configured $50 service input bypasses the effective $60 global customer floor, that normal item delivery falls to the global floor, or that curbside scrap pickup is free.
 
 Any task touching pricing, quote totals, quote risk, customer quote payloads, or app/quote_engine.py is high-risk.
 
