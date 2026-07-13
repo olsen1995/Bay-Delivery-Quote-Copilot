@@ -98,6 +98,18 @@ _DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8000"
 _DEPLOY_COMMIT_ENV_VARS = ("BAYDELIVERY_COMMIT_SHA", "RENDER_GIT_COMMIT")
 _DEPLOY_COMMIT_HEX_RE = re.compile(r"^[0-9a-fA-F]{12,64}$")
 _RENDER_ENV_MARKERS = ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
+_PUBLIC_SITE_ORIGIN = "https://bay-delivery-quote-copilot.onrender.com"
+_NOINDEX_ROBOTS_TAG = "noindex, nofollow, noarchive"
+_NOINDEX_SHELL_PATHS = frozenset(
+    {
+        "/admin",
+        "/admin/mobile",
+        "/admin/uploads",
+        "/static/admin.html",
+        "/static/admin_mobile.html",
+        "/static/admin_uploads.html",
+    }
+)
 
 # Initialize audit table at startup
 init_audit_table()
@@ -539,6 +551,19 @@ class StaticFileCacheMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(StaticFileCacheMiddleware)
+
+
+# Crawlability headers for exact admin shell paths and saved quote reviews
+class CrawlabilityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path in _NOINDEX_SHELL_PATHS or (path == "/quote" and "quote_id" in request.query_params):
+            response.headers["X-Robots-Tag"] = _NOINDEX_ROBOTS_TAG
+        return response
+
+
+app.add_middleware(CrawlabilityHeadersMiddleware)
 
 
 # Security headers middleware
@@ -1115,6 +1140,43 @@ def _maybe_auto_snapshot(background_tasks: BackgroundTasks) -> None:
 # =========================
 # Pages
 # =========================
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt() -> Response:
+    return Response(
+        content=(
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /admin/api/\n"
+            "Disallow: /api/\n"
+            "Disallow: /quote/\n"
+            "Disallow: /health\n"
+            "Disallow: /docs\n"
+            "Disallow: /redoc\n"
+            "Disallow: /openapi.json\n"
+            f"Sitemap: {_PUBLIC_SITE_ORIGIN}/sitemap.xml\n"
+        ),
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml() -> Response:
+    return Response(
+        content=(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "  <url>\n"
+            f"    <loc>{_PUBLIC_SITE_ORIGIN}/</loc>\n"
+            "  </url>\n"
+            "  <url>\n"
+            f"    <loc>{_PUBLIC_SITE_ORIGIN}/quote</loc>\n"
+            "  </url>\n"
+            "</urlset>\n"
+        ),
+        media_type="application/xml",
+    )
+
 
 @app.get("/")
 def index():
