@@ -1,6 +1,207 @@
+import hashlib
+import json
 import re
 import struct
 from pathlib import Path
+
+
+PUBLIC_SITE_ORIGIN = "https://bay-delivery-quote-copilot.onrender.com"
+SOCIAL_IMAGE_URL = (
+    f"{PUBLIC_SITE_ORIGIN}/static/assets/brand/bay-delivery-social-share-1200x630.png"
+)
+LOGO_URL = f"{PUBLIC_SITE_ORIGIN}/static/assets/brand/bay-delivery-logo-horizontal-header.png"
+HOMEPAGE_TITLE = "Bay Delivery | Junk Removal, Moving Help & Hauling in North Bay"
+HOMEPAGE_DESCRIPTION = (
+    "Bay Delivery provides junk removal, dump runs, moving help, furniture delivery, "
+    "property cleanups, demolition, scrap removal, trailer hauling, and general labour "
+    "in North Bay and surrounding communities."
+)
+QUOTE_TITLE = "Request an Estimate | Bay Delivery North Bay"
+QUOTE_DESCRIPTION = (
+    "Send Bay Delivery your job details, location, access information, and photos to "
+    "request an estimate for local moving, hauling, cleanup, delivery, demolition, "
+    "and removal services."
+)
+APPROVED_SERVICE_AREAS = [
+    "North Bay",
+    "Callander",
+    "Corbeil",
+    "Astorville",
+    "Bonfield",
+    "Sturgeon Falls",
+    "Powassan",
+]
+APPROVED_SERVICE_NAMES = [
+    "Junk Removal & Dump Runs",
+    "Moving Help",
+    "Furniture & Appliance Delivery",
+    "Property Cleanups",
+    "Demolition & Tear-Out Help",
+    "Scrap Metal Removal",
+    "Trailer Hauling",
+    "General Labour",
+]
+
+
+def _head_html(document: str) -> str:
+    return document.split("</head>", 1)[0]
+
+
+def _body_sha256(document: str) -> str:
+    body = "<body" + document.split("<body", 1)[1]
+    return hashlib.sha256(body.encode("utf-8")).hexdigest().upper()
+
+
+def _meta_content(head: str, attribute: str, value: str) -> str:
+    matches = re.findall(
+        rf'<meta\s+{attribute}="{re.escape(value)}"\s+content="([^"]*)"\s*/?>',
+        head,
+    )
+    assert len(matches) == 1, f"Expected one meta tag for {attribute}={value}, found {len(matches)}"
+    return matches[0]
+
+
+def _json_ld_blocks(head: str) -> list[dict[str, object]]:
+    blocks = re.findall(
+        r'<script\s+type="application/ld\+json">\s*(.*?)\s*</script>',
+        head,
+        re.DOTALL,
+    )
+    return [json.loads(block) for block in blocks]
+
+
+def _find_forbidden_json_keys(value: object, forbidden: set[str]) -> set[str]:
+    found: set[str] = set()
+    if isinstance(value, dict):
+        found.update(key for key in value if key in forbidden)
+        for nested_value in value.values():
+            found.update(_find_forbidden_json_keys(nested_value, forbidden))
+    elif isinstance(value, list):
+        for nested_value in value:
+            found.update(_find_forbidden_json_keys(nested_value, forbidden))
+    return found
+
+
+def test_homepage_has_approved_public_metadata() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    head = _head_html(index_html)
+
+    assert re.findall(r"<title>(.*?)</title>", head) == [HOMEPAGE_TITLE]
+    assert _meta_content(head, "name", "description") == HOMEPAGE_DESCRIPTION
+    assert re.findall(r'<link\s+rel="canonical"\s+href="([^"]+)"\s*/?>', head) == [
+        f"{PUBLIC_SITE_ORIGIN}/"
+    ]
+    assert _meta_content(head, "property", "og:title") == HOMEPAGE_TITLE
+    assert _meta_content(head, "property", "og:description") == HOMEPAGE_DESCRIPTION
+    assert _meta_content(head, "property", "og:type") == "website"
+    assert _meta_content(head, "property", "og:url") == f"{PUBLIC_SITE_ORIGIN}/"
+    assert _meta_content(head, "property", "og:image") == SOCIAL_IMAGE_URL
+    assert _meta_content(head, "property", "og:image:width") == "1200"
+    assert _meta_content(head, "property", "og:image:height") == "630"
+    assert _meta_content(head, "property", "og:image:alt") == "Bay Delivery — Fast. Reliable. Local."
+    assert _meta_content(head, "name", "twitter:card") == "summary_large_image"
+    assert _meta_content(head, "name", "twitter:title") == HOMEPAGE_TITLE
+    assert _meta_content(head, "name", "twitter:description") == HOMEPAGE_DESCRIPTION
+    assert _meta_content(head, "name", "twitter:image") == SOCIAL_IMAGE_URL
+
+
+def test_homepage_has_valid_organization_structured_data() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    blocks = _json_ld_blocks(_head_html(index_html))
+
+    assert len(blocks) == 1
+    organization = blocks[0]
+    assert organization["@context"] == "https://schema.org"
+    assert organization["@type"] == "Organization"
+    assert organization["name"] == "Bay Delivery"
+    assert organization["url"] == f"{PUBLIC_SITE_ORIGIN}/"
+    assert organization["logo"] == LOGO_URL
+    assert organization["image"] == SOCIAL_IMAGE_URL
+    assert organization["telephone"] == "+1-705-303-4409"
+    assert organization["email"] == "BayDeliveryNB@gmail.com"
+
+    service_areas = organization["areaServed"]
+    assert isinstance(service_areas, list)
+    assert service_areas == [
+        {"@type": "City", "name": area_name}
+        for area_name in APPROVED_SERVICE_AREAS
+    ]
+
+    catalog = organization["hasOfferCatalog"]
+    assert catalog == {
+        "@type": "OfferCatalog",
+        "name": "Bay Delivery services",
+        "itemListElement": [
+            {
+                "@type": "Offer",
+                "itemOffered": {
+                    "@type": "Service",
+                    "name": service_name,
+                },
+            }
+            for service_name in APPROVED_SERVICE_NAMES
+        ],
+    }
+    assert "serviceType" not in json.dumps(organization)
+    assert _find_forbidden_json_keys(
+        organization,
+        {
+            "address",
+            "streetAddress",
+            "postalCode",
+            "openingHours",
+            "priceRange",
+            "AggregateRating",
+            "aggregateRating",
+            "Review",
+            "review",
+            "ratingValue",
+            "reviewCount",
+            "sameAs",
+        },
+    ) == set()
+
+
+def test_quote_page_has_approved_public_metadata_without_structured_data() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    head = _head_html(quote_html)
+
+    assert re.findall(r"<title>(.*?)</title>", head) == [QUOTE_TITLE]
+    assert _meta_content(head, "name", "description") == QUOTE_DESCRIPTION
+    assert re.findall(r'<link\s+rel="canonical"\s+href="([^"]+)"\s*/?>', head) == [
+        f"{PUBLIC_SITE_ORIGIN}/quote"
+    ]
+    assert _meta_content(head, "property", "og:title") == QUOTE_TITLE
+    assert _meta_content(head, "property", "og:description") == QUOTE_DESCRIPTION
+    assert _meta_content(head, "property", "og:type") == "website"
+    assert _meta_content(head, "property", "og:url") == f"{PUBLIC_SITE_ORIGIN}/quote"
+    assert _meta_content(head, "property", "og:image") == SOCIAL_IMAGE_URL
+    assert _meta_content(head, "property", "og:image:width") == "1200"
+    assert _meta_content(head, "property", "og:image:height") == "630"
+    assert _meta_content(head, "property", "og:image:alt") == "Bay Delivery — Fast. Reliable. Local."
+    assert _meta_content(head, "name", "twitter:card") == "summary_large_image"
+    assert _meta_content(head, "name", "twitter:title") == QUOTE_TITLE
+    assert _meta_content(head, "name", "twitter:description") == QUOTE_DESCRIPTION
+    assert _meta_content(head, "name", "twitter:image") == SOCIAL_IMAGE_URL
+    assert _json_ld_blocks(head) == []
+
+
+def test_public_metadata_change_preserves_bodies_and_asset_references() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert _body_sha256(index_html) == "F38FFCF462B41A611E47B1E890542AA13428969DD6B8A9CD8B38A48C5F5AFCD2"
+    assert _body_sha256(quote_html) == "61C66561F822176058CD03BDF5D04ABD57C0A59CF11326FBC608EF9AAB88ACF6"
+    assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
+        "/static/site.css"
+    ]
+    assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', quote_html) == [
+        "/static/quote.css"
+    ]
+    assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', index_html) == []
+    assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', quote_html) == [
+        "/static/quote.js"
+    ]
 
 
 def _jpeg_dimensions(path: Path) -> tuple[int, int]:
@@ -67,8 +268,8 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
     assert social_asset.stat().st_size < 500_000
     assert 'src="/static/assets/brand/bay-delivery-logo-horizontal-header.png"' in index_html
     assert 'alt="Bay Delivery"' in index_html
-    assert '<meta property="og:image" content="/static/assets/brand/bay-delivery-social-share-1200x630.png" />' in index_html
-    assert '<meta name="twitter:image" content="/static/assets/brand/bay-delivery-social-share-1200x630.png" />' in index_html
+    assert f'<meta property="og:image" content="{SOCIAL_IMAGE_URL}" />' in index_html
+    assert f'<meta name="twitter:image" content="{SOCIAL_IMAGE_URL}" />' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
     assert 'href="/quote">Get a Quote<' in index_html
     assert 'href="tel:+17053034409"' in index_html
