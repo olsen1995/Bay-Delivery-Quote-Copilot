@@ -9,6 +9,7 @@
   if (!menuToggle || !mobileNav || !publicLogo) return;
 
   const desktopQuery = window.matchMedia("(min-width: 1180px)");
+  let mobileControlHadFocus = false;
 
   const setMenuState = (isOpen) => {
     mobileNav.hidden = !isOpen;
@@ -23,6 +24,7 @@
 
   const moveFocusToLogo = () => {
     publicLogo.focus({ preventScroll: true });
+    mobileControlHadFocus = false;
   };
 
   setMenuState(false);
@@ -46,11 +48,22 @@
     setMenuState(false);
   });
 
+  document.addEventListener("focusin", (event) => {
+    if (event.target === menuToggle || mobileNav.contains(event.target)) {
+      mobileControlHadFocus = true;
+      return;
+    }
+    if (event.target !== document.body && event.target !== root) {
+      mobileControlHadFocus = false;
+    }
+  });
+
   desktopQuery.addEventListener("change", (event) => {
     if (!event.matches) return;
     if (
       document.activeElement === menuToggle ||
-      mobileNav.contains(document.activeElement)
+      mobileNav.contains(document.activeElement) ||
+      mobileControlHadFocus
     ) {
       moveFocusToLogo();
     }
