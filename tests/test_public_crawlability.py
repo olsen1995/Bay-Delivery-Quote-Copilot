@@ -150,6 +150,27 @@ def test_public_pages_remain_indexable_and_preserve_existing_file_responses(
     assert "noindex" not in response.headers.get("x-robots-tag", "").lower()
 
 
+@pytest.mark.parametrize(
+    ("path", "canonical_url"),
+    [
+        ("/", f"{PUBLIC_SITE_ORIGIN}/"),
+        ("/quote", f"{PUBLIC_SITE_ORIGIN}/quote"),
+    ],
+)
+def test_public_metadata_uses_approved_origin_without_weakening_crawlability(
+    client: TestClient,
+    path: str,
+    canonical_url: str,
+) -> None:
+    response = client.get(path, headers={"Host": "hostile.example"})
+
+    assert response.status_code == 200
+    assert "noindex" not in response.headers.get("x-robots-tag", "").lower()
+    assert response.text.count(f'<link rel="canonical" href="{canonical_url}" />') == 1
+    assert response.text.count(f'<meta property="og:url" content="{canonical_url}" />') == 1
+    assert "hostile.example" not in response.text
+
+
 def test_saved_quote_review_query_is_noindex_and_preserves_quote_page(client: TestClient) -> None:
     response = client.get("/quote?quote_id=test-quote")
 
