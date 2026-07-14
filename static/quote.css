@@ -28,9 +28,9 @@
 body.quotePage {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color: var(--quote-text);
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 28px 16px 40px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
   background:
     linear-gradient(180deg, rgba(7, 24, 39, 0.08), transparent 260px),
     var(--quote-bg);
@@ -93,6 +93,13 @@ body.quotePage {
 .quotePage .container {
   display: grid;
   gap: 20px;
+}
+
+.quotePage .quote-content {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 16px 40px;
 }
 
 .quotePage .topbar {
@@ -974,7 +981,7 @@ body.quotePage {
 }
 
 @media (max-width: 720px) {
-  body.quotePage {
+  .quotePage .quote-content {
     padding-bottom: 92px;
   }
 

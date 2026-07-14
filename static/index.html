@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bd-no-js">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -20,6 +20,7 @@
   <meta name="twitter:description" content="Bay Delivery provides junk removal, dump runs, moving help, furniture delivery, property cleanups, demolition, scrap removal, trailer hauling, and general labour in North Bay and surrounding communities." />
   <meta name="twitter:image" content="https://bay-delivery-quote-copilot.onrender.com/static/assets/brand/bay-delivery-social-share-1200x630.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="/static/assets/brand/bay-delivery-favicon-512.png" />
+  <link rel="stylesheet" href="/static/public.css" />
   <link rel="stylesheet" href="/static/site.css" />
   <script type="application/ld+json">
     {
@@ -82,26 +83,61 @@
   </script>
 </head>
 <body>
-  <div class="container">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Bay Delivery home">
-        <img src="/static/assets/brand/bay-delivery-logo-horizontal-header.png" alt="Bay Delivery" class="brandLogo" />
-        <div class="brandTitle">
-          <strong>Bay Delivery</strong>
-          <span>North Bay, Ontario &bull; Hauling &bull; Moving &bull; Cleanouts</span>
-        </div>
-      </a>
+  <a class="bd-skip-link" href="#main-content">Skip to main content</a>
 
-      <nav class="toplinks" aria-label="Primary navigation">
-        <a class="badgeLink primaryNavLink" href="/quote">Get a Quote</a>
-        <a class="badgeLink callNavLink" href="tel:+17053034409" aria-label="Call or text Dan at 705 303 4409">Call/Text Dan 705-303-4409</a>
-        <a class="badgeLink callNavLink" href="tel:+12493588087" aria-label="Call or text Austin at 249 358 8087">Call/Text Austin 249-358-8087</a>
-        <a class="badgeLink socialNavLink" href="https://www.facebook.com/p/Bay-Delivery-61556796055262/" target="_blank" rel="noopener">Facebook</a>
-        <a class="badgeLink socialNavLink" href="https://www.google.com/search?kgmid=/g/11y3rzh_gz&q=Bay+Delivery" target="_blank" rel="noopener">Google Profile</a>
+  <header class="bd-public-header" data-public-shell="header">
+    <div class="bd-shell-container">
+      <div class="bd-public-header__bar">
+        <a class="bd-public-logo" href="/" aria-label="Bay Delivery home" data-public-shell-logo>
+          <img
+            class="bd-public-logo__image"
+            src="/static/assets/brand/bay-delivery-logo-horizontal-header.png"
+            alt="Bay Delivery"
+            width="600"
+            height="177"
+            decoding="async"
+          />
+        </a>
+
+        <nav class="bd-public-nav bd-public-nav--desktop" aria-label="Primary navigation" data-public-desktop-nav>
+          <a href="/" aria-current="page">Home</a>
+          <a href="/#servicesTitle">Services</a>
+          <a href="/#howTitle">How It Works</a>
+          <a href="/#trustFaqTitle">Service Area</a>
+          <a href="/#workTitle">Recent Work</a>
+          <a href="/quote">Request a Quote</a>
+        </nav>
+
+        <a class="bd-public-phone" href="tel:+17053034409" aria-label="Call or text Bay Delivery at 705 303 4409">705-303-4409</a>
+        <a class="bd-public-cta" href="/quote">Request a Quote</a>
+
+        <button
+          class="bd-menu-toggle"
+          id="publicMenuToggle"
+          type="button"
+          aria-controls="publicMobileNav"
+          aria-expanded="false"
+          aria-label="Open navigation menu"
+          data-public-menu-toggle
+          hidden
+        >
+          <span aria-hidden="true">Menu</span>
+        </button>
+      </div>
+
+      <nav class="bd-public-mobile-nav" id="publicMobileNav" aria-label="Mobile navigation" data-public-menu data-state="open">
+        <a href="/" aria-current="page">Home</a>
+        <a href="/#servicesTitle">Services</a>
+        <a href="/#howTitle">How It Works</a>
+        <a href="/#trustFaqTitle">Service Area</a>
+        <a href="/#workTitle">Recent Work</a>
+        <a href="/quote">Request a Quote</a>
       </nav>
-    </header>
+    </div>
+  </header>
 
-    <main>
+  <main id="main-content" tabindex="-1">
+    <div class="container">
       <section class="premiumHero" aria-labelledby="homepageTitle">
         <div class="premiumHeroContent">
           <p class="eyebrow">North Bay's reliable local crew</p>
@@ -292,14 +328,40 @@
           </p>
         </div>
       </section>
-    </main>
+    </div>
+  </main>
 
-    <footer class="footer">
-      <div>Bay Delivery &bull; North Bay, Ontario</div>
-      <div class="small">
-        This site generates estimates and booking requests. Final pricing may change if job details differ from what is described.
-      </div>
-    </footer>
-  </div>
+  <footer class="bd-public-footer" data-public-shell="footer">
+    <div class="bd-shell-container bd-public-footer__grid">
+      <section class="bd-public-footer__brand" aria-label="Bay Delivery">
+        <img
+          class="bd-public-footer__logo"
+          src="/static/assets/brand/bay-delivery-logo-horizontal-header.png"
+          alt="Bay Delivery"
+          width="600"
+          height="177"
+          loading="lazy"
+          decoding="async"
+        />
+        <p>Local hauling, moving help, junk removal, light demolition, delivery, cleanup, scrap pickup, trailer hauling, and general labour.</p>
+      </section>
+
+      <section aria-labelledby="publicFooterContact">
+        <h2 class="bd-footer-heading" id="publicFooterContact">Contact</h2>
+        <a href="tel:+17053034409">705-303-4409</a>
+        <a href="mailto:BayDeliveryNB@gmail.com">BayDeliveryNB@gmail.com</a>
+        <a href="/quote">Request a Quote</a>
+      </section>
+
+      <section aria-labelledby="publicFooterArea">
+        <h2 class="bd-footer-heading" id="publicFooterArea">Service Area</h2>
+        <p>Serving North Bay and surrounding areas, including Callander, Powassan, Bonfield, Astorville, Corbeil, and Sturgeon Falls. Availability and travel costs depend on job location and scope.</p>
+      </section>
+    </div>
+
+    <div class="bd-shell-container bd-public-footer__note">Estimates are based on the details provided. Final pricing may change if job details differ after review.</div>
+  </footer>
+
+  <script src="/static/public.js" defer></script>
 </body>
 </html>

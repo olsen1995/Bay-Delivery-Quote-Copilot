@@ -52,6 +52,48 @@ def _body_sha256(document: str) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest().upper()
 
 
+def _normalized_public_shell(document: str, tag: str, shell_name: str) -> str:
+    match = re.search(
+        rf'<{tag}\b(?=[^>]*\bdata-public-shell="{shell_name}")[^>]*>.*?</{tag}>',
+        document,
+        re.DOTALL,
+    )
+    assert match is not None, f"Missing {shell_name} public shell"
+    without_current_page = re.sub(r'\s+aria-current="page"', "", match.group(0))
+    return re.sub(r"\s+", " ", without_current_page).strip()
+
+
+def _nav_html(document: str, aria_label: str) -> str:
+    match = re.search(
+        rf'<nav\b(?=[^>]*\baria-label="{re.escape(aria_label)}")[^>]*>.*?</nav>',
+        document,
+        re.DOTALL,
+    )
+    assert match is not None, f"Missing navigation landmark: {aria_label}"
+    return match.group(0)
+
+
+def _quote_contract_sha256(document: str) -> str:
+    start = document.index('<section class="quoteTrustStrip"')
+    upload_start = document.index(
+        '<div class="card hidden stageCard" id="uploadCard">',
+        start,
+    )
+    depth = 0
+    end: int | None = None
+    for match in re.finditer(r"<div\b[^>]*>|</div\s*>", document[upload_start:], re.IGNORECASE):
+        if match.group(0).lower().startswith("<div"):
+            depth += 1
+        else:
+            depth -= 1
+            if depth == 0:
+                end = upload_start + match.end()
+                break
+    assert end is not None, "Could not locate the end of #uploadCard"
+    normalized = re.sub(r"\s+", " ", document[start:end]).strip()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest().upper()
+
+
 def _meta_content(head: str, attribute: str, value: str) -> str:
     matches = re.findall(
         rf'<meta\s+{attribute}="{re.escape(value)}"\s+content="([^"]*)"\s*/?>',
@@ -186,22 +228,242 @@ def test_quote_page_has_approved_public_metadata_without_structured_data() -> No
     assert _json_ld_blocks(head) == []
 
 
-def test_public_metadata_change_preserves_bodies_and_asset_references() -> None:
+def test_shared_public_shell_body_baseline_and_asset_references() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
-    assert _body_sha256(index_html) == "F38FFCF462B41A611E47B1E890542AA13428969DD6B8A9CD8B38A48C5F5AFCD2"
-    assert _body_sha256(quote_html) == "61C66561F822176058CD03BDF5D04ABD57C0A59CF11326FBC608EF9AAB88ACF6"
+    assert _body_sha256(index_html) == "6A37C247286035F75A0920A84A3BA6F59B16B55BA49A13A264DEE4D4D58C3D5A"
+    assert _body_sha256(quote_html) == "3B20A22A90F543D1770596FEEA2A97E009D7FD2C73F1195D088AA675C473EA59"
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
+        "/static/public.css",
         "/static/site.css"
     ]
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', quote_html) == [
+        "/static/public.css",
         "/static/quote.css"
     ]
-    assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', index_html) == []
+    assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', index_html) == [
+        "/static/public.js"
+    ]
     assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', quote_html) == [
+        "/static/public.js",
         "/static/quote.js"
     ]
+
+
+def test_public_pages_load_shared_shell_assets_in_order() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
+        "/static/public.css",
+        "/static/site.css",
+    ]
+    assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', quote_html) == [
+        "/static/public.css",
+        "/static/quote.css",
+    ]
+    assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', index_html) == [
+        "/static/public.js"
+    ]
+    assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', quote_html) == [
+        "/static/public.js",
+        "/static/quote.js",
+    ]
+    for document in [index_html, quote_html]:
+        for script_tag in re.findall(r"<script\b[^>]*>", document):
+            if "src=" in script_tag:
+                assert " defer" in script_tag
+
+
+def test_public_pages_do_not_add_inline_executable_javascript() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    for document in [index_html, quote_html]:
+        inline_scripts = [
+            attrs
+            for attrs, _body in re.findall(r"<script\b([^>]*)>(.*?)</script>", document, re.DOTALL)
+            if "src=" not in attrs
+        ]
+        assert all('type="application/ld+json"' in attrs for attrs in inline_scripts)
+        assert "onclick=" not in document
+        assert "onload=" not in document
+    assert len(re.findall(r'<script\s+type="application/ld\+json">', index_html)) == 1
+    assert re.findall(r'<script\s+type="application/ld\+json">', quote_html) == []
+
+
+def test_homepage_json_ld_source_remains_unchanged() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    block = re.search(
+        r'<script type="application/ld\+json">.*?</script>',
+        index_html,
+        re.DOTALL,
+    )
+    assert block is not None
+    assert hashlib.sha256(block.group(0).encode("utf-8")).hexdigest().upper() == (
+        "BFCDEE003C9CAA7D1490BAD38A2DF66E78A0B65C42CAD9699B642843D42E2A72"
+    )
+
+
+def test_public_shell_progressive_enhancement_and_breakpoint_contract() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    public_css = Path("static/public.css").read_text(encoding="utf-8")
+    public_js = Path("static/public.js").read_text(encoding="utf-8")
+
+    for document in [index_html, quote_html]:
+        assert '<html lang="en" class="bd-no-js">' in document
+        assert re.search(
+            r'<button(?=[^>]*\bid="publicMenuToggle")(?=[^>]*\btype="button")'
+            r'(?=[^>]*\baria-controls="publicMobileNav")'
+            r'(?=[^>]*\baria-expanded="false")'
+            r'(?=[^>]*\baria-label="Open navigation menu")'
+            r'(?=[^>]*\bhidden)[^>]*>',
+            document,
+        )
+        mobile_nav_tag = re.search(
+            r'<nav(?=[^>]*\bid="publicMobileNav")(?=[^>]*\bdata-state="open")[^>]*>',
+            document,
+        )
+        assert mobile_nav_tag is not None
+        assert " hidden" not in mobile_nav_tag.group(0)
+
+    assert ".bd-public-mobile-nav[hidden]" in public_css
+    assert "display: none;" in public_css
+    assert "@media (min-width: 1180px)" in public_css
+    assert "@media (max-width: 640px)" in public_css
+    assert "@media (min-width: 641px) and (max-width: 1179px)" in public_css
+    assert "768px" not in public_css
+    assert 'matchMedia("(min-width: 1180px)")' in public_js
+    assert "768px" not in public_js
+    assert 'root.classList.replace("bd-no-js", "bd-js")' in public_js
+    assert 'menuToggle.setAttribute("aria-label", "Open navigation menu")' in public_js
+    assert 'menuToggle.setAttribute("aria-label", "Close navigation menu")' in public_js
+
+
+def test_public_shell_design_tokens_focus_and_typography_scope() -> None:
+    public_css = Path("static/public.css").read_text(encoding="utf-8")
+    for token in [
+        "--bd-black: #111111;",
+        "--bd-near-black: #171717;",
+        "--bd-red: #d92d27;",
+        "--bd-red-hover: #a92824;",
+        "--bd-cream: #fff4e4;",
+        "--bd-white: #ffffff;",
+        "--bd-text: #1f2933;",
+        "--bd-muted: #5d6875;",
+        "--bd-border-color: #e6ded2;",
+        "--bd-border-rule: 1px solid var(--bd-border-color);",
+        "--bd-success: #18794e;",
+        "--bd-warning: #b45309;",
+        "--bd-error: #b42318;",
+        "--bd-focus: rgba(217, 45, 39, 0.34);",
+        '--bd-font-body: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;',
+        '--bd-font-heading: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;',
+    ]:
+        assert token in public_css
+    assert "outline: 3px solid var(--bd-red);" in public_css
+    assert "outline-offset: 3px;" in public_css
+    assert "box-shadow: 0 0 0 5px var(--bd-focus);" in public_css
+    assert not re.search(r"(?:^|,)\s*h[123](?:\s*,|\s*\{)", public_css, re.MULTILINE)
+
+
+def test_public_page_landmarks_skip_link_and_unique_ids() -> None:
+    for path in [Path("static/index.html"), Path("static/quote.html")]:
+        document = path.read_text(encoding="utf-8")
+        body = document.split("<body", 1)[1]
+        first_focusable = re.search(r'<(?:a|button|input|select|textarea)\b[^>]*>', body)
+        assert first_focusable is not None
+        assert 'class="bd-skip-link"' in first_focusable.group(0)
+        assert 'href="#main-content"' in first_focusable.group(0)
+        assert len(re.findall(r'<main\b[^>]*\bid="main-content"[^>]*\btabindex="-1"[^>]*>', document)) == 1
+        assert len(re.findall(r"<main\b", document)) == 1
+        assert len(re.findall(r"<header\b", document)) == 1
+        assert len(re.findall(r"<footer\b", document)) == 1
+        assert len(re.findall(r"<h1\b", document)) == 1
+        ids = re.findall(r'\bid="([^"]+)"', document)
+        assert len(ids) == len(set(ids)), f"Duplicate IDs in {path}"
+
+
+def test_public_shell_navigation_targets_and_current_page_state() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    expected_hrefs = [
+        "/",
+        "/#servicesTitle",
+        "/#howTitle",
+        "/#trustFaqTitle",
+        "/#workTitle",
+        "/quote",
+    ]
+
+    for document, current_href in [(index_html, "/"), (quote_html, "/quote")]:
+        for label in ["Primary navigation", "Mobile navigation"]:
+            nav = _nav_html(document, label)
+            assert re.findall(r'<a\s+href="([^"]+)"(?:\s+aria-current="page")?>', nav) == expected_hrefs
+            current_links = re.findall(
+                r'<a\s+href="([^"]+)"\s+aria-current="page">',
+                nav,
+            )
+            assert current_links == [current_href]
+        assert document.count('aria-current="page"') == 2
+
+    homepage_ids = set(re.findall(r'\bid="([^"]+)"', index_html))
+    for href in expected_hrefs:
+        if href.startswith("/#"):
+            assert href[2:] in homepage_ids
+    assert "/privacy" not in index_html + quote_html
+    assert "/accessibility" not in index_html + quote_html
+    assert "facebook.com" not in _normalized_public_shell(index_html, "header", "header")
+    assert "google.com/search" not in _normalized_public_shell(index_html, "header", "header")
+
+
+def test_copied_public_shells_match_after_current_page_normalization() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert _normalized_public_shell(index_html, "header", "header") == _normalized_public_shell(
+        quote_html,
+        "header",
+        "header",
+    )
+    assert _normalized_public_shell(index_html, "footer", "footer") == _normalized_public_shell(
+        quote_html,
+        "footer",
+        "footer",
+    )
+
+
+def test_public_javascript_is_menu_only_and_focus_safe() -> None:
+    public_js = Path("static/public.js").read_text(encoding="utf-8")
+
+    for forbidden in [
+        "fetch(",
+        "XMLHttpRequest",
+        "FormData",
+        "localStorage",
+        "sessionStorage",
+        "document.cookie",
+        "/quote/calculate",
+        "/quote/upload-photos",
+        "quote_id",
+        "accept_token",
+    ]:
+        assert forbidden not in public_js
+    assert "mobileNav.contains(document.activeElement)" in public_js
+    assert "document.activeElement === menuToggle" in public_js
+    assert "publicLogo.focus({ preventScroll: true })" in public_js
+    assert "event.preventDefault()" not in public_js
+
+
+def test_complete_quote_content_contract_remains_unchanged() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    assert _quote_contract_sha256(quote_html) == (
+        "BABF0E971EEB9A3D627F85BDF0D6D6F7F92BB5F2CCB379BD2DC28455B08CC4CB"
+    )
+    assert quote_html.count('id="quoteForm"') == 1
+    assert Path("static/quote.js").read_text(encoding="utf-8")
 
 
 def _jpeg_dimensions(path: Path) -> tuple[int, int]:
@@ -271,13 +533,13 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
     assert f'<meta property="og:image" content="{SOCIAL_IMAGE_URL}" />' in index_html
     assert f'<meta name="twitter:image" content="{SOCIAL_IMAGE_URL}" />' in index_html
     assert 'href="/quote">Get My Fast Estimate<' in index_html
-    assert 'href="/quote">Get a Quote<' in index_html
+    assert 'href="/quote">Request a Quote<' in index_html
     assert 'href="tel:+17053034409"' in index_html
     assert 'href="tel:+12493588087"' in index_html
-    assert "Dan 705-303-4409" in index_html
-    assert "Austin 249-358-8087" in index_html
     assert "Call/Text Dan" in index_html
     assert "Call/Text Austin" in index_html
+    assert "(705) 303-4409" in index_html
+    assert "(249) 358-8087" in index_html
 
 
 def test_quote_page_uses_current_logo_asset() -> None:
@@ -290,9 +552,9 @@ def test_quote_page_uses_current_logo_asset() -> None:
     assert 'src="/static/images/bay-delivery-logo.png"' not in quote_html
     assert 'src="/static/images/logo.jpg"' not in quote_html
     assert 'href="tel:+17053034409"' in quote_html
-    assert 'href="tel:+12493588087"' in quote_html
-    assert "Call/Text Dan 705-303-4409" in quote_html
-    assert "Call/Text Austin 249-358-8087" in quote_html
+    assert 'href="tel:+12493588087"' not in quote_html
+    assert "705-303-4409" in quote_html
+    assert "Call/Text Austin 249-358-8087" not in quote_html
 
 
 def test_quote_page_owns_public_stylesheet_boundary() -> None:
@@ -726,9 +988,9 @@ def test_quote_page_mobile_polish_preserves_one_form_flow() -> None:
     assert "overflow-x: auto;" in quote_css
     assert "scroll-snap-type: x proximity;" in quote_css
     mobile_quote_css = quote_css[quote_css.index("@media (max-width: 720px)") :]
-    mobile_body_match = re.search(r"body\.quotePage\s*\{(?P<body>.*?)\n\s*\}", mobile_quote_css, re.S)
-    assert mobile_body_match is not None
-    assert "padding-bottom: 92px;" in mobile_body_match.group("body")
+    mobile_content_match = re.search(r"\.quotePage \.quote-content\s*\{(?P<body>.*?)\n\s*\}", mobile_quote_css, re.S)
+    assert mobile_content_match is not None
+    assert "padding-bottom: 92px;" in mobile_content_match.group("body")
     assert "#quoteForm > .btnRow" in quote_css
     assert "position: sticky;" in quote_css
     assert "env(safe-area-inset-bottom)" in quote_css

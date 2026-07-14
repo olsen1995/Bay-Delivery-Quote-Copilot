@@ -276,3 +276,193 @@ async def test_haul_away_requires_structured_load_detail(page: Page, live_server
     await expect(page.locator("#resultBox")).to_contain_text("Pricing Breakdown", timeout=20_000)
     await expect(page.locator("#resultBox")).to_contain_text("Estimated junk load (Under 1/4 trailer)")
     await expect(page.locator("#resultBox")).not_to_contain_text("Estimated junk load (0 bags)")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["/", "/quote"])
+async def test_public_shell_skip_link_focus(page: Page, live_server: str, route: str) -> None:
+    await page.goto(f"{live_server}{route}", wait_until="networkidle")
+    skip_link = page.locator(".bd-skip-link")
+    await page.keyboard.press("Tab")
+    await expect(skip_link).to_be_focused()
+    await expect(skip_link).to_have_attribute("href", "#main-content")
+    await skip_link.click()
+    await expect(page.locator("#main-content")).to_be_focused()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["/", "/quote"])
+async def test_public_shell_desktop_navigation(page: Page, live_server: str, route: str) -> None:
+    await page.set_viewport_size({"width": 1280, "height": 900})
+    await page.goto(f"{live_server}{route}", wait_until="networkidle")
+
+    await expect(page.locator(".bd-public-header")).to_be_visible()
+    await expect(page.locator(".bd-public-logo")).to_be_visible()
+    await expect(page.get_by_role("navigation", name="Primary navigation")).to_be_visible()
+    await expect(page.get_by_role("navigation", name="Mobile navigation")).to_be_hidden()
+    await expect(page.locator("#publicMenuToggle")).to_be_hidden()
+    await expect(page.locator('.bd-public-phone[href="tel:+17053034409"]')).to_be_visible()
+    await expect(page.locator('.bd-public-cta[href="/quote"]')).to_be_visible()
+    await page.locator(".bd-public-footer").scroll_into_view_if_needed()
+    await expect(page.locator(".bd-public-footer")).to_be_visible()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["/", "/quote"])
+async def test_public_shell_mobile_menu_aria_and_escape(page: Page, live_server: str, route: str) -> None:
+    await page.set_viewport_size({"width": 390, "height": 844})
+    await page.goto(f"{live_server}{route}", wait_until="networkidle")
+
+    menu_toggle = page.locator("#publicMenuToggle")
+    mobile_nav = page.locator("#publicMobileNav")
+    await expect(menu_toggle).to_be_visible()
+    await expect(menu_toggle).to_have_attribute("aria-expanded", "false")
+    await expect(menu_toggle).to_have_attribute("aria-label", "Open navigation menu")
+    await expect(mobile_nav).to_have_attribute("data-state", "closed")
+    await expect(mobile_nav).to_have_attribute("hidden", "")
+
+    await menu_toggle.click()
+    await expect(menu_toggle).to_have_attribute("aria-expanded", "true")
+    await expect(menu_toggle).to_have_attribute("aria-label", "Close navigation menu")
+    await expect(mobile_nav).to_have_attribute("data-state", "open")
+    await expect(mobile_nav).not_to_have_attribute("hidden", "")
+    await expect(mobile_nav.locator("a").first).to_be_visible()
+
+    await page.keyboard.press("Escape")
+    await expect(menu_toggle).to_have_attribute("aria-expanded", "false")
+    await expect(menu_toggle).to_have_attribute("aria-label", "Open navigation menu")
+    await expect(mobile_nav).to_have_attribute("data-state", "closed")
+    await expect(mobile_nav).to_have_attribute("hidden", "")
+    await expect(menu_toggle).to_be_focused()
+
+
+@pytest.mark.asyncio
+async def test_public_shell_mobile_link_focus_is_safe_before_hiding(page: Page, live_server: str) -> None:
+    await page.set_viewport_size({"width": 390, "height": 844})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    await page.locator("#publicMenuToggle").click()
+    await page.evaluate(
+        """() => {
+          const nav = document.querySelector('#publicMobileNav');
+          window.__focusWasOutsideMenuBeforeHide = false;
+          new MutationObserver(() => {
+            if (nav.hidden) {
+              window.__focusWasOutsideMenuBeforeHide = !nav.contains(document.activeElement);
+            }
+          }).observe(nav, { attributes: true, attributeFilter: ['hidden'] });
+        }"""
+    )
+    services_link = page.locator('#publicMobileNav a[href="/#servicesTitle"]')
+    await services_link.focus()
+    await page.keyboard.press("Enter")
+    await expect(page).to_have_url(re.compile(r".*/#servicesTitle$"))
+    assert await page.evaluate("window.__focusWasOutsideMenuBeforeHide") is True
+    await expect(page.locator("#publicMobileNav")).to_have_attribute("hidden", "")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("focus_target", ["trigger", "link"])
+async def test_public_shell_desktop_transition_moves_mobile_focus_to_logo(
+    page: Page,
+    live_server: str,
+    focus_target: str,
+) -> None:
+    await page.set_viewport_size({"width": 1024, "height": 800})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    menu_toggle = page.locator("#publicMenuToggle")
+    await menu_toggle.click()
+    if focus_target == "trigger":
+        await menu_toggle.focus()
+    else:
+        await page.locator("#publicMobileNav a").first.focus()
+
+    await page.set_viewport_size({"width": 1180, "height": 800})
+    await expect(page.locator(".bd-public-logo")).to_be_focused()
+    await expect(page.locator("#publicMobileNav")).to_have_attribute("hidden", "")
+    await expect(menu_toggle).to_be_hidden()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["/", "/quote"])
+async def test_public_shell_no_javascript_mobile_navigation(
+    browser: Browser,
+    live_server: str,
+    route: str,
+) -> None:
+    context = await browser.new_context(
+        java_script_enabled=False,
+        viewport={"width": 390, "height": 844},
+    )
+    try:
+        expected_hrefs = [
+            "/",
+            "/#servicesTitle",
+            "/#howTitle",
+            "/#trustFaqTitle",
+            "/#workTitle",
+            "/quote",
+        ]
+        for href in expected_hrefs:
+            no_js_page = await context.new_page()
+            await no_js_page.goto(f"{live_server}{route}", wait_until="networkidle")
+            await expect(no_js_page.get_by_role("navigation", name="Primary navigation")).to_be_hidden()
+            await expect(no_js_page.get_by_role("navigation", name="Mobile navigation")).to_be_visible()
+            await expect(no_js_page.locator("#publicMenuToggle")).to_be_hidden()
+            link = no_js_page.locator(f'#publicMobileNav a[href="{href}"]')
+            await expect(link).to_be_visible()
+            await link.click()
+            if href.startswith("/#"):
+                await expect(no_js_page).to_have_url(re.compile(rf".*/{re.escape(href[1:])}$"))
+            elif href == "/quote":
+                await expect(no_js_page).to_have_url(re.compile(r".*/quote$"))
+            else:
+                await expect(no_js_page).to_have_url(re.compile(r".*/$"))
+            await no_js_page.close()
+    finally:
+        await context.close()
+
+
+@pytest.mark.asyncio
+async def test_public_shell_responsive_layouts_have_no_overflow(page: Page, live_server: str) -> None:
+    for width in [320, 360, 390, 430, 640, 641, 768, 1024, 1179, 1180, 1280, 1440, 1680]:
+        for route in ["/", "/quote"]:
+            await page.set_viewport_size({"width": width, "height": 900})
+            await page.goto(f"{live_server}{route}", wait_until="networkidle")
+            overflow = await page.evaluate(
+                "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+            )
+            assert overflow <= 1, f"Horizontal overflow at {width}px on {route}: {overflow}px"
+
+            if width <= 640:
+                logo_top = await page.locator(".bd-public-logo").evaluate("node => node.offsetTop")
+                toggle_top = await page.locator("#publicMenuToggle").evaluate("node => node.offsetTop")
+                phone_top = await page.locator(".bd-public-phone").evaluate("node => node.offsetTop")
+                cta_top = await page.locator(".bd-public-cta").evaluate("node => node.offsetTop")
+                assert abs(logo_top - toggle_top) <= 4
+                assert abs(phone_top - cta_top) <= 4
+                assert phone_top > logo_top
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("width", [390, 1280])
+async def test_public_shell_anchor_offsets_clear_sticky_header(
+    page: Page,
+    live_server: str,
+    width: int,
+) -> None:
+    await page.set_viewport_size({"width": width, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    if width < 1180:
+        await page.locator("#publicMenuToggle").click()
+        await page.locator('#publicMobileNav a[href="/#servicesTitle"]').click()
+    else:
+        await page.locator('.bd-public-nav--desktop a[href="/#servicesTitle"]').click()
+    await expect(page).to_have_url(re.compile(r".*/#servicesTitle$"))
+    target_top = await page.locator("#servicesTitle").evaluate(
+        "node => node.getBoundingClientRect().top"
+    )
+    header_bottom = await page.locator(".bd-public-header").evaluate(
+        "node => node.getBoundingClientRect().bottom"
+    )
+    assert target_top >= header_bottom - 1
+    assert target_top < 900
