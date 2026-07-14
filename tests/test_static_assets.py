@@ -123,7 +123,7 @@ def test_homepage_has_valid_organization_structured_data() -> None:
     service_areas = organization["areaServed"]
     assert isinstance(service_areas, list)
     assert service_areas == [
-        {"@type": "City", "name": area_name}
+        {"@type": "Place", "name": area_name}
         for area_name in APPROVED_SERVICE_AREAS
     ]
 
