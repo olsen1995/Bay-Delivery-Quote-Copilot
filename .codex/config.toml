@@ -3,7 +3,7 @@ model_reasoning_effort = "high"
 personality = "pragmatic"
 
 allow_login_shell = false
-approval_policy = "on-request"
+approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
 [windows]
