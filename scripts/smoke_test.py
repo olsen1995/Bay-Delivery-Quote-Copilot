@@ -207,11 +207,22 @@ def _check_health_commit(health: Dict[str, Any]) -> None:
     print(f"[ok] /health commit matches checked-out HEAD ({expected_commit})")
 
 
+def _require_public_homepage_shell(homepage: str) -> None:
+    require(
+        'data-public-shell="header"' in homepage,
+        "GET / missing shared public header marker",
+    )
+    require(
+        'class="bd-public-cta" href="/quote"' in homepage,
+        "GET / missing primary quote CTA targeting /quote",
+    )
+
+
 def _run_public_customer_page_checks() -> None:
     status, homepage = api("GET", "/")
     require(status == 200, f"GET / expected 200, got {status}")
     require(isinstance(homepage, str), "GET / expected HTML response")
-    require("Get a Quote" in homepage, "GET / missing homepage quote CTA marker")
+    _require_public_homepage_shell(homepage)
     print("[ok] / page marker checks")
 
     status, quote_page = api("GET", "/quote")
@@ -225,7 +236,7 @@ def _run_post_deploy_public_page_checks() -> None:
     status, homepage = api("GET", "/")
     require(status == 200, f"GET / expected 200, got {status}")
     require(isinstance(homepage, str), "GET / expected HTML response")
-    require("Get a Quote" in homepage, "GET / missing homepage quote CTA marker")
+    _require_public_homepage_shell(homepage)
     print("[ok] / post-deploy page marker checks")
 
     status, quote_page = api("GET", "/quote")

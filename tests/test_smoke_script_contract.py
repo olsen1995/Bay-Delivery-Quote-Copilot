@@ -7,10 +7,17 @@ from app.services.quote_service import build_quote_artifacts
 from scripts import smoke_test
 
 
+_PUBLIC_HOME_SHELL = (
+    '<html><header data-public-shell="header">'
+    '<a class="bd-public-cta" href="/quote">Request a Quote</a>'
+    "</header></html>"
+)
+
+
 def _post_deploy_responses(path: str) -> object:
     responses = {
         "/health": {"ok": True, "version": "0.10.1", "commit": "3544537f1c36"},
-        "/": '<html><a href="/quote">Get a Quote</a></html>',
+        "/": _PUBLIC_HOME_SHELL,
         "/quote": '<html><form id="quoteForm"></form></html>',
         "/admin": (
             '<html><h2>Admin Access</h2><input id="adminUsername" />'
@@ -95,6 +102,51 @@ def test_post_deploy_smoke_checks_health_public_pages_and_pre_auth_admin(monkeyp
         ("GET", "/admin"),
         ("GET", "/admin/mobile"),
     ]
+
+
+@pytest.mark.parametrize(
+    "runner",
+    [
+        smoke_test._run_public_customer_page_checks,
+        smoke_test._run_post_deploy_public_page_checks,
+    ],
+)
+@pytest.mark.parametrize(
+    ("homepage", "expected_message"),
+    [
+        (
+            '<html><a class="bd-public-cta" href="/quote">Request a Quote</a></html>',
+            "GET / missing shared public header marker",
+        ),
+        (
+            '<html><header data-public-shell="header"><a href="/quote">Request a Quote</a></header></html>',
+            "GET / missing primary quote CTA targeting /quote",
+        ),
+        (
+            '<html><header data-public-shell="header"><a class="bd-public-cta" href="/estimate">Request a Quote</a></header></html>',
+            "GET / missing primary quote CTA targeting /quote",
+        ),
+    ],
+)
+def test_public_page_smoke_requires_shared_shell_markers(
+    monkeypatch: pytest.MonkeyPatch,
+    runner,
+    homepage: str,
+    expected_message: str,
+) -> None:
+    def fake_api(method: str, path: str, payload: dict | None = None, headers: dict | None = None):
+        del payload, headers
+        assert method == "GET"
+        if path == "/":
+            return 200, homepage
+        if path == "/quote":
+            return 200, '<html><form id="quoteForm"></form></html>'
+        raise AssertionError(f"Unexpected smoke API call: {method} {path}")
+
+    monkeypatch.setattr(smoke_test, "api", fake_api)
+
+    with pytest.raises(AssertionError, match=expected_message):
+        runner()
 
 
 @pytest.mark.parametrize(
@@ -250,7 +302,7 @@ def test_live_safe_without_commit_flag_does_not_read_checked_out_head(
         if path == "/health":
             return 200, {"ok": True, "version": "0.11.0", "commit": "abcdef123456"}
         if path == "/":
-            return 200, '<html><a href="/quote">Get a Quote</a></html>'
+            return 200, _PUBLIC_HOME_SHELL
         if path == "/quote":
             return 200, '<html><form id="quoteForm"></form></html>'
         if path == "/admin":
