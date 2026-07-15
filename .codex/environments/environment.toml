@@ -4,121 +4,302 @@ name = "Bay-Delivery-Quote-Copilot"
 
 [setup]
 script = '''
-$ErrorActionPreference = "Stop"
+set -euo pipefail
 
-Set-Location "$env:CODEX_WORKTREE_PATH"
+: "${CODEX_WORKTREE_PATH:?CODEX_WORKTREE_PATH is not set}"
 
-Write-Host "==> Working directory: $(Get-Location)"
+cd "$CODEX_WORKTREE_PATH"
 
-if (Test-Path ".\.venv\Scripts\Activate.ps1") {
-    Write-Host "==> Activating .venv"
-    . .\.venv\Scripts\Activate.ps1
-} else {
-    Write-Host "==> No .venv found, continuing without activation"
-}
+echo "==> Working directory: $(pwd)"
 
-Write-Host "==> Python version"
-python --version
+PYTHON_BIN="python3"
 
-Write-Host "==> Pip version"
-pip --version
+if command -v python3.11 >/dev/null 2>&1; then
+    PYTHON_BIN="python3.11"
+fi
 
-if (Test-Path ".\requirements.txt") {
-    Write-Host "==> Installing requirements.txt"
-    pip install -r requirements.txt
-} else {
-    Write-Host "==> No requirements.txt found"
-}
+"$PYTHON_BIN" -c \
+'import sys; assert sys.version_info[:2] == (3, 11), f"Python 3.11 required, found {sys.version}"'
 
-if (Test-Path ".\requirements-dev.txt") {
-    Write-Host "==> Installing requirements-dev.txt"
-    pip install -r requirements-dev.txt
-} else {
-    Write-Host "==> No requirements-dev.txt found"
-}
+if [ ! -x ".venv/bin/python" ]; then
+    echo "==> Creating Python 3.11 virtual environment"
+    "$PYTHON_BIN" -m venv .venv
+else
+    echo "==> Reusing existing .venv"
+fi
 
-Write-Host "==> Ensuring Playwright browsers are installed"
-python -m playwright install
+PYTHON=".venv/bin/python"
 
-Write-Host "==> Environment setup complete"
-'''
+echo "==> Python version"
+"$PYTHON" -B --version
+
+echo "==> Pip version"
+"$PYTHON" -B -m pip --version
+
+if [ ! -f "requirements.lock.txt" ]; then
+    echo "ERROR: requirements.lock.txt is missing"
+    exit 1
+fi
+
+echo "==> Installing locked project dependencies"
+"$PYTHON" -B -m pip install -r requirements.lock.txt
+
+echo "==> Installing local validation tooling"
+"$PYTHON" -B -m pip install "pip-audit==2.10.0"
+
+if ! "$PYTHON" -B -c "import playwright" >/dev/null 2>&1; then
+    echo "==> Installing Playwright package"
+    "$PYTHON" -B -m pip install playwright
+fi
+
+echo "==> Checking installed dependency compatibility"
+"$PYTHON" -B -m pip check
+
+echo "==> Ensuring Playwright Chromium is installed"
+"$PYTHON" -B -m playwright install chromium
+
+echo "==> Running lightweight repository checks"
+"$PYTHON" -B tools/check_version_parity.py
+"$PYTHON" -B tools/check_gpt_grounding_pack_parity.py
+"$PYTHON" -B -m compileall -q app tools scripts tests
+
+echo "==> Environment setup complete"'''
 
 [setup.win32]
 script = '''
 $ErrorActionPreference = "Stop"
 
-Set-Location "$env:CODEX_WORKTREE_PATH"
+function Assert-LastExitCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Step
+    )
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Step failed with exit code $LASTEXITCODE."
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($env:CODEX_WORKTREE_PATH)) {
+    throw "CODEX_WORKTREE_PATH is not set."
+}
+
+if (-not (Test-Path -LiteralPath $env:CODEX_WORKTREE_PATH)) {
+    throw "Codex worktree path does not exist: $env:CODEX_WORKTREE_PATH"
+}
+
+Set-Location -LiteralPath $env:CODEX_WORKTREE_PATH
 
 Write-Host "==> Working directory: $(Get-Location)"
 
-if (Test-Path ".\.venv\Scripts\Activate.ps1") {
-    Write-Host "==> Activating existing .venv"
-    . .\.venv\Scripts\Activate.ps1
+$venvPython = Join-Path (Get-Location) ".venv\Scripts\python.exe"
+
+if (-not (Test-Path -LiteralPath $venvPython)) {
+    Write-Host "==> Creating Python 3.11 virtual environment"
+
+    $venvCreated = $false
+
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3.11 -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
+
+        if ($LASTEXITCODE -eq 0) {
+            & py -3.11 -m venv .venv
+            Assert-LastExitCode "Python 3.11 virtual-environment creation"
+            $venvCreated = $true
+        }
+    }
+
+    if (-not $venvCreated) {
+        if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+            throw "Python 3.11 was not found. Install Python 3.11 before creating this environment."
+        }
+
+        & python -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)"
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "The available python command is not Python 3.11."
+        }
+
+        & python -m venv .venv
+        Assert-LastExitCode "Python virtual-environment creation"
+    }
 } else {
-    Write-Host "==> No .venv found, creating .venv"
-    python -m venv .venv
-    . .\.venv\Scripts\Activate.ps1
+    Write-Host "==> Reusing existing .venv"
 }
+
+if (-not (Test-Path -LiteralPath $venvPython)) {
+    throw "Virtual-environment Python was not created: $venvPython"
+}
+
+Write-Host "==> Verifying Python 3.11"
+
+& $venvPython -B -c "import sys; assert sys.version_info[:2] == (3, 11), f'Python 3.11 required, found {sys.version}'"
+
+Assert-LastExitCode "Python version verification"
 
 Write-Host "==> Python version"
-python --version
+
+& $venvPython -B --version
+
+Assert-LastExitCode "Python version check"
 
 Write-Host "==> Pip version"
-python -m pip --version
 
-Write-Host "==> Upgrading pip"
-python -m pip install --upgrade pip
+& $venvPython -B -m pip --version
 
-if (Test-Path ".\requirements.lock.txt") {
-    Write-Host "==> Installing requirements.lock.txt"
-    python -m pip install -r requirements.lock.txt
-} elseif (Test-Path ".\requirements.txt") {
-    Write-Host "==> Installing requirements.txt"
-    python -m pip install -r requirements.txt
-} else {
-    Write-Host "==> No requirements file found"
+Assert-LastExitCode "Pip version check"
+
+if (-not (Test-Path -LiteralPath ".\requirements.lock.txt")) {
+    throw "requirements.lock.txt is missing. Refusing to install from an unlocked fallback."
 }
 
-if (Test-Path ".\requirements-dev.txt") {
-    Write-Host "==> Installing requirements-dev.txt"
-    python -m pip install -r requirements-dev.txt
+Write-Host "==> Installing locked project dependencies"
+
+& $venvPython -B -m pip install -r requirements.lock.txt
+
+Assert-LastExitCode "Locked dependency installation"
+
+Write-Host "==> Installing local validation tooling"
+
+& $venvPython -B -m pip install "pip-audit==2.10.0"
+
+Assert-LastExitCode "pip-audit installation"
+
+Write-Host "==> Checking Playwright package availability"
+
+& $venvPython -B -c "import playwright" 2>$null
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "==> Installing Playwright package"
+
+    & $venvPython -B -m pip install playwright
+
+    Assert-LastExitCode "Playwright package installation"
 } else {
-    Write-Host "==> No requirements-dev.txt found"
+    Write-Host "==> Playwright package already available"
 }
 
-Write-Host "==> Checking Playwright availability"
-python -c "import playwright; print('Playwright package available')" 2>$null
+Write-Host "==> Checking installed dependency compatibility"
 
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "==> Installing Playwright browsers"
-    python -m playwright install
-} else {
-    Write-Host "==> Playwright package not available; skipping browser install"
-}
+& $venvPython -B -m pip check
 
-Write-Host "==> Running lightweight repo checks"
-python tools/check_version_parity.py
-python tools/check_gpt_grounding_pack_parity.py
-python -m compileall app tools scripts tests
+Assert-LastExitCode "Dependency compatibility check"
 
-Write-Host "==> Environment setup complete"
-'''
+Write-Host "==> Ensuring Playwright Chromium is installed"
+
+& $venvPython -B -m playwright install chromium
+
+Assert-LastExitCode "Playwright Chromium installation"
+
+Write-Host "==> Running version parity"
+
+& $venvPython -B tools/check_version_parity.py
+
+Assert-LastExitCode "Version parity check"
+
+Write-Host "==> Running GPT grounding-pack parity"
+
+& $venvPython -B tools/check_gpt_grounding_pack_parity.py
+
+Assert-LastExitCode "GPT grounding-pack parity check"
+
+Write-Host "==> Compiling Python sources"
+
+& $venvPython -B -m compileall -q app tools scripts tests
+
+Assert-LastExitCode "Python compilation check"
+
+Write-Host "==> Environment setup complete"'''
 
 [cleanup]
 script = '''
+set +e
+
+if [ -z "${CODEX_WORKTREE_PATH:-}" ]; then
+    echo "==> CODEX_WORKTREE_PATH is not set. Cleanup skipped."
+    exit 0
+fi
+
+if [ ! -d "$CODEX_WORKTREE_PATH" ]; then
+    echo "==> Worktree path no longer exists. Cleanup skipped."
+    exit 0
+fi
+
+cd "$CODEX_WORKTREE_PATH"
+
+echo "==> Cleaning temporary local artifacts"
+
+rm -rf \
+    .cache/tmp \
+    .pytest_cache \
+    playwright-smoke-junit.xml \
+    playwright-report \
+    test-results
+
+find app tools scripts tests \
+    -type d \
+    -name "__pycache__" \
+    -prune \
+    -exec rm -rf {} + \
+    2>/dev/null
+
+echo "==> Cleanup complete"'''
+
+[cleanup.win32]
+script = '''
 $ErrorActionPreference = "Continue"
 
-Set-Location "$env:CODEX_WORKTREE_PATH"
+if ([string]::IsNullOrWhiteSpace($env:CODEX_WORKTREE_PATH)) {
+    Write-Warning "CODEX_WORKTREE_PATH is not set. Cleanup skipped."
+    exit 0
+}
+
+if (-not (Test-Path -LiteralPath $env:CODEX_WORKTREE_PATH)) {
+    Write-Warning "Worktree path no longer exists. Cleanup skipped."
+    exit 0
+}
+
+Set-Location -LiteralPath $env:CODEX_WORKTREE_PATH
 
 Write-Host "==> Cleaning temporary local artifacts"
 
-if (Test-Path ".\.cache\tmp") {
-    Remove-Item ".\.cache\tmp" -Recurse -Force
+$temporaryPaths = @(
+    ".\.cache\tmp",
+    ".\.pytest_cache",
+    ".\playwright-smoke-junit.xml",
+    ".\playwright-report",
+    ".\test-results"
+)
+
+foreach ($path in $temporaryPaths) {
+    if (Test-Path -LiteralPath $path) {
+        Write-Host "==> Removing $path"
+
+        Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Continue
+    }
 }
 
-if (Get-Command docker -ErrorAction SilentlyContinue) {
-    docker compose down --remove-orphans
+$sourceRoots = @(
+    ".\app",
+    ".\tools",
+    ".\scripts",
+    ".\tests"
+)
+
+foreach ($root in $sourceRoots) {
+    if (Test-Path -LiteralPath $root) {
+        Get-ChildItem `
+            -LiteralPath $root `
+            -Directory `
+            -Recurse `
+            -Force `
+            -Filter "__pycache__" `
+            -ErrorAction SilentlyContinue |
+        Remove-Item `
+            -Recurse `
+            -Force `
+            -ErrorAction Continue
+    }
 }
 
-Write-Host "==> Cleanup complete"
-'''
+Write-Host "==> Cleanup complete"'''
