@@ -455,6 +455,13 @@ def test_public_javascript_is_menu_only_and_focus_safe() -> None:
     assert "document.activeElement === menuToggle" in public_js
     assert "publicLogo.focus({ preventScroll: true })" in public_js
     assert "event.preventDefault()" not in public_js
+    assert 'typeof desktopQuery.addEventListener === "function"' in public_js
+    assert 'typeof desktopQuery.addListener === "function"' in public_js
+    assert 'desktopQuery.addEventListener("change", handleDesktopChange)' in public_js
+    assert "desktopQuery.addListener(handleDesktopChange)" in public_js
+    assert public_js.index("if (!desktopListenerInstalled) return;") < public_js.rindex(
+        "setMenuState(false)"
+    )
 
 
 def test_complete_quote_content_contract_remains_unchanged() -> None:
@@ -566,9 +573,9 @@ def test_quote_page_owns_public_stylesheet_boundary() -> None:
 
     for selector in [
         "body.quotePage",
-        ".quotePage h1",
-        ".quotePage h2",
-        ".quotePage h3",
+        ".quotePage .quote-content h1",
+        ".quotePage .quote-content h2",
+        ".quotePage .quote-content h3",
         ".quotePage label",
         ".quotePage .muted",
         ".quotePage .row",
@@ -591,6 +598,20 @@ def test_quote_page_owns_public_stylesheet_boundary() -> None:
         quote_scope = re.search(r"\.quotePage\s*\{(?P<body>.*?)\n\}", quote_css, re.S)
         assert quote_scope is not None
         assert "--brand-red: var(--quote-accent);" in quote_scope.group("body")
+
+
+def test_quote_heading_styles_are_scoped_to_quote_content() -> None:
+    quote_css = Path("static/quote.css").read_text(encoding="utf-8")
+
+    for level in ["h1", "h2", "h3"]:
+        assert re.search(
+            rf"(?m)^\.quotePage \.quote-content {level}\s*(?:,|\{{)",
+            quote_css,
+        )
+        assert not re.search(
+            rf"(?m)^\.quotePage {level}\s*(?:,|\{{)",
+            quote_css,
+        )
 
 
 def test_quote_page_review_followup_layout_guards() -> None:

@@ -27,7 +27,28 @@
     mobileControlHadFocus = false;
   };
 
-  setMenuState(false);
+  const handleDesktopChange = (event) => {
+    if (!event.matches) return;
+    if (
+      document.activeElement === menuToggle ||
+      mobileNav.contains(document.activeElement) ||
+      mobileControlHadFocus
+    ) {
+      moveFocusToLogo();
+    }
+    setMenuState(false);
+  };
+
+  let desktopListenerInstalled = false;
+  if (typeof desktopQuery.addEventListener === "function") {
+    desktopQuery.addEventListener("change", handleDesktopChange);
+    desktopListenerInstalled = true;
+  } else if (typeof desktopQuery.addListener === "function") {
+    desktopQuery.addListener(handleDesktopChange);
+    desktopListenerInstalled = true;
+  }
+
+  if (!desktopListenerInstalled) return;
 
   menuToggle.addEventListener("click", () => {
     const isOpen = menuToggle.getAttribute("aria-expanded") === "true";
@@ -58,18 +79,7 @@
     }
   });
 
-  desktopQuery.addEventListener("change", (event) => {
-    if (!event.matches) return;
-    if (
-      document.activeElement === menuToggle ||
-      mobileNav.contains(document.activeElement) ||
-      mobileControlHadFocus
-    ) {
-      moveFocusToLogo();
-    }
-    setMenuState(false);
-  });
-
+  setMenuState(false);
   menuToggle.hidden = false;
   root.classList.replace("bd-no-js", "bd-js");
 })();

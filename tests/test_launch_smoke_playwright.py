@@ -308,6 +308,19 @@ async def test_public_shell_desktop_navigation(page: Page, live_server: str, rou
 
 
 @pytest.mark.asyncio
+async def test_quote_public_footer_headings_use_light_text(page: Page, live_server: str) -> None:
+    await page.set_viewport_size({"width": 1280, "height": 900})
+    await page.goto(f"{live_server}/quote", wait_until="networkidle")
+
+    footer = page.locator(".bd-public-footer")
+    headings = footer.locator(".bd-footer-heading")
+    await expect(headings).to_have_count(2)
+    await expect(footer).to_have_css("background-color", "rgb(23, 23, 23)")
+    for index in range(await headings.count()):
+        await expect(headings.nth(index)).to_have_css("color", "rgb(255, 255, 255)")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("route", ["/", "/quote"])
 async def test_public_shell_mobile_menu_aria_and_escape(page: Page, live_server: str, route: str) -> None:
     await page.set_viewport_size({"width": 390, "height": 844})
@@ -334,6 +347,69 @@ async def test_public_shell_mobile_menu_aria_and_escape(page: Page, live_server:
     await expect(mobile_nav).to_have_attribute("data-state", "closed")
     await expect(mobile_nav).to_have_attribute("hidden", "")
     await expect(menu_toggle).to_be_focused()
+
+
+@pytest.mark.asyncio
+async def test_public_shell_uses_legacy_media_query_listener(page: Page, live_server: str) -> None:
+    await page.set_viewport_size({"width": 390, "height": 844})
+    await page.add_init_script(
+        """(() => {
+          const prototype = MediaQueryList.prototype;
+          const nativeAddListener = prototype.addListener;
+          window.__legacyAddListenerUsed = false;
+          Object.defineProperty(prototype, 'addEventListener', {
+            configurable: true,
+            value: undefined,
+          });
+          Object.defineProperty(prototype, 'addListener', {
+            configurable: true,
+            value(listener) {
+              window.__legacyAddListenerUsed = true;
+              return nativeAddListener.call(this, listener);
+            },
+          });
+        })();"""
+    )
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+
+    menu_toggle = page.locator("#publicMenuToggle")
+    mobile_nav = page.locator("#publicMobileNav")
+    assert await page.evaluate("window.__legacyAddListenerUsed") is True
+    await expect(page.locator("html")).to_have_class(re.compile(r"\bbd-js\b"))
+    await expect(menu_toggle).to_be_visible()
+    await expect(mobile_nav).to_have_attribute("hidden", "")
+    await menu_toggle.click()
+    await expect(menu_toggle).to_have_attribute("aria-expanded", "true")
+    await expect(mobile_nav).not_to_have_attribute("hidden", "")
+    await page.keyboard.press("Escape")
+    await expect(menu_toggle).to_have_attribute("aria-expanded", "false")
+    await expect(mobile_nav).to_have_attribute("hidden", "")
+
+
+@pytest.mark.asyncio
+async def test_public_shell_preserves_no_js_fallback_without_media_query_listener(
+    page: Page,
+    live_server: str,
+) -> None:
+    await page.set_viewport_size({"width": 390, "height": 844})
+    await page.add_init_script(
+        """(() => {
+          const prototype = MediaQueryList.prototype;
+          Object.defineProperty(prototype, 'addEventListener', {
+            configurable: true,
+            value: undefined,
+          });
+          Object.defineProperty(prototype, 'addListener', {
+            configurable: true,
+            value: undefined,
+          });
+        })();"""
+    )
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+
+    await expect(page.locator("html")).to_have_class(re.compile(r"\bbd-no-js\b"))
+    await expect(page.locator("#publicMenuToggle")).to_be_hidden()
+    await expect(page.get_by_role("navigation", name="Mobile navigation")).to_be_visible()
 
 
 @pytest.mark.asyncio

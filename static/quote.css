@@ -37,23 +37,23 @@ body.quotePage {
   min-height: 100vh;
 }
 
-.quotePage h1,
-.quotePage h2,
-.quotePage h3 {
+.quotePage .quote-content h1,
+.quotePage .quote-content h2,
+.quotePage .quote-content h3 {
   margin: 0;
   color: var(--quote-text);
   line-height: 1.15;
 }
 
-.quotePage h1 {
+.quotePage .quote-content h1 {
   font-size: 2.35rem;
 }
 
-.quotePage h2 {
+.quotePage .quote-content h2 {
   font-size: 1.35rem;
 }
 
-.quotePage h3 {
+.quotePage .quote-content h3 {
   font-size: 1.08rem;
 }
 
@@ -226,7 +226,7 @@ body.quotePage {
   color: var(--quote-accent);
 }
 
-.quotePage h1 {
+.quotePage .quote-content h1 {
   margin-bottom: 10px;
 }
 
