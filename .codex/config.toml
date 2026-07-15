@@ -4,7 +4,7 @@ personality = "pragmatic"
 
 allow_login_shell = false
 approval_policy = "on-request"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 
 [windows]
 # "elevated" is preferred when it works on your machine.
