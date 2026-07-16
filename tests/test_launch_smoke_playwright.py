@@ -542,3 +542,162 @@ async def test_public_shell_anchor_offsets_clear_sticky_header(
     )
     assert target_top >= header_bottom - 1
     assert target_top < 900
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("width", [320, 390])
+async def test_homepage_mobile_actions_follow_hero_and_footer(
+    page: Page,
+    live_server: str,
+    width: int,
+) -> None:
+    await page.set_viewport_size({"width": width, "height": 844})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+
+    hero = page.locator(".homeHero")
+    actions = page.get_by_role("navigation", name="Homepage quick actions")
+    await expect(hero).to_be_visible()
+    await expect(actions).to_be_hidden()
+
+    await page.evaluate(
+        """() => {
+          const hero = document.querySelector('.homeHero');
+          window.scrollBy(0, hero.getBoundingClientRect().bottom - 1);
+        }"""
+    )
+    await expect(actions).to_be_hidden()
+
+    await page.evaluate("window.scrollBy(0, 2)")
+    await expect(actions).to_be_visible()
+    links = actions.locator("a")
+    await expect(links).to_have_count(2)
+    await expect(links.nth(0)).to_have_text("Call")
+    await expect(links.nth(0)).to_have_attribute("href", "tel:+17053034409")
+    await expect(links.nth(1)).to_have_text("Request a Quote")
+    await expect(links.nth(1)).to_have_attribute("href", "/quote")
+    assert await actions.locator('a[href^="sms:"]').count() == 0
+    assert await actions.get_by_text("Text", exact=True).count() == 0
+
+    geometry = await page.evaluate(
+        """() => {
+          const actions = document.querySelector('.homeMobileActions');
+          const links = [...actions.querySelectorAll('a')];
+          const bodyPadding = parseFloat(getComputedStyle(document.body).paddingBottom);
+          return {
+            actionHeight: actions.getBoundingClientRect().height,
+            bodyPadding,
+            linkRects: links.map((link) => ({
+              height: link.getBoundingClientRect().height,
+              width: link.getBoundingClientRect().width,
+              scrollWidth: link.scrollWidth,
+              clientWidth: link.clientWidth,
+              whiteSpace: getComputedStyle(link).whiteSpace,
+            })),
+            overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          };
+        }"""
+    )
+    assert geometry["actionHeight"] >= 44
+    assert geometry["bodyPadding"] >= geometry["actionHeight"] - 1
+    assert geometry["overflow"] <= 1
+    for rect in geometry["linkRects"]:
+        assert rect["height"] >= 44
+        assert rect["width"] > 0
+        assert rect["scrollWidth"] <= rect["clientWidth"] + 1
+        assert rect["whiteSpace"] == "nowrap"
+
+    await page.locator(".bd-public-footer").scroll_into_view_if_needed()
+    await expect(actions).to_be_hidden()
+    footer_links = page.locator(".bd-public-footer a")
+    for index in range(await footer_links.count()):
+        await expect(footer_links.nth(index)).to_be_visible()
+        await footer_links.nth(index).focus()
+        await expect(footer_links.nth(index)).to_be_focused()
+
+
+@pytest.mark.asyncio
+async def test_homepage_mobile_actions_are_hidden_at_tablet_width(page: Page, live_server: str) -> None:
+    await page.set_viewport_size({"width": 768, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+    await expect(page.get_by_role("navigation", name="Homepage quick actions")).to_be_hidden()
+
+
+@pytest.mark.asyncio
+async def test_homepage_mobile_actions_fail_closed_without_javascript(
+    browser: Browser,
+    live_server: str,
+) -> None:
+    context = await browser.new_context(java_script_enabled=False, viewport={"width": 390, "height": 844})
+    try:
+        no_js_page = await context.new_page()
+        await no_js_page.goto(f"{live_server}/", wait_until="networkidle")
+        await expect(no_js_page.get_by_role("navigation", name="Homepage quick actions")).to_be_hidden()
+        await expect(no_js_page.locator('.homeHero a[href="/quote"]')).to_be_visible()
+        await expect(no_js_page.get_by_role("navigation", name="Mobile navigation")).to_be_visible()
+    finally:
+        await context.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["/quote", "/privacy", "/accessibility", "/unknown-pr3-route"])
+async def test_non_homepage_routes_do_not_load_homepage_actions(
+    page: Page,
+    live_server: str,
+    route: str,
+) -> None:
+    response = await page.goto(f"{live_server}{route}", wait_until="networkidle")
+    assert response is not None
+    content = await page.content()
+    assert "homeMobileActions" not in content
+    assert "/static/site.js" not in content
+    assert await page.get_by_role("navigation", name="Homepage quick actions").count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("width, hero_image_visible", [(768, False), (1280, True)])
+async def test_homepage_hero_uses_approved_responsive_image_direction(
+    page: Page,
+    live_server: str,
+    width: int,
+    hero_image_visible: bool,
+) -> None:
+    await page.set_viewport_size({"width": width, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    hero = page.locator(".homeHero")
+    hero_image = hero.locator('img[src$="bay-delivery-wood-pallet-debris-haul-hero.webp"]')
+    await expect(hero).to_be_visible()
+    await expect(hero.locator("h1")).to_have_text("Junk removal, moving help & hauling in North Bay.")
+    if hero_image_visible:
+        await expect(hero_image).to_be_visible()
+        assert await hero_image.evaluate("image => image.complete && image.naturalWidth === 1600 && image.naturalHeight === 900")
+    else:
+        await expect(hero_image).to_be_hidden()
+
+
+@pytest.mark.asyncio
+async def test_homepage_recent_work_images_load_and_faq_is_keyboard_operable(
+    page: Page,
+    live_server: str,
+) -> None:
+    await page.set_viewport_size({"width": 1280, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+    images = page.locator('.recentWorkSection img[src^="/static/images/homepage/"]')
+    await expect(images).to_have_count(6)
+    for index in range(await images.count()):
+        image = images.nth(index)
+        await image.scroll_into_view_if_needed()
+        await expect(image).to_be_visible()
+        await page.wait_for_function(
+            "image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0",
+            arg=await image.element_handle(),
+        )
+
+    first_details = page.locator(".faqList details").first
+    first_summary = first_details.locator("summary")
+    await first_summary.scroll_into_view_if_needed()
+    await first_summary.focus()
+    await expect(first_summary).to_be_focused()
+    await page.keyboard.press("Enter")
+    await expect(first_details).to_have_attribute("open", "")
+    await expect(first_details.locator("p")).to_be_visible()

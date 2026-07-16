@@ -232,7 +232,7 @@ def test_shared_public_shell_body_baseline_and_asset_references() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
-    assert _body_sha256(index_html) == "6A37C247286035F75A0920A84A3BA6F59B16B55BA49A13A264DEE4D4D58C3D5A"
+    assert _body_sha256(index_html) == "19F8FE94B5B3E2643DA04CBBDBCC04BA2C0C7269797975D2002F80B8A04FF330"
     assert _body_sha256(quote_html) == "3B20A22A90F543D1770596FEEA2A97E009D7FD2C73F1195D088AA675C473EA59"
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
         "/static/public.css",
@@ -243,7 +243,8 @@ def test_shared_public_shell_body_baseline_and_asset_references() -> None:
         "/static/quote.css"
     ]
     assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', index_html) == [
-        "/static/public.js"
+        "/static/public.js",
+        "/static/site.js",
     ]
     assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', quote_html) == [
         "/static/public.js",
@@ -264,7 +265,8 @@ def test_public_pages_load_shared_shell_assets_in_order() -> None:
         "/static/quote.css",
     ]
     assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', index_html) == [
-        "/static/public.js"
+        "/static/public.js",
+        "/static/site.js",
     ]
     assert re.findall(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>', quote_html) == [
         "/static/public.js",
@@ -508,6 +510,22 @@ def _jpeg_dimensions(path: Path) -> tuple[int, int]:
     raise AssertionError(f"Could not read JPEG dimensions for {path}")
 
 
+def _webp_dimensions(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    assert data[:4] == b"RIFF" and data[8:12] == b"WEBP", f"{path} is not WebP"
+    chunk = data[12:16]
+    if chunk == b"VP8 ":
+        assert data[23:26] == b"\x9d\x01\x2a", f"Missing VP8 frame header in {path}"
+        width, height = struct.unpack("<HH", data[26:30])
+        return width & 0x3FFF, height & 0x3FFF
+    if chunk == b"VP8L":
+        bits = int.from_bytes(data[21:25], "little")
+        return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+    if chunk == b"VP8X":
+        return int.from_bytes(data[24:27], "little") + 1, int.from_bytes(data[27:30], "little") + 1
+    raise AssertionError(f"Unsupported WebP chunk {chunk!r} in {path}")
+
+
 def test_homepage_images_exist():
     """Validate that all images referenced in the homepage HTML exist on disk."""
     index_path = Path("static/index.html")
@@ -539,14 +557,12 @@ def test_homepage_logo_and_primary_cta_are_present() -> None:
     assert 'alt="Bay Delivery"' in index_html
     assert f'<meta property="og:image" content="{SOCIAL_IMAGE_URL}" />' in index_html
     assert f'<meta name="twitter:image" content="{SOCIAL_IMAGE_URL}" />' in index_html
-    assert 'href="/quote">Get My Fast Estimate<' in index_html
     assert 'href="/quote">Request a Quote<' in index_html
     assert 'href="tel:+17053034409"' in index_html
     assert 'href="tel:+12493588087"' in index_html
-    assert "Call/Text Dan" in index_html
-    assert "Call/Text Austin" in index_html
-    assert "(705) 303-4409" in index_html
-    assert "(249) 358-8087" in index_html
+    assert "705-303-4409" in index_html
+    assert "249-358-8087" in index_html
+    assert "Get My Fast Estimate" not in index_html
 
 
 def test_quote_page_uses_current_logo_asset() -> None:
@@ -658,23 +674,22 @@ def test_homepage_premium_polish_stays_local_service_first() -> None:
     site_css = Path("static/site.css").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
     admin_css = Path("static/admin.css").read_text(encoding="utf-8")
-    hero_asset = Path("static/assets/brand/bay-delivery-hero-brand-refresh.jpg")
+    hero_asset = Path("static/images/homepage/bay-delivery-wood-pallet-debris-haul-hero.webp")
 
     assert hero_asset.exists()
-    assert 'src="/static/assets/brand/bay-delivery-hero-brand-refresh.jpg"' in index_html
+    assert 'src="/static/images/homepage/bay-delivery-wood-pallet-debris-haul-hero.webp"' in index_html
     assert 'src="/static/images/homepage-hero-full.jpg"' not in index_html
     assert 'src="/static/assets/bay-delivery-premium-hero.png"' not in index_html
     assert "working_assets/" not in index_html
     assert "working_assets/" not in site_css
-    assert "Local North Bay hauling, moving, cleanouts, and light demolition" in index_html
-    assert "Real local service, clear estimates, no booking pressure" in index_html
-    assert "Red Bay Delivery truck with enclosed trailer near the North Bay waterfront" in index_html
-    assert "Truck and trailer service." in index_html
-    assert 'class="premiumServiceGrid"' in index_html
-    assert 'class="localProofStrip"' in index_html
-    assert "--candy-red: #d92d27;" in site_css
-    assert ".premiumHeroMedia" in site_css
-    assert ".localProofStrip" in site_css
+    assert "Junk removal, moving help &amp; hauling in North Bay." in index_html
+    assert "Serving North Bay &amp; surrounding area" in index_html
+    assert "Wood pallets and renovation debris loaded for hauling by Bay Delivery" in index_html
+    assert 'class="serviceGrid"' in index_html
+    assert 'class="homeSectionInner homeTrustStrip__grid"' in index_html
+    assert "var(--bd-red)" in site_css
+    assert ".homeHero__media" in site_css
+    assert ".homeTrustStrip" in site_css
     assert "overflow-x: hidden;" in site_css
     assert "--quote-accent: #d92d27;" in quote_css
     assert "--brand-red: #d92d27;" in admin_css
@@ -684,20 +699,19 @@ def test_pr320_review_followup_readability_and_hero_asset_are_safe() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     site_css = Path("static/site.css").read_text(encoding="utf-8")
     quote_css = Path("static/quote.css").read_text(encoding="utf-8")
-    hero_asset = Path("static/assets/brand/bay-delivery-hero-brand-refresh.jpg")
+    hero_asset = Path("static/images/homepage/bay-delivery-wood-pallet-debris-haul-hero.webp")
 
-    width, height = _jpeg_dimensions(hero_asset)
-    assert width == 1727
-    assert height == 911
+    width, height = _webp_dimensions(hero_asset)
+    assert width == 1600
+    assert height == 900
     assert 100_000 < hero_asset.stat().st_size < 450_000
     assert "image/jpeg" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
     assert "705-303-4409" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
-    assert "object-fit: contain;" in site_css
-    assert "aspect-ratio: 1727 / 911;" in site_css
+    assert "object-fit: cover;" in site_css
+    assert "aspect-ratio: 16 / 9;" in site_css
     assert "GET A QUOTE" not in hero_asset.read_bytes().decode("latin1", errors="ignore")
-    assert "Minimum 4 hours. Minimum crew 2." in index_html
-    assert "Pickup and drop-off jobs for homes, apartments, cottages, and bulky-item moves. Minimum 4 hours. Minimum crew 2." in index_html
-    assert 'class="stickyMobileCall"' not in index_html
+    assert "Minimum 4 hours. Minimum crew 2." not in index_html
+    assert 'class="homeMobileActions"' in index_html
     assert ".quotePage .quoteHeroShell" in quote_css
 
     assert "color: #f5f8fd;" in re.search(
@@ -884,39 +898,38 @@ def test_homepage_includes_service_area_trust_faq_copy() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     site_css = Path("static/site.css").read_text(encoding="utf-8")
 
-    assert 'class="trustFaqSection"' in index_html
-    assert "Service Area &amp; Estimate Notes" in index_html
-    assert "Bay Delivery serves North Bay and surrounding areas" in index_html
+    assert 'class="homeSection serviceAreaSection"' in index_html
+    assert "Serving North Bay and surrounding areas." in index_html
+    assert "Bay Delivery serves North Bay, Callander, Corbeil, Astorville, Bonfield, Sturgeon Falls, and Powassan" in index_html
     for area_name in ["Callander", "Powassan", "Bonfield", "Astorville", "Corbeil", "Sturgeon Falls"]:
         assert area_name in index_html
-    assert "Out-of-town jobs may include additional travel cost." in index_html
-    assert "Photos are optional but helpful." in index_html
-    assert "Pricing may be confirmed or adjusted if job details differ" in index_html
-    assert "Cash has no HST." in index_html
-    assert "EMT/e-transfer includes 13% HST" in index_html
-    assert "Submitting a booking request does not confirm the job." in index_html
-    assert "Bay Delivery follows up before the booking is locked in." in index_html
-    assert ".trustFaqSection" in site_css
-    assert ".trustFaqGrid" in site_css
+    assert "Availability and travel costs depend on the job location and scope." in index_html
+    assert "Photos are encouraged when available" in index_html
+    assert "Cash totals are shown without HST." in index_html
+    assert "EMT/e-transfer totals include 13% HST." in index_html
+    assert "Submitting a quote or booking request does not reserve a date." in index_html
+    assert "Bay Delivery confirms the job details and scheduling directly." in index_html
+    assert ".serviceAreaSection" in site_css
+    assert ".faqList" in site_css
 
 
-def test_sticky_mobile_call_is_hidden_by_default_and_mobile_only() -> None:
+def test_homepage_mobile_actions_are_hidden_by_default_and_mobile_only() -> None:
     site_css = Path("static/site.css").read_text(encoding="utf-8")
 
-    base_match = re.search(r"\.stickyMobileCall\{(?P<body>.*?)\n\}", site_css, re.DOTALL)
+    base_match = re.search(r"\.homeMobileActions\s*\{(?P<body>.*?)\n\}", site_css, re.DOTALL)
     assert base_match is not None
     base_body = base_match.group("body")
     assert "display: none;" in base_body
-    assert "display: flex;" not in base_body
+    assert "display: grid;" not in base_body
     mobile_match = re.search(
-        r"@media \(max-width: 720px\)\{(?P<body>.*?\.stickyMobileCall\{(?P<call_body>.*?)\n  \}.*?)\n\}",
+        r"@media \(max-width: 720px\)\s*\{(?P<body>.*?\.homeMobileActions:not\(\[hidden\]\)\s*\{(?P<call_body>.*?)\n  \}.*?)\n\}",
         site_css,
         re.DOTALL,
     )
     assert mobile_match is not None
     mobile_call_body = mobile_match.group("call_body")
-    assert "display: flex;" in mobile_call_body
-    assert "bottom: calc(18px + env(safe-area-inset-bottom));" in mobile_call_body
+    assert "display: grid;" in mobile_call_body
+    assert "env(safe-area-inset-bottom)" in mobile_call_body
 
 
 def test_quote_page_phase_a_guidance_copy_is_present() -> None:
@@ -1054,7 +1067,7 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
     assert '<p class="customerFlowLabel">5. Photos can help</p>' not in quote_html
 
     assert "admin dashboard" not in index_html.lower()
-    assert "Bay Delivery confirms before scheduling." in index_html
+    assert "Bay Delivery confirms the job details and scheduling directly." in index_html
 
     assert re.search(
         r"\.quotePage,\s*\.quotePage \*,\s*\.quotePage \*::before,\s*\.quotePage \*::after\s*\{[^}]*box-sizing:\s*border-box;",
@@ -1071,13 +1084,11 @@ def test_launch_mobile_quote_polish_copy_and_overflow_guards() -> None:
     assert re.search(r"\.flowStep\s*\{[^}]*min-width:\s*0;", mobile_quote_css, re.S)
 
     mobile_site_css = site_css[site_css.index("@media (max-width: 720px)") :]
-    assert re.search(r"\.container\s*\{[^}]*padding-bottom:\s*96px;", mobile_site_css, re.S)
-    assert re.search(r"\.premiumHeroContent\s*\{[^}]*padding:\s*24px 18px;", mobile_site_css, re.S)
-    assert re.search(r"\.toplinks\s*\{[^}]*grid-template-columns:\s*1fr 1fr;", mobile_site_css, re.S)
-    assert re.search(r"\.primaryNavLink,\s*\.callNavLink\s*\{[^}]*grid-column:\s*1 / -1;", mobile_site_css, re.S)
-    assert re.search(r"\.premiumHeroMedia,\s*\.premiumHeroMedia img\s*\{[^}]*min-height:\s*0;", mobile_site_css, re.S)
-    assert re.search(r"\.sectionIntro\s*\{[^}]*margin-bottom:\s*22px;", mobile_site_css, re.S)
-    assert re.search(r"\.stickyMobileCall\s*\{[^}]*bottom:\s*calc\(18px \+ env\(safe-area-inset-bottom\)\);", mobile_site_css, re.S)
+    assert re.search(r"\.homeMobileActions:not\(\[hidden\]\)\s*\{[^}]*display:\s*grid;", mobile_site_css, re.S)
+    assert re.search(r"\.homeMobileActions:not\(\[hidden\]\)\s*\{[^}]*position:\s*fixed;", mobile_site_css, re.S)
+    assert "env(safe-area-inset-bottom)" in mobile_site_css
+    assert re.search(r"\.homeMobileActions a\s*\{[^}]*min-height:\s*var\(--bd-button-height\);", mobile_site_css, re.S)
+    assert re.search(r"\.homeMobileActions a\s*\{[^}]*white-space:\s*nowrap;", mobile_site_css, re.S)
 
 
 def test_quote_visible_customer_copy_avoids_internal_jargon() -> None:
@@ -2188,9 +2199,212 @@ def test_homepage_contact_section_avoids_duplicate_large_ctas() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     site_css = Path("static/site.css").read_text(encoding="utf-8")
 
-    assert 'Prefer to talk first?' in index_html
-    assert 'class="contactQuickLink"' in index_html
+    contact_html = index_html[index_html.index('class="homeSection contactSection"'):index_html.index('</main>')]
+    assert "Start with a clear estimate." in contact_html
+    assert contact_html.count('href="/quote">Request a Quote</a>') == 1
     assert 'Get a Quote Online' not in index_html
     assert 'contactCTA' not in index_html
-    assert '.contactQuickLink' in site_css
-    assert '.contactHelper' in site_css
+    assert '.contactGrid' in site_css
+    assert '.contactSection__caveat' in site_css
+    tablet_css = site_css[site_css.index("@media (min-width: 640px)"):]
+    assert re.search(
+        r"\.contactGrid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);",
+        tablet_css,
+        re.S,
+    )
+
+
+def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+
+    ordered_markers = [
+        'class="homeHero"',
+        'class="homeTrustStrip"',
+        'id="servicesTitle"',
+        'class="homeSection whySection"',
+        'id="howTitle"',
+        'id="workTitle"',
+        'id="trustFaqTitle"',
+        'id="faqTitle"',
+        'id="contactTitle"',
+        'class="homeMobileActions"',
+        'data-public-shell="footer"',
+    ]
+    positions = [index_html.index(marker) for marker in ordered_markers]
+    assert positions == sorted(positions)
+
+    exact_copy = [
+        "Serving North Bay &amp; surrounding area",
+        "Junk removal, moving help &amp; hauling in North Bay.",
+        "Bay Delivery provides practical local help with junk removal, dump runs, moving, furniture delivery, property cleanups, demolition, trailer hauling, and more. Send us the job details and photos for a straightforward estimate.",
+        "Local service",
+        "Based in North Bay and serving nearby communities.",
+        "Practical estimates",
+        "Send the job details so Bay Delivery can review the work and provide an estimate.",
+        "Helpful photos",
+        "Photos can help show the load, access, materials, and work area.",
+        "No automatic booking",
+        "Sending a request does not reserve a date; Bay Delivery confirms details and scheduling.",
+        "Practical help for homes, rentals &amp; local businesses.",
+        "One local crew for jobs that need a truck, trailer, equipment, and reliable help.",
+        "Single items, household junk, garage piles, renovation debris, yard waste, and full trailer loads.",
+        "Local moves, apartment moves, storage moves, loading, unloading, and extra hands when needed.",
+        "Marketplace purchases, store pickups, furniture delivery, appliance delivery, and single heavy items.",
+        "Estate cleanouts, rental cleanouts, garage cleanouts, basement cleanouts, yard cleanup, and full-property clearing.",
+        "Small demolition, sheds, decks, flooring, cabinets, interior tear-outs, debris removal, and cleanup.",
+        "Appliances, metal items, equipment, and qualifying scrap loads, with curbside or inside removal reviewed from the submitted job details.",
+        "Trailer hauling and transportation help for suitable loads across North Bay and surrounding areas.",
+        "Loading, unloading, lifting, cleanup assistance, and practical labour support for jobs that need a hand.",
+        "Why Bay Delivery",
+        "Local help. Straight answers. Hard work.",
+        "Bay Delivery is a local crew serving North Bay and surrounding communities with practical help and clear communication.",
+        "Local Service",
+        "Practical Estimates",
+        "Estimates are based on the details you provide and the requirements of the job.",
+        "The Right Equipment",
+        "Truck, trailers, tools, and labour are matched to the job.",
+        "Clear Communication",
+        "Customers know what information is needed and what the next step will be.",
+        "Three simple steps. No runaround.",
+        "Tell us about the job",
+        "Send the locations, job details, access information, and photos when available.",
+        "Receive your estimate",
+        "Bay Delivery reviews the submitted information and the production quote flow provides an estimate for you to review.",
+        "Confirm the work",
+        "If you want to continue, submit a booking request. Bay Delivery confirms the job details and scheduling directly.",
+        "Real jobs. Real results.",
+        "A look at recent junk removal, cleanup, hauling, and demolition work completed by Bay Delivery in North Bay and surrounding communities.",
+        "Deck removal completed in North Bay",
+        "Existing deck, landing, and stairs removed to open up the space.",
+        "Wood pallet and renovation debris haul",
+        "Wood debris and pallet material loaded for removal.",
+        "Property cleanup load",
+        "Mixed property-cleanup material secured for hauling.",
+        "Brick removal in progress",
+        "Brick and demolition debris being removed from the work area.",
+        "Yard cleanup load",
+        "Outdoor cleanup material loaded and ready for hauling.",
+        "Serving North Bay and surrounding areas.",
+        "Bay Delivery serves North Bay, Callander, Corbeil, Astorville, Bonfield, Sturgeon Falls, and Powassan, with surrounding-area requests reviewed from the submitted job details.",
+        "Availability and travel costs depend on the job location and scope.",
+        "Not sure if we cover your area?",
+        "Send the job location with your details so Bay Delivery can review the request.",
+        "Common questions.",
+        "What areas does Bay Delivery serve?",
+        "Bay Delivery serves North Bay, Callander, Corbeil, Astorville, Bonfield, Sturgeon Falls, and Powassan. Requests from surrounding areas are reviewed based on the job location and scope.",
+        "How accurate is the online estimate?",
+        "The estimate is based on the information submitted through the production quote flow. It may change if the job details, access, materials, volume, or other site conditions differ from what was provided.",
+        "Should I include photos?",
+        "Photos are encouraged when available because they can show the load, access, materials, and work area. Include clear views that help Bay Delivery understand the job.",
+        "Is my job booked when I submit a booking request?",
+        "No. Submitting a quote or booking request does not reserve a date. Bay Delivery confirms the job details and scheduling directly.",
+        "Start with a clear estimate.",
+        "Send Bay Delivery the job details and photos to request an estimate. Bay Delivery can then review the information and determine the next step.",
+        "What is the difference between cash and EMT/e-transfer totals?",
+        "Cash totals are shown without HST. EMT/e-transfer totals include 13% HST. Review the displayed estimate before deciding whether to continue.",
+        "What kinds of jobs does Bay Delivery handle?",
+        "Bay Delivery handles junk removal and dump runs, moving help, furniture and appliance delivery, property cleanups, demolition and tear-out help, scrap metal removal, trailer hauling, and general labour.",
+        "Start with the job",
+        "Submitting a quote or booking request does not reserve a date.",
+    ]
+    for copy in exact_copy:
+        assert copy in index_html
+
+    service_names = re.findall(r'<h3 class="serviceCard__title">(.*?)</h3>', index_html)
+    assert [re.sub(r"&amp;", "&", name) for name in service_names] == APPROVED_SERVICE_NAMES
+    assert index_html.count('class="serviceCard__cta" href="/quote">Request a Quote</a>') == 8
+    assert "You're on the quote page" not in index_html
+    assert "You’re on the quote page" not in index_html
+    assert "google.com/search" not in index_html
+    assert "AggregateRating" not in index_html
+
+
+def test_pr3_homepage_assets_are_exact_and_optimized() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    expected = {
+        "bay-delivery-wood-pallet-debris-haul-hero.webp": ((1600, 900), 332800),
+        "bay-delivery-deck-removal-before-north-bay-gallery.webp": ((1200, 900), 355464),
+        "bay-delivery-deck-removal-after-north-bay-gallery.webp": ((1200, 900), 402556),
+        "bay-delivery-wood-pallet-debris-haul-north-bay-gallery.webp": ((1200, 900), 289300),
+        "bay-delivery-property-cleanup-load-north-bay-gallery.webp": ((1200, 900), 212220),
+        "bay-delivery-brick-removal-work-in-progress-north-bay-gallery.webp": ((1200, 900), 173166),
+        "bay-delivery-yard-cleanup-trailer-north-bay-gallery.webp": ((1200, 900), 408708),
+    }
+    referenced = re.findall(r'/static/images/homepage/([^"\)]+\.webp)', index_html)
+    assert sorted(set(referenced)) == sorted(expected)
+    for filename, (dimensions, byte_size) in expected.items():
+        path = Path("static/images/homepage") / filename
+        assert path.exists()
+        assert path.stat().st_size == byte_size
+        assert _webp_dimensions(path) == dimensions
+
+    assert re.search(
+        r'<img(?=[^>]*bay-delivery-wood-pallet-debris-haul-hero\.webp)'
+        r'(?=[^>]*loading="eager")(?=[^>]*fetchpriority="high")'
+        r'(?=[^>]*decoding="async")(?=[^>]*width="1600")(?=[^>]*height="900")[^>]*>',
+        index_html,
+    )
+    recent_work = index_html[index_html.index('id="workTitle"'):index_html.index('id="trustFaqTitle"')]
+    assert recent_work.count('loading="lazy"') == 6
+    assert recent_work.count('width="1200"') == 6
+    assert recent_work.count('height="900"') == 6
+
+
+def test_pr3_homepage_action_bar_is_two_action_progressive_enhancement() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+    site_js = Path("static/site.js").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    action_nav = _nav_html(index_html, "Homepage quick actions")
+    assert re.findall(r'<a href="([^"]+)">([^<]+)</a>', action_nav) == [
+        ("tel:+17053034409", "Call"),
+        ("/quote", "Request a Quote"),
+    ]
+    assert " hidden" in action_nav.split(">", 1)[0]
+    assert "sms:" not in action_nav
+    assert "Text" not in action_nav
+    assert "env(safe-area-inset-bottom)" in site_css
+    assert "@media (max-width: 720px)" in site_css
+    assert 'aria-live' not in action_nav
+    assert 'src="/static/public.js" defer' in index_html
+    assert 'src="/static/site.js" defer' in index_html
+    assert index_html.index('/static/public.js') < index_html.index('/static/site.js')
+    assert "/static/site.js" not in quote_html
+    assert "homeMobileActions" not in quote_html
+
+    for forbidden in [
+        "fetch(", "XMLHttpRequest", "FormData", "localStorage", "sessionStorage",
+        "document.cookie", "sms:", "quote_id", "accept_token", "/quote/calculate",
+        ".focus(",
+    ]:
+        assert forbidden not in site_js
+    for required in [
+        'matchMedia("(max-width: 720px)")',
+        'requestAnimationFrame',
+        'addEventListener("scroll"',
+        'addEventListener("resize"',
+        'addEventListener("orientationchange"',
+        '{ passive: true }',
+        'hero.getBoundingClientRect().bottom <= 0',
+        'footer.getBoundingClientRect().top',
+    ]:
+        assert required in site_js
+
+
+def test_pr3_homepage_contacts_and_content_safety_are_exact() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    main_html = index_html[index_html.index('<main id="main-content"'):index_html.index('<footer')]
+    contact_html = main_html[main_html.index('id="contactTitle"'):]
+
+    assert contact_html.count("249-358-8087") == 1
+    assert '<span>Primary contact</span><strong>Bay Delivery</strong><a href="tel:+17053034409">705-303-4409</a>' in contact_html
+    assert '<span>Additional contact</span><strong>Austin</strong><a href="tel:+12493588087">249-358-8087</a>' in contact_html
+    assert '<span>Email</span><strong>Bay Delivery</strong><a href="mailto:BayDeliveryNB@gmail.com">BayDeliveryNB@gmail.com</a>' in contact_html
+    assert 'href="tel:+12493588087"' in contact_html
+    assert "249-358-8087" not in main_html[:main_html.index('id="contactTitle"')]
+    assert 'href="mailto:BayDeliveryNB@gmail.com"' in contact_html
+    assert 'href="tel:+17053034409"' in main_html
+    assert "sms:" not in main_html
+    for forbidden in ["Quote ID:", "confidence value", "booking confirmed", "priceRange"]:
+        assert forbidden not in main_html
