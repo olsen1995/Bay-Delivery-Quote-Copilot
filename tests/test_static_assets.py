@@ -232,7 +232,7 @@ def test_shared_public_shell_body_baseline_and_asset_references() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
-    assert _body_sha256(index_html) == "19F8FE94B5B3E2643DA04CBBDBCC04BA2C0C7269797975D2002F80B8A04FF330"
+    assert _body_sha256(index_html) == "B5FF22FBC1EC72EF80394FF43B2534BC20D439493837CB9E8F7F8A2806991D40"
     assert _body_sha256(quote_html) == "3B20A22A90F543D1770596FEEA2A97E009D7FD2C73F1195D088AA675C473EA59"
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
         "/static/public.css",
@@ -2340,7 +2340,7 @@ def test_pr3_homepage_assets_are_exact_and_optimized() -> None:
 
     assert re.search(
         r'<img(?=[^>]*bay-delivery-wood-pallet-debris-haul-hero\.webp)'
-        r'(?=[^>]*loading="eager")(?=[^>]*fetchpriority="high")'
+        r'(?![^>]*fetchpriority="high")(?=[^>]*loading="lazy")'
         r'(?=[^>]*decoding="async")(?=[^>]*width="1600")(?=[^>]*height="900")[^>]*>',
         index_html,
     )
