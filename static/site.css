@@ -266,6 +266,7 @@ main [id] {
 
 .serviceCard__cta {
   align-self: flex-start;
+  white-space: normal;
 }
 
 .whySection,

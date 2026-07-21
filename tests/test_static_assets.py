@@ -2343,6 +2343,19 @@ def test_pr370_homepage_service_actions_use_truthful_supported_quote_paths() -> 
     assert "contact Bay Delivery for labour-only work" in index_html
 
 
+def test_pr370_service_card_ctas_allow_wrapped_labels() -> None:
+    site_css = Path("static/site.css").read_text(encoding="utf-8")
+    css_rules = re.findall(r"(?P<selectors>[^{}]+)\{(?P<body>[^{}]*)\}", site_css)
+    cta_rules = [body for selectors, body in css_rules if selectors.strip() == ".serviceCard__cta"]
+
+    assert len(cta_rules) == 1
+    cta_body = cta_rules[0]
+    assert "white-space: normal;" in cta_body
+    assert "white-space: nowrap;" not in cta_body
+    assert "overflow: hidden;" not in cta_body
+    assert "text-overflow: ellipsis;" not in cta_body
+
+
 def test_pr370_photo_guidance_matches_the_post_booking_upload_workflow() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")

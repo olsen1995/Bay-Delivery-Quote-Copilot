@@ -713,6 +713,96 @@ async def test_homepage_reviewed_service_actions_reach_supported_quote_options(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("width", [320, 900, 1179])
+async def test_homepage_service_card_actions_wrap_without_horizontal_overflow(
+    page: Page,
+    live_server: str,
+    width: int,
+) -> None:
+    await page.set_viewport_size({"width": width, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+
+    cards = page.locator(".serviceCard")
+    actions = cards.locator(".serviceCard__cta")
+    await expect(cards).to_have_count(8)
+    await expect(actions).to_have_count(8)
+
+    action_names = [name.strip() for name in await actions.all_inner_texts()]
+    assert len(set(action_names)) == 8
+    for action_name in action_names:
+        await expect(page.get_by_role("link", name=action_name, exact=True)).to_have_count(1)
+
+    for index in range(await actions.count()):
+        action = actions.nth(index)
+        card = cards.nth(index)
+        await expect(action).to_be_visible()
+        await expect(action).to_have_attribute("href", "/quote")
+        layout = await action.evaluate(
+            """
+            action => {
+              const style = getComputedStyle(action);
+              const actionRect = action.getBoundingClientRect();
+              const cardRect = action.closest('.serviceCard').getBoundingClientRect();
+              return {
+                whiteSpace: style.whiteSpace,
+                textAlign: style.textAlign,
+                justifyContent: style.justifyContent,
+                overflowX: style.overflowX,
+                textOverflow: style.textOverflow,
+                actionLeft: actionRect.left,
+                actionRight: actionRect.right,
+                cardLeft: cardRect.left,
+                cardRight: cardRect.right,
+                clientWidth: action.clientWidth,
+                scrollWidth: action.scrollWidth,
+                clientHeight: action.clientHeight,
+                scrollHeight: action.scrollHeight,
+              };
+            }
+            """
+        )
+        assert layout["whiteSpace"] == "normal"
+        assert layout["textAlign"] == "center"
+        assert layout["justifyContent"] == "center"
+        assert layout["overflowX"] != "hidden"
+        assert layout["textOverflow"] != "ellipsis"
+        assert layout["actionLeft"] >= layout["cardLeft"] - 1
+        assert layout["actionRight"] <= layout["cardRight"] + 1
+        assert layout["scrollWidth"] <= layout["clientWidth"] + 1
+        assert layout["scrollHeight"] <= layout["clientHeight"] + 1
+
+    document_widths = await page.evaluate(
+        "({ viewport: window.innerWidth, document: document.documentElement.scrollWidth })"
+    )
+    assert document_widths["document"] <= document_widths["viewport"]
+
+    for action_name in [
+        "Review Trailer Hauling Estimate Options",
+        "Review General Labour Estimate Options",
+    ]:
+        action = page.get_by_role("link", name=action_name, exact=True)
+        line_count = await action.evaluate(
+            """
+            action => {
+              const range = document.createRange();
+              range.selectNodeContents(action);
+              return new Set(
+                Array.from(range.getClientRects(), rect => Math.round(rect.top))
+              ).size;
+            }
+            """
+        )
+        assert line_count >= 2
+
+    await page.get_by_role(
+        "link",
+        name="Review General Labour Estimate Options",
+        exact=True,
+    ).click()
+    await expect(page).to_have_url(re.compile(r".*/quote$"))
+
+
+@pytest.mark.asyncio
 async def test_homepage_recent_work_images_load_and_faq_is_keyboard_operable(
     page: Page,
     live_server: str,
