@@ -713,6 +713,72 @@ async def test_homepage_reviewed_service_actions_reach_supported_quote_options(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("service_name", "action_name", "homepage_guidance", "quote_guidance", "complete_move"),
+    [
+        (
+            "Property Cleanups",
+            "Review Property Cleanup Estimate Options",
+            "Use Junk removal / Haul away when items or debris are leaving the property",
+            "Cleanup jobs: choose Junk removal / Haul away when items or debris are leaving the property",
+            False,
+        ),
+        (
+            "Moving Help",
+            "Quote a Complete Move",
+            "for labour-only loading or unloading at one location, contact Bay Delivery for a manual estimate",
+            "For labour-only loading or unloading at one location, call or text Bay Delivery",
+            True,
+        ),
+    ],
+)
+async def test_homepage_cleanup_and_moving_actions_use_truthful_supported_guidance(
+    page: Page,
+    live_server: str,
+    service_name: str,
+    action_name: str,
+    homepage_guidance: str,
+    quote_guidance: str,
+    complete_move: bool,
+) -> None:
+    await page.set_viewport_size({"width": 1280, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+
+    card = page.locator(".serviceCard").filter(
+        has=page.get_by_role("heading", name=service_name, exact=True)
+    )
+    await expect(card).to_have_count(1)
+    await expect(card).to_contain_text(homepage_guidance)
+
+    action = card.get_by_role("link", name=action_name, exact=True)
+    await expect(action).to_have_count(1)
+    await expect(action).to_have_attribute("href", "/quote")
+    await action.focus()
+    await expect(action).to_be_focused()
+    await page.keyboard.press("Enter")
+
+    await expect(page).to_have_url(re.compile(r".*/quote$"))
+    assert await page.evaluate("window.location.search") == ""
+    await expect(page.locator("#quoteIntakeGuidance")).to_contain_text(quote_guidance)
+
+    service_select = page.locator("#service_type")
+    service_values = await service_select.locator("option").evaluate_all(
+        "options => options.map(option => option.value)"
+    )
+    assert service_values == ["haul_away", "scrap_pickup", "small_move", "item_delivery", "demolition"]
+    assert await service_select.input_value() != "small_move"
+
+    if complete_move:
+        await service_select.select_option("small_move")
+        await expect(page.locator("#routeRow")).to_be_visible()
+        await expect(page.locator("#pickup_address")).to_have_attribute("required", "")
+        await expect(page.locator("#dropoff_address")).to_have_attribute("required", "")
+        await expect(page.locator("#serviceHelp")).to_contain_text(
+            "add both pickup and dropoff addresses"
+        )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("width", [320, 900, 1179])
 async def test_homepage_service_card_actions_wrap_without_horizontal_overflow(
     page: Page,
@@ -777,6 +843,7 @@ async def test_homepage_service_card_actions_wrap_without_horizontal_overflow(
     assert document_widths["document"] <= document_widths["viewport"]
 
     for action_name in [
+        "Review Property Cleanup Estimate Options",
         "Review Trailer Hauling Estimate Options",
         "Review General Labour Estimate Options",
     ]:

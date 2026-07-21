@@ -231,8 +231,8 @@ def test_shared_public_shell_body_baseline_and_asset_references() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
-    assert _body_sha256(index_html) == "B49D10909ABBA5E362A1371328E4296249E6350BEF93503E5FC8133AED97ADBB"
-    assert _body_sha256(quote_html) == "3B20A22A90F543D1770596FEEA2A97E009D7FD2C73F1195D088AA675C473EA59"
+    assert _body_sha256(index_html) == "D85ACAB87ADD744D5D1032E277F13F67796D3D41AC9F3B04EA23C951EBF41C2E"
+    assert _body_sha256(quote_html) == "52BBA93CF9043DCF7BF197CB35253A547CCB1EBF9945F7EEA1C936266A424FFD"
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
         "/static/public.css",
         "/static/site.css"
@@ -468,7 +468,7 @@ def test_public_javascript_is_menu_only_and_focus_safe() -> None:
 def test_complete_quote_content_contract_remains_unchanged() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
     assert _quote_contract_sha256(quote_html) == (
-        "BABF0E971EEB9A3D627F85BDF0D6D6F7F92BB5F2CCB379BD2DC28455B08CC4CB"
+        "9AA2A81C1E2BE3D1EAE74DF1D822A58E60158BFCF4AA580CBD362B7EE6925DFF"
     )
     assert quote_html.count('id="quoteForm"') == 1
     assert Path("static/quote.js").read_text(encoding="utf-8")
@@ -2247,9 +2247,9 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
         "Practical help for homes, rentals &amp; local businesses.",
         "One local crew for jobs that need a truck, trailer, equipment, and reliable help.",
         "Single items, household junk, garage piles, renovation debris, yard waste, and full trailer loads.",
-        "Local moves, apartment moves, storage moves, loading, unloading, and extra hands when needed.",
+        "Local, apartment, and storage moves between pickup and drop-off addresses. Use Small move for complete moves; for labour-only loading or unloading at one location, contact Bay Delivery for a manual estimate.",
         "Marketplace purchases, store pickups, furniture delivery, appliance delivery, and single heavy items.",
-        "Estate cleanouts, rental cleanouts, garage cleanouts, basement cleanouts, yard cleanup, and full-property clearing.",
+        "Estate, rental, garage, basement, and yard cleanups. Use Junk removal / Haul away when items or debris are leaving the property, or Demolition when tear-out work is included; contact Bay Delivery if neither fits.",
         "Small demolition, sheds, decks, flooring, cabinets, interior tear-outs, debris removal, and cleanup.",
         "Appliances, metal items, equipment, and qualifying scrap loads, with curbside or inside removal reviewed from the submitted job details.",
         "Trailer hauling and transportation help for suitable loads across North Bay and surrounding areas. Use Item delivery when a load is moving between addresses; contact Bay Delivery if the job does not fit that option.",
@@ -2320,10 +2320,13 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
 
 def test_pr370_homepage_service_actions_use_truthful_supported_quote_paths() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
     cards = re.findall(r'<article class="serviceCard">.*?</article>', index_html)
 
     assert len(cards) == len(APPROVED_SERVICE_NAMES)
     actions: dict[str, tuple[str, str]] = {}
+    cards_by_title: dict[str, str] = {}
     for card in cards:
         title_match = re.search(r'<h3 class="serviceCard__title">(.*?)</h3>', card)
         action_match = re.search(r'<a class="serviceCard__cta" href="([^"]+)">([^<]+)</a>', card)
@@ -2331,16 +2334,40 @@ def test_pr370_homepage_service_actions_use_truthful_supported_quote_paths() -> 
         assert action_match is not None
         title = title_match.group(1).replace("&amp;", "&")
         actions[title] = (action_match.group(1), action_match.group(2))
+        cards_by_title[title] = card
 
+    assert actions["Moving Help"] == ("/quote", "Quote a Complete Move")
+    assert actions["Property Cleanups"] == ("/quote", "Review Property Cleanup Estimate Options")
     assert actions["Trailer Hauling"] == ("/quote", "Review Trailer Hauling Estimate Options")
     assert actions["General Labour"] == ("/quote", "Review General Labour Estimate Options")
     assert all(href == "/quote" for href, _ in actions.values())
     assert len({name for _, name in actions.values()}) == len(actions)
-    assert "trailer_hauling" not in index_html
-    assert "general_labour" not in index_html
+    assert "Use Small move for complete moves" in cards_by_title["Moving Help"]
+    assert "contact Bay Delivery for a manual estimate" in cards_by_title["Moving Help"]
+    assert "Use Junk removal / Haul away when items or debris are leaving the property" in cards_by_title[
+        "Property Cleanups"
+    ]
+    assert "Demolition when tear-out work is included" in cards_by_title["Property Cleanups"]
+    assert "contact Bay Delivery if neither fits" in cards_by_title["Property Cleanups"]
     assert "Use Item delivery when a load is moving between addresses" in index_html
     assert "Use Small move for loading or unloading tied to a move" in index_html
     assert "contact Bay Delivery for labour-only work" in index_html
+
+    supported_service_values = re.findall(r'<option value="([^"]+)">', quote_html[quote_html.index('id="service_type"') :])[:5]
+    assert supported_service_values == ["haul_away", "scrap_pickup", "small_move", "item_delivery", "demolition"]
+    assert "Cleanup jobs: choose Junk removal / Haul away when items or debris are leaving the property" in quote_html
+    assert "Complete moves between addresses use Small move." in quote_html
+    assert "For labour-only loading or unloading at one location, call or text Bay Delivery" in quote_html
+    assert '<a href="tel:+17053034409">705-303-4409</a>' in quote_html
+    assert "?service=" not in index_html
+    assert 'params.get("service")' not in quote_js
+    assert 'params.get("quote_id")' in quote_js
+    assert 'hashParams.get("accept_token")' in quote_js
+    assert 'setFieldValue("service_type", requestData.service_type || "haul_away");' in quote_js
+
+    for unsupported_service in ["property_cleanup", "moving_help", "labour_only", "trailer_hauling", "general_labour"]:
+        assert unsupported_service not in index_html
+        assert unsupported_service not in quote_html
 
 
 def test_pr370_service_card_ctas_allow_wrapped_labels() -> None:
