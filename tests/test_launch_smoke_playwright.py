@@ -676,6 +676,43 @@ async def test_homepage_hero_uses_approved_responsive_image_direction(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("service_name", "action_name"),
+    [
+        ("Trailer Hauling", "Review Trailer Hauling Estimate Options"),
+        ("General Labour", "Review General Labour Estimate Options"),
+    ],
+)
+async def test_homepage_reviewed_service_actions_reach_supported_quote_options(
+    page: Page,
+    live_server: str,
+    service_name: str,
+    action_name: str,
+) -> None:
+    await page.set_viewport_size({"width": 1280, "height": 900})
+    await page.goto(f"{live_server}/", wait_until="networkidle")
+
+    cards = page.locator(".serviceCard")
+    action_names = await cards.locator(".serviceCard__cta").all_inner_texts()
+    assert len(action_names) == 8
+    assert len(set(action_names)) == 8
+
+    card = cards.filter(has=page.get_by_role("heading", name=service_name, exact=True))
+    await expect(card).to_have_count(1)
+    action = card.get_by_role("link", name=action_name, exact=True)
+    await expect(action).to_have_attribute("href", "/quote")
+    await action.click()
+
+    await expect(page).to_have_url(re.compile(r".*/quote$"))
+    service_values = await page.locator("#service_type option").evaluate_all(
+        "options => options.map(option => option.value)"
+    )
+    assert service_values == ["haul_away", "scrap_pickup", "small_move", "item_delivery", "demolition"]
+    assert "trailer_hauling" not in service_values
+    assert "general_labour" not in service_values
+
+
+@pytest.mark.asyncio
 async def test_homepage_recent_work_images_load_and_faq_is_keyboard_operable(
     page: Page,
     live_server: str,

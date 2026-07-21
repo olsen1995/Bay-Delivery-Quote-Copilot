@@ -18,9 +18,8 @@ HOMEPAGE_DESCRIPTION = (
 )
 QUOTE_TITLE = "Request an Estimate | Bay Delivery North Bay"
 QUOTE_DESCRIPTION = (
-    "Send Bay Delivery your job details, location, access information, and photos to "
-    "request an estimate for local moving, hauling, cleanup, delivery, demolition, "
-    "and removal services."
+    "Send Bay Delivery your job details, location, and access information to request "
+    "an estimate. Optional photos can be added after a booking request."
 )
 APPROVED_SERVICE_AREAS = [
     "North Bay",
@@ -232,7 +231,7 @@ def test_shared_public_shell_body_baseline_and_asset_references() -> None:
     index_html = Path("static/index.html").read_text(encoding="utf-8")
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
-    assert _body_sha256(index_html) == "B5FF22FBC1EC72EF80394FF43B2534BC20D439493837CB9E8F7F8A2806991D40"
+    assert _body_sha256(index_html) == "B49D10909ABBA5E362A1371328E4296249E6350BEF93503E5FC8133AED97ADBB"
     assert _body_sha256(quote_html) == "3B20A22A90F543D1770596FEEA2A97E009D7FD2C73F1195D088AA675C473EA59"
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
         "/static/public.css",
@@ -904,7 +903,7 @@ def test_homepage_includes_service_area_trust_faq_copy() -> None:
     for area_name in ["Callander", "Powassan", "Bonfield", "Astorville", "Corbeil", "Sturgeon Falls"]:
         assert area_name in index_html
     assert "Availability and travel costs depend on the job location and scope." in index_html
-    assert "Photos are encouraged when available" in index_html
+    assert "Optional photos can be added after you submit a booking request" in index_html
     assert "Cash totals are shown without HST." in index_html
     assert "EMT/e-transfer totals include 13% HST." in index_html
     assert "Submitting a quote or booking request does not reserve a date." in index_html
@@ -2236,13 +2235,13 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
     exact_copy = [
         "Serving North Bay &amp; surrounding area",
         "Junk removal, moving help &amp; hauling in North Bay.",
-        "Bay Delivery provides practical local help with junk removal, dump runs, moving, furniture delivery, property cleanups, demolition, trailer hauling, and more. Send us the job details and photos for a straightforward estimate.",
+        "Bay Delivery provides practical local help with junk removal, dump runs, moving, furniture delivery, property cleanups, demolition, trailer hauling, and more. Send us the job details for a straightforward estimate. If you continue with a booking request, you can add optional photos afterward.",
         "Local service",
         "Based in North Bay and serving nearby communities.",
         "Practical estimates",
         "Send the job details so Bay Delivery can review the work and provide an estimate.",
         "Helpful photos",
-        "Photos can help show the load, access, materials, and work area.",
+        "Optional photos can be added after a booking request to help show the load, access, materials, and work area.",
         "No automatic booking",
         "Sending a request does not reserve a date; Bay Delivery confirms details and scheduling.",
         "Practical help for homes, rentals &amp; local businesses.",
@@ -2253,8 +2252,8 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
         "Estate cleanouts, rental cleanouts, garage cleanouts, basement cleanouts, yard cleanup, and full-property clearing.",
         "Small demolition, sheds, decks, flooring, cabinets, interior tear-outs, debris removal, and cleanup.",
         "Appliances, metal items, equipment, and qualifying scrap loads, with curbside or inside removal reviewed from the submitted job details.",
-        "Trailer hauling and transportation help for suitable loads across North Bay and surrounding areas.",
-        "Loading, unloading, lifting, cleanup assistance, and practical labour support for jobs that need a hand.",
+        "Trailer hauling and transportation help for suitable loads across North Bay and surrounding areas. Use Item delivery when a load is moving between addresses; contact Bay Delivery if the job does not fit that option.",
+        "Loading, unloading, lifting, cleanup assistance, and practical labour support for jobs that need a hand. Use Small move for loading or unloading tied to a move, or Junk removal / Haul away for cleanup with removal; contact Bay Delivery for labour-only work.",
         "Why Bay Delivery",
         "Local help. Straight answers. Hard work.",
         "Bay Delivery is a local crew serving North Bay and surrounding communities with practical help and clear communication.",
@@ -2267,7 +2266,7 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
         "Customers know what information is needed and what the next step will be.",
         "Three simple steps. No runaround.",
         "Tell us about the job",
-        "Send the locations, job details, access information, and photos when available.",
+        "Send the locations, job details, and access information. If you continue with a booking request, you can add optional photos afterward.",
         "Receive your estimate",
         "Bay Delivery reviews the submitted information and the production quote flow provides an estimate for you to review.",
         "Confirm the work",
@@ -2295,11 +2294,11 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
         "How accurate is the online estimate?",
         "The estimate is based on the information submitted through the production quote flow. It may change if the job details, access, materials, volume, or other site conditions differ from what was provided.",
         "Should I include photos?",
-        "Photos are encouraged when available because they can show the load, access, materials, and work area. Include clear views that help Bay Delivery understand the job.",
+        "Optional photos can be added after you submit a booking request. Clear views of the load, access, materials, and work area can help Bay Delivery understand the job.",
         "Is my job booked when I submit a booking request?",
         "No. Submitting a quote or booking request does not reserve a date. Bay Delivery confirms the job details and scheduling directly.",
         "Start with a clear estimate.",
-        "Send Bay Delivery the job details and photos to request an estimate. Bay Delivery can then review the information and determine the next step.",
+        "Send Bay Delivery the job details to request an estimate. If you continue with a booking request, you can add optional photos afterward.",
         "What is the difference between cash and EMT/e-transfer totals?",
         "Cash totals are shown without HST. EMT/e-transfer totals include 13% HST. Review the displayed estimate before deciding whether to continue.",
         "What kinds of jobs does Bay Delivery handle?",
@@ -2312,11 +2311,56 @@ def test_pr3_homepage_content_and_section_order_match_approved_plan() -> None:
 
     service_names = re.findall(r'<h3 class="serviceCard__title">(.*?)</h3>', index_html)
     assert [re.sub(r"&amp;", "&", name) for name in service_names] == APPROVED_SERVICE_NAMES
-    assert index_html.count('class="serviceCard__cta" href="/quote">Request a Quote</a>') == 8
+    assert index_html.count('class="serviceCard__cta" href="/quote">') == 8
     assert "You're on the quote page" not in index_html
     assert "You’re on the quote page" not in index_html
     assert "google.com/search" not in index_html
     assert "AggregateRating" not in index_html
+
+
+def test_pr370_homepage_service_actions_use_truthful_supported_quote_paths() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    cards = re.findall(r'<article class="serviceCard">.*?</article>', index_html)
+
+    assert len(cards) == len(APPROVED_SERVICE_NAMES)
+    actions: dict[str, tuple[str, str]] = {}
+    for card in cards:
+        title_match = re.search(r'<h3 class="serviceCard__title">(.*?)</h3>', card)
+        action_match = re.search(r'<a class="serviceCard__cta" href="([^"]+)">([^<]+)</a>', card)
+        assert title_match is not None
+        assert action_match is not None
+        title = title_match.group(1).replace("&amp;", "&")
+        actions[title] = (action_match.group(1), action_match.group(2))
+
+    assert actions["Trailer Hauling"] == ("/quote", "Review Trailer Hauling Estimate Options")
+    assert actions["General Labour"] == ("/quote", "Review General Labour Estimate Options")
+    assert all(href == "/quote" for href, _ in actions.values())
+    assert len({name for _, name in actions.values()}) == len(actions)
+    assert "trailer_hauling" not in index_html
+    assert "general_labour" not in index_html
+    assert "Use Item delivery when a load is moving between addresses" in index_html
+    assert "Use Small move for loading or unloading tied to a move" in index_html
+    assert "contact Bay Delivery for labour-only work" in index_html
+
+
+def test_pr370_photo_guidance_matches_the_post_booking_upload_workflow() -> None:
+    index_html = Path("static/index.html").read_text(encoding="utf-8")
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert "Optional photos can be added after a booking request" in index_html
+    assert "you can add optional photos afterward" in index_html
+    assert "Optional photos can be added after a booking request" in quote_html
+    assert "Optional photos come after your booking request" in quote_html
+    assert "After you submit your booking request, add photos here if they help" in quote_html
+
+    for inaccurate_copy in [
+        "Send us the job details and photos for a straightforward estimate.",
+        "Send the locations, job details, access information, and photos when available.",
+        "Send Bay Delivery the job details and photos to request an estimate.",
+        "Send Bay Delivery your job details, location, access information, and photos to request an estimate",
+    ]:
+        assert inaccurate_copy not in index_html
+        assert inaccurate_copy not in quote_html
 
 
 def test_pr3_homepage_assets_are_exact_and_optimized() -> None:
