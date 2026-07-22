@@ -232,7 +232,7 @@ def test_shared_public_shell_body_baseline_and_asset_references() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
 
     assert _body_sha256(index_html) == "D85ACAB87ADD744D5D1032E277F13F67796D3D41AC9F3B04EA23C951EBF41C2E"
-    assert _body_sha256(quote_html) == "52BBA93CF9043DCF7BF197CB35253A547CCB1EBF9945F7EEA1C936266A424FFD"
+    assert _body_sha256(quote_html) == "50253227F4C487AEB95216175B3A9A594803D7C4387E924B4B3692C0B68215AF"
     assert re.findall(r'<link\s+rel="stylesheet"\s+href="([^"]+)"', index_html) == [
         "/static/public.css",
         "/static/site.css"
@@ -468,7 +468,7 @@ def test_public_javascript_is_menu_only_and_focus_safe() -> None:
 def test_complete_quote_content_contract_remains_unchanged() -> None:
     quote_html = Path("static/quote.html").read_text(encoding="utf-8")
     assert _quote_contract_sha256(quote_html) == (
-        "9AA2A81C1E2BE3D1EAE74DF1D822A58E60158BFCF4AA580CBD362B7EE6925DFF"
+        "C3B80F0438367F379ECD3D0A60CCCBBB7A4A220A6046E9FE540C1368214EF2AE"
     )
     assert quote_html.count('id="quoteForm"') == 1
     assert Path("static/quote.js").read_text(encoding="utf-8")
@@ -819,6 +819,50 @@ def test_quote_page_uses_external_script_for_csp():
     assert "<script>" not in quote_html
 
 
+def test_quote_page_explains_route_review_requirement() -> None:
+    quote_html = Path("static/quote.html").read_text(encoding="utf-8")
+
+    assert (
+        "Include the city or municipality for both pickup and drop-off. "
+        "Instant estimates are available only when both locations can be confirmed "
+        "as North Bay; other routes need a quick review."
+    ) in quote_html
+
+
+def test_quote_script_has_non_authoritative_review_branch() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    assert "function isReviewRequiredResult(data)" in quote_js
+    assert "function renderReviewRequiredResult(data)" in quote_js
+    assert 'if (res.status === 202 && isReviewRequiredResult(data)) {' in quote_js
+    assert "No price or booking has been issued." in quote_js
+
+
+def test_quote_script_requires_authoritative_route_marker_before_totals() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    assert "function isAuthoritativeRouteResult(data, quoteResponse)" in quote_js
+    assert "data.authoritative === true" in quote_js
+    assert "quoteResponse.authoritative === true" in quote_js
+    assert "Number.isFinite(Number(quoteResponse.cash_total_cad))" in quote_js
+    assert "Number.isFinite(Number(quoteResponse.emt_total_cad))" in quote_js
+    assert "isAuthoritativeRouteResult(data, quoteResponse)" in quote_js
+
+
+def test_quote_script_clears_tokens_for_review_required_result() -> None:
+    quote_js = Path("static/quote.js").read_text(encoding="utf-8")
+
+    renderer_start = quote_js.index("function renderReviewRequiredResult(data)")
+    renderer_end = quote_js.index("\n}\n", renderer_start)
+    renderer = quote_js[renderer_start:renderer_end]
+    assert "lastQuoteId = data.quote_id || null;" in renderer
+    assert "lastAcceptToken = null;" in renderer
+    assert "lastBookingToken = null;" in renderer
+    assert 'el("decisionCard").classList.add("hidden");' in renderer
+    assert 'el("bookingCard").classList.add("hidden");' in renderer
+    assert 'el("uploadCard").classList.add("hidden");' in renderer
+
+
 def test_quote_upload_formdata_includes_accept_token() -> None:
     quote_js = Path("static/quote.js").read_text(encoding="utf-8")
 
@@ -957,7 +1001,7 @@ def test_quote_page_phase_a_guidance_copy_is_present() -> None:
     assert "What needs to be moved, removed, delivered, or cleaned up?" in quote_html
     assert "Where is it located?" in quote_html
     assert "Any special or heavy items?" in quote_html
-    assert "Required for moves and deliveries." in quote_html
+    assert "Include the city or municipality for both pickup and drop-off." in quote_html
     assert "Use full kitchen-size bags as a rough count." in quote_html
     assert "Most jobs are 5-10 bags. Adjust if needed." in quote_html
     assert "Heavy items help Bay Delivery bring the right setup." in quote_html

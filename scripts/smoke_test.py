@@ -445,8 +445,8 @@ def _run_stateful_workflow_smoke() -> int:
         payload=clone_payload(
             quote_payload,
             service_type="small_move",
-            pickup_address="111 Pickup Rd",
-            dropoff_address="222 Dropoff Ave",
+            pickup_address="111 Pickup Rd, North Bay, ON",
+            dropoff_address="222 Dropoff Ave, North Bay, ON",
             crew_size=2,
             estimated_hours=4,
         ),
@@ -461,14 +461,41 @@ def _run_stateful_workflow_smoke() -> int:
         payload=clone_payload(
             quote_payload,
             service_type="item_delivery",
-            pickup_address="111 Pickup Rd",
-            dropoff_address="222 Dropoff Ave",
+            pickup_address="111 Pickup Rd, North Bay, ON",
+            dropoff_address="222 Dropoff Ave, North Bay, ON",
             estimated_hours=1,
         ),
     )
     require(status == 200, f"item_delivery with routes expected 200, got {status}")
     require(isinstance(delivery_ok, dict) and bool(delivery_ok.get("quote_id")), "item_delivery expected quote_id")
     print("[ok] /quote/calculate item_delivery with routes")
+
+    status, route_review = api(
+        "POST",
+        "/quote/calculate",
+        payload=clone_payload(
+            quote_payload,
+            service_type="small_move",
+            pickup_address="111 Pickup Rd, North Bay, ON",
+            dropoff_address="222 Dropoff Ave, Sudbury, ON",
+            travel_zone="in_town",
+            crew_size=2,
+            estimated_hours=4,
+        ),
+    )
+    require(status == 202, f"unknown small_move route expected 202, got {status}")
+    require(isinstance(route_review, dict) and bool(route_review.get("quote_id")), "route review expected quote_id")
+    require(route_review.get("status") == "review_required", "unknown route expected review_required status")
+    require(route_review.get("authoritative") is False, "unknown route must not be authoritative")
+    require(not route_review.get("accept_token"), "unknown route must not return accept_token")
+    review_response = route_review.get("response")
+    require(isinstance(review_response, dict), "unknown route expected response object")
+    require(review_response.get("status") == "review_required", "unknown route response expected review_required")
+    require(review_response.get("authoritative") is False, "unknown route response must not be authoritative")
+    for total_field in ("cash_total_cad", "emt_total_cad", "total_cad", "total"):
+        require(total_field not in route_review, f"unknown route must not return {total_field}")
+        require(total_field not in review_response, f"unknown route response must not return {total_field}")
+    print("[ok] /quote/calculate unknown route requires review without totals")
 
     # Optional route: customer decision (some deployments may not have it yet)
     status, decision = api(

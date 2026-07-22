@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from typing import Any
 from uuid import uuid4
 
@@ -70,6 +71,11 @@ _STRUCTURED_ACCESS_PRICING_FIELDS = (
 _ROUTE_CALIBRATION_FIELDS = (
     "route_distance_km",
     "route_duration_minutes",
+)
+_PUBLIC_ROUTE_SERVICE_TYPES = frozenset({"small_move", "item_delivery"})
+_ROUTE_CLASSIFICATION_SOURCE = "backend_address_locality_v1"
+_CANADIAN_POSTAL_CODE_RE = re.compile(
+    r"^[abceghj-nprstvxy]\d[abceghj-nprstvwxyz][ -]?\d[abceghj-nprstvwxyz]\d$"
 )
 LEAD_SOURCE_LABELS = {
     "facebook": "Facebook",
@@ -273,9 +279,109 @@ def _structured_intake_values(request_payload: dict[str, Any]) -> dict[str, Any]
     return {field: request_payload.get(field) for field in field_names}
 
 
+def _normalized_saved_request(
+    request_payload: dict[str, Any],
+    *,
+    service_type: str,
+    travel_zone: str | None,
+) -> dict[str, Any]:
+    normalized_request = {
+        "customer_name": request_payload.get("customer_name"),
+        "customer_phone": request_payload.get("customer_phone"),
+        "job_address": request_payload.get("job_address"),
+        "job_description_customer": request_payload.get("job_description_customer")
+        or request_payload.get("description"),
+        "description": request_payload.get("description") or request_payload.get("job_description_customer"),
+        "service_type": service_type,
+        "payment_method": request_payload.get("payment_method"),
+        "lead_source": normalize_lead_source(request_payload.get("lead_source")),
+        "pickup_address": request_payload.get("pickup_address"),
+        "dropoff_address": request_payload.get("dropoff_address"),
+        "estimated_hours": float(request_payload.get("estimated_hours", 0.0)),
+        "crew_size": int(request_payload.get("crew_size", 1)),
+        "garbage_bag_count": int(request_payload.get("garbage_bag_count", 0)),
+        "bag_type": request_payload.get("bag_type"),
+        "trailer_fill_estimate": request_payload.get("trailer_fill_estimate"),
+        "trailer_class": request_payload.get("trailer_class"),
+        "mattresses_count": int(request_payload.get("mattresses_count", 0)),
+        "box_springs_count": int(request_payload.get("box_springs_count", 0)),
+        "scrap_pickup_location": request_payload.get("scrap_pickup_location", "curbside"),
+        "travel_zone": travel_zone,
+        "access_difficulty": request_payload.get("access_difficulty", "normal"),
+        "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
+        "load_mode": _normalize_load_mode(request_payload.get("load_mode")),
+    }
+    for field in _ROUTE_CALIBRATION_FIELDS:
+        if field in request_payload:
+            normalized_request[field] = request_payload.get(field)
+    normalized_request.update(_structured_intake_values(request_payload))
+    return normalized_request
+
+
+def _normalized_address_text(value: Any) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or ""))
+    return re.sub(r"\s+", " ", normalized.strip().casefold())
+
+
+def _is_allowed_north_bay_suffix(segments: list[str]) -> bool:
+    remaining = list(segments)
+    if remaining and remaining[-1] == "canada":
+        remaining.pop()
+
+    if remaining and _CANADIAN_POSTAL_CODE_RE.fullmatch(remaining[-1]):
+        remaining.pop()
+
+    if not remaining:
+        return True
+    if len(remaining) != 1:
+        return False
+
+    province = remaining[0]
+    if province in {"on", "ontario"}:
+        return True
+    for prefix in ("on ", "ontario "):
+        if province.startswith(prefix):
+            return bool(_CANADIAN_POSTAL_CODE_RE.fullmatch(province[len(prefix) :]))
+    return False
+
+
+def _address_has_north_bay_locality(value: Any) -> bool:
+    normalized = _normalized_address_text(value)
+    if not normalized:
+        return False
+
+    segments = [segment.strip() for segment in normalized.split(",") if segment.strip()]
+    north_bay_indexes = [index for index, segment in enumerate(segments) if segment == "north bay"]
+    if len(north_bay_indexes) != 1:
+        return False
+
+    north_bay_index = north_bay_indexes[0]
+    return _is_allowed_north_bay_suffix(segments[north_bay_index + 1 :])
+
+
+def _classify_public_route(request_payload: dict[str, Any]) -> dict[str, Any]:
+    pickup_is_north_bay = _address_has_north_bay_locality(request_payload.get("pickup_address"))
+    dropoff_is_north_bay = _address_has_north_bay_locality(request_payload.get("dropoff_address"))
+
+    if pickup_is_north_bay and dropoff_is_north_bay:
+        return {
+            "status": "authoritative",
+            "source": _ROUTE_CLASSIFICATION_SOURCE,
+            "reason": "both_locations_north_bay",
+            "travel_zone": "in_town",
+        }
+
+    reason = "conflicting_locality" if pickup_is_north_bay != dropoff_is_north_bay else "unclassified_locality"
+    return {
+        "status": "review_required",
+        "source": _ROUTE_CLASSIFICATION_SOURCE,
+        "reason": reason,
+        "travel_zone": None,
+    }
+
+
 def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
     _validate_quote_boundary(request_payload)
-    lead_source = normalize_lead_source(request_payload.get("lead_source"))
     requested_service_type = str(request_payload.get("service_type", "")).strip()
     normalized_load_mode = _normalize_load_mode(request_payload.get("load_mode"))
     baseline_engine_quote = calculate_quote(
@@ -292,35 +398,11 @@ def build_quote_artifacts(request_payload: dict[str, Any]) -> dict[str, Any]:
         if not request_payload.get("pickup_address") or not request_payload.get("dropoff_address"):
             raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
 
-    normalized_request = {
-        "customer_name": request_payload.get("customer_name"),
-        "customer_phone": request_payload.get("customer_phone"),
-        "job_address": request_payload.get("job_address"),
-        "job_description_customer": request_payload.get("job_description_customer") or request_payload.get("description"),
-        "description": request_payload.get("description") or request_payload.get("job_description_customer"),
-        "service_type": baseline_engine_quote["service_type"],
-        "payment_method": request_payload.get("payment_method"),
-        "lead_source": lead_source,
-        "pickup_address": request_payload.get("pickup_address"),
-        "dropoff_address": request_payload.get("dropoff_address"),
-        "estimated_hours": float(request_payload.get("estimated_hours", 0.0)),
-        "crew_size": int(request_payload.get("crew_size", 1)),
-        "garbage_bag_count": int(request_payload.get("garbage_bag_count", 0)),
-        "bag_type": request_payload.get("bag_type"),
-        "trailer_fill_estimate": request_payload.get("trailer_fill_estimate"),
-        "trailer_class": request_payload.get("trailer_class"),
-        "mattresses_count": int(request_payload.get("mattresses_count", 0)),
-        "box_springs_count": int(request_payload.get("box_springs_count", 0)),
-        "scrap_pickup_location": request_payload.get("scrap_pickup_location", "curbside"),
-        "travel_zone": request_payload.get("travel_zone", "in_town"),
-        "access_difficulty": request_payload.get("access_difficulty", "normal"),
-        "has_dense_materials": bool(request_payload.get("has_dense_materials", False)),
-        "load_mode": normalized_load_mode,
-    }
-    for field in _ROUTE_CALIBRATION_FIELDS:
-        if field in request_payload:
-            normalized_request[field] = request_payload.get(field)
-    normalized_request.update(_structured_intake_values(request_payload))
+    normalized_request = _normalized_saved_request(
+        request_payload,
+        service_type=str(baseline_engine_quote["service_type"]),
+        travel_zone=str(request_payload.get("travel_zone", "in_town")),
+    )
 
     internal_risk_assessment = build_quote_risk_assessment(
         normalized_request=normalized_request,
@@ -417,6 +499,52 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
     normalized_payload = dict(request_payload)
     normalized_payload["customer_phone"] = normalized_customer_phone
 
+    config = load_config()
+    normalized_service_type = _normalized_service_type_or_400(config, normalized_payload)
+    if normalized_service_type in _PUBLIC_ROUTE_SERVICE_TYPES:
+        if not normalized_payload.get("pickup_address") or not normalized_payload.get("dropoff_address"):
+            raise HTTPException(status_code=400, detail="pickup_address and dropoff_address are required")
+
+        # A public route caller cannot select its own travel zone. Use a controlled
+        # value for boundary validation, then replace it with the backend result.
+        normalized_payload["travel_zone"] = "in_town"
+        _validate_quote_boundary(normalized_payload)
+        try:
+            route_classification = _classify_public_route(normalized_payload)
+        except Exception:
+            logger.warning("Failed to classify public route; requiring review", exc_info=True)
+            route_classification = {
+                "status": "review_required",
+                "source": _ROUTE_CLASSIFICATION_SOURCE,
+                "reason": "classification_error",
+                "travel_zone": None,
+            }
+
+        if route_classification["status"] == "review_required":
+            normalized_request = _normalized_saved_request(
+                normalized_payload,
+                service_type=normalized_service_type,
+                travel_zone=None,
+            )
+            normalized_request["route_classification"] = route_classification
+            quote = {
+                "quote_id": str(uuid4()),
+                "created_at": now_iso,
+                "status": "review_required",
+                "authoritative": False,
+                "request": normalized_request,
+                "response": {
+                    "status": "review_required",
+                    "authoritative": False,
+                    "reason": "route_confirmation_required",
+                    "message": "Bay Delivery must confirm the pickup and drop-off route before providing a price.",
+                    "contact_phone": "705-303-4409",
+                    "contact_email": "BayDeliveryNB@gmail.com",
+                },
+            }
+            save_quote({**quote, "accept_token": None})
+            return quote
+
     quote_artifacts = build_quote_artifacts(normalized_payload)
 
     # Generate accept_token for this quote (before saving)
@@ -428,6 +556,13 @@ def build_and_save_quote(request_payload: dict[str, Any], now_iso: str) -> dict[
         "request": quote_artifacts["normalized_request"],
         "response": quote_artifacts["response"],
     }
+
+    if normalized_service_type in _PUBLIC_ROUTE_SERVICE_TYPES:
+        quote["status"] = "authoritative"
+        quote["authoritative"] = True
+        quote["request"]["route_classification"] = route_classification
+        quote["response"]["status"] = "authoritative"
+        quote["response"]["authoritative"] = True
 
     save_quote(
         {
@@ -485,25 +620,49 @@ def load_admin_quote_detail(quote_id: str) -> dict[str, Any]:
     quote_risk_summary: dict[str, Any] | None = None
     request_payload = quote.get("request")
     safe_request_payload = request_payload if isinstance(request_payload, dict) else {}
+    response_payload = quote.get("response")
+    is_review_required = (
+        isinstance(response_payload, dict)
+        and response_payload.get("status") == "review_required"
+        and response_payload.get("authoritative") is False
+    )
     try:
         if not isinstance(request_payload, dict):
             raise TypeError("Saved quote request is not a structured object.")
-        artifacts = build_quote_artifacts(dict(request_payload))
-        assessment = artifacts.get("internal_risk_assessment")
-        if isinstance(assessment, dict):
-            internal_risk_assessment = assessment
-        advisory = artifacts.get("quote_risk_advisory")
-        if isinstance(advisory, dict):
-            quote_risk_advisory = advisory
-        quote_risk_summary_request = _quote_risk_summary_request_context(
-            quote_id=quote_id,
-            request_payload=request_payload,
-        )
-        quote_risk_summary = build_quote_risk_summary(
-            quote_risk_summary_request,
-            quote_risk_advisory,
-            internal_risk_assessment,
-        )
+        if is_review_required:
+            classification = request_payload.get("route_classification")
+            safe_classification = classification if isinstance(classification, dict) else {}
+            quote_risk_summary = {
+                "risk_level": "high",
+                "reasons": [
+                    "Route confirmation required",
+                    f"Pickup: {request_payload.get('pickup_address') or 'Unknown'}",
+                    f"Drop-off: {request_payload.get('dropoff_address') or 'Unknown'}",
+                    f"Classification reason: {safe_classification.get('reason') or 'unknown'}",
+                ],
+                "missing_info": ["Operator-confirmed travel zone"],
+                "suggested_action": "owner_review_before_approving",
+                "crew_suggestion": "unknown",
+                "trailer_suggestion": "unknown",
+                "pricing_caution": "no_authoritative_total_until_route_is_confirmed",
+            }
+        else:
+            artifacts = build_quote_artifacts(dict(request_payload))
+            assessment = artifacts.get("internal_risk_assessment")
+            if isinstance(assessment, dict):
+                internal_risk_assessment = assessment
+            advisory = artifacts.get("quote_risk_advisory")
+            if isinstance(advisory, dict):
+                quote_risk_advisory = advisory
+            quote_risk_summary_request = _quote_risk_summary_request_context(
+                quote_id=quote_id,
+                request_payload=request_payload,
+            )
+            quote_risk_summary = build_quote_risk_summary(
+                quote_risk_summary_request,
+                quote_risk_advisory,
+                internal_risk_assessment,
+            )
     except Exception:
         logger.warning(
             "Failed to re-derive internal risk assessment for admin quote detail %s",

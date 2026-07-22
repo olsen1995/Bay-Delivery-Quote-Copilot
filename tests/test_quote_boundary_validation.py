@@ -36,6 +36,9 @@ def _base_payload(service_type: str = "haul_away") -> dict:
     }
     if service_type == "haul_away":
         payload["trailer_fill_estimate"] = "under_quarter"
+    if service_type in {"small_move", "item_delivery", "moving", "delivery"}:
+        payload["pickup_address"] = "1 Pickup Rd, North Bay, ON"
+        payload["dropoff_address"] = "2 Dropoff Ave, North Bay, ON"
     return payload
 
 

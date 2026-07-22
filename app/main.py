@@ -1516,7 +1516,10 @@ async def quote_calculate(payload: QuoteRequestPayload):
     request_payload["_structured_intake_fields_supplied"] = [
         field for field in STRUCTURED_INTAKE_FIELD_NAMES if field in provided_fields
     ]
-    return quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
+    result = quote_service.build_and_save_quote(request_payload, now_iso=_now_local_iso())
+    if result.get("status") == "review_required":
+        return JSONResponse(status_code=202, content=result)
+    return result
 
 
 @app.post(_GPT_QUOTE_ROUTE_NAME, include_in_schema=False, dependencies=[Depends(_require_gpt_internal_token)])

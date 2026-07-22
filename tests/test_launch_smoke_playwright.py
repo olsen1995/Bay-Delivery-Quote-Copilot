@@ -130,6 +130,16 @@ def _next_booking_date() -> str:
     return (dt.date.today() + dt.timedelta(days=2)).isoformat()
 
 
+async def _fill_unknown_route_quote(page: Page) -> None:
+    await page.locator("#customer_name").fill("Playwright Route Review")
+    await page.locator("#customer_phone").fill("705-555-0199")
+    await page.locator("#job_address").fill("123 Smoke Test Rd, North Bay")
+    await page.locator("#description").fill("Unknown route fail-safe browser validation")
+    await page.locator("#service_type").select_option("small_move")
+    await page.locator("#pickup_address").fill("123 Main Street, North Bay, ON")
+    await page.locator("#dropoff_address").fill("456 Elm Street, Sudbury, ON")
+
+
 @pytest.mark.asyncio
 async def test_launch_happy_path_customer_quote_and_admin_visibility(page: Page, live_server: str) -> None:
     await page.goto(f"{live_server}/", wait_until="networkidle")
@@ -208,6 +218,50 @@ async def test_launch_quote_route_missing_fields_are_named(page: Page, live_serv
     await expect(page.locator("#resultBox")).to_contain_text("Dropoff address")
     await expect(page.locator("#resultBox")).to_contain_text("Pickup and dropoff addresses are required for moves and deliveries")
     await expect(page.locator("#serviceDetailsPanel")).to_have_attribute("open", "")
+
+
+@pytest.mark.asyncio
+async def test_quote_unknown_route_shows_review_without_total_or_decision(
+    page: Page,
+    live_server: str,
+) -> None:
+    await page.goto(f"{live_server}/quote", wait_until="networkidle")
+    await _fill_unknown_route_quote(page)
+    await page.locator("#btnCalc").click()
+
+    result = page.locator("#resultBox")
+    await expect(result).to_contain_text("Route review needed.", timeout=20_000)
+    await expect(result).to_contain_text("No price or booking has been issued.")
+    await expect(result).to_contain_text("Quote reference:")
+    await expect(result).not_to_contain_text("Your Estimate")
+    await expect(result).not_to_contain_text("Cash (no HST)")
+    await expect(page.locator("#decisionCard")).to_be_hidden()
+    await expect(page.locator("#bookingCard")).to_be_hidden()
+    await expect(page.locator("#uploadCard")).to_be_hidden()
+
+
+@pytest.mark.asyncio
+async def test_quote_tampered_travel_zone_cannot_unlock_total(
+    page: Page,
+    live_server: str,
+) -> None:
+    async def inject_public_zone(route) -> None:
+        request = route.request
+        payload = dict(request.post_data_json or {})
+        payload["travel_zone"] = "in_town"
+        await route.continue_(post_data=payload)
+
+    await page.route("**/quote/calculate", inject_public_zone)
+    await page.goto(f"{live_server}/quote", wait_until="networkidle")
+    await _fill_unknown_route_quote(page)
+    await page.locator("#btnCalc").click()
+
+    result = page.locator("#resultBox")
+    await expect(result).to_contain_text("Route review needed.", timeout=20_000)
+    await expect(result).to_contain_text("No price or booking has been issued.")
+    await expect(result).not_to_contain_text("Your Estimate")
+    await expect(result).not_to_contain_text("Cash (no HST)")
+    await expect(page.locator("#decisionCard")).to_be_hidden()
 
 
 @pytest.mark.asyncio

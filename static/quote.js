@@ -650,6 +650,50 @@ function extractQuoteResponse(data) {
   return data;
 }
 
+function isReviewRequiredResult(data) {
+  return Boolean(
+    data &&
+    data.status === "review_required" &&
+    data.authoritative === false &&
+    data.response &&
+    data.response.status === "review_required" &&
+    data.response.authoritative === false
+  );
+}
+
+function isAuthoritativeRouteResult(data, quoteResponse) {
+  return Boolean(
+    data &&
+    data.authoritative === true &&
+    quoteResponse &&
+    quoteResponse.authoritative === true &&
+    Number.isFinite(Number(quoteResponse.cash_total_cad)) &&
+    Number.isFinite(Number(quoteResponse.emt_total_cad)) &&
+    typeof data.accept_token === "string" &&
+    data.accept_token.length > 0
+  );
+}
+
+function renderReviewRequiredResult(data) {
+  lastQuoteId = data.quote_id || null;
+  lastAcceptToken = null;
+  lastBookingToken = null;
+  el("decisionCard").classList.add("hidden");
+  el("bookingCard").classList.add("hidden");
+  el("uploadCard").classList.add("hidden");
+  el("quoteSummaryCard").classList.add("hidden");
+  setFlowStage(2);
+
+  const reference = data.quote_id ? "\n\nQuote reference: " + data.quote_id : "";
+  showBox(
+    "resultBox",
+    "Route review needed.\n\nWe received your request, but we could not safely confirm both locations as an in-town North Bay route. No price or booking has been issued. Bay Delivery must confirm the route before providing a final quote." +
+      reference +
+      "\n\nCall or text Dan at (705) 303-4409, or email BayDeliveryNB@gmail.com and include your quote reference.",
+    "info"
+  );
+}
+
 function syncRouteFields() {
   const needRoutes = requiresRouteFields(el("service_type").value);
   const routeRow = el("routeRow");
@@ -1029,6 +1073,12 @@ el("btnCalc").addEventListener("click", async () => {
       data = {};
     }
 
+    if (res.status === 202 && isReviewRequiredResult(data)) {
+      renderReviewRequiredResult(data);
+      scrollToElement("resultBox");
+      return;
+    }
+
     if (!res.ok) {
       showBox("resultBox", "Error:\n" + friendlyQuoteErrorMessage(data.detail), "error");
       return;
@@ -1037,6 +1087,18 @@ el("btnCalc").addEventListener("click", async () => {
     const quoteResponse = extractQuoteResponse(data);
     if (!quoteResponse) {
       showBox("resultBox", "Error:\nQuote response was empty.");
+      return;
+    }
+
+    if (requiresRouteFields(serviceType) && !isAuthoritativeRouteResult(data, quoteResponse)) {
+      lastQuoteId = null;
+      lastAcceptToken = null;
+      lastBookingToken = null;
+      showBox(
+        "resultBox",
+        "Error:\n" + manualQuoteFallbackMessage("The route could not be verified as an authoritative estimate."),
+        "error"
+      );
       return;
     }
 
