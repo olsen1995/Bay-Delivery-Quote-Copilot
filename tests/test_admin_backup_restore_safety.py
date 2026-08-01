@@ -1,5 +1,7 @@
 import base64
 import json
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -15,8 +17,11 @@ DRIVE_CONFIRMATION = "RESTORE BAY DELIVERY DATABASE"
 
 
 @pytest.fixture
-def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory) -> None:
-    monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(tmp_path / "test-admin-backup-restore-safety.sqlite3"))
+def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
+    db_path = tmp_path / "test-admin-backup-restore-safety.sqlite3"
+    monkeypatch.setenv("BAYDELIVERY_DB_PATH", str(db_path))
+    monkeypatch.setattr(storage, "DB_PATH", db_path)
+    storage._TABLE_COL_CACHE.clear()
     storage.init_db()
     conn = storage._connect()
     try:
@@ -24,6 +29,10 @@ def isolated_db(monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactor
         conn.commit()
     finally:
         conn.close()
+    try:
+        yield
+    finally:
+        storage._TABLE_COL_CACHE.clear()
 
 
 @pytest.fixture
@@ -69,6 +78,82 @@ def _backup_payload() -> dict[str, Any]:
             "legacy_private": [{"password": "row-password"}],
         },
     }
+
+
+def _review_required_linked_workflow_payload(linked_table: str) -> dict[str, Any]:
+    quote_id = "review-linked-quote"
+    tables: dict[str, list[dict[str, Any]]] = {
+        "quotes": [
+            {
+                "quote_id": quote_id,
+                "created_at": "2026-08-01T12:00:00+00:00",
+                "request_json": {
+                    "service_type": "small_move",
+                    "route_classification": {
+                        "status": "review_required",
+                        "travel_zone": None,
+                    },
+                },
+                "response_json": {
+                    "status": "review_required",
+                    "authoritative": False,
+                },
+                "accept_token": None,
+                "admin_status": "pending",
+            }
+        ],
+        "quote_requests": [],
+        "jobs": [],
+    }
+    if linked_table == "quote_requests":
+        tables["quote_requests"].append(
+            {
+                "request_id": "review-linked-request",
+                "quote_id": quote_id,
+                "status": "customer_accepted",
+                "accept_token": "stale-accept-token",
+                "booking_token": "stale-booking-token",
+            }
+        )
+    elif linked_table == "jobs":
+        tables["jobs"].append(
+            {
+                "job_id": "review-linked-job",
+                "quote_id": quote_id,
+                "request_id": None,
+                "status": "approved",
+            }
+        )
+    else:
+        raise AssertionError(f"Unsupported linked table: {linked_table}")
+
+    return {
+        "meta": {"format": "bay-delivery-sqlite-backup", "version": 1},
+        "tables": tables,
+    }
+
+
+def _save_authoritative_quote(quote_id: str) -> None:
+    storage.save_quote(
+        {
+            "quote_id": quote_id,
+            "created_at": "2026-08-01T11:00:00+00:00",
+            "request": {
+                "service_type": "small_move",
+                "route_classification": {
+                    "status": "authoritative",
+                    "travel_zone": "in_town",
+                },
+            },
+            "response": {
+                "status": "authoritative",
+                "authoritative": True,
+                "cash_total_cad": 250.0,
+                "emt_total_cad": 282.5,
+            },
+            "accept_token": f"{quote_id}-accept-token",
+        }
+    )
 
 
 def _assert_no_key(data: Any, forbidden_key: str) -> None:
@@ -345,6 +430,131 @@ def test_drive_restore_valid_confirmation_reaches_mutation_path_only_with_mock(
     assert entry["action_type"] == "drive_restore"
     assert entry["record_id"] == VALID_FILE_ID
     assert entry["success"] is True
+
+
+@pytest.mark.parametrize("channel", ["database", "drive"])
+@pytest.mark.parametrize("linked_table", ["quote_requests", "jobs"])
+def test_review_required_linked_workflow_is_rejected_consistently_by_preview_and_restore(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    channel: str,
+    linked_table: str,
+) -> None:
+    payload = _review_required_linked_workflow_payload(linked_table)
+    _save_authoritative_quote("existing-target-quote")
+    original_target = storage.get_quote_record("existing-target-quote")
+    init_calls: list[bool] = []
+    token_rotation_calls: list[bool] = []
+
+    def fail_if_init_runs() -> None:
+        init_calls.append(True)
+        raise AssertionError("rejected preview or restore must not initialize the database")
+
+    def fail_if_token_rotation_runs() -> str:
+        token_rotation_calls.append(True)
+        raise AssertionError("rejected preview or restore must not rotate tokens")
+
+    monkeypatch.setattr(storage, "init_db", fail_if_init_runs)
+    monkeypatch.setattr(storage, "_fresh_workflow_token", fail_if_token_rotation_runs)
+    monkeypatch.setattr("app.main._maybe_auto_snapshot", lambda _background_tasks: None)
+
+    request_client = TestClient(app, raise_server_exceptions=False)
+    try:
+        if channel == "database":
+            preview_response = request_client.post(
+                "/admin/api/db/import",
+                headers=_admin_headers(),
+                json={"payload": payload, "dry_run": True},
+            )
+            restore_response = request_client.post(
+                "/admin/api/db/import",
+                headers=_admin_headers(),
+                json={"payload": payload, "confirm_action": DB_CONFIRMATION},
+            )
+        else:
+            monkeypatch.setattr("app.main._drive_enabled", lambda: True)
+            monkeypatch.setattr(
+                "app.main.gdrive.download_file",
+                lambda _file_id: json.dumps(payload).encode("utf-8"),
+            )
+            preview_response = request_client.post(
+                "/admin/api/drive/restore",
+                headers=_admin_headers(),
+                json={"file_id": VALID_FILE_ID, "dry_run": True},
+            )
+            restore_response = request_client.post(
+                "/admin/api/drive/restore",
+                headers=_admin_headers(),
+                json={"file_id": VALID_FILE_ID, "confirm_action": DRIVE_CONFIRMATION},
+            )
+    finally:
+        request_client.close()
+
+    expected_error = {
+        "detail": "Backup contains a review-required quote with linked workflow state"
+    }
+    assert preview_response.status_code == 400
+    assert restore_response.status_code == 400
+    assert preview_response.json() == expected_error
+    assert restore_response.json() == expected_error
+    assert storage.get_quote_record("existing-target-quote") == original_target
+    assert storage.get_quote_record("review-linked-quote") is None
+    assert storage.get_quote_request_record("review-linked-request") is None
+    assert storage.get_job_by_quote_id("review-linked-quote") is None
+    assert init_calls == []
+    assert token_rotation_calls == []
+
+
+@pytest.mark.parametrize("channel", ["database", "drive"])
+def test_authoritative_backup_previews_and_restores_successfully(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    channel: str,
+) -> None:
+    quote_id = f"authoritative-{channel}-restore"
+    _save_authoritative_quote(quote_id)
+    payload = storage.export_db_to_json()
+    monkeypatch.setattr("app.main._maybe_auto_snapshot", lambda _background_tasks: None)
+
+    if channel == "database":
+        preview_response = client.post(
+            "/admin/api/db/import",
+            headers=_admin_headers(),
+            json={"payload": payload, "dry_run": True},
+        )
+        restore_response = client.post(
+            "/admin/api/db/import",
+            headers=_admin_headers(),
+            json={"payload": payload, "confirm_action": DB_CONFIRMATION},
+        )
+    else:
+        monkeypatch.setattr("app.main._drive_enabled", lambda: True)
+        monkeypatch.setattr(
+            "app.main.gdrive.download_file",
+            lambda _file_id: json.dumps(payload).encode("utf-8"),
+        )
+        preview_response = client.post(
+            "/admin/api/drive/restore",
+            headers=_admin_headers(),
+            json={"file_id": VALID_FILE_ID, "dry_run": True},
+        )
+        restore_response = client.post(
+            "/admin/api/drive/restore",
+            headers=_admin_headers(),
+            json={"file_id": VALID_FILE_ID, "confirm_action": DRIVE_CONFIRMATION},
+        )
+
+    assert preview_response.status_code == 200
+    assert preview_response.json()["dry_run"] is True
+    assert restore_response.status_code == 200
+    restored = storage.get_quote_record(quote_id)
+    assert restored is not None
+    assert restored["status"] == "authoritative"
+    assert restored["accept_token"] not in {
+        None,
+        storage.BACKUP_TOKEN_ROTATION_PLACEHOLDER,
+        f"{quote_id}-accept-token",
+    }
 
 
 def test_confirmed_success_audit_metadata_is_safe(

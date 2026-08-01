@@ -66,6 +66,17 @@ def test_stateful_smoke_uses_contract_valid_haul_away_payload(monkeypatch: pytes
             quote_payloads.append(dict(payload))
             if payload.get("service_type") == "small_move" and not payload.get("pickup_address"):
                 return 400, {"detail": "pickup_address and dropoff_address are required"}
+            if payload.get("service_type") == "small_move" and "Sudbury" in str(payload.get("dropoff_address")):
+                return 202, {
+                    "quote_id": f"quote-{len(quote_payloads)}",
+                    "status": "review_required",
+                    "authoritative": False,
+                    "response": {
+                        "status": "review_required",
+                        "authoritative": False,
+                        "reason": "route_confirmation_required",
+                    },
+                }
             build_quote_artifacts(dict(payload))
             return 200, {"quote_id": f"quote-{len(quote_payloads)}", "accept_token": "token"}
         if method == "POST" and path.startswith("/quote/") and path.endswith("/decision"):
@@ -77,6 +88,12 @@ def test_stateful_smoke_uses_contract_valid_haul_away_payload(monkeypatch: pytes
     assert smoke_test._run_stateful_workflow_smoke() == 0
     assert quote_payloads[0]["service_type"] == "haul_away"
     assert quote_payloads[0]["trailer_fill_estimate"] == "under_quarter"
+    assert quote_payloads[2]["pickup_address"].endswith("North Bay, ON")
+    assert quote_payloads[2]["dropoff_address"].endswith("North Bay, ON")
+    assert quote_payloads[3]["pickup_address"].endswith("North Bay, ON")
+    assert quote_payloads[3]["dropoff_address"].endswith("North Bay, ON")
+    assert quote_payloads[4]["service_type"] == "small_move"
+    assert quote_payloads[4]["dropoff_address"].endswith("Sudbury, ON")
 
 
 def test_post_deploy_smoke_checks_health_public_pages_and_pre_auth_admin(monkeypatch: pytest.MonkeyPatch) -> None:

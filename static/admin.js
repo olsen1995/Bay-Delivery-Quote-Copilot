@@ -727,6 +727,7 @@ function statusLabel(status) {
     scheduled: "Scheduled",
     cancelled: "Cancelled",
     rejected: "Rejected",
+    review_required: "Review required",
     expired: "Expired"
   };
   return map[(status || "").toLowerCase()] || (status || "unknown");
@@ -2055,7 +2056,9 @@ function renderQuotes(items) {
     tdId.append(code, created);
 
     const tdStatus = document.createElement("td");
-    const quoteStatus = q.admin_status || safeGet(q, "request.status", q.status || "pending");
+    const quoteStatus = q.status === "review_required"
+      ? "review_required"
+      : q.admin_status || safeGet(q, "request.status", q.status || "pending");
     tdStatus.appendChild(makeStatusBadge(quoteStatus));
 
     const tdCustomer = document.createElement("td");

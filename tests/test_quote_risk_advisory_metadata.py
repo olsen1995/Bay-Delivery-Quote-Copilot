@@ -607,8 +607,8 @@ def test_public_quote_excludes_high_care_move_advisory_and_completed_job_calibra
         service_type="small_move",
         description="High-risk appliance move with expensive items and careful handling.",
         job_description_customer="High-risk appliance move with expensive items and careful handling.",
-        pickup_address="1 Pickup Rd",
-        dropoff_address="2 Dropoff Ave",
+        pickup_address="1 Pickup Rd, North Bay, Ontario",
+        dropoff_address="2 Dropoff Ave, North Bay, Ontario",
         estimated_hours=6.5,
         crew_size=4,
     )
