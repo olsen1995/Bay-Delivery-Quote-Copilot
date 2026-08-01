@@ -350,6 +350,18 @@ def _is_allowed_north_bay_suffix(segments: list[str]) -> bool:
     return False
 
 
+def _address_prefix_is_civic(address_prefix: str) -> bool:
+    if not _NO_COMMA_CIVIC_ADDRESS_RE.fullmatch(address_prefix):
+        return False
+    return address_prefix.rsplit(" ", 1)[-1] not in _AMBIGUOUS_LOCALITY_PREFIX_ENDINGS
+
+
+def _comma_delimited_prefix_is_civic(segments: list[str]) -> bool:
+    if not segments:
+        return True
+    return len(segments) == 1 and _address_prefix_is_civic(segments[0])
+
+
 def _address_has_terminal_north_bay_locality_without_commas(normalized: str) -> bool:
     locality_matches = list(_NORTH_BAY_LOCALITY_RE.finditer(normalized))
     if len(locality_matches) != 1:
@@ -357,11 +369,8 @@ def _address_has_terminal_north_bay_locality_without_commas(normalized: str) -> 
 
     locality_match = locality_matches[0]
     address_prefix = normalized[: locality_match.start()].strip()
-    if address_prefix:
-        if not _NO_COMMA_CIVIC_ADDRESS_RE.fullmatch(address_prefix):
-            return False
-        if address_prefix.rsplit(" ", 1)[-1] in _AMBIGUOUS_LOCALITY_PREFIX_ENDINGS:
-            return False
+    if address_prefix and not _address_prefix_is_civic(address_prefix):
+        return False
 
     suffix = normalized[locality_match.end() :].strip()
     suffix_segments = [suffix] if suffix else []
@@ -381,6 +390,8 @@ def _address_has_north_bay_locality(value: Any) -> bool:
         if len(north_bay_indexes) != 1:
             return False
         north_bay_index = north_bay_indexes[0]
+        if not _comma_delimited_prefix_is_civic(segments[:north_bay_index]):
+            return False
         return _is_allowed_north_bay_suffix(segments[north_bay_index + 1 :])
 
     if "," in normalized:
@@ -390,7 +401,9 @@ def _address_has_north_bay_locality(value: Any) -> bool:
             if segment.startswith("north bay ")
             and _address_has_terminal_north_bay_locality_without_commas(segment)
         ]
-        return north_bay_with_suffix_indexes == [len(segments) - 1]
+        if north_bay_with_suffix_indexes != [len(segments) - 1]:
+            return False
+        return _comma_delimited_prefix_is_civic(segments[: north_bay_with_suffix_indexes[0]])
     return _address_has_terminal_north_bay_locality_without_commas(normalized)
 
 

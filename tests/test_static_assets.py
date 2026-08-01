@@ -2195,6 +2195,22 @@ def test_desktop_admin_includes_pending_estimate_cleanup_controls_only() -> None
     assert "/expire" not in mobile_js
 
 
+def test_desktop_admin_prioritizes_review_required_quote_status() -> None:
+    admin_js = Path("static/admin.js").read_text(encoding="utf-8")
+
+    assert 'review_required: "Review required"' in admin_js
+    render_quotes = re.search(
+        r"function renderQuotes\(items\) \{(?P<body>.*?)\n\}\n\nasync function decide",
+        admin_js,
+        re.S,
+    )
+    assert render_quotes is not None
+    render_body = render_quotes.group("body")
+    assert 'q.status === "review_required"' in render_body
+    assert "q.admin_status ||" in render_body
+    assert render_body.index('q.status === "review_required"') < render_body.index("q.admin_status ||")
+
+
 def test_admin_mobile_page_includes_dedicated_mobile_shell() -> None:
     mobile_html = Path("static/admin_mobile.html").read_text(encoding="utf-8")
     mobile_js = Path("static/admin_mobile.js").read_text(encoding="utf-8")

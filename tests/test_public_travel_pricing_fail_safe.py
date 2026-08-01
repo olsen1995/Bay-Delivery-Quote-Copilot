@@ -174,6 +174,41 @@ def test_invalid_terminal_comma_delimited_north_bay_segment_requires_review(
 
 
 @pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+def test_civic_prefix_before_terminal_north_bay_locality_is_authoritative(
+    client: TestClient,
+    service_type: str,
+) -> None:
+    _assert_authoritative(
+        client,
+        service_type,
+        pickup_address="123 Main St, North Bay, ON",
+        dropoff_address="456 Oak Avenue North Bay Ontario",
+    )
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+@pytest.mark.parametrize(
+    "conflicting_address",
+    [
+        "17 Main St, Callander, North Bay, ON",
+        "17 Main St, Callander, North Bay ON",
+    ],
+)
+def test_municipality_before_terminal_north_bay_locality_requires_review(
+    client: TestClient,
+    service_type: str,
+    conflicting_address: str,
+) -> None:
+    _assert_review_required(
+        client,
+        service_type,
+        conflicting_address,
+        "456 Oak Avenue, North Bay, ON",
+        "conflicting_locality",
+    )
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
 @pytest.mark.parametrize(
     ("pickup_address", "dropoff_address"),
     [

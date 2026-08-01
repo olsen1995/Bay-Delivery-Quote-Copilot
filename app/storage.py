@@ -5136,6 +5136,53 @@ def _rotate_restored_quote_request_tokens(
     return rotated
 
 
+def _reject_review_required_linked_workflows(tables: Dict[str, Any]) -> None:
+    quote_rows = tables.get("quotes", [])
+    if not isinstance(quote_rows, list):
+        return
+
+    review_quote_ids = {
+        str(row["quote_id"])
+        for row in quote_rows
+        if isinstance(row, dict)
+        and row.get("quote_id") is not None
+        and _quote_is_review_required(row.get("request_json"), row.get("response_json"))
+    }
+    if not review_quote_ids:
+        return
+
+    request_rows = tables.get("quote_requests", [])
+    linked_request_ids: set[str] = set()
+    has_linked_workflow = False
+    if isinstance(request_rows, list):
+        for row in request_rows:
+            if not isinstance(row, dict):
+                continue
+            quote_id = row.get("quote_id")
+            if quote_id is None or str(quote_id) not in review_quote_ids:
+                continue
+            has_linked_workflow = True
+            if row.get("request_id") is not None:
+                linked_request_ids.add(str(row["request_id"]))
+
+    job_rows = tables.get("jobs", [])
+    if isinstance(job_rows, list):
+        for row in job_rows:
+            if not isinstance(row, dict):
+                continue
+            quote_id = row.get("quote_id")
+            request_id = row.get("request_id")
+            if (
+                (quote_id is not None and str(quote_id) in review_quote_ids)
+                or (request_id is not None and str(request_id) in linked_request_ids)
+            ):
+                has_linked_workflow = True
+                break
+
+    if has_linked_workflow:
+        raise ValueError("Backup contains a review-required quote with linked workflow state")
+
+
 def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Backup payload must be a JSON object")
@@ -5143,6 +5190,8 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     tables = payload.get("tables")
     if not isinstance(tables, dict):
         raise ValueError("Backup payload missing 'tables' object")
+
+    _reject_review_required_linked_workflows(tables)
 
     incoming_quote_request_duplicate_group_count, _ = _quote_request_quote_id_duplicate_summary_from_rows(
         tables.get("quote_requests", [])
