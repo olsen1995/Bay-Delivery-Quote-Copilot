@@ -128,6 +128,53 @@ def test_small_move_strict_north_bay_route_is_authoritative(client: TestClient) 
 
 @pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
 @pytest.mark.parametrize(
+    "locality_segment",
+    [
+        "North Bay ON",
+        "North Bay Ontario",
+        "North Bay ON P1A 1A1",
+        "North Bay Ontario P1A 1A1",
+        "North Bay ON P1A 1A1 Canada",
+        "North Bay Ontario P1A 1A1 Canada",
+    ],
+)
+def test_terminal_comma_delimited_north_bay_segment_is_authoritative(
+    client: TestClient,
+    service_type: str,
+    locality_segment: str,
+) -> None:
+    _assert_authoritative(
+        client,
+        service_type,
+        pickup_address=f"123 Main Street, {locality_segment}",
+        dropoff_address=f"456 Oak Avenue, {locality_segment}",
+    )
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+@pytest.mark.parametrize(
+    "invalid_locality_segment",
+    [
+        "North Bay near",
+        "North Bay ON P1A 1A1 Canada extra",
+    ],
+)
+def test_invalid_terminal_comma_delimited_north_bay_segment_requires_review(
+    client: TestClient,
+    service_type: str,
+    invalid_locality_segment: str,
+) -> None:
+    _assert_review_required(
+        client,
+        service_type,
+        f"123 Main Street, {invalid_locality_segment}",
+        f"456 Oak Avenue, {invalid_locality_segment}",
+        "unclassified_locality",
+    )
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+@pytest.mark.parametrize(
     ("pickup_address", "dropoff_address"),
     [
         ("123 Main Street North Bay ON", "123 Main St North Bay Ontario"),

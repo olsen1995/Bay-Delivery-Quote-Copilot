@@ -377,13 +377,20 @@ def _address_has_north_bay_locality(value: Any) -> bool:
 
     segments = [segment.strip() for segment in normalized.split(",") if segment.strip()]
     north_bay_indexes = [index for index, segment in enumerate(segments) if segment == "north bay"]
-    if len(north_bay_indexes) == 1:
+    if north_bay_indexes:
+        if len(north_bay_indexes) != 1:
+            return False
         north_bay_index = north_bay_indexes[0]
-        if _is_allowed_north_bay_suffix(segments[north_bay_index + 1 :]):
-            return True
+        return _is_allowed_north_bay_suffix(segments[north_bay_index + 1 :])
 
     if "," in normalized:
-        return False
+        north_bay_with_suffix_indexes = [
+            index
+            for index, segment in enumerate(segments)
+            if segment.startswith("north bay ")
+            and _address_has_terminal_north_bay_locality_without_commas(segment)
+        ]
+        return north_bay_with_suffix_indexes == [len(segments) - 1]
     return _address_has_terminal_north_bay_locality_without_commas(normalized)
 
 
