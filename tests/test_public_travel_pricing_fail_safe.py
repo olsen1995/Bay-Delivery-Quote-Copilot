@@ -55,8 +55,21 @@ def _haul_payload(*, travel_zone: str = "in_town") -> dict:
     }
 
 
-def _assert_authoritative(client: TestClient, service_type: str) -> dict:
-    response = client.post("/quote/calculate", json=_payload(service_type=service_type))
+def _assert_authoritative(
+    client: TestClient,
+    service_type: str,
+    *,
+    pickup_address: str = "123 Main Street, North Bay, ON P1A 1A1",
+    dropoff_address: str = "456 Oak Avenue, North Bay, Ontario, P1B 2B2, Canada",
+) -> dict:
+    response = client.post(
+        "/quote/calculate",
+        json=_payload(
+            service_type=service_type,
+            pickup_address=pickup_address,
+            dropoff_address=dropoff_address,
+        ),
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -111,6 +124,71 @@ def _assert_review_required(
 
 def test_small_move_strict_north_bay_route_is_authoritative(client: TestClient) -> None:
     _assert_authoritative(client, "small_move")
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+@pytest.mark.parametrize(
+    ("pickup_address", "dropoff_address"),
+    [
+        ("123 Main Street North Bay ON", "123 Main St North Bay Ontario"),
+        ("123 Main Street North Bay", "123 Main St North Bay ON P1A 1A1"),
+        ("123 Main St North Bay P1A 1A1", "456 Oak Ave North Bay Canada"),
+        (
+            "123 Main St North Bay Ontario P1A 1A1 Canada",
+            "456 Oak Avenue North Bay ON P1B 2B2 Canada",
+        ),
+    ],
+)
+def test_no_comma_terminal_north_bay_routes_are_authoritative(
+    client: TestClient,
+    service_type: str,
+    pickup_address: str,
+    dropoff_address: str,
+) -> None:
+    _assert_authoritative(
+        client,
+        service_type,
+        pickup_address=pickup_address,
+        dropoff_address=dropoff_address,
+    )
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+@pytest.mark.parametrize(
+    ("pickup_address", "dropoff_address", "expected_reason"),
+    [
+        (
+            "123 Main Street near North Bay ON",
+            "456 Oak Avenue North Bay ON",
+            "conflicting_locality",
+        ),
+        (
+            "123 Main Street North Bay to Sudbury",
+            "456 Oak Avenue North Bay ON",
+            "conflicting_locality",
+        ),
+        ("near North Bay", "outside North Bay", "unclassified_locality"),
+        (
+            "123 Main Street North Bay ON",
+            "456 Elm Street Sudbury ON",
+            "conflicting_locality",
+        ),
+    ],
+)
+def test_ambiguous_or_out_of_area_no_comma_routes_require_review(
+    client: TestClient,
+    service_type: str,
+    pickup_address: str,
+    dropoff_address: str,
+    expected_reason: str,
+) -> None:
+    _assert_review_required(
+        client,
+        service_type,
+        pickup_address,
+        dropoff_address,
+        expected_reason,
+    )
 
 
 def test_small_move_surrounding_route_requires_review(client: TestClient) -> None:

@@ -77,6 +77,11 @@ _ROUTE_CLASSIFICATION_SOURCE = "backend_address_locality_v1"
 _CANADIAN_POSTAL_CODE_RE = re.compile(
     r"^[abceghj-nprstvxy]\d[abceghj-nprstvwxyz][ -]?\d[abceghj-nprstvwxyz]\d$"
 )
+_NORTH_BAY_LOCALITY_RE = re.compile(r"\bnorth bay\b")
+_NO_COMMA_CIVIC_ADDRESS_RE = re.compile(r"^\d+[a-z]?(?:[-/]\d+[a-z]?)?\s+\S(?:.*\S)?$")
+_AMBIGUOUS_LOCALITY_PREFIX_ENDINGS = frozenset(
+    {"around", "from", "near", "of", "outside", "to", "toward", "towards"}
+)
 LEAD_SOURCE_LABELS = {
     "facebook": "Facebook",
     "google": "Google",
@@ -345,6 +350,26 @@ def _is_allowed_north_bay_suffix(segments: list[str]) -> bool:
     return False
 
 
+def _address_has_terminal_north_bay_locality_without_commas(normalized: str) -> bool:
+    locality_matches = list(_NORTH_BAY_LOCALITY_RE.finditer(normalized))
+    if len(locality_matches) != 1:
+        return False
+
+    locality_match = locality_matches[0]
+    address_prefix = normalized[: locality_match.start()].strip()
+    if address_prefix:
+        if not _NO_COMMA_CIVIC_ADDRESS_RE.fullmatch(address_prefix):
+            return False
+        if address_prefix.rsplit(" ", 1)[-1] in _AMBIGUOUS_LOCALITY_PREFIX_ENDINGS:
+            return False
+
+    suffix = normalized[locality_match.end() :].strip()
+    suffix_segments = [suffix] if suffix else []
+    if suffix.endswith(" canada"):
+        suffix_segments = [suffix[: -len(" canada")], "canada"]
+    return _is_allowed_north_bay_suffix(suffix_segments)
+
+
 def _address_has_north_bay_locality(value: Any) -> bool:
     normalized = _normalized_address_text(value)
     if not normalized:
@@ -352,11 +377,14 @@ def _address_has_north_bay_locality(value: Any) -> bool:
 
     segments = [segment.strip() for segment in normalized.split(",") if segment.strip()]
     north_bay_indexes = [index for index, segment in enumerate(segments) if segment == "north bay"]
-    if len(north_bay_indexes) != 1:
-        return False
+    if len(north_bay_indexes) == 1:
+        north_bay_index = north_bay_indexes[0]
+        if _is_allowed_north_bay_suffix(segments[north_bay_index + 1 :]):
+            return True
 
-    north_bay_index = north_bay_indexes[0]
-    return _is_allowed_north_bay_suffix(segments[north_bay_index + 1 :])
+    if "," in normalized:
+        return False
+    return _address_has_terminal_north_bay_locality_without_commas(normalized)
 
 
 def _classify_public_route(request_payload: dict[str, Any]) -> dict[str, Any]:
