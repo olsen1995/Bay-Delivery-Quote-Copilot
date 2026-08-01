@@ -152,6 +152,32 @@ def _cards(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {card["key"]: card for card in payload["cards"]}
 
 
+def _public_route_payload(
+    service_type: str,
+    *,
+    pickup_address: str,
+    dropoff_address: str,
+) -> dict[str, Any]:
+    return {
+        "customer_name": "Queue Route Tester",
+        "customer_phone": "705-555-0144",
+        "job_address": pickup_address,
+        "job_description_customer": "Move a couch and table",
+        "description": "Move a couch and table",
+        "service_type": service_type,
+        "payment_method": "cash",
+        "pickup_address": pickup_address,
+        "dropoff_address": dropoff_address,
+        "estimated_hours": 4.0 if service_type == "small_move" else 1.0,
+        "crew_size": 2 if service_type == "small_move" else 1,
+        "garbage_bag_count": 0,
+        "mattresses_count": 0,
+        "box_springs_count": 0,
+        "scrap_pickup_location": "curbside",
+        "travel_zone": "in_town",
+    }
+
+
 def test_storage_list_helpers_offset_zero_preserves_default_order_and_offset_one_advances(
     isolated_db: Path,
 ) -> None:
@@ -207,6 +233,99 @@ def test_admin_ops_queue_returns_stable_zero_count_daily_ops_board(
         assert card["description"]
         assert payload["counts"][card["key"]] == card["count"]
     assert payload["accepted_not_booked_items"] == []
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+def test_review_required_public_route_quote_immediately_counts_owner_review_only(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    service_type: str,
+) -> None:
+    quote_response = client.post(
+        "/quote/calculate",
+        json=_public_route_payload(
+            service_type,
+            pickup_address="123 Main Street, North Bay, ON",
+            dropoff_address="456 Elm Street, Sudbury, ON",
+        ),
+    )
+
+    assert quote_response.status_code == 202
+    quote = quote_response.json()
+    assert quote["status"] == "review_required"
+    assert quote["authoritative"] is False
+    assert "accept_token" not in quote
+
+    queue_response = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert queue_response.status_code == 200
+    counts = queue_response.json()["counts"]
+    assert counts["owner_review"] == 1
+    assert counts["new_requests"] == 0
+    assert counts["accepted_not_booked"] == 0
+    assert counts["stale_quotes"] == 0
+
+    with storage._connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM quote_requests").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("service_type", ["small_move", "item_delivery"])
+def test_authoritative_public_route_classification_does_not_count_owner_review(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+    service_type: str,
+) -> None:
+    quote_response = client.post(
+        "/quote/calculate",
+        json=_public_route_payload(
+            service_type,
+            pickup_address="123 Main Street, North Bay, ON P1A 1A1",
+            dropoff_address="456 Oak Avenue, North Bay, Ontario, P1B 2B2, Canada",
+        ),
+    )
+
+    assert quote_response.status_code == 200
+    assert quote_response.json()["request"]["route_classification"]["status"] == "authoritative"
+
+    queue_response = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert queue_response.status_code == 200
+    assert queue_response.json()["counts"]["owner_review"] == 0
+
+
+def test_review_required_route_adds_to_existing_owner_review_signals(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    _seed_quote(
+        "q-existing-owner-review",
+        request_overrides={"service_type": "haul_away", "dense_material_type": "concrete"},
+    )
+    before = client.get("/admin/api/ops-queue", headers=admin_headers)
+    assert before.status_code == 200
+    assert before.json()["counts"]["owner_review"] == 1
+
+    quote_response = client.post(
+        "/quote/calculate",
+        json=_public_route_payload(
+            "small_move",
+            pickup_address="North Bay",
+            dropoff_address="Sudbury",
+        ),
+    )
+    assert quote_response.status_code == 202
+
+    after = client.get("/admin/api/ops-queue", headers=admin_headers)
+
+    assert after.status_code == 200
+    counts = after.json()["counts"]
+    assert counts["owner_review"] == 2
+    assert counts["new_requests"] == 0
+    assert counts["accepted_not_booked"] == 0
 
 
 def test_admin_ops_queue_daily_ops_board_counts_existing_attention_queues(

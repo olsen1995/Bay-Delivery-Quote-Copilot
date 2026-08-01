@@ -33,6 +33,7 @@ class DuplicateQuoteRequestError(RuntimeError):
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
 BACKUP_TOKEN_ROTATION_PLACEHOLDER = "__bay_delivery_token_rotated_on_import__"
+REVIEW_REQUIRED_TOTAL_CAD_STORAGE_MARKER = "review_required"
 
 ALLOWED_DEPOSIT_STATUSES = (
     "not_required",
@@ -247,6 +248,8 @@ class QuoteRecord(TypedDict):
     admin_status: NotRequired[str]
     job_type: NotRequired[str]
     total_cad: NotRequired[float]
+    status: NotRequired[str]
+    authoritative: NotRequired[bool]
 
 
 class QuoteRequest(TypedDict):
@@ -1096,14 +1099,53 @@ def _derive_quote_job_type(record: Dict[str, Any]) -> str:
     return "unknown"
 
 
-def _derive_quote_total_cad(record: Dict[str, Any]) -> float:
+def _decode_quote_json(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return value
+
+
+def _quote_route_status(request: Any, response: Any) -> Optional[str]:
+    request_obj = _decode_quote_json(request)
+    response_obj = _decode_quote_json(response)
+    statuses: List[Any] = []
+
+    if isinstance(response_obj, dict):
+        statuses.append(response_obj.get("status"))
+    if isinstance(request_obj, dict):
+        route_classification = request_obj.get("route_classification")
+        if isinstance(route_classification, dict):
+            statuses.append(route_classification.get("status"))
+
+    if "review_required" in statuses:
+        return "review_required"
+    if "authoritative" in statuses:
+        return "authoritative"
+    return None
+
+
+def _quote_is_review_required(request: Any, response: Any) -> bool:
+    return _quote_route_status(request, response) == "review_required"
+
+
+def _record_is_review_required(record: Dict[str, Any]) -> bool:
+    return _quote_is_review_required(record.get("request"), record.get("response"))
+
+
+def _derive_quote_total_cad(record: Dict[str, Any]) -> Optional[float]:
     """
-    Forward-compat: some schemas include quotes.total_cad NOT NULL.
-    We derive a stable numeric value from the response totals.
+    Derive the compatibility total from an authoritative response.
 
     Default: use cash_total_cad as the base amount (pre-HST).
-    Fallback to emt_total_cad, then 0.0.
+    Fallback to emt_total_cad. Review-required quotes have no price.
+    Preserve the historical 0.0 fallback for unrelated malformed records.
     """
+    if _record_is_review_required(record):
+        return None
+
     resp = record.get("response") or {}
     if isinstance(resp, dict):
         for key in ("cash_total_cad", "emt_total_cad"):
@@ -1116,6 +1158,25 @@ def _derive_quote_total_cad(record: Dict[str, Any]) -> float:
                 except Exception:
                     pass
     return 0.0
+
+
+def _quote_total_cad_is_not_null(table_info: List[sqlite3.Row]) -> bool:
+    for column in table_info:
+        if column["name"] == "total_cad":
+            return int(column["notnull"] or 0) == 1
+    return False
+
+
+def _quote_total_cad_storage_value(
+    record: Dict[str, Any],
+    table_info: List[sqlite3.Row],
+) -> Any:
+    total_cad = _derive_quote_total_cad(record)
+    if total_cad is not None:
+        return total_cad
+    if _quote_total_cad_is_not_null(table_info):
+        return REVIEW_REQUIRED_TOTAL_CAD_STORAGE_MARKER
+    return None
 
 
 def _missing_required_columns(table_info: List[sqlite3.Row], provided: Dict[str, Any]) -> List[str]:
@@ -1176,7 +1237,7 @@ def save_quote(record: Dict[str, Any]) -> None:
         if "job_type" in cols:
             insert_fields["job_type"] = _derive_quote_job_type(record)
         if "total_cad" in cols:
-            insert_fields["total_cad"] = _derive_quote_total_cad(record)
+            insert_fields["total_cad"] = _quote_total_cad_storage_value(record, info)
 
         # Filter to columns that exist
         filtered = {k: v for k, v in insert_fields.items() if k in cols}
@@ -1207,27 +1268,23 @@ def save_quote(record: Dict[str, Any]) -> None:
         conn.close()
 
 
-def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
-    conn = _connect()
-    try:
-        row = conn.execute("SELECT * FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
-    finally:
-        conn.close()
-
-    if not row:
+def _application_quote_total_cad(raw_total_cad: Any) -> Optional[float]:
+    if isinstance(raw_total_cad, bool):
         return None
+    if isinstance(raw_total_cad, (int, float)):
+        return float(raw_total_cad)
+    if isinstance(raw_total_cad, str):
+        try:
+            return float(raw_total_cad)
+        except ValueError:
+            return None
+    return None
 
+
+def _quote_record_from_row(row: sqlite3.Row) -> QuoteRecord:
     row_dict = dict(row)
-
-    try:
-        request_obj = json.loads(row_dict["request_json"])
-    except Exception:
-        request_obj = row_dict["request_json"]
-
-    try:
-        response_obj = json.loads(row_dict["response_json"])
-    except Exception:
-        response_obj = row_dict["response_json"]
+    request_obj = _decode_quote_json(row_dict["request_json"])
+    response_obj = _decode_quote_json(row_dict["response_json"])
 
     out: QuoteRecord = {
         "quote_id": row_dict["quote_id"],
@@ -1239,12 +1296,31 @@ def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
     if "admin_status" in row_dict:
         out["admin_status"] = row_dict.get("admin_status") or "pending"
 
+    route_status = _quote_route_status(request_obj, response_obj)
+    if route_status is not None:
+        out["status"] = route_status
+        out["authoritative"] = route_status == "authoritative"
+
     if "job_type" in row_dict:
         out["job_type"] = row_dict["job_type"]
-    if "total_cad" in row_dict:
-        out["total_cad"] = row_dict["total_cad"]
+    if "total_cad" in row_dict and route_status != "review_required":
+        total_cad = _application_quote_total_cad(row_dict["total_cad"])
+        if total_cad is not None:
+            out["total_cad"] = total_cad
 
     return cast(QuoteRecord, out)
+
+
+def get_quote_record(quote_id: str) -> Optional[QuoteRecord]:
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT * FROM quotes WHERE quote_id = ?", (quote_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+    return _quote_record_from_row(row)
 
 
 def list_quotes(limit: int = 50, *, include_expired: bool = False, offset: int = 0) -> List[QuoteRecord]:
@@ -1264,33 +1340,7 @@ def list_quotes(limit: int = 50, *, include_expired: bool = False, offset: int =
     finally:
         conn.close()
 
-    out: List[QuoteRecord] = []
-    for r in rows:
-        try:
-            req = json.loads(r["request_json"])
-        except Exception:
-            req = r["request_json"]
-        try:
-            resp = json.loads(r["response_json"])
-        except Exception:
-            resp = r["response_json"]
-
-        item: QuoteRecord = {
-            "quote_id": r["quote_id"],
-            "created_at": r["created_at"],
-            "request": req,
-            "response": resp,
-            "accept_token": r["accept_token"] if "accept_token" in r.keys() else None,
-        }
-        if "admin_status" in r.keys():
-            item["admin_status"] = r["admin_status"] or "pending"
-        if "job_type" in r.keys():
-            item["job_type"] = r["job_type"]
-        if "total_cad" in r.keys():
-            item["total_cad"] = r["total_cad"]
-        out.append(item)
-
-    return out
+    return [_quote_record_from_row(row) for row in rows]
 
 
 def _normalize_history_phone(value: Any) -> Optional[str]:
@@ -2255,6 +2305,26 @@ def _owner_review_manual_signal_filter(alias: str) -> str:
     """
 
 
+def _owner_review_quote_status_signal_filter(alias: str) -> str:
+    request_json = f"{alias}.request_json"
+    response_json = f"{alias}.response_json"
+    return f"""
+        CASE
+            WHEN json_valid({request_json}) = 1
+             AND LOWER(TRIM(COALESCE(CAST(json_extract(
+                    {request_json}, '$.route_classification.status'
+                 ) AS TEXT), ''))) = 'review_required'
+            THEN 1
+            WHEN json_valid({response_json}) = 1
+             AND LOWER(TRIM(COALESCE(CAST(json_extract(
+                    {response_json}, '$.status'
+                 ) AS TEXT), ''))) = 'review_required'
+            THEN 1
+            ELSE 0
+        END = 1
+    """
+
+
 def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_start_iso: str) -> AdminOpsQueueSources:
     """Return targeted read-only counts and risk-advisory candidates for the admin ops board."""
     counts: Dict[str, int] = {key: 0 for key in ADMIN_OPS_BOARD_COUNT_KEYS}
@@ -2301,6 +2371,7 @@ def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_star
     owner_review_job_manual_signal_where = _owner_review_manual_signal_filter("j")
     owner_review_request_manual_signal_where = _owner_review_manual_signal_filter("qr")
     owner_review_quote_manual_signal_where = _owner_review_manual_signal_filter("q")
+    owner_review_quote_status_signal_where = _owner_review_quote_status_signal_filter("q")
 
     conn = _connect()
     _register_owner_review_sql_functions(conn)
@@ -2377,7 +2448,8 @@ def load_admin_ops_queue_sources(*, stale_pending_before_iso: str, upcoming_star
                 WHERE COALESCE(q.admin_status, 'pending') = 'pending'
                   AND q.request_json IS NOT NULL
                   AND TRIM(q.request_json) <> ''
-                  AND ({owner_review_quote_manual_signal_where})
+                  AND (({owner_review_quote_manual_signal_where})
+                       OR ({owner_review_quote_status_signal_where}))
                   AND NOT EXISTS (SELECT 1 FROM quote_requests AS qr WHERE qr.quote_id = q.quote_id)
                   AND NOT EXISTS (SELECT 1 FROM jobs AS j WHERE j.quote_id = q.quote_id)
             )
@@ -4972,8 +5044,14 @@ def export_db_to_json() -> Dict[str, Any]:
 
 
 def _sanitize_backup_tokens(table: str, row: Dict[str, Any]) -> Dict[str, Any]:
-    if table == "quotes" and row.get("accept_token"):
-        row["accept_token"] = BACKUP_TOKEN_ROTATION_PLACEHOLDER
+    if table == "quotes":
+        if _quote_is_review_required(row.get("request_json"), row.get("response_json")):
+            if "total_cad" in row:
+                row["total_cad"] = None
+            if "accept_token" in row:
+                row["accept_token"] = None
+        elif row.get("accept_token"):
+            row["accept_token"] = BACKUP_TOKEN_ROTATION_PLACEHOLDER
     elif table == "quote_requests":
         for token_field in ("accept_token", "booking_token"):
             if row.get(token_field):
@@ -4998,6 +5076,10 @@ def _rotate_restored_quote_tokens(
     quote_accept_tokens_by_id: Dict[str, str],
 ) -> Dict[str, Any]:
     rotated = dict(row)
+    if _quote_is_review_required(rotated.get("request_json"), rotated.get("response_json")):
+        rotated["accept_token"] = None
+        return rotated
+
     token = _fresh_workflow_token()
     rotated["accept_token"] = token
 
@@ -5006,6 +5088,31 @@ def _rotate_restored_quote_tokens(
         quote_accept_tokens_by_id[str(quote_id)] = token
 
     return rotated
+
+
+def _normalize_restored_quote_total_cad(
+    row: Dict[str, Any],
+    table_info: List[sqlite3.Row],
+) -> Dict[str, Any]:
+    normalized = dict(row)
+    if not _quote_is_review_required(
+        normalized.get("request_json"),
+        normalized.get("response_json"),
+    ):
+        return normalized
+
+    total_cad_column = next(
+        (column for column in table_info if column["name"] == "total_cad"),
+        None,
+    )
+    if total_cad_column is None:
+        return normalized
+
+    if int(total_cad_column["notnull"] or 0) == 1:
+        normalized["total_cad"] = REVIEW_REQUIRED_TOTAL_CAD_STORAGE_MARKER
+    else:
+        normalized["total_cad"] = None
+    return normalized
 
 
 def _rotate_restored_quote_request_tokens(
@@ -5094,6 +5201,7 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
                     raw = _normalize_job_payment_fields(raw)
                 if safe_table == "quotes":
                     raw = _normalize_quote_admin_fields(raw)
+                    raw = _normalize_restored_quote_total_cad(raw, col_rows)
                     raw = _rotate_restored_quote_tokens(raw, quote_accept_tokens_by_id)
                 if safe_table == "quote_requests":
                     raw = _rotate_restored_quote_request_tokens(raw, quote_accept_tokens_by_id, restored_at)
