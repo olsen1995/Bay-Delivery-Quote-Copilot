@@ -2771,6 +2771,10 @@ def _build_backup_preview(payload: dict[str, Any]) -> dict[str, Any]:
     raw_tables = payload.get("tables")
     if not isinstance(raw_tables, dict):
         raise HTTPException(status_code=400, detail="Backup payload missing 'tables' object.")
+    try:
+        storage.validate_db_restore_payload(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     known_counts: dict[str, int] = {table: 0 for table in storage.KNOWN_TABLES}
     omitted_known_tables = set(storage.KNOWN_TABLES)
@@ -2853,7 +2857,10 @@ def admin_db_import(request: Request, body: ImportPayload, background_tasks: Bac
         raise HTTPException(status_code=400, detail="Missing or invalid confirmation for database import.")
 
     try:
-        result = import_db_from_json(body.payload)
+        try:
+            result = import_db_from_json(body.payload)
+        except storage.ReviewRequiredWorkflowRestoreError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         _try_log_admin_audit(
             operator_username=operator_username,
             action_type="import_db",

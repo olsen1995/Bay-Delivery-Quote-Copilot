@@ -30,6 +30,11 @@ class DuplicateQuoteRequestError(RuntimeError):
             f"duplicate quote_requests rows for quote_id={quote_id!r}; duplicate_count={duplicate_count}"
         )
 
+
+class ReviewRequiredWorkflowRestoreError(ValueError):
+    """Raised when a review-only quote is linked to request or job workflow state."""
+
+
 # Token validity in days
 TOKEN_VALIDITY_DAYS = 30
 BACKUP_TOKEN_ROTATION_PLACEHOLDER = "__bay_delivery_token_rotated_on_import__"
@@ -5180,10 +5185,12 @@ def _reject_review_required_linked_workflows(tables: Dict[str, Any]) -> None:
                 break
 
     if has_linked_workflow:
-        raise ValueError("Backup contains a review-required quote with linked workflow state")
+        raise ReviewRequiredWorkflowRestoreError(
+            "Backup contains a review-required quote with linked workflow state"
+        )
 
 
-def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
+def validate_db_restore_payload(payload: Any) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Backup payload must be a JSON object")
 
@@ -5192,6 +5199,11 @@ def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("Backup payload missing 'tables' object")
 
     _reject_review_required_linked_workflows(tables)
+    return tables
+
+
+def import_db_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
+    tables = validate_db_restore_payload(payload)
 
     incoming_quote_request_duplicate_group_count, _ = _quote_request_quote_id_duplicate_summary_from_rows(
         tables.get("quote_requests", [])

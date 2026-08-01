@@ -78,7 +78,17 @@ _CANADIAN_POSTAL_CODE_RE = re.compile(
     r"^[abceghj-nprstvxy]\d[abceghj-nprstvwxyz][ -]?\d[abceghj-nprstvwxyz]\d$"
 )
 _NORTH_BAY_LOCALITY_RE = re.compile(r"\bnorth bay\b")
-_NO_COMMA_CIVIC_ADDRESS_RE = re.compile(r"^\d+[a-z]?(?:[-/]\d+[a-z]?)?\s+\S(?:.*\S)?$")
+_CIVIC_STREET_TYPE_PATTERN = (
+    r"alley|avenue|ave|boulevard|blvd|circle|cir|close|court|ct|crescent|cres|"
+    r"drive|dr|gardens|gate|grove|heights|highway|hwy|hill|lane|ln|line|parkway|"
+    r"pkwy|path|place|pl|plaza|point|pt|road|rd|route|rte|row|rue|square|sq|"
+    r"street|st|terrace|ter|trail|trl|way"
+)
+_NO_COMMA_CIVIC_ADDRESS_RE = re.compile(
+    rf"^\d+[a-z]?(?:[-/]\d+[a-z]?)?\s+"
+    rf"(?:[^\s,]+\s+){{1,6}}(?:{_CIVIC_STREET_TYPE_PATTERN})"
+    r"(?:\s+(?:north|south|east|west|n|s|e|w))?$"
+)
 _AMBIGUOUS_LOCALITY_PREFIX_ENDINGS = frozenset(
     {"around", "from", "near", "of", "outside", "to", "toward", "towards"}
 )
