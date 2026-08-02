@@ -1,6 +1,6 @@
 ---
 name: bay-delivery-pr-safety-review
-description: Use for Bay Delivery Quote Copilot repo planning, PR review, implementation prompts, CI debugging, post-merge verification, dependency lock refreshes, GPT grounding docs, protected-surface checks, Render/live-smoke decisions, and production-safety workflow. This skill protects pricing authority, customer/admin boundaries, production data, and Austin's preferred P1/P2/P3 review style.
+description: Use when planning, implementing, reviewing, or verifying Bay Delivery repository changes that may affect pricing authority, quote or admin boundaries, persistence, CI, publication artifacts, release readiness, or protected surfaces.
 ---
 
 <!-- cspell:words Uvicorn Supabase -->
@@ -391,7 +391,26 @@ Classify every touched field as one of:
 
 If a field is pricing-relevant, it must reach `app/quote_engine.py` through the existing quote-service path without creating duplicate pricing logic. If a field is advisory-only, admin-only, or display-only, prove it cannot change customer totals, cash/EMT/HST math, pricing floors, or owner pricing authority unless that behavior is explicitly scoped.
 
-### 12. Security Boundary Trigger Discipline
+### 12. Authoritative Classification Input-Class Review
+
+When a change affects authoritative pricing classification, owner-review routing, structured quote inputs, or public eligibility, require an explicit matrix for the complete relevant input class. Scope the matrix to the dimensions the change can affect; unrelated PRs do not trigger it.
+
+The matrix must cover, when applicable:
+- comma and no-comma forms
+- optional province, postal-code, and Canada suffixes
+- valid civic-address prefixes and ambiguous locality wording
+- another municipality appearing before North Bay
+- pickup and drop-off placement
+- every affected service path, including `small_move` and `item_delivery`
+- expected authoritative result versus fail-closed manual review
+- customer accept/booking tokens and eligibility
+- owner-review queue inclusion and operator status precedence
+
+Trace any classification boundary crossing through adjacent read models, admin surfaces, persistence paths, and customer workflows. **REQUIRED SUB-SKILL:** Use `bay-delivery-storage-invariant-review` when the result creates or stores review-required or non-authoritative records.
+
+Focused tests, a green full suite, and self-review do not replace reviewing the complete branch diff against `main`. Before completion, inspect that diff after all corrections and address every independent P1/P2 finding with test, diff, or runtime evidence.
+
+### 13. Security Boundary Trigger Discipline
 
 Treat boundary-hardening PRs as security-scan work even when they look small or docs-adjacent.
 
@@ -403,7 +422,7 @@ Auto-trigger `codex-security:security-diff-scan` when a PR touches:
 
 The review must explicitly confirm the customer path did not widen and that the protected diff stayed inside the intended boundary surface.
 
-### 13. Narrow Dependency-Audit and Lock Hygiene
+### 14. Narrow Dependency-Audit and Lock Hygiene
 
 Dependency audit or lock refresh work is its own narrow workflow, not an excuse to mix in runtime cleanup.
 
