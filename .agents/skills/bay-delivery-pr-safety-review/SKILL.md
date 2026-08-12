@@ -1,6 +1,6 @@
 ---
 name: bay-delivery-pr-safety-review
-description: Use when planning, implementing, reviewing, or verifying Bay Delivery repository changes that may affect pricing authority, quote or admin boundaries, persistence, CI, publication artifacts, release readiness, or protected surfaces.
+description: Use when planning, implementing, reviewing, or verifying Bay Delivery repository work involving public/static/UI changes; quote, pricing, or routing changes; admin, auth, or customer-boundary changes; storage, persistence, import, or restore changes; skills, prompts, templates, documentation, GPT publication, or repository guidance; dependency or lock-file updates; CI debugging; workflow, deployment, Render, production-safety, or release-readiness work; protected-surface checks; or applicable post-merge verification.
 ---
 
 <!-- cspell:words Uvicorn Supabase -->
