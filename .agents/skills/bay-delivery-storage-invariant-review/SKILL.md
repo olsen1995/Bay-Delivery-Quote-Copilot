@@ -1,6 +1,6 @@
 ---
 name: bay-delivery-storage-invariant-review
-description: Use when reviewing or changing Bay Delivery SQLite writes, constraints, save/update/upsert paths, imports, restores, backups, migrations, duplicate handling, startup integrity, or storage persistence behavior.
+description: Use when reviewing or changing Bay Delivery SQLite persistence, including writes, constraints, save/update/upsert paths, explicit non-authoritative review records, owner-review advisories, reconstruction, listings, queues, imports, restores, backups, migrations, duplicate handling, startup integrity, or compatibility behavior.
 ---
 
 # Bay Delivery Storage Invariant Review
@@ -20,6 +20,27 @@ Before implementation or merge, identify every relevant:
 - import, restore, backup/export, and dry-run/preview path
 
 Record which invariant each path must preserve. Stop if the table or mutation-path inventory is incomplete.
+
+## Non-Authoritative Operational Review Records
+
+Trigger this section only when repository source explicitly establishes a quote record as non-authoritative through a dedicated persisted record type or status, or another source-of-truth rule that explicitly labels it non-authoritative. Do not infer non-authoritative classification from `owner_review`, `manual_review_recommended`, queue placement, risk flags, missing information, or other advisory metadata.
+
+Authoritative owner-review advisories are outside this strict contract. An authoritative quote may carry `manual_review_recommended`, map to `owner_review`, and still legitimately retain its quote-engine total, accept token, and established customer acceptance and booking workflow. Those records remain authoritative unless a separate explicit non-authoritative classification says otherwise; do not strip or suppress their totals, tokens, or workflows merely because owner review is recommended.
+
+For a record explicitly established as non-authoritative, apply this operational-review contract across every applicable path:
+
+- no authoritative customer total is emitted or treated as a price
+- no accept token, booking token, customer acceptance path, or booking path exists
+- no linked `quote_request` can become bookable
+- no linked job exists unless a separately proven workflow explicitly permits it
+- no admin approval can create a job without an authoritative price
+- `owner_review` keeps the explicitly non-authoritative record operator-visible while `new_requests` and `accepted_not_booked` do not include it
+- the explicit non-authoritative status displays ahead of generic pending status
+- existing records remain compatible without regaining authoritative workflows
+
+Inventory every creator, mutator, and reader, including save/update/upsert, token rotation, reconstruction/listing, queue/count queries, admin/customer actions, backup/export, import, preview/dry-run, and restore. For explicitly non-authoritative records, non-authoritative price semantics and absent workflow tokens are protected state. Token rotation must not create tokens, and reconstruction must not expose compatibility values as customer totals.
+
+Preview and execution must apply the same applicable non-authoritative-record relationship validation and return compatible pass/fail outcomes. "Informational only" is not an exemption. Validate before deletion, initialization, token rotation, or other mutation; failed previews and failed restores must preserve the target database.
 
 ## Duplicate, Missing, And Legacy Matrix
 
@@ -142,6 +163,8 @@ Use these recurring patterns to test whether the review is complete:
 2. Legacy duplicate `quote_requests.quote_id` rows prevent creation of the unique index.
 3. A direct partial update bypasses the guard used by create/save paths.
 4. A stale duplicate job payload carries conflicting lifecycle, totals, payment, costing, and calendar state.
+5. A real restore rejects an explicitly non-authoritative quote linked to a `quote_request`, but preview reports success.
+6. An explicitly non-authoritative quote linked to a job regains an approval or booking workflow.
 
 Each case must route to an explicit rule above and produce a fail-closed, non-destructive outcome.
 
