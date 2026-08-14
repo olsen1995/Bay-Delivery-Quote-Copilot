@@ -23,8 +23,10 @@ charset-normalizer==3.4.7
     # via requests
 click==8.3.3
     # via uvicorn
-cryptography==48.0.1
-    # via google-auth
+cryptography==50.0.0
+    # via
+    #   -r requirements.txt
+    #   google-auth
 fastapi==0.135.1
     # via -r requirements.txt
 google-api-core==2.30.3
