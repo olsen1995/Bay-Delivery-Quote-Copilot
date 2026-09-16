@@ -1187,6 +1187,19 @@ textarea:focus {
 	margin-top: 14px;
 }
 
+.manualCompletedJobSearchForm {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+	gap: 10px;
+	align-items: end;
+	margin: 14px 0;
+}
+
+.manualCompletedJobSearchForm label {
+	display: grid;
+	gap: 6px;
+}
+
 .manualCompletedJobGrid,
 .manualCompletedJobTextGrid {
 	display: grid;
@@ -1261,6 +1274,7 @@ textarea:focus {
 	.dashboardGrid,
 	.manualCompletedJobGrid,
 	.manualCompletedJobTextGrid,
+	.manualCompletedJobSearchForm,
 	.opsQueueGrid,
 	.acceptedNotBookedDetailGrid,
 	.profitReportSummaryGrid {

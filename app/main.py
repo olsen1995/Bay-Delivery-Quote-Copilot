@@ -29,6 +29,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
 )
@@ -71,7 +72,7 @@ from app.storage import (
     init_db,
     is_token_expired,
     Job,
-    list_completed_job_calibration_entries,
+    search_completed_job_calibration_entries,
     list_attachments,
     list_admin_audit_log,
     list_gpt_admin_notes,
@@ -85,6 +86,7 @@ from app.storage import (
     save_gpt_quote_observability_event,
     update_job,
     update_job_costing,
+    update_completed_job_calibration_entry,
     update_quote_admin_status,
     update_quote_request_followup_status,
 )
@@ -905,6 +907,16 @@ def _summarize_validation_error(exc: RequestValidationError) -> str:
 @app.exception_handler(RequestValidationError)
 async def request_validation_audit_handler(request: Request, exc: RequestValidationError):
     audit_metadata = _ADMIN_VALIDATION_AUDIT_ROUTES.get((request.method.upper(), request.url.path))
+    if (
+        audit_metadata is None
+        and request.method.upper() == "PATCH"
+        and request.url.path.startswith("/admin/api/manual-completed-jobs/")
+    ):
+        audit_metadata = {
+            "action_type": "update_manual_completed_job_calibration_entry",
+            "entity_type": "completed_job_calibration_entry",
+            "record_id": request.url.path.rsplit("/", 1)[-1] or "unknown",
+        }
     if audit_metadata is not None:
         operator_username = _resolve_authenticated_admin_username(request)
         if operator_username is not None:
@@ -1932,6 +1944,82 @@ class ManualCompletedJobPayload(BaseModel):
         return v
 
 
+class ManualCompletedJobUpdatePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_title: Optional[str] = Field(None, min_length=1, max_length=120)
+    service_type: Optional[str] = Field(None, min_length=1, max_length=120)
+    secondary_category: Optional[str] = Field(None, max_length=120)
+    quoted_price_cad: Optional[float] = Field(None, ge=0)
+    actual_collected_cad: Optional[float] = Field(None, gt=0)
+    crew_size: Optional[int] = Field(None, ge=1)
+    duration_hours: Optional[float] = Field(None, gt=0)
+    labour_hours: Optional[float] = Field(None, ge=0)
+    disposal_cost_cad: Optional[float] = Field(None, ge=0)
+    fuel_cost_cad: Optional[float] = Field(None, ge=0)
+    other_costs_cad: Optional[float] = Field(None, ge=0)
+    difficulty: Optional[Literal["easy", "normal", "hard", "very_hard"]] = None
+    access_difficulty: Optional[Literal["normal", "awkward", "difficult"]] = None
+    disassembly_required: Optional[bool] = None
+    dense_materials: Optional[bool] = None
+    underquoted: Optional[bool] = None
+    painful_job: Optional[bool] = None
+    pricing_result: Optional[Literal["underquoted", "fair", "profitable", "painful"]] = None
+    notes: Optional[str] = Field(None, max_length=1000)
+    calibration_note: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("job_title", "service_type", mode="before")
+    @classmethod
+    def strip_required_update_text(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("Field cannot be blank")
+            return stripped
+        if v is None:
+            raise ValueError("Field cannot be null")
+        return v
+
+    @field_validator("secondary_category", "notes", "calibration_note", mode="before")
+    @classmethod
+    def strip_optional_update_text(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped or None
+        return v
+
+    @field_validator("difficulty", "access_difficulty", "pricing_result", mode="before")
+    @classmethod
+    def normalize_update_vocab(cls, v):
+        if isinstance(v, str):
+            stripped = v.strip().lower()
+            return stripped or None
+        return v
+
+    @field_validator(
+        "actual_collected_cad",
+        "crew_size",
+        "duration_hours",
+        "disassembly_required",
+        "dense_materials",
+        "underquoted",
+        "painful_job",
+        mode="before",
+    )
+    @classmethod
+    def reject_null_required_update_values(cls, v):
+        if v is None:
+            raise ValueError("Field cannot be null")
+        return v
+
+    @field_validator("pricing_result", mode="after")
+    @classmethod
+    def reject_null_pricing_result(cls, v):
+        if v is None:
+            raise ValueError("Field cannot be null")
+        return v
+
+
 @app.post("/quote/{quote_id}/decision")
 def quote_decision(quote_id: str, body: CustomerDecision, background_tasks: BackgroundTasks):
     provided_fields = getattr(body, "model_fields_set", None)
@@ -2149,9 +2237,22 @@ def admin_completed_job_profit_report(request: Request):
 
 
 @app.get("/admin/api/manual-completed-jobs")
-def admin_list_manual_completed_jobs(request: Request, limit: int = 10):
+def admin_list_manual_completed_jobs(
+    request: Request,
+    limit: int = Query(25),
+    offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None, max_length=120),
+    service_type: Optional[str] = Query(None, max_length=120),
+    actual_collected_cad: Optional[float] = Query(None, ge=0),
+):
     _require_admin(request)
-    return {"items": list_completed_job_calibration_entries(limit=limit)}
+    return search_completed_job_calibration_entries(
+        limit=limit,
+        offset=offset,
+        search=search,
+        service_type=service_type,
+        actual_collected_cad=actual_collected_cad,
+    )
 
 
 @app.post("/admin/api/manual-completed-jobs")
@@ -2175,6 +2276,24 @@ def admin_create_manual_completed_job(
 
     try:
         entry = save_completed_job_calibration_entry(record)
+    except storage.DuplicateCompletedJobCalibrationEntryError as exc:
+        existing_entry = exc.existing_entry
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="create_manual_completed_job_calibration_entry",
+            entity_type="completed_job_calibration_entry",
+            record_id=entry_id,
+            success=False,
+            error_summary=f"Likely duplicate of {existing_entry['entry_id']}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "manual_completed_job_duplicate",
+                "message": "A likely matching completed-job calibration entry already exists.",
+                "existing_entry": existing_entry,
+            },
+        )
     except ValueError as exc:
         _try_log_admin_audit(
             operator_username=operator_username,
@@ -2191,6 +2310,78 @@ def admin_create_manual_completed_job(
         action_type="create_manual_completed_job_calibration_entry",
         entity_type="completed_job_calibration_entry",
         record_id=entry["entry_id"],
+        success=True,
+    )
+    _maybe_auto_snapshot(background_tasks)
+    return {"ok": True, "entry": entry}
+
+
+@app.patch("/admin/api/manual-completed-jobs/{entry_id}")
+def admin_update_manual_completed_job(
+    entry_id: str,
+    request: Request,
+    body: ManualCompletedJobUpdatePayload,
+    background_tasks: BackgroundTasks,
+):
+    _require_admin(request)
+    operator_username = _admin_operator_username(request)
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_manual_completed_job_calibration_entry",
+            entity_type="completed_job_calibration_entry",
+            record_id=entry_id,
+            success=False,
+            error_summary="At least one field must be supplied",
+        )
+        raise HTTPException(status_code=400, detail="At least one field must be supplied.")
+    updates["updated_at"] = _now_local_iso()
+    try:
+        entry = update_completed_job_calibration_entry(entry_id, updates)
+    except storage.DuplicateCompletedJobCalibrationEntryError as exc:
+        existing_entry = exc.existing_entry
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_manual_completed_job_calibration_entry",
+            entity_type="completed_job_calibration_entry",
+            record_id=entry_id,
+            success=False,
+            error_summary=f"Update would duplicate {existing_entry['entry_id']}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "manual_completed_job_duplicate",
+                "message": "This update would match another completed-job calibration entry.",
+                "existing_entry": existing_entry,
+            },
+        )
+    except ValueError as exc:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_manual_completed_job_calibration_entry",
+            entity_type="completed_job_calibration_entry",
+            record_id=entry_id,
+            success=False,
+            error_summary=str(exc),
+        )
+        raise HTTPException(status_code=400, detail=str(exc))
+    if entry is None:
+        _try_log_admin_audit(
+            operator_username=operator_username,
+            action_type="update_manual_completed_job_calibration_entry",
+            entity_type="completed_job_calibration_entry",
+            record_id=entry_id,
+            success=False,
+            error_summary="Calibration entry not found",
+        )
+        raise HTTPException(status_code=404, detail="Completed-job calibration entry not found.")
+    _try_log_admin_audit(
+        operator_username=operator_username,
+        action_type="update_manual_completed_job_calibration_entry",
+        entity_type="completed_job_calibration_entry",
+        record_id=entry_id,
         success=True,
     )
     _maybe_auto_snapshot(background_tasks)

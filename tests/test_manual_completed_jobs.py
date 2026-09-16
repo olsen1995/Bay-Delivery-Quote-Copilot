@@ -433,6 +433,194 @@ def test_manual_completed_jobs_get_returns_newest_entries_with_limit_cap(
     assert len(items) == 25
     assert items[0]["entry_id"] == "api-manual-entry-29"
     assert items[-1]["entry_id"] == "api-manual-entry-05"
+    assert resp.json()["total"] == 30
+    assert resp.json()["has_more"] is True
+    assert resp.json()["limit"] == 25
+    assert resp.json()["offset"] == 0
+
+
+def test_manual_completed_jobs_search_paginates_beyond_first_page(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    for index in range(30):
+        storage.save_completed_job_calibration_entry(
+            _entry(
+                entry_id=f"search-entry-{index:02d}",
+                created_at=f"2026-05-17T11:{index:02d}:00",
+                job_title=f"Historical cleanup {index:02d}",
+                service_type="haul_away" if index != 2 else "demolition",
+                actual_collected_cad=600 + index,
+                notes="Partner referral evidence" if index == 2 else "Other source",
+            )
+        )
+
+    second_page = client.get(
+        "/admin/api/manual-completed-jobs?limit=10&offset=20",
+        headers=admin_headers,
+    )
+    assert second_page.status_code == 200
+    payload = second_page.json()
+    assert len(payload["items"]) == 10
+    assert payload["total"] == 30
+    assert payload["offset"] == 20
+    assert payload["has_more"] is False
+    assert payload["items"][-1]["entry_id"] == "search-entry-00"
+
+    filtered = client.get(
+        "/admin/api/manual-completed-jobs?search=Partner%20referral&service_type=demolition&actual_collected_cad=602",
+        headers=admin_headers,
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+    assert filtered.json()["has_more"] is False
+    assert filtered.json()["items"][0]["entry_id"] == "search-entry-02"
+
+
+def test_manual_completed_jobs_duplicate_create_returns_existing_entry(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    original = _entry(entry_id="existing-calibration")
+    storage.save_completed_job_calibration_entry(original)
+    response = client.post(
+        "/admin/api/manual-completed-jobs",
+        headers=admin_headers,
+        json={
+            "job_title": "  BACKYARD   cleanup with teardown ",
+            "service_type": "HAUL_AWAY",
+            "actual_collected_cad": 600,
+            "crew_size": 3,
+            "duration_hours": 3,
+            "pricing_result": "profitable",
+        },
+    )
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "manual_completed_job_duplicate"
+    assert detail["existing_entry"]["entry_id"] == "existing-calibration"
+    assert len(storage.list_completed_job_calibration_entries()) == 1
+    assert any(
+        item["action_type"] == "create_manual_completed_job_calibration_entry"
+        and item["record_id"] != "existing-calibration"
+        and item["success"] is False
+        and "existing-calibration" in str(item["error_summary"])
+        for item in storage.list_admin_audit_log(limit=10)
+    )
+
+
+def test_manual_completed_jobs_similar_distinct_job_can_be_created(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    storage.save_completed_job_calibration_entry(_entry(entry_id="first-cleanup"))
+    response = client.post(
+        "/admin/api/manual-completed-jobs",
+        headers=admin_headers,
+        json={
+            "job_title": "Backyard cleanup with teardown - second property",
+            "service_type": "haul_away",
+            "actual_collected_cad": 600,
+            "crew_size": 3,
+            "duration_hours": 3,
+            "pricing_result": "profitable",
+            "notes": "Similar scope, separate confirmed job.",
+        },
+    )
+    assert response.status_code == 200
+    assert len(storage.list_completed_job_calibration_entries()) == 2
+
+
+def test_manual_completed_jobs_patch_updates_only_target_and_audits(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    original = storage.save_completed_job_calibration_entry(
+        _entry(entry_id="entry-to-enrich", notes=None, disposal_cost_cad=None)
+    )
+    storage.save_completed_job_calibration_entry(
+        _entry(entry_id="other-entry", job_title="Other job", actual_collected_cad=700)
+    )
+    response = client.patch(
+        "/admin/api/manual-completed-jobs/entry-to-enrich",
+        headers=admin_headers,
+        json={"notes": "Receipt confirmed.", "disposal_cost_cad": 130},
+    )
+    assert response.status_code == 200
+    updated = response.json()["entry"]
+    assert updated["notes"] == "Receipt confirmed."
+    assert updated["disposal_cost_cad"] == 130
+    assert updated["created_at"] == original["created_at"]
+    assert updated["operator_username"] == original["operator_username"]
+    assert updated["updated_at"]
+    assert updated["actual_collected_cad"] == original["actual_collected_cad"]
+    assert len(storage.list_completed_job_calibration_entries()) == 2
+    assert storage.get_completed_job_calibration_entry("other-entry")["notes"] == original["notes"]
+    assert any(
+        item["action_type"] == "update_manual_completed_job_calibration_entry"
+        and item["record_id"] == "entry-to-enrich"
+        and item["success"] is True
+        for item in storage.list_admin_audit_log(limit=10)
+    )
+
+
+def test_manual_completed_jobs_patch_missing_and_unauthorized_fail_safely(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    unauthorized = client.patch(
+        "/admin/api/manual-completed-jobs/missing-entry", json={"notes": "No"}
+    )
+    assert unauthorized.status_code == 401
+
+    missing = client.patch(
+        "/admin/api/manual-completed-jobs/missing-entry",
+        headers=admin_headers,
+        json={"notes": "No"},
+    )
+    assert missing.status_code == 404
+    assert storage.list_completed_job_calibration_entries() == []
+    assert any(
+        item["action_type"] == "update_manual_completed_job_calibration_entry"
+        and item["record_id"] == "missing-entry"
+        and item["success"] is False
+        for item in storage.list_admin_audit_log(limit=10)
+    )
+
+
+def test_manual_completed_jobs_patch_cannot_duplicate_another_entry(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    isolated_db: Path,
+) -> None:
+    storage.save_completed_job_calibration_entry(_entry(entry_id="existing-entry"))
+    storage.save_completed_job_calibration_entry(
+        _entry(
+            entry_id="different-entry",
+            job_title="Different cleanup",
+            actual_collected_cad=700,
+        )
+    )
+    response = client.patch(
+        "/admin/api/manual-completed-jobs/different-entry",
+        headers=admin_headers,
+        json={
+            "job_title": "Backyard cleanup with teardown",
+            "actual_collected_cad": 600,
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["existing_entry"]["entry_id"] == "existing-entry"
+    unchanged = storage.get_completed_job_calibration_entry("different-entry")
+    assert unchanged["job_title"] == "Different cleanup"
+    assert unchanged["actual_collected_cad"] == 700
+    assert len(storage.list_completed_job_calibration_entries()) == 2
 
 
 def test_manual_completed_jobs_do_not_affect_completed_job_profit_report(
