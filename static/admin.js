@@ -92,6 +92,12 @@ const followupMessageCopyBtn = document.getElementById("followupMessageCopyBtn")
 const followupMessageStatusLine = document.getElementById("followupMessageStatusLine");
 const manualCompletedJobForm = document.getElementById("manualCompletedJobForm");
 const manualCompletedJobStatus = document.getElementById("manualCompletedJobStatus");
+const manualCompletedJobSearchForm = document.getElementById("manualCompletedJobSearchForm");
+const manualCompletedJobSearchSummary = document.getElementById("manualCompletedJobSearchSummary");
+const manualCompletedJobSubmit = document.getElementById("manualCompletedJobSubmit");
+const manualCompletedJobCancelEdit = document.getElementById("manualCompletedJobCancelEdit");
+const manualCompletedJobsPrevious = document.getElementById("manualCompletedJobsPrevious");
+const manualCompletedJobsNext = document.getElementById("manualCompletedJobsNext");
 const refreshButtonLabel = "Log In & Load Data";
 let adminSessionReady = false;
 let currentAssistantAnalysisId = "";
@@ -103,6 +109,8 @@ let currentQuoteItems = [];
 let currentQuoteDetailId = "";
 let currentQuoteDetailLoading = false;
 let currentQuoteDetailError = "";
+let manualCompletedJobPage = { limit: 10, offset: 0, total: 0, has_more: false };
+let manualCompletedJobEditing = null;
 let currentQuoteDetailsById = {};
 let assistantDraftDirty = false;
 const assistantUnsavedDraftWarning = "Desktop admin guidance is reference-only. Use request and job workflow actions for operational updates.";
@@ -1380,9 +1388,50 @@ function manualCompletedJobFlags(entry) {
   return flags;
 }
 
-function renderManualCompletedJobs(items) {
+function beginManualCompletedJobEdit(entry) {
+  if (!manualCompletedJobForm) return;
+  manualCompletedJobEditing = entry;
+  const fields = ["entry_id", "job_title", "service_type", "secondary_category", "quoted_price_cad", "actual_collected_cad", "crew_size", "duration_hours", "labour_hours", "disposal_cost_cad", "fuel_cost_cad", "other_costs_cad", "difficulty", "access_difficulty", "pricing_result", "notes", "calibration_note"];
+  fields.forEach((field) => {
+    const control = manualCompletedJobForm.elements.namedItem(field);
+    if (control) control.value = entry[field] ?? "";
+  });
+  ["disassembly_required", "dense_materials", "underquoted", "painful_job"].forEach((field) => {
+    const control = manualCompletedJobForm.elements.namedItem(field);
+    if (control) control.checked = Boolean(entry[field]);
+  });
+  if (manualCompletedJobSubmit) manualCompletedJobSubmit.textContent = "Save Enrichment";
+  if (manualCompletedJobCancelEdit) manualCompletedJobCancelEdit.hidden = false;
+  setLine(manualCompletedJobStatus, "muted", "Editing existing calibration entry.", entry.entry_id);
+  updateManualLabourHoursPreview();
+  manualCompletedJobForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelManualCompletedJobEdit() {
+  manualCompletedJobEditing = null;
+  if (manualCompletedJobForm) manualCompletedJobForm.reset();
+  if (manualCompletedJobSubmit) manualCompletedJobSubmit.textContent = "Save Calibration Entry";
+  if (manualCompletedJobCancelEdit) manualCompletedJobCancelEdit.hidden = true;
+  updateManualLabourHoursPreview();
+}
+
+function renderManualCompletedJobs(payload) {
   const box = document.getElementById("manualCompletedJobsBox");
   if (!box) return;
+  const items = payload.items || [];
+  manualCompletedJobPage = {
+    limit: Number(payload.limit || 10),
+    offset: Number(payload.offset || 0),
+    total: Number(payload.total || 0),
+    has_more: Boolean(payload.has_more)
+  };
+  if (manualCompletedJobSearchSummary) {
+    const start = items.length ? manualCompletedJobPage.offset + 1 : 0;
+    const end = manualCompletedJobPage.offset + items.length;
+    manualCompletedJobSearchSummary.textContent = `Showing ${start}-${end} of ${manualCompletedJobPage.total} matching entries.`;
+  }
+  if (manualCompletedJobsPrevious) manualCompletedJobsPrevious.disabled = manualCompletedJobPage.offset === 0;
+  if (manualCompletedJobsNext) manualCompletedJobsNext.disabled = !manualCompletedJobPage.has_more;
   if (!items || items.length === 0) return addEmptyState(box, "No manual calibration entries yet.");
   clearNode(box);
 
@@ -1433,6 +1482,13 @@ function renderManualCompletedJobs(items) {
       card.appendChild(note);
     }
 
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "actionBtn secondary";
+    edit.textContent = "Edit / Enrich";
+    edit.addEventListener("click", () => beginManualCompletedJobEdit(entry));
+    card.appendChild(edit);
+
     list.appendChild(card);
   });
 
@@ -1454,8 +1510,19 @@ function renderManualCompletedJobsError() {
 
 async function refreshManualCompletedJobsBestEffort() {
   try {
-    const payload = await fetchJSON("/admin/api/manual-completed-jobs?limit=10");
-    renderManualCompletedJobs(payload.items || []);
+    const params = new URLSearchParams({
+      limit: String(manualCompletedJobPage.limit),
+      offset: String(manualCompletedJobPage.offset)
+    });
+    if (manualCompletedJobSearchForm) {
+      const data = new FormData(manualCompletedJobSearchForm);
+      ["search", "service_type", "actual_collected_cad"].forEach((field) => {
+        const value = String(data.get(field) || "").trim();
+        if (value) params.set(field, value);
+      });
+    }
+    const payload = await fetchJSON(`/admin/api/manual-completed-jobs?${params.toString()}`);
+    renderManualCompletedJobs(payload);
   } catch {
     renderManualCompletedJobsError();
   }
@@ -1515,22 +1582,31 @@ function updateManualLabourHoursPreview() {
 async function saveManualCompletedJob(event) {
   event.preventDefault();
   if (!manualCompletedJobForm) return;
-  setLine(manualCompletedJobStatus, "muted", "Saving manual completed-job calibration entry...");
+  const editingId = manualCompletedJobEditing && manualCompletedJobEditing.entry_id;
+  setLine(manualCompletedJobStatus, "muted", editingId ? "Saving enrichment..." : "Saving manual completed-job calibration entry...");
   try {
-    const resp = await fetchJSON("/admin/api/manual-completed-jobs", {
-      method: "POST",
+    let payload = manualCompletedJobPayloadFromForm(manualCompletedJobForm);
+    if (editingId) {
+      const original = manualCompletedJobEditing;
+      payload = Object.fromEntries(Object.entries(payload).filter(([key, value]) => {
+        const originalValue = original[key];
+        if (typeof value === "boolean") return value !== Boolean(originalValue);
+        return String(value ?? "") !== String(originalValue ?? "");
+      }));
+    }
+    const resp = await fetchJSON(editingId ? `/admin/api/manual-completed-jobs/${encodeURIComponent(editingId)}` : "/admin/api/manual-completed-jobs", {
+      method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(manualCompletedJobPayloadFromForm(manualCompletedJobForm))
+      body: JSON.stringify(payload)
     });
-    manualCompletedJobForm.reset();
-    updateManualLabourHoursPreview();
-    renderManualCompletedJobs([resp.entry].filter(Boolean));
+    cancelManualCompletedJobEdit();
     await refreshManualCompletedJobsBestEffort();
-    setLine(manualCompletedJobStatus, "ok", "Saved manual completed-job calibration entry.");
+    setLine(manualCompletedJobStatus, "ok", editingId ? "Updated existing calibration entry." : "Saved manual completed-job calibration entry.");
   } catch (err) {
     const parsed = parseApiError(err);
-    const detail = safeGet(parsed, "data.detail", "") || parsed.raw || "Save failed.";
-    setLine(manualCompletedJobStatus, "bad", "Manual calibration entry was not saved. " + detail);
+    const detail = safeGet(parsed, "data.detail.message", "") || safeGet(parsed, "data.detail", "") || parsed.raw || "Save failed.";
+    const duplicateId = safeGet(parsed, "data.detail.existing_entry.entry_id", "");
+    setLine(manualCompletedJobStatus, "bad", "Manual calibration entry was not saved. " + detail, duplicateId);
   }
 }
 
@@ -3321,6 +3397,27 @@ if (followupMessageCopyBtn) followupMessageCopyBtn.addEventListener("click", cop
 if (manualCompletedJobForm) {
   manualCompletedJobForm.addEventListener("submit", saveManualCompletedJob);
   manualCompletedJobForm.addEventListener("input", updateManualLabourHoursPreview);
+}
+if (manualCompletedJobSearchForm) {
+  manualCompletedJobSearchForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    manualCompletedJobPage.offset = 0;
+    refreshManualCompletedJobsBestEffort();
+  });
+}
+if (manualCompletedJobCancelEdit) manualCompletedJobCancelEdit.addEventListener("click", cancelManualCompletedJobEdit);
+if (manualCompletedJobsPrevious) {
+  manualCompletedJobsPrevious.addEventListener("click", () => {
+    manualCompletedJobPage.offset = Math.max(0, manualCompletedJobPage.offset - manualCompletedJobPage.limit);
+    refreshManualCompletedJobsBestEffort();
+  });
+}
+if (manualCompletedJobsNext) {
+  manualCompletedJobsNext.addEventListener("click", () => {
+    if (!manualCompletedJobPage.has_more) return;
+    manualCompletedJobPage.offset += manualCompletedJobPage.limit;
+    refreshManualCompletedJobsBestEffort();
+  });
 }
 
 resetProtectedDashboard();

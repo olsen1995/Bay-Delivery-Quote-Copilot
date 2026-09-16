@@ -175,7 +175,24 @@
     <details id="manualCompletedJobsSection" class="card dataCard mt18 adminProtectedSection manualCompletedJobsSection" data-admin-protected="true" hidden aria-hidden="true">
       <summary>Manual Completed Job Calibration Log</summary>
       <div class="muted">Internal calibration evidence only. Does not change quote prices.</div>
+      <form id="manualCompletedJobSearchForm" class="manualCompletedJobSearchForm">
+        <label>
+          <span>Search title, category, or notes</span>
+          <input name="search" type="search" maxlength="120" />
+        </label>
+        <label>
+          <span>Service type</span>
+          <input name="service_type" type="text" maxlength="120" />
+        </label>
+        <label>
+          <span>Actual collected CAD</span>
+          <input name="actual_collected_cad" type="number" min="0" step="0.01" inputmode="decimal" />
+        </label>
+        <button class="actionBtn secondary" type="submit">Search all entries</button>
+      </form>
+      <div id="manualCompletedJobSearchSummary" class="small muted"></div>
       <form id="manualCompletedJobForm" class="manualCompletedJobForm">
+        <input name="entry_id" type="hidden" />
         <div class="manualCompletedJobGrid">
           <label>
             <span>Job title</span>
@@ -269,11 +286,16 @@
           </label>
         </div>
         <div class="manualCompletedJobActions">
-          <button class="actionBtn" type="submit">Save Calibration Entry</button>
+          <button id="manualCompletedJobSubmit" class="actionBtn" type="submit">Save Calibration Entry</button>
+          <button id="manualCompletedJobCancelEdit" class="actionBtn secondary" type="button" hidden>Cancel Edit</button>
           <div id="manualCompletedJobStatus" class="statusNotice muted" role="status" aria-live="polite"></div>
         </div>
       </form>
       <div id="manualCompletedJobsBox" class="manualCompletedJobList"></div>
+      <div class="manualCompletedJobActions">
+        <button id="manualCompletedJobsPrevious" class="actionBtn secondary" type="button" disabled>Previous</button>
+        <button id="manualCompletedJobsNext" class="actionBtn secondary" type="button" disabled>Next</button>
+      </div>
     </details>
 
     <details class="adminReferenceDetails adminProtectedSection" data-admin-protected="true" hidden aria-hidden="true">

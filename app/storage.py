@@ -234,6 +234,12 @@ class GptAdminNoteIdempotencyReplay(GptAdminNoteConflictError):
     pass
 
 
+class DuplicateCompletedJobCalibrationEntryError(RuntimeError):
+    def __init__(self, existing_entry: "CompletedJobCalibrationEntry") -> None:
+        super().__init__("A likely matching completed-job calibration entry already exists.")
+        self.existing_entry = existing_entry
+
+
 class GptAdminNoteDuplicatePayload(GptAdminNoteConflictError):
     pass
 
@@ -2584,6 +2590,10 @@ def save_completed_job_calibration_entry(
     normalized = _normalize_completed_job_calibration_entry(entry)
     conn = _connect()
     try:
+        conn.execute("BEGIN IMMEDIATE")
+        duplicate = _find_completed_job_calibration_duplicate(conn, normalized)
+        if duplicate is not None:
+            raise DuplicateCompletedJobCalibrationEntryError(duplicate)
         conn.execute(
             """
             INSERT INTO completed_job_calibration_entries (
@@ -2631,6 +2641,48 @@ def save_completed_job_calibration_entry(
     return normalized
 
 
+def _normalized_duplicate_text(value: Any) -> str:
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def _find_completed_job_calibration_duplicate(
+    conn: sqlite3.Connection,
+    entry: CompletedJobCalibrationEntry,
+    *,
+    exclude_entry_id: Optional[str] = None,
+) -> Optional[CompletedJobCalibrationEntry]:
+    params: List[Any] = [
+        entry["actual_collected_cad"],
+        entry["crew_size"],
+        entry["duration_hours"],
+    ]
+    exclude_sql = ""
+    if exclude_entry_id is not None:
+        exclude_sql = "AND entry_id != ?"
+        params.append(exclude_entry_id)
+    rows = conn.execute(
+        f"""
+        SELECT *
+        FROM completed_job_calibration_entries
+        WHERE actual_collected_cad = ?
+          AND crew_size = ?
+          AND duration_hours = ?
+          {exclude_sql}
+        ORDER BY datetime(created_at) DESC, entry_id DESC
+        """,
+        params,
+    ).fetchall()
+    normalized_title = _normalized_duplicate_text(entry["job_title"])
+    normalized_service = _normalized_duplicate_text(entry["service_type"])
+    for row in rows:
+        if (
+            _normalized_duplicate_text(row["job_title"]) == normalized_title
+            and _normalized_duplicate_text(row["service_type"]) == normalized_service
+        ):
+            return cast(CompletedJobCalibrationEntry, dict(row))
+    return None
+
+
 def _manual_completed_jobs_limit(limit: int = 10) -> int:
     try:
         parsed = int(limit)
@@ -2660,6 +2712,108 @@ def list_completed_job_calibration_entries(
         conn.close()
 
     return [cast(CompletedJobCalibrationEntry, dict(row)) for row in rows]
+
+
+def search_completed_job_calibration_entries(
+    *,
+    limit: int = 25,
+    offset: int = 0,
+    search: Optional[str] = None,
+    service_type: Optional[str] = None,
+    actual_collected_cad: Optional[float] = None,
+) -> Dict[str, Any]:
+    safe_limit = _manual_completed_jobs_limit(limit)
+    try:
+        safe_offset = max(int(offset), 0)
+    except (TypeError, ValueError):
+        safe_offset = 0
+    clauses: List[str] = []
+    params: List[Any] = []
+    normalized_search = str(search or "").strip().casefold()
+    if normalized_search:
+        clauses.append(
+            "(lower(job_title) LIKE ? ESCAPE '\\' OR lower(COALESCE(secondary_category, '')) LIKE ? ESCAPE '\\' "
+            "OR lower(COALESCE(notes, '')) LIKE ? ESCAPE '\\' OR lower(COALESCE(calibration_note, '')) LIKE ? ESCAPE '\\')"
+        )
+        escaped = normalized_search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        params.extend([f"%{escaped}%"] * 4)
+    normalized_service = str(service_type or "").strip().casefold()
+    if normalized_service:
+        clauses.append("lower(trim(service_type)) = ?")
+        params.append(normalized_service)
+    if actual_collected_cad is not None:
+        amount = _optional_nonnegative_float(actual_collected_cad, "actual_collected_cad")
+        clauses.append("actual_collected_cad = ?")
+        params.append(amount)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    conn = _connect()
+    try:
+        total = int(
+            conn.execute(
+                f"SELECT COUNT(*) FROM completed_job_calibration_entries {where_sql}", params
+            ).fetchone()[0]
+        )
+        rows = conn.execute(
+            f"""
+            SELECT * FROM completed_job_calibration_entries
+            {where_sql}
+            ORDER BY datetime(created_at) DESC, entry_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            [*params, safe_limit, safe_offset],
+        ).fetchall()
+    finally:
+        conn.close()
+    items = [cast(CompletedJobCalibrationEntry, dict(row)) for row in rows]
+    return {
+        "items": items,
+        "total": total,
+        "limit": safe_limit,
+        "offset": safe_offset,
+        "has_more": safe_offset + len(items) < total,
+    }
+
+
+def update_completed_job_calibration_entry(
+    entry_id: str,
+    updates: Dict[str, Any],
+) -> Optional[CompletedJobCalibrationEntry]:
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT * FROM completed_job_calibration_entries WHERE entry_id = ?", (entry_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        merged = dict(row)
+        merged.update(updates)
+        merged["entry_id"] = row["entry_id"]
+        merged["created_at"] = row["created_at"]
+        merged["operator_username"] = row["operator_username"]
+        normalized = _normalize_completed_job_calibration_entry(merged)
+        duplicate = _find_completed_job_calibration_duplicate(
+            conn, normalized, exclude_entry_id=entry_id
+        )
+        if duplicate is not None:
+            raise DuplicateCompletedJobCalibrationEntryError(duplicate)
+        columns = tuple(updates)
+        if not columns:
+            raise ValueError("At least one field must be supplied")
+        allowed_columns = set(CompletedJobCalibrationEntry.__annotations__) - {
+            "entry_id", "created_at", "operator_username"
+        }
+        if not set(columns) <= allowed_columns:
+            raise ValueError("Update contains unsupported fields")
+        assignments = ", ".join(f"{column} = ?" for column in columns)
+        conn.execute(
+            f"UPDATE completed_job_calibration_entries SET {assignments} WHERE entry_id = ?",
+            [*(normalized[column] for column in columns), entry_id],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return get_completed_job_calibration_entry(entry_id)
 
 
 def get_completed_job_calibration_entry(entry_id: str) -> Optional[CompletedJobCalibrationEntry]:
